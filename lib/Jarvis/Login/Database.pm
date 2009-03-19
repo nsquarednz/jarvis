@@ -69,7 +69,7 @@ package Jarvis::Login::Database;
 #           $$args_href{'dbh'} - DBI object
 #
 # Returns:
-#       ($error_string or "", $username or "" [, group1, group2, group3...])
+#       ($error_string or "", $username or "", "group1,group2,group3...")
 ################################################################################
 #
 sub Jarvis::Login::Check {
