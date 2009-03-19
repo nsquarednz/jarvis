@@ -1,0 +1,30 @@
+<dataset serial="id" read="*" write="admin">
+    <select>
+SELECT id, name,
+        COALESCE (email, '') AS email,
+        COALESCE (city, '') AS city,
+        CASE WHEN (LENGTH (warning) > 0) THEN 'WARNING' ELSE '' END AS warning_flag
+FROM fan
+ORDER BY name
+    </select>
+    <update>
+UPDATE fan
+SET name = BTRIM ({{name}}),
+    email = NULLIF (BTRIM ({{email}}), ''),
+    city = NULLIF (BTRIM ({{city}}), ''),
+    change_user = {{__username}},
+    change_date = now()
+WHERE id = {{id}};
+    </update>
+    <insert>
+INSERT INTO fan (name, email, city, change_user, change_date)
+VALUES (BTRIM ({{name}}),
+        NULLIF (BTRIM ({{email}}), ''),
+        NULLIF (BTRIM ({{city}}), ''),
+        {{__username}}, now());
+    </insert>
+    <delete>
+DELETE FROM fan
+WHERE id = {{id}};
+    </delete>
+</dataset>

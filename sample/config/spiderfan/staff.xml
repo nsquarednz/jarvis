@@ -1,0 +1,42 @@
+<dataset serial="id" read="*" write="admin">
+    <select>
+SELECT id, rank, name,
+        COALESCE (nickname, '') AS nickname,
+        COALESCE (password, '') AS password,
+        COALESCE (email, '') AS email,
+        CASE WHEN (LENGTH (warning) > 0) THEN 'WARNING' ELSE '' END AS warning_flag,
+        CASE WHEN (
+            LENGTH (status) > 0 AND
+            LENGTH (occupation) > 0 AND
+            LENGTH (city) > 0 AND
+            LENGTH (intro) > 0 AND
+            LENGTH (collects) > 0 AND
+            LENGTH (why_fan) > 0 AND
+            LENGTH (favourite) > 0) THEN 'DETAILS' ELSE '' END AS details_flag
+FROM staff
+ORDER BY name;
+    </select>
+    <update>
+UPDATE staff
+SET rank = {{rank}},
+    name = BTRIM ({{name}}),
+    nickname = NULLIF (BTRIM ({{nickname}}), ''),
+    password = NULLIF (BTRIM ({{password}}), ''),
+    email = NULLIF (BTRIM ({{email}}), ''),
+    change_user = {{__username}},
+    change_date = now()
+WHERE id = {{id}};
+    </update>
+    <insert>
+INSERT INTO staff (rank, name, nickname, password, email, change_user, change_date)
+VALUES ({{rank}}, BTRIM ({{name}}),
+        NULLIF (BTRIM ({{nickname}}), ''),
+        NULLIF (BTRIM ({{password}}), ''),
+        NULLIF (BTRIM ({{email}}), ''),
+        {{__username}}, now());
+    </insert>
+    <delete>
+DELETE FROM staff
+WHERE id = {{id}};
+    </delete>
+</dataset>

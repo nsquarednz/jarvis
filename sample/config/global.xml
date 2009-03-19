@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<jarvis>
+    <app name="spiderfan" use_placeholders="yes" format="json" debug="no">
+        <sessiondb store="driver:file;serializer:default;id:md5">
+            <parameter name="Directory" value="/home/spiderfan/tmp/sessions"/>
+        </sessiondb>
+        <login module="Jarvis::Login::Spiderfan"/>
+        <database connect="dbi:Pg:dbname=spiderfan" username="" password=""/>
+    </app>
+    <app name="boris" use_placeholders="no" format="xml" debug="yes" max_rows="500">
+        <sessiondb store="driver:file;serializer:default;id:md5">
+            <parameter name="Directory" value="/tmp/boris"/>
+        </sessiondb>
+        <login module="Jarvis::Login::None"/>
+        <database connect="dbi:Sybase:server=BOBSTER" username="porseuser" password="porseuser"/>
+    </app>
+</jarvis>

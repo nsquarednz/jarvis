@@ -1,0 +1,7 @@
+<dataset serial="id" read="**" write="">
+    <select>
+SELECT id, name
+FROM staff
+ORDER BY name
+    </select>
+</dataset>
