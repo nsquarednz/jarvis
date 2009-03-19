@@ -20,6 +20,7 @@ use Jarvis::Text;
 #
 # Params:
 #       $msg - User message string.
+#       $level - "log", "error", etc.
 #       %args - Hash of Args (* indicates mandatory)
 #           user_name, app_name, dataset_name
 #
@@ -28,13 +29,13 @@ use Jarvis::Text;
 ################################################################################
 #
 sub DumpString {
-    my ($msg, %args) = @_;
+    my ($msg, $level, %args) = @_;
 
     my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime();
     my @days = ('Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat');
     my @months = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Sep', 'Oct', 'Nov', 'Dec');
 
-    my $header = sprintf "[%s %s %d %02d:%02d:%02d %04d] [error] ",
+    my $header = sprintf "[%s %s %d %02d:%02d:%02d %04d] [$level] ",
         $days[$wday], $months[$mon], $mday, $hour, $min, $sec, $year + 1900;
 
     $header .= "[" . $$;
@@ -47,7 +48,7 @@ sub DumpString {
     if ($msg !~ m/\n$/) {
         $msg .= "\n";
     }
-    $header && (length ($msg) + length ($header) > 80) && ($header .= "\n");
+    $header && (length ($msg) + length ($header) > 132) && ($header .= "\n");
 
     return "$header$msg";
 }
@@ -66,7 +67,7 @@ sub DumpString {
 sub MyDie {
     my ($msg, %args) = @_;
 
-    die &DumpString ($msg, %args);
+    die &DumpString ($msg, 'fatal', %args);
 }
 
 ################################################################################
@@ -83,7 +84,7 @@ sub Debug {
 
     $args{'debug'} || return;
 
-    print STDERR &DumpString ($msg, %args);
+    print STDERR &DumpString ($msg, 'debug', %args);
 }
 
 ################################################################################
@@ -98,7 +99,7 @@ sub Debug {
 sub Log {
     my ($msg, %args) = @_;
 
-    print STDERR &DumpString ($msg, %args);
+    print STDERR &DumpString ($msg, 'log', %args);
 }
 
 1;
