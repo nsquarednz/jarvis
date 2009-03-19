@@ -141,7 +141,17 @@ sub Setup {
     # No successful session?  Login.  Note that we store failed sessions too.
     } else {
         &Jarvis::Error::Debug ("Login attempt on '" . $$args_href{'sid'} . "'.", %$args_href);
-        ($error_string, $user_name, $group_list) = &Jarvis::Login::Check (%$args_href);
+
+        # Get our login parameter values.
+        my @parameter_names = $axml->{login}{parameter}('[@]', 'name');
+        my @parameter_values = $axml->{login}{parameter}('@');
+
+        my %login_parameters = ();
+        foreach my $i (0 .. $#parameter_values) {
+            &Jarvis::Error::Debug ("Login Parameter: $parameter_names[$i] -> $parameter_values[$i]", %$args_href);
+            $login_parameters {$parameter_names[$i]} = $parameter_values[$i];
+        }
+        ($error_string, $user_name, $group_list) = &Jarvis::Login::Check (\%login_parameters, $args_href);
 
         $logged_in = (($error_string eq "") && ($user_name ne "")) ? 1 : 0;
         $session->param('logged_in', $logged_in);
