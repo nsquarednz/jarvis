@@ -1,10 +1,29 @@
-#NOT FOR RUNNING AS CGI
+###############################################################################
+# Description:
+#       Jarvis supports pluggable Login modules.  This module fetches
+#       usernames and passwords from a database table, and optionally
+#       fetches group ownership from a second database table.
 #
-# Description:  Functions for dealing with login and user authentication.
+#       Refer to the documentation for the "Check" function for how
+#       to configure your global.xml to use this login module.
 #
-#               This is a database module that reads a single table
-#               that contains a username and password field, and checks that
-#               the supplied pair exists in that table.
+# Licence:
+#       This file is part of the Jarvis WebApp/Database gateway utility.
+# 
+#       Jarvis is free software: you can redistribute it and/or modify
+#       it under the terms of the GNU General Public License as published by
+#       the Free Software Foundation, either version 3 of the License, or
+#       (at your option) any later version.
+# 
+#       Jarvis is distributed in the hope that it will be useful,
+#       but WITHOUT ANY WARRANTY; without even the implied warranty of
+#       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#       GNU General Public License for more details.
+# 
+#       You should have received a copy of the GNU General Public License
+#       along with Jarvis.  If not, see <http://www.gnu.org/licenses/>.
+#
+#       This software is Copyright 2008 by Jonathan Couper-Smartt.
 ###############################################################################
 #
 use CGI;
