@@ -2,14 +2,21 @@
 <jarvis>
     <app name="application1" use_placeholders="yes" format="json" debug="no">
         <sessiondb store="driver:file;serializer:default;id:md5">
-            <parameter name="Directory" value="/tmp/mysessions"/>
+            <parameter name="Directory" value="/tmp/app1sessions"/>
         </sessiondb>
-        <login module="Jarvis::Login::Spiderfan"/>
-        <database connect="dbi:Pg:dbname=spiderfan" username="" password=""/>
+        <login module="Jarvis::Login::Database">
+	    <parameter name="user_table">staff</a>
+	    <parameter name="user_username_column">name</a>
+	    <parameter name="user_password_column">password</a>
+	    <parameter name="group_table">staff_group</a>
+	    <parameter name="group_username_column">name</a>
+	    <parameter name="group_group_column">group_name</a>
+	</login>
+        <database connect="dbi:Pg:dbname=myappdb" username="" password=""/>
     </app>
     <app name="application2" use_placeholders="no" format="xml" debug="yes" max_rows="500">
         <sessiondb store="driver:file;serializer:default;id:md5">
-            <parameter name="Directory" value="/tmp/mysessions"/>
+            <parameter name="Directory" value="/tmp/app2sessions"/>
         </sessiondb>
         <login module="Jarvis::Login::None"/>
         <database connect="dbi:Sybase:server=SERVERNAME" username="username" password="password"/>
