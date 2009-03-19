@@ -5,12 +5,12 @@
             <parameter name="Directory" value="/tmp/app1sessions"/>
         </sessiondb>
         <login module="Jarvis::Login::Database">
-	    <parameter name="user_table">staff</a>
-	    <parameter name="user_username_column">name</a>
-	    <parameter name="user_password_column">password</a>
-	    <parameter name="group_table">staff_group</a>
-	    <parameter name="group_username_column">name</a>
-	    <parameter name="group_group_column">group_name</a>
+	    <parameter name="user_table">staff</parameter>
+            <parameter name="user_username_column">name</parameter>
+            <parameter name="user_password_column">password</parameter>
+            <parameter name="group_table">staff_group</parameter>
+            <parameter name="group_username_column">name</parameter>
+            <parameter name="group_group_column">group_name</parameter>
 	</login>
         <database connect="dbi:Pg:dbname=myappdb" username="" password=""/>
     </app>
