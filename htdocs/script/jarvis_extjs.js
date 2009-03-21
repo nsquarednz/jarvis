@@ -7,7 +7,7 @@
 //
 // Licence:
 //      This file is part of the Jarvis WebApp/Database gateway utility.
-// 
+//
 //      Jarvis is free software: you can redistribute it and/or modify
 //      it under the terms of the GNU General Public License as published by
 //      the Free Software Foundation, either version 3 of the License, or
@@ -50,6 +50,18 @@ function jarvisUrl (action_name, dataset_name) {
         url = url + '&dataset=' + dataset_name;
     }
     return url;
+}
+
+// Alternate POST URL without args.
+function jarvisPostUrl () {
+    return jarvis_home;
+}
+
+// Fill the standard post params.  Caller can then add their own params.
+function jarvisPostParams (action_name, dataset_name) {
+    this.app = application;
+    this.action = action_name;
+    this.dataset = dataset_name;
 }
 
 // Store load failed.  Set this as your "loadexception" handler on your Stores
