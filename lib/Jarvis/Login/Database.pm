@@ -49,10 +49,10 @@ package Jarvis::Login::Database;
 # can omit the group name parameters, in which case all users will be placed
 # into a single group named "default".
 #  
-#    <app name="spiderfan" use_placeholders="yes" format="json" debug="no">
+#    <app name="myapp" use_placeholders="yes" format="json" debug="no">
 #        ...
 #        <login module="Jarvis::Login::Database">
-# 	   <parameter name="user_table">staff</parameter>
+# 	     <parameter name="user_table">staff</parameter>
 #            <parameter name="user_username_column">name</parameter>
 #            <parameter name="user_password_column">password</parameter>
 #            <parameter name="group_table">staff_group</parameter>
@@ -63,7 +63,7 @@ package Jarvis::Login::Database;
 #   </app>
 #
 # Params:
-#       $login_parameters_href
+#       $login_parameters_href (configuration for this module)
 #       $args_href
 #           $$args_href{'cgi'} - CGI object
 #           $$args_href{'dbh'} - DBI object

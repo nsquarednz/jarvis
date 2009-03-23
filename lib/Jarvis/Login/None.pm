@@ -2,8 +2,8 @@
 # Description:
 #       Functions for dealing with login and user authentication.
 #
-#       This is a "dummy" login module that always returns user = "guest"
-#       and groups = ("guest") with no checking.  It's good for testing.
+#       This is a "dummy" login module that always returns user = "admin"
+#       and groups = ("admin") with no checking.  It's good for testing.
 #
 # Licence:
 #       This file is part of the Jarvis WebApp/Database gateway utility.
@@ -37,19 +37,39 @@ package Jarvis::Login::None;
 ###############################################################################
 
 ################################################################################
-# Always returns "yes logged in" as "admin", in group "admin".
+# Always returns "yes logged in" as "guest", in group "guest".
+#
+# You can override the returned user_name and and group_list as follows, e.g.
+#
+#    <app name="myapp" use_placeholders="yes" format="json" debug="no">
+#        ...
+#        <login module="Jarvis::Login::Database">
+# 	     <parameter name="user_name">admin</parameter>
+#            <parameter name="group_list">admin</parameter>
+#        </login>
+#        ...
+#   </app>
+#
+# The "group_list" parameter in you config may be a single group, or a comma
+# separated list of groups.
 #
 # Params:
-#       %args - Hash of standard args.  None used by this function.
+#       $login_parameters_href (configuration for this module)
+#       $args_href
+#           $$args_href{'cgi'} - CGI object (Not used)
+#           $$args_href{'dbh'} - DBI object (Not used)
 #
 # Returns:
 #       ($error_string or "", $username or "", "group1,group2,group3...")
 ################################################################################
 #
 sub Jarvis::Login::Check {
-    my (%args) = @_;
+    my ($login_parameters_href, $args_href) = @_;
 
-    return ("", "admin", "admin");
+    my $user_name = $$login_parameters_href{'user_name'} || "guest";
+    my $group_list = $$login_parameters_href{'group_list'} || "guest";
+
+    return ("", $user_name, $group_list);
 }
 
 1;
