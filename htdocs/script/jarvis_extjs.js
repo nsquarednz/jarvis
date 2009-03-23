@@ -4,6 +4,9 @@
 //      ExtJS.  If using Flex, Dojo, or another toolkit, you would not use these
 //      functions, you would write an equivalent interface to your own toolkit.
 //
+//      Note that this is not a core part of Jarvis.  Many of these
+//      "helper" functions include some specific behaviour which suited my
+//      use of Jarvis, but might not suit yours.
 //
 // Licence:
 //      This file is part of the Jarvis WebApp/Database gateway utility.
@@ -32,6 +35,11 @@ Ext.BLANK_IMAGE_URL = '/edit/decoration/s.gif';
 var application = 'default';
 var login_page  = 'login.html';
 var jarvis_home = '/jarvis-bin/jarvis.pl';
+
+// Constants indicating the result of a database update.
+var UPDATE_SUCCESS = 0;         // An update succeeded.
+var UPDATE_DB_DECLINED = 1;     // The update was declined by the database.
+var UPDATE_FAILED = 2;          // The update failed at some other point.
 
 // Init our parameters.
 function jarvisInit (new_application, new_login_page) {
@@ -78,45 +86,39 @@ function jarvisLoadException (proxy, options, response, e) {
     document.location.href = login_page;
 };
 
-// Common submit method (does delete/update/insert).  Pass an array of
-// changes of form hash of "key" => "value".  The key field must be present,
-// and cannot of course be changed.
+// Common submit method (does delete/update/insert).  Needs:
 //
-//      Use negative ID to specify deletion.
-//      Use positive ID to specify update.
-//      Use zero ID to specify insert.
+//      store        - The store to update.
+//      dataset_name - Name of the .xml file containing dataset config.
+//      fields       - Actually "record.data" extended with some extra magic fields.
 //
-function jarvisSendChange (store, dataset_name, fields, status_element, disable_component) {
+// When the update attempt is over we will fire the store's 'writeback' listener with arguments
+//               result - UPDATE_SUCCESS, UPDATE_DB_DECLINED, or UPDATE_FAILED.
+//               message - Additional failure information that we may have.
+//
+function jarvisSendChange (store, dataset_name, fields) {
     Ext.Ajax.request({
         url: jarvis_home,
 
         // We received a response back from the server, that's a good start.
         success: function (response, request) {
 
-            // If we succeeded, then enable our component if there are no more changes.
+            // If we succeeded, fire the writeback listener if this was the last update.
             if (response.responseText == 'OK') {
-                if ((store.getModifiedRecords().length == 0) && (disable_component != null)) {
-                    disable_component.setDisabled (false);
+                if (store.getModifiedRecords().length == 0) {
+                    store.fireEvent ('writeback', UPDATE_SUCCESS, '');
                 }
 
-            // This indicates that not all updates succeeded.  Better reload store.
-            // Assume that the store reload callback will enable the component.  We don't.
+            // This indicates that not all updates succeeded.  You should reload your store.
             } else {
-                alert (response.responseText);
-                store.reload ();
-            }
-
-            // In any case, reset the status element if there are no more changes.
-            if ((store.getModifiedRecords().length == 0) && (status_element != null)) {
-                status_element.innerHTML = '&nbsp';
+                store.fireEvent ('writeback', UPDATE_DB_DECLINED, response.responseText);
             }
         },
 
         // Total failure.  Script failed.  It might have managed to update
-        // our changes, but we have no way to tell.  Must reload store.
+        // our changes, but we have no way to tell.  You should reload your store.
         failure: function () {
-            alert ('Server responded with error.  Updates lost.');
-            store.reload ();
+            store.fireEvent ('writeback', UPDATE_FAILED, 'Server responded with error.  Updates lost.');
         },
 
         params: {
@@ -129,31 +131,17 @@ function jarvisSendChange (store, dataset_name, fields, status_element, disable_
 }
 
 // Transaction Type = Remove.  Deletes a single row in the specified store.
-function jarvisRemove (store, dataset_name, record, status_element, disable_component) {
+function jarvisRemove (store, dataset_name, record) {
     var fields = record.data;
     fields._transaction_type = 'remove';
-
-    if (status_element != null) {
-        status_element.innerHTML = '&nbsp;<b>DELETING...</b>';
-    }
-    if (disable_component != null) {
-        disable_component.setDisabled (true);
-    }
-    jarvisSendChange (store, dataset_name, fields, status_element, disable_component);
+    jarvisSendChange (store, dataset_name, fields);
 }
 
 // Transaction Type = Update.  Creates OR Updates a single row in the specified store.
-function jarvisUpdate (store, dataset_name, record, status_element, disable_component) {
+function jarvisUpdate (store, dataset_name, record) {
     var fields = record.data;
     fields._transaction_type = 'update';
-
-    if (status_element != null) {
-        status_element.innerHTML = '&nbsp;<b>UPDATING...</b>';
-    }
-    if (disable_component != null) {
-        disable_component.setDisabled (true);
-    }
-    jarvisSendChange (store, dataset_name, fields, status_element, disable_component);
+    jarvisSendChange (store, dataset_name, fields);
 }
 
 // Add a cookie.
