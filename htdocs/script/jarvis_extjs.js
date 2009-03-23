@@ -93,6 +93,7 @@ function jarvisLoadException (proxy, options, response, e) {
 //      fields       - Actually "record.data" extended with some extra magic fields.
 //
 // When the update attempt is over we will fire the store's 'writeback' listener with arguments
+//              `store - This store.
 //               result - UPDATE_SUCCESS, UPDATE_DB_DECLINED, or UPDATE_FAILED.
 //               message - Additional failure information that we may have.
 //
@@ -106,19 +107,19 @@ function jarvisSendChange (store, dataset_name, fields) {
             // If we succeeded, fire the writeback listener if this was the last update.
             if (response.responseText == 'OK') {
                 if (store.getModifiedRecords().length == 0) {
-                    store.fireEvent ('writeback', UPDATE_SUCCESS, '');
+                    store.fireEvent ('writeback', store, UPDATE_SUCCESS, '');
                 }
 
             // This indicates that not all updates succeeded.  You should reload your store.
             } else {
-                store.fireEvent ('writeback', UPDATE_DB_DECLINED, response.responseText);
+                store.fireEvent ('writeback', store, UPDATE_DB_DECLINED, response.responseText);
             }
         },
 
         // Total failure.  Script failed.  It might have managed to update
         // our changes, but we have no way to tell.  You should reload your store.
         failure: function () {
-            store.fireEvent ('writeback', UPDATE_FAILED, 'Server responded with error.  Updates lost.');
+            store.fireEvent ('writeback', store, UPDATE_FAILED, 'Server responded with error.  Updates lost.');
         },
 
         params: {
