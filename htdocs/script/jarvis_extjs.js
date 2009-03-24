@@ -36,11 +36,6 @@ var application = 'default';
 var login_page  = 'login.html';
 var jarvis_home = '/jarvis-bin/jarvis.pl';
 
-// Constants indicating the result of a database update.
-var UPDATE_SUCCESS = 0;         // An update succeeded.
-var UPDATE_DB_DECLINED = 1;     // The update was declined by the database.
-var UPDATE_FAILED = 2;          // The update failed at some other point.
-
 // Init our parameters.
 function jarvisInit (new_application, new_login_page) {
     if (new_application != null) {
@@ -90,12 +85,16 @@ function jarvisLoadException (proxy, options, response, e) {
 //
 //      store        - The store to update.
 //      dataset_name - Name of the .xml file containing dataset config.
-//      fields       - Actually "record.data" extended with some extra magic fields.
+//      fields       - Copy of "record.data" that we extend with some extra magic attributes:
+//                          _operation_type: (Mandatory) 'update' or 'delete'
+//                          _record_id:      (Mandatory) Internal ExtJS Store ID.
 //
 // When the update attempt is over we will fire the store's 'writeback' listener with arguments
-//              `store - This store.
-//               result - UPDATE_SUCCESS, UPDATE_DB_DECLINED, or UPDATE_FAILED.
-//               message - Additional failure information that we may have.
+//      store        - This store.
+//      result       - object containing attributes:
+//                          success: (Mandatory) 1 (succeeded), 0 (failed)
+//                          message: (Optional) Error message text, present if update failed.
+//                          data:    (Optional) Array of returned objects.  E.g. if SQL used INSERT RETURNING.
 //
 function jarvisSendChange (store, dataset_name, fields) {
     Ext.Ajax.request({
@@ -110,19 +109,22 @@ function jarvisSendChange (store, dataset_name, fields) {
             // If we succeeded, fire the writeback listener if this was the last update.
             if (result.success == 1) {
                 if (store.getModifiedRecords().length == 0) {
-                    store.fireEvent ('writeback', store, UPDATE_SUCCESS, '');
+                    store.fireEvent ('writeback', store, result);
                 }
 
             // This indicates that not all updates succeeded.  You should reload your store.
             } else {
-                store.fireEvent ('writeback', store, UPDATE_DB_DECLINED, result.message);
+                store.fireEvent ('writeback', store, result);
             }
         },
 
         // Total failure.  Script failed.  It might have managed to update
         // our changes, but we have no way to tell.  You should reload your store.
         failure: function () {
-            store.fireEvent ('writeback', store, UPDATE_FAILED, 'Server responded with error.  Updates lost.');
+            var result = new Object ();
+            result.success = 0;
+            result.message = 'Server responded with error.  Updates lost.';
+            store.fireEvent ('writeback', store, result);
         },
 
         params: {
