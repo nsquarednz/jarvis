@@ -104,15 +104,18 @@ function jarvisSendChange (store, dataset_name, fields) {
         // We received a response back from the server, that's a good start.
         success: function (response, request) {
 
+            // Eval the response.  It MUST be valid JSON.
+            var result = Ext.util.JSON.decode (response.responseText);
+
             // If we succeeded, fire the writeback listener if this was the last update.
-            if (response.responseText == 'OK') {
+            if (result.success == 1) {
                 if (store.getModifiedRecords().length == 0) {
                     store.fireEvent ('writeback', store, UPDATE_SUCCESS, '');
                 }
 
             // This indicates that not all updates succeeded.  You should reload your store.
             } else {
-                store.fireEvent ('writeback', store, UPDATE_DB_DECLINED, response.responseText);
+                store.fireEvent ('writeback', store, UPDATE_DB_DECLINED, result.message);
             }
         },
 
@@ -134,6 +137,7 @@ function jarvisSendChange (store, dataset_name, fields) {
 // Transaction Type = Remove.  Deletes a single row in the specified store.
 function jarvisRemove (store, dataset_name, record) {
     var fields = record.data;
+    fields._record_id = record.id;          // This is the INTERNAL ExtJS ID.  Not the database "id" column.
     fields._transaction_type = 'remove';
     jarvisSendChange (store, dataset_name, fields);
 }
@@ -141,7 +145,8 @@ function jarvisRemove (store, dataset_name, record) {
 // Transaction Type = Update.  Creates OR Updates a single row in the specified store.
 function jarvisUpdate (store, dataset_name, record) {
     var fields = record.data;
-    fields._transaction_type = 'update';
+    fields._record_id = record.id;          // This is the INTERNAL ExtJS ID.  Not the database "id" column.
+    fields._transaction_type = 'update';    
     jarvisSendChange (store, dataset_name, fields);
 }
 

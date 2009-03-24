@@ -32,6 +32,8 @@ package Jarvis::Dataset;
 use Jarvis::Text;
 use Jarvis::Error;
 
+my %yes_value = ('yes' => 1, 'true' => 1, '1' => 1);
+
 ###############################################################################
 # Internal Functions
 ###############################################################################
@@ -306,10 +308,11 @@ sub Fetch {
         || &Jarvis::Error::MyDie ("Couldn't prepare statement '$sql': " . $args{'dbh'}->errstr, %args);
 
     # Execute
+    my $num_rows = 0;
     eval {
         my $err_handler = $SIG{__DIE__};
         $SIG{__DIE__} = sub {};
-        $sth->execute (@arg_values);
+        $num_rows = $sth->execute (@arg_values);
         $SIG{__DIE__} = $err_handler;
     };
     if ($@) {
@@ -326,6 +329,7 @@ sub Fetch {
     # Return content in requested format.
     if ($args{'format'} eq "json") {
         my %return_data = ();
+        $return_data {"fetched"} = $num_rows;
         $return_data {"data"} = $rows_aref;
 
         my $json = JSON::XS->new->pretty(1);
@@ -333,6 +337,7 @@ sub Fetch {
 
     } else {
         my $xml = XML::Smart->new ();
+        $xml->{fetched} = $num_rows;
         $xml->{data}{row} = $rows_aref;
 
         return $xml->data ();
@@ -376,6 +381,9 @@ sub Store {
     my $sql = undef;
     my @variable_names = undef;
 
+    # Does this insert return rows?
+    my $returning = 0;
+
     # Remove => DELETE.  Must have a serial code present.
     if ($transaction_type eq "remove") {
         ((defined $serial_value) && ($serial_value ne ''))
@@ -390,6 +398,8 @@ sub Store {
 
         } else {
             $sql = &GetSQL ('insert', $dsxml, %args);
+            $returning = defined ($yes_value {lc ($dsxml->{dataset}{'insert'}{'returning'} || "no")});
+            &Jarvis::Error::Debug ("Insert Returning = " . $returning, %args);
         }
 
     } else {
@@ -406,6 +416,7 @@ sub Store {
 
         $sql = $sql_with_placeholders;
         @arg_values = map { $param_values{$_} } @variable_names;
+        &Jarvis::Error::Debug ("Statement Args = '" . join ("','", @arg_values) . "'", %args);
 
     } else {
         my $sql_with_variables = &SqlWithVariables ($sql, %param_values);
@@ -419,11 +430,11 @@ sub Store {
         || &Jarvis::Error::MyDie ("Couldn't prepare statement '$sql': " . $args{'dbh'}->errstr, %args);
 
     # Execute
-    my $num_not_found = 0;
+    my $num_rows = 0;
     eval {
         my $err_handler = $SIG{__DIE__};
         $SIG{__DIE__} = sub {};
-        $sth->execute (@arg_values) || $num_not_found++;
+        $num_rows = $sth->execute (@arg_values);
         $SIG{__DIE__} = $err_handler;
     };
     if ($@) {
@@ -431,16 +442,31 @@ sub Store {
         print STDERR $sth->errstr . "!\n";
         my $message = $sth->errstr;
         $sth->finish;
-        return $message;
+        return "{ \"success\": 0, \"message\": \"" . &EscapeJavaScript (&Trim($message)) . "\"}";
     }
 
-    # Clean up.
+    # Fetch the results, if this INSERT indicates that it returns values.
+    my $rows_aref = $returning ? $sth->fetchall_arrayref({}) : undef;
     $sth->finish;
-    if ($num_not_found > 0) {
-        return "$num_not_found updates failed because record(s) not found.";
-    }
 
-    return "OK";
+    # Return content in requested format.
+    if ($args{'format'} eq "json") {
+        my %return_data = ();
+        $return_data {"success"} = 1;
+        $return_data {"updated"} = $num_rows;
+        $returning && ($return_data {"data"} = $rows_aref);
+
+        my $json = JSON::XS->new->pretty(1);
+        return $json->encode ( \%return_data );
+
+    } else {
+        my $xml = XML::Smart->new ();
+        $xml->{success} = 1;
+        $xml->{updated} = $num_rows;
+        $returning && ($xml->{data}{row} = $rows_aref);
+
+        return $xml->data ();
+    }
 }
 
 1;
