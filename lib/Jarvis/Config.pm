@@ -160,7 +160,7 @@ sub Setup {
 
         # Get our login parameter values.
         my @parameter_names = $axml->{login}{parameter}('[@]', 'name');
-        my @parameter_values = $axml->{login}{parameter}('@');
+        my @parameter_values = $axml->{login}{parameter}('[@]', 'value');
 
         my %login_parameters = ();
         foreach my $i (0 .. $#parameter_values) {

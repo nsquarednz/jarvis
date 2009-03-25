@@ -52,15 +52,15 @@ package Jarvis::Login::Database;
 #    <app name="myapp" use_placeholders="yes" format="json" debug="no">
 #        ...
 #        <login module="Jarvis::Login::Database">
-# 	     <parameter name="user_table">staff</parameter>
-#            <parameter name="user_username_column">name</parameter>
-#            <parameter name="user_password_column">password</parameter>
-#            <parameter name="group_table">staff_group</parameter>
-#            <parameter name="group_username_column">name</parameter>
-#            <parameter name="group_group_column">group_name</parameter>
+#  	     <parameter name="user_table" value="staff"/>
+#            <parameter name="user_username_column" value="name"/>
+#            <parameter name="user_password_column" value="password"/>
+#            <parameter name="group_table" value="staff_group"/>
+#            <parameter name="group_username_column" value="name"/>
+#            <parameter name="group_group_column" value="group_name"/>
 #        </login>
 #        ...
-#   </app>
+#    </app>
 #
 # Params:
 #       $login_parameters_href (configuration for this module)

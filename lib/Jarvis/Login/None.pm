@@ -44,8 +44,8 @@ package Jarvis::Login::None;
 #    <app name="myapp" use_placeholders="yes" format="json" debug="no">
 #        ...
 #        <login module="Jarvis::Login::Database">
-# 	     <parameter name="user_name">admin</parameter>
-#            <parameter name="group_list">admin</parameter>
+# 	     <parameter name="user_name" value="admin"/>
+#            <parameter name="group_list" value="admin"/>
 #        </login>
 #        ...
 #   </app>
