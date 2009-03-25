@@ -66,6 +66,7 @@ package Jarvis::Login::None;
 sub Jarvis::Login::Check {
     my ($login_parameters_href, $args_href) = @_;
 
+    # print STDERR (join (",", keys %$login_parameters_href)) . "\n";
     my $user_name = $$login_parameters_href{'user_name'} || "guest";
     my $group_list = $$login_parameters_href{'group_list'} || "guest";
 

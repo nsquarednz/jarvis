@@ -158,15 +158,15 @@ sub Setup {
     } else {
         &Jarvis::Error::Debug ("Login attempt on '" . $$args_href{'sid'} . "'.", %$args_href);
 
-        # Get our login parameter values.
-        my @parameter_names = $axml->{login}{parameter}('[@]', 'name');
-        my @parameter_values = $axml->{login}{parameter}('[@]', 'value');
-
+        # Get our login parameter values.  We were using $axml->{login}{parameter}('[@]', 'name');
+        # but that seemed to cause all sorts of DataDumper and cleanup problems.  This seems to
+        # work smoothly.
         my %login_parameters = ();
-        foreach my $i (0 .. $#parameter_values) {
-            &Jarvis::Error::Debug ("Login Parameter: $parameter_names[$i] -> $parameter_values[$i]", %$args_href);
-            $login_parameters {$parameter_names[$i]} = $parameter_values[$i];
+        foreach my $parameter ($axml->{login}{parameter}('@')) {
+            &Jarvis::Error::Debug ("Login Parameter: " . $parameter->{'name'} . " -> " . $parameter->{'value'}, %$args_href);
+            $login_parameters {$parameter->{'name'}->content} = $parameter->{'value'}->content;
         }
+
         ($error_string, $user_name, $group_list) = &Jarvis::Login::Check (\%login_parameters, $args_href);
 
         $logged_in = (($error_string eq "") && ($user_name ne "")) ? 1 : 0;
