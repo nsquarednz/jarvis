@@ -447,6 +447,7 @@ sub Store {
             return "{ \"success\": 0, \"message\": \"" . &EscapeJavaScript (&Trim($message)) . "\"}";
 
         } else {
+            my $xml = XML::Smart->new ();
             $xml->{success} = 0;
             $xml->{message} = &Trim($message);
             return $xml->data ();
