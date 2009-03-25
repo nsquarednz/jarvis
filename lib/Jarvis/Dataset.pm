@@ -442,7 +442,15 @@ sub Store {
         print STDERR $sth->errstr . "!\n";
         my $message = $sth->errstr;
         $sth->finish;
-        return "{ \"success\": 0, \"message\": \"" . &EscapeJavaScript (&Trim($message)) . "\"}";
+
+        if ($args{'format'} eq "json") {
+            return "{ \"success\": 0, \"message\": \"" . &EscapeJavaScript (&Trim($message)) . "\"}";
+
+        } else {
+            $xml->{success} = 0;
+            $xml->{message} = &Trim($message);
+            return $xml->data ();
+        }
     }
 
     # Fetch the results, if this INSERT indicates that it returns values.
