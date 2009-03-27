@@ -5,7 +5,7 @@
 #       fetches group ownership from a second database table.
 #
 #       Refer to the documentation for the "Check" function for how
-#       to configure your global.xml to use this login module.
+#       to configure your <application>.xml to use this login module.
 #
 # Licence:
 #       This file is part of the Jarvis WebApp/Database gateway utility.
@@ -49,7 +49,7 @@ package Jarvis::Login::Database;
 # can omit the group name parameters, in which case all users will be placed
 # into a single group named "default".
 #  
-#    <app name="myapp" use_placeholders="yes" format="json" debug="no">
+#    <app use_placeholders="yes" format="json" debug="no">
 #        ...
 #        <login module="Jarvis::Login::Database">
 #  	     <parameter name="user_table" value="staff"/>

@@ -41,7 +41,7 @@ package Jarvis::Login::None;
 #
 # You can override the returned user_name and and group_list as follows, e.g.
 #
-#    <app name="myapp" use_placeholders="yes" format="json" debug="no">
+#    <app use_placeholders="yes" format="json" debug="no">
 #        ...
 #        <login module="Jarvis::Login::Database">
 # 	     <parameter name="user_name" value="admin"/>
