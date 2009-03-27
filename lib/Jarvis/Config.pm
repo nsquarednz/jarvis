@@ -44,7 +44,7 @@ my %yes_value = ('yes' => 1, 'true' => 1, '1' => 1);
 #   You Must SPECIFY
 #           $args{'cgi'}                CGI object as passed in.
 #           $args{'app_name'}           App name as passed in.
-#           $args{'config_dir'}         "$java_root/config" used by Dataset.pm etc.
+#           $args{'etc_dir'}            e.g. "/opt/jarvis/etc" finds our <appname>.xml
 #
 #   We will ADD
 #           $args{'format'}             Format xml or json?
@@ -69,18 +69,18 @@ sub Setup {
     # Check our mandatory params
     $$args_href{'cgi'} || die "Missing parameter 'cgi'\n";
     $$args_href{'app_name'} || die "Missing parameter 'app_name'\n";
-    $$args_href{'config_dir'} || die "Missing parameter 'config_dir'\n";
+    $$args_href{'etc_dir'} || die "Missing parameter 'etc_dir'\n";
 
     # Check our parameters for correctness. 
     ($$args_href{'app_name'} =~ m/^\w+$/) || die "Invalid characters in parameter 'app_name'.\n";
-    (-d $$args_href{'config_dir'}) || die "Parameter 'config_dir' does not specify a directory.\n";
+    (-d $$args_href{'etc_dir'}) || die "Parameter 'etc_dir' does not specify a directory.\n";
 
     ###############################################################################
     # Load our global configuration.
     ###############################################################################
     #
     # Process the global XML config file.
-    my $gxml_filename = $$args_href{'config_dir'} . "/global.xml";
+    my $gxml_filename = $$args_href{'etc_dir'} . "/" . $$args_href{'app_name'} . ".xml";
     my $gxml = XML::Smart->new ("$gxml_filename") || die "Cannot read '$gxml_filename': $!\n";
     ($gxml->{jarvis}) || die "Missing <jarvis> tag in '$gxml_filename'!\n";
 
@@ -93,8 +93,13 @@ sub Setup {
     ###############################################################################
     #
     # We MUST have an entry for this application in our config.
-    my $axml = (grep { $_->{name} eq $$args_href{'app_name'} } @{$gxml->{jarvis}{app}}) [0];
-    (defined $axml) || die "Application '" . $$args_href{'app_name'} . "' not defined in default.xml!\n";
+    my $axml = $gxml->{jarvis}{app};
+    (defined $axml) || die "Cannot find <jarvis><app> in '" . $$args_href{'app_name'} . ".xml'!\n";
+
+    # And this MUST contain our dataset dir.
+    my $dataset_dir = $axml->{'dataset_dir'}->content || die "No attribute dataset_dir defined for <app> in '" . $$args_href{'app_name'} . ".xml'!\n";
+    $$args_href{'dataset_dir'} = $dataset_dir;
+    &Jarvis::Error::Debug ("Dataset Directory '$dataset_dir'.", %$args_href);
 
     ###############################################################################
     # Determine some other application flags.

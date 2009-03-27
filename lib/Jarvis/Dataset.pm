@@ -42,7 +42,7 @@ my %yes_value = ('yes' => 1, 'true' => 1, '1' => 1);
 # Loads the DataSet config from the config dir and returns it as XML.
 #
 # Params: Hash of Args (* indicates mandatory)
-#       *config_dir, *app_name, *dataset_name
+#       *dataset_dir, *app_name, *dataset_name
 #
 # Returns:
 #       $dsxml - XML::Smart object holding config info read from file.
@@ -52,7 +52,7 @@ sub GetConfigXML {
     my ($args_href) = @_;
 
     my $cgi = $$args_href {"cgi"};
-    my $config_dir = $$args_href {"config_dir"};
+    my $dataset_dir = $$args_href {"dataset_dir"};
     my $app_name = $$args_href {"app_name"};
 
     # Now we require 'dataset' to also be a CGI parameter.
@@ -61,7 +61,7 @@ sub GetConfigXML {
     $$args_href{"dataset_name"} = $dataset_name;
 
     # Load the dataset-specific XML file.
-    my $dsxml_filename = "$config_dir/$app_name/$dataset_name.xml";
+    my $dsxml_filename = "$dataset_dir/$dataset_name.xml";
     my $dsxml = XML::Smart->new ("$dsxml_filename") || die "Cannot read '$dsxml_filename': $!\n";
     ($dsxml->{dataset}) || die "Missing <dataset> tag in '$dsxml_filename'!\n";
 

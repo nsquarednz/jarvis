@@ -43,7 +43,7 @@ use Jarvis::Status;
 package Main;
 
 $Main::cgi = new CGI();
-$Main::jarvis_config = "/home/spiderfan/edit/config";
+$Main::jarvis_etc = $ENV{'JARVIS_ETC'} || "/opt/jarvis/etc";
 %Main::args = ();
 
 $Carp::CarpLevel = 1;
@@ -82,7 +82,7 @@ MAIN: {
 
     $Main::args{'cgi'} = $Main::cgi;
     $Main::args{'app_name'} = $app_name;
-    $Main::args{'config_dir'} = "$Main::jarvis_config";
+    $Main::args{'etc_dir'} = "$Main::jarvis_etc";
 
     &Jarvis::Config::Setup (\%Main::args);
 
