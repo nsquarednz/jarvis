@@ -11,17 +11,17 @@
 #
 # Licence:
 #       This file is part of the Jarvis WebApp/Database gateway utility.
-# 
+#
 #       Jarvis is free software: you can redistribute it and/or modify
 #       it under the terms of the GNU General Public License as published by
 #       the Free Software Foundation, either version 3 of the License, or
 #       (at your option) any later version.
-# 
+#
 #       Jarvis is distributed in the hope that it will be useful,
 #       but WITHOUT ANY WARRANTY; without even the implied warranty of
 #       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #       GNU General Public License for more details.
-# 
+#
 #       You should have received a copy of the GNU General Public License
 #       along with Jarvis.  If not, see <http://www.gnu.org/licenses/>.
 #
@@ -55,13 +55,14 @@ $Carp::CarpLevel = 1;
 sub Handler {
     my ($msg) = @_;
 
+    # Return error.  Note that we do not print stack trace to user, since
+    # that is a potential security weakness.
     print $Main::cgi->header("text/plain");
     print $Main::cgi->url () . "\n";
     print $msg;
 
-    $Main::args{'debug'} && print Carp::longmess ();
-
-    print STDERR Carp::longmess $msg;
+    # Print to error log.  Include stack trace if debug is enabled.
+    print STDERR ($Main::args{'debug'} ? Carp::longmess $msg : Carp::shortmess $msg);
     exit 0;
 }
 
@@ -96,7 +97,7 @@ MAIN: {
 
     my $return_text = '';
 
-    # Status.  I.e. are we logged in? 
+    # Status.  I.e. are we logged in?
     if ($Main::args{'action'} eq "status") {
 
         $return_text = &Jarvis::Status::Report (%Main::args);
@@ -105,12 +106,12 @@ MAIN: {
     } elsif ($Main::args{'action'} eq "fetch") {
 
         $return_text = &Jarvis::Dataset::Fetch (%Main::args);
-        
+
     # Store.  I.e. alter some data.
     } elsif ($Main::args{'action'} eq "store") {
 
         $return_text = &Jarvis::Dataset::Store (%Main::args);
-                    
+
     } else {
         die "Unsupported action '" . $Main::args{'action'} . "'!\n";
     }
