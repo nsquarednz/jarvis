@@ -425,7 +425,7 @@ sub Store {
 
         $sql = $sql_with_placeholders;
         @arg_values = map { $param_values{$_} } @variable_names;
-        &Jarvis::Error::Debug ("Statement Args = '" . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) . "'", %args);
+        &Jarvis::Error::Debug ("Statement Args = " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values), %args);
 
     } else {
         my $sql_with_variables = &SqlWithVariables ($sql, %param_values);
