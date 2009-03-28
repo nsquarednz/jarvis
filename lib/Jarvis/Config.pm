@@ -42,6 +42,8 @@ use lib "/opt/jarvis/lib";
 
 package Jarvis::Config;
 
+use Jarvis::Error;
+
 my %yes_value = ('yes' => 1, 'true' => 1, '1' => 1);
 
 ################################################################################
