@@ -1,19 +1,28 @@
 ###############################################################################
-# Description:  Functions for creating dojo helper JS for grid widgets.
+# Description:  The Config::Setup method will read variables from our
+#               <app_name>.xml (and possibly other sources).  It will perform
+#               a Login attempt if required, and will set other variables
+#               based on the results of the Login.  The derived config is
+#               stored in an %args hash so that other functions can access
+#               it.
+#
+#               The actual login functionality is contained in a login module,
+#               e.g. Database, None, LDAP, etc.  The <app_name>.xml tells this
+#               Config function which module to use for this application.
 #
 # Licence:
 #       This file is part of the Jarvis WebApp/Database gateway utility.
-# 
+#
 #       Jarvis is free software: you can redistribute it and/or modify
 #       it under the terms of the GNU General Public License as published by
 #       the Free Software Foundation, either version 3 of the License, or
 #       (at your option) any later version.
-# 
+#
 #       Jarvis is distributed in the hope that it will be useful,
 #       but WITHOUT ANY WARRANTY; without even the implied warranty of
 #       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #       GNU General Public License for more details.
-# 
+#
 #       You should have received a copy of the GNU General Public License
 #       along with Jarvis.  If not, see <http://www.gnu.org/licenses/>.
 #
@@ -39,12 +48,12 @@ my %yes_value = ('yes' => 1, 'true' => 1, '1' => 1);
 # Setup our entire jarvis config, based on the root directory passed in.
 #
 # Params:
-#       $args_href - Reference to our args. 
+#       $args_href - Reference to our args.
 #
 #   You Must SPECIFY
 #           $args{'cgi'}                CGI object as passed in.
 #           $args{'app_name'}           App name as passed in.
-#           $args{'etc_dir'}            e.g. "/opt/jarvis/etc" finds our <appname>.xml
+#           $args{'etc_dir'}            e.g. "/opt/jarvis/etc" finds our <app_name>.xml
 #
 #   We will ADD
 #           $args{'format'}             Format xml or json?
@@ -71,7 +80,7 @@ sub Setup {
     $$args_href{'app_name'} || die "Missing parameter 'app_name'\n";
     $$args_href{'etc_dir'} || die "Missing parameter 'etc_dir'\n";
 
-    # Check our parameters for correctness. 
+    # Check our parameters for correctness.
     ($$args_href{'app_name'} =~ m/^\w+$/) || die "Invalid characters in parameter 'app_name'.\n";
     (-d $$args_href{'etc_dir'}) || die "Parameter 'etc_dir' does not specify a directory.\n";
 
@@ -104,7 +113,7 @@ sub Setup {
     ###############################################################################
     # Determine some other application flags.
     ###############################################################################
-    # 
+    #
     $$args_href{'format'} = lc ($$args_href{'cgi'}->param ('format') || $axml->{'format'}->content || "json");
     (($$args_href{'format'} eq "json") || ($$args_href{'format'} eq "xml")) || die "Unsupported format '$$args_href{'format'}'!\n";
 
@@ -182,7 +191,8 @@ sub Setup {
 
     $logged_in || &Jarvis::Error::Log ("Login fail: $error_string", %$args_href);
 
-    # Give another 1 hour login.  Flush new/modified session data.
+    # Give another 1 hour login.  Flush new/modified session data.  This expiry
+    # extension time would be a good thing to allow to be configurable per app.
     $session->expire('+1h');
     $session->flush();
 

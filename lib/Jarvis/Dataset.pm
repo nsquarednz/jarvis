@@ -1,19 +1,28 @@
 ###############################################################################
-# Description:  Functions for creating dojo helper JS for grid widgets.
+# Description:  Dataset access functions.  This is the core purpose of Jarvis,
+#               to provide a front end to your database so that your ExtJS,
+#               Adobe Flex, or other web application can have simple JSON or
+#               XML web-service access to fetch and update data from your
+#               back end SQL database on the server.
+#
+#               A dataset is defined by a <dataset>.xml file which contains
+#               the SQL to SELECT, UPDATE, INSERT, DELETE row(s).  A dataset
+#               appears to be a single table to the web application.  In
+#               practice, the SQL may interact with one or more tables.
 #
 # Licence:
 #       This file is part of the Jarvis WebApp/Database gateway utility.
-# 
+#
 #       Jarvis is free software: you can redistribute it and/or modify
 #       it under the terms of the GNU General Public License as published by
 #       the Free Software Foundation, either version 3 of the License, or
 #       (at your option) any later version.
-# 
+#
 #       Jarvis is distributed in the hope that it will be useful,
 #       but WITHOUT ANY WARRANTY; without even the implied warranty of
 #       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #       GNU General Public License for more details.
-# 
+#
 #       You should have received a copy of the GNU General Public License
 #       along with Jarvis.  If not, see <http://www.gnu.org/licenses/>.
 #
