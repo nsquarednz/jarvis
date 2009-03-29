@@ -1,7 +1,7 @@
 ###############################################################################
 # Description:
 #       Jarvis supports pluggable Login modules.  This module checks usernames
-#       and passwords via LDAP.
+#       and passwords via ActiveDirectory (Microsoft's LDAP Implementation).
 #
 #       Refer to the documentation for the "Check" function for how
 #       to configure your <application>.xml to use this login module.
@@ -34,7 +34,7 @@ use Net::LDAP;
 
 use Jarvis::Error;
 
-package Jarvis::Login::LDAP;
+package Jarvis::Login::ActiveDirectory;
 
 ###############################################################################
 # Public Functions
@@ -50,8 +50,7 @@ package Jarvis::Login::LDAP;
 #  
 #    <app use_placeholders="yes" format="json" debug="no">
 #        ...
-#        <login module="Jarvis::Login::LDAP">
-#            <parameter name="flavor" value="activedirectory/>      
+#        <login module="Jarvis::Login::ActiveDirectory">
 #  	     <parameter name="server" value="server-address"/>
 #  	     <parameter name="port" value="389"/>
 #            <parameter name="suffix" value="OU=BorisOffices,OU=PORSE HQ USERS,OU=PORSENZ,DC=PORSENZ,DC=LOCAL"/>
@@ -59,7 +58,6 @@ package Jarvis::Login::LDAP;
 #        ...
 #    </app>
 #
-#       flavor:   "ldap" (default) or "activedirectory"
 #       server:   address of server.  Required.
 #       port:     port for server.  Default 389.
 #       suffix:   The office unit & domain component suffix to append to CN=<user>
@@ -78,16 +76,12 @@ sub Jarvis::Login::Check {
     my ($login_parameters_href, $args_href) = @_;
 
     # Our user name login parameters are here...
-    my $flavor = lc ($$login_parameters_href{'flavor'} || 'ldap');
     my $server = $$login_parameters_href{'server'};
     my $port = $$login_parameters_href{'port'} || 389;
     my $suffix = $$login_parameters_href{'suffix'};
 
     if (! ($server && $suffix)) {
-        return ("Missing configuration for Login module LDAP.");
-    }
-    if (($flavor ne 'ldap') && ($flavor ne 'activedirectory')) {
-        return ("Unsupported LDAP flavor '$flavor' in configuration.");
+        return ("Missing configuration for Login module ActiveDirectory.");
     }
 
     # Now see what we got passed.
