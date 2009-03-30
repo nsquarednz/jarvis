@@ -79,56 +79,6 @@ sub GetConfigXML {
 }
 
 ################################################################################
-# Checks that a given dataset grants access to the currently logged in user
-# or the current public (non-logged-in) user.
-#
-#    ""   -> Allow nobody at all.
-#    "**" -> Allow all and sundry.
-#    "*"  -> Allow all logged-in users.
-#    "group,[group]"  -> Allow those in one (or more) of the named groups.
-#
-# Params:
-#       Permission ("read" or "write")
-#       Hash of Args (* indicates mandatory)
-#               logged_in, user_name, group_list
-#
-# Returns:
-#       1.
-#       die on error.
-################################################################################
-#
-sub CheckAccess {
-    my ($permission, $dsxml, %args) = @_;
-
-    # Check permissions
-    my $allowed_groups = $dsxml->{dataset}{$permission};
-    if ($allowed_groups eq "") {
-        &Jarvis::Error::MyDie ("This dataset does not allow $permission to anybody.\n", %args);
-
-    } elsif ($allowed_groups eq "**") {
-        # Allow access to all even those not logged in.
-
-    } elsif ($allowed_groups eq "*") {
-        $args{'logged_in'} || &Jarvis::Error::MyDie ("Successful login is required in order to $permission this dataset.\n", %args);
-
-    } else {
-        my $allowed = 0;
-        foreach my $allowed_group (split (',', $allowed_groups)) {
-            foreach my $member_group (split (',', $args{'group_list'})) {
-                if ($allowed_group eq $member_group) {
-                    $allowed = 1;
-                    last;
-                }
-            }
-            last if $allowed;
-        }
-        $allowed || &Jarvis::Error::MyDie ("Logged-in user does not belong to any of the permitted $permission groups.\n", %args);
-    }
-
-    1;
-}
-
-################################################################################
 # Get the SQL for the update, insert, and delete.
 #
 # Params:
@@ -152,7 +102,10 @@ sub GetSQL {
 }
 
 ################################################################################
-# Adds some special variables to our name -> value map.
+# Adds some special variables to our name -> value map.  Note that our special
+# variables are added AFTER the user-provided variables.  That means that you
+# can securely rely upon the values of __username, __grouplist, etc.  If the
+# caller attempts to supply them, ours will replace the hacked values.
 #
 #   __username  -> <logged-in-username>
 #   __grouplist -> ('<group1>', '<group2>', ...)
@@ -167,19 +120,18 @@ sub GetSQL {
 #       1
 ################################################################################
 #
-sub AddSpecialVariables {
+sub AddSpecialDatasetVariables {
 
     my ($param_values_href, %args) = @_;
 
-    # These are defined if we have logged in.
-    if (defined $args{'user_name'}) {
-        $$param_values_href{"__username"} = $args{'user_name'};
-    }
-    if (defined $args{'group_list'}) {
-        $$param_values_href{"__grouplist"} = "('" . join ("',", $args{'group_list'} || '') . "')";
-        foreach my $group (split (',', $args{'group_list'})) {
-            $$param_values_href{"__group:$group"} = 1;
-        }
+    # These are '' if we have not logged in, but must ALWAYS be defined.  In
+    # theory, any datasets which allows non-logged-in access is not going to
+    # reference __username
+    #
+    $$param_values_href{"__username"} = $args{'user_name'};
+    $$param_values_href{"__grouplist"} = "('" . join ("','", split (',', $args{'group_list'})) . "')";
+    foreach my $group (split (',', $args{'group_list'})) {
+        $$param_values_href{"__group:$group"} = 1;
     }
 
     # These can be passed by the client, we just set defaults if needed.
@@ -290,13 +242,18 @@ sub Fetch {
     my (%args) = @_;
 
     my $dsxml = &GetConfigXML (\%args) || die "Cannot load configuration for dataset.\n";
-    &CheckAccess ("read", $dsxml, %args);
+
+    my $allowed_groups = $dsxml->{dataset}{"read"};
+    my $failure = &Jarvis::Config::CheckAccess ($allowed_groups, %args);
+    $failure && &Jarvis::Error::MyDie ( "Wanted read access: $failure", %args);
 
     my $sql = &GetSQL ('select', $dsxml, %args);
 
-    # Handle our parameters.  Either inline or with placeholders.
+    # Handle our parameters.  Either inline or with placeholders.  Note that our
+    # special variables like __username will override sneaky user-supplied values.
+    #
     my %param_values = $args{'cgi'}->Vars;
-    &AddSpecialVariables (\%param_values, %args);
+    &AddSpecialDatasetVariables (\%param_values, %args);
 
     my @arg_values = ();
     if ($args{'use_placeholders'}) {
@@ -369,7 +326,10 @@ sub Store {
     my (%args) = @_;
 
     my $dsxml = &GetConfigXML (\%args) || die "Cannot load configuration for dataset.\n";
-    &CheckAccess ("write", $dsxml, %args);
+
+    my $allowed_groups = $dsxml->{dataset}{"write"};
+    my $failure = &Jarvis::Config::CheckAccess ($allowed_groups, %args);
+    $failure && &Jarvis::Error::MyDie ( "Wanted write access: $failure", %args);
 
     # Figure out what field is our "serial" ID.  Normally it is "id", but it
     # could change.
@@ -415,9 +375,11 @@ sub Store {
         &Jarvis::Error::MyDie ("Unsupported transaction type '$transaction_type'.", %args);
     }
 
-    # Handle our parameters.  Either inline or with placeholders.
+    # Handle our parameters.  Either inline or with placeholders.  Note that our
+    # special variables like __username will override sneaky user-supplied values.
+    #
     my %param_values = %{ $fields_href };
-    &AddSpecialVariables (\%param_values, %args);
+    &AddSpecialDatasetVariables (\%param_values, %args);
 
     my @arg_values = ();
     if ($args{'use_placeholders'}) {

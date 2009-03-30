@@ -27,7 +27,7 @@ package Jarvis::Text;
 
 BEGIN {
     our @ISA = qw (Exporter);
-    our @EXPORT = qw (EscapeJavaScript CleanName Trim);
+    our @EXPORT = qw (EscapeJavaScript EscapeSQL EscapeShell CleanName Trim);
 
     require Exporter;
 }
@@ -44,6 +44,24 @@ sub EscapeJavaScript {
     $text =~ s|'|\\'|og;
     $text =~ s|"|\\"|og;
     $text =~ s|\n|\\n\\\n|osg;
+    return $text;
+}
+
+# ARGS: TextString
+# Returns: Escape characters that will bother a SQL '' string.
+sub EscapeSQL {
+    my $text = $_[0];
+    $text =~ s|'|''|og;
+    $text =~ s|\\|\\\\|og;
+    return $text;
+}
+
+# ARGS: TextString
+# Returns: Escape characters that will bother a Shell Exec '' string.
+sub EscapeShell {
+    my $text = $_[0];
+    $text =~ s|'|'\\''|og;
+    $text =~ s|\\|\\\\|og;
     return $text;
 }
 

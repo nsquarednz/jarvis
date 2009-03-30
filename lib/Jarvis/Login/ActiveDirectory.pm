@@ -96,13 +96,13 @@ sub Jarvis::Login::Check {
         return ("No password supplied.");
     }
 
-    # Do that LDAP thing.  Connect first.
-    &Jarvis::Error::Debug ("Connecting to LDAP Server: '$server:$port'.", %$args_href);
+    # Do that ActiveDirectory thing.  Connect first.
+    &Jarvis::Error::Debug ("Connecting to ActiveDirectory Server: '$server:$port'.", %$args_href);
     my $ldap = Net::LDAP->new ($server, port => $port) || die "Cannot connect to '$server' on port $port\n";
 
     # Bind with a password.
     my $name = "CN=$username,$suffix";
-    &Jarvis::Error::Debug ("Binding to LDAP Server: '$server:$port' as '$name'.", %$args_href);
+    &Jarvis::Error::Debug ("Binding to ActiveDirectory Server: '$server:$port' as '$name'.", %$args_href);
     my $mesg = $ldap->bind ($name, password => $password);
 
     $mesg->code && die "Bind to server '$server' failed with " . $mesg->code . " '" . $mesg->error . "'\n";

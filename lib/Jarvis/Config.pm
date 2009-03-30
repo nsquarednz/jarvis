@@ -65,10 +65,15 @@ my %yes_value = ('yes' => 1, 'true' => 1, '1' => 1);
 #           $args{'dbh'}                Database handle
 #           $args{'sname'}              Session name for/from cookie.
 #           $args{'sid'}                Session ID for/from cookie.
-#           $args{'logged_in'}          Did a user login?
+#           $args{'logged_in'}          Did a user log in?
 #           $args{'user_name'}          Which user logged in?
 #           $args{'error_string'}       What error if not logged in?
 #           $args{'group_list'}         Comma-separated group list.
+#           $args{'dataset_dir'}        Our dataset directory for this application.
+#           $args{'exec'}               Optional hash of exec <action-name> to additional parameters:
+#               -> {'command'}              Shell command to run.
+#               -> {'add_headers'}          0/1 should we add headers, or will script do it?
+#               -> {'filename_arg'}         A special input parameter we should use as filename.
 #
 # Returns:
 #       1
@@ -108,9 +113,33 @@ sub Setup {
     (defined $axml) || die "Cannot find <jarvis><app> in '" . $$args_href{'app_name'} . ".xml'!\n";
 
     # And this MUST contain our dataset dir.
-    my $dataset_dir = $axml->{'dataset_dir'}->content || die "No attribute dataset_dir defined for <app> in '" . $$args_href{'app_name'} . ".xml'!\n";
+    my $dataset_dir = $axml->{'dataset_dir'}->content || die "No attribute 'dataset_dir' defined for <app> in '" . $$args_href{'app_name'} . ".xml'!\n";
     $$args_href{'dataset_dir'} = $dataset_dir;
     &Jarvis::Error::Debug ("Dataset Directory '$dataset_dir'.", %$args_href);
+
+
+    ###############################################################################
+    # See if we have any extra "exec" actions for this application.
+    ###############################################################################
+    #
+    my %execs = ();
+    if ($axml->{'exec'}) {
+        foreach my $exec (@{ $axml->{'exec'} }) {
+            my $action = $exec->{'action'}->content;
+
+            $action || die "No attribute 'action' designed for <app><exec> in '" . $$args_href{'app_name'} . ".xml'!\n";
+            $exec->{'access'}->content || die "No attribute 'access' designed for <app><exec> in '" . $$args_href{'app_name'} . ".xml'!\n";
+            $exec->{'command'}->content || die "No attribute 'command' designed for <app><exec> in '" . $$args_href{'app_name'} . ".xml'!\n";
+
+            $execs {$action}{'access'} = $exec->{'access'}->content;
+            $execs {$action}{'command'} = $exec->{'command'}->content;
+            $execs {$action}{'add_headers'} = defined ($yes_value {lc ($exec->{'add_headers'}->content || "no")});
+            $execs {$action}{'filename_parameter'} = $exec->{'filename_parameter'}->content;
+
+            &Jarvis::Error::Debug ("Installed custom <exec> action '$action'.", %$args_href);
+        }
+    }
+    $$args_href{'exec'} = \%execs;
 
     ###############################################################################
     # Determine some other application flags.
@@ -128,10 +157,10 @@ sub Setup {
     # do this early, since the login module can check logins against DB table.
     ###############################################################################
     #
-    my $dbxml = $axml->{database};
-    my $dbconnect = $dbxml->{connect}->content || "dbi:Pg:" . $$args_href{'app_name'};
-    my $dbuser = $dbxml->{username}->content;
-    my $dbpass = $dbxml->{password}->content;
+    my $dbxml = $axml->{'database'};
+    my $dbconnect = $dbxml->{'connect'}->content || "dbi:Pg:" . $$args_href{'app_name'};
+    my $dbuser = $dbxml->{'username'}->content;
+    my $dbpass = $dbxml->{'password'}->content;
 
     $$args_href{'dbh'} = DBI->connect($dbconnect, $dbuser, $dbpass) or die DBI::errstr;
 
@@ -151,8 +180,10 @@ sub Setup {
     &Jarvis::Error::Debug ("SID Store '$sid_store'.", %$args_href);
 
     my %sid_params = ();
-    foreach my $sid_param (@{ $axml->{'sessiondb'}->{'parameter'} }) {
-        $sid_params {$sid_param->{'name'}} = $sid_param->{'value'};
+    if ($axml->{'sessiondb'}->{'parameter'}) {
+        foreach my $sid_param (@{ $axml->{'sessiondb'}->{'parameter'} }) {
+            $sid_params {$sid_param->{'name'}->content} = $sid_param->{'value'}->content;
+        }
     }
 
     # Get an existing/new session.
@@ -160,43 +191,58 @@ sub Setup {
     $$args_href{'sname'} = $session->name();
     $$args_href{'sid'} = $session->id();
 
-    # See if we already logged in.
-    my ($error_string, $user_name, $group_list, $logged_in) = ('', undef, undef, 0);
+    # By default these values are all empty.  Note that we never allow user_name
+    # and group_list to be undef, too many things depend on it having some value,
+    # even if that is just ''.
+    # 
+    my ($error_string, $user_name, $group_list, $logged_in) = ('', '', '', 0);
 
     # Existing, successful session?  Fine, we trust this.
     if ($session->param('logged_in') && $session->param('user_name')) {
         &Jarvis::Error::Debug ("Already logged in for session '" . $$args_href{'sid'} . "'.", %$args_href);
-        $logged_in = $session->param('logged_in');
-        $user_name = $session->param('user_name');
-        $group_list = $session->param('group_list');
+        $logged_in = $session->param('logged_in') || 0;
+        $user_name = $session->param('user_name') || '';
+        $group_list = $session->param('group_list') || '';
 
     # No successful session?  Login.  Note that we store failed sessions too.
-    } else {
+    # 
+    # Note that not all actions allow you to provide a username and password for
+    # login purposes.  "status" does, and so does "fetch".  But the others don't.
+    # For exec scripts that's good, since it means that a report parameter named 
+    # "username" won't get misinterpreted as an attempt to login.
+    # 
+    } elsif ($$args_href {'allow_login'}) {
         &Jarvis::Error::Debug ("Login attempt on '" . $$args_href{'sid'} . "'.", %$args_href);
 
         # Get our login parameter values.  We were using $axml->{login}{parameter}('[@]', 'name');
         # but that seemed to cause all sorts of DataDumper and cleanup problems.  This seems to
         # work smoothly.
         my %login_parameters = ();
-        foreach my $parameter ($axml->{login}{parameter}('@')) {
-            &Jarvis::Error::Debug ("Login Parameter: " . $parameter->{'name'} . " -> " . $parameter->{'value'}, %$args_href);
-            $login_parameters {$parameter->{'name'}->content} = $parameter->{'value'}->content;
+        if ($axml->{'login'}{'parameter'}) {
+            foreach my $parameter ($axml->{'login'}{'parameter'}('@')) {
+                &Jarvis::Error::Debug ("Login Parameter: " . $parameter->{'name'}->content . " -> " . $parameter->{'value'}->content, %$args_href);
+                $login_parameters {$parameter->{'name'}->content} = $parameter->{'value'}->content;
+            }
         }
-
         ($error_string, $user_name, $group_list) = &Jarvis::Login::Check (\%login_parameters, $args_href);
+        $user_name || ($user_name = '');
+        $group_list || ($group_list = '');
 
         $logged_in = (($error_string eq "") && ($user_name ne "")) ? 1 : 0;
         $session->param('logged_in', $logged_in);
         $session->param('user_name', $user_name);
         $session->param('group_list', $group_list);
-    }
 
+    # Fail because login not allowed.
+    } else {
+        $error_string = "Not logged and login disallowed for this request";
+    }
     $logged_in || &Jarvis::Error::Log ("Login fail: $error_string", %$args_href);
 
-    # Give another 1 hour login.  Flush new/modified session data.  This expiry
-    # extension time would be a good thing to allow to be configurable per app.
-    $session->expire('+1h');
-    $session->flush();
+    # Set/extend session expiry.  Flush new/modified session data.
+    my $session_expiry = $axml->{'sessiondb'}->{'expiry'}->content || '+1h';
+    $session->expire ($session_expiry);
+    $session->flush ();
 
     # Add to our $args_href since e.g. fetch queries might use them.
     $$args_href{'logged_in'} = $logged_in;
@@ -205,6 +251,59 @@ sub Setup {
     $$args_href{'group_list'} = $group_list;
 
     return 1;
+}
+
+################################################################################
+# Checks that a given group list grants access to the currently logged in user
+# or the current public (non-logged-in) user.  All this permission check is
+# currently performed by group matching.  We don't provide any way to control
+# access for individual users within a group.
+#
+#    ""   -> Allow nobody at all.
+#    "**" -> Allow all and sundry.
+#    "*"  -> Allow all logged-in users.
+#    "group,[group]"  -> Allow those in one (or more) of the named groups.
+#
+# Params:
+#       Permission ("read" or "write")
+#       Hash of Args (* indicates mandatory)
+#               logged_in, user_name, group_list
+#
+# Returns:
+#       "" on success.
+#       "<Failure description message>" on failure.
+################################################################################
+#
+sub CheckAccess {
+    my ($allowed_groups, %args) = @_;
+
+    # Check permissions
+    if ($allowed_groups eq "") {
+        return "This resource does not allow access to anybody.";
+
+    # Allow access to all even those not logged in.
+    } elsif ($allowed_groups eq "**") {
+        return "";
+
+    # Allow access to any logged in user.
+    } elsif ($allowed_groups eq "*") {
+        $args{'logged_in'} || return "Successful login is required in order to access this resource.";
+
+    # Allow access to a specific comma-separated group list.
+    } else {
+        my $allowed = 0;
+        foreach my $allowed_group (split (',', $allowed_groups)) {
+            foreach my $member_group (split (',', $args{'group_list'})) {
+                if ($allowed_group eq $member_group) {
+                    $allowed = 1;
+                    last;
+                }
+            }
+            last if $allowed;
+        }
+        $allowed || return "Logged-in user does not belong to any permitted access group for this resource.";
+    }
+    return "";
 }
 
 1;

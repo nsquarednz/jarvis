@@ -39,6 +39,7 @@ use Jarvis::Error;
 use Jarvis::Config;
 use Jarvis::Dataset;
 use Jarvis::Status;
+use Jarvis::Exec;
 
 package Main;
 
@@ -85,40 +86,58 @@ MAIN: {
     $Main::args{'app_name'} = $app_name;
     $Main::args{'etc_dir'} = "$Main::jarvis_etc";
 
-    &Jarvis::Config::Setup (\%Main::args);
-
     ###############################################################################
     # Action: "status", "fetch", "update".
     ###############################################################################
     #
     # Must have an action.
-    $Main::args{'action'} = $Main::cgi->param ('action') || die "Missing mandatory parameter 'action'!\n";
-    ($Main::args{'action'} =~ m/^\w+$/) || die "Invalid characters in parameter 'action'\n";
+    my $action = $Main::cgi->param ('action') || die "Missing mandatory parameter 'action'!\n";
+    ($action =~ m/^\w+$/) || die "Invalid characters in parameter 'action'\n";
 
-    my $return_text = '';
+    $Main::args{'action'} = $action;
+    $Main::args{'allow_login'} = (($action eq "status") || ($action eq "fetch"));
+
+    &Jarvis::Config::Setup (\%Main::args);
+
+    &Jarvis::Error::Debug ("User Name = " . $Main::args{'user_name'}, %Main::args);
+    &Jarvis::Error::Debug ("Group List = " . $Main::args{'group_list'}, %Main::args);
+
+    # This is a cookie that sets the SESSION.
+    my $cookie = CGI::Cookie->new (-name => $Main::args{'sname'}, -value => $Main::args{'sid'});
 
     # Status.  I.e. are we logged in?
-    if ($Main::args{'action'} eq "status") {
+    if ($action eq "status") {
 
-        $return_text = &Jarvis::Status::Report (%Main::args);
+        my $return_text = &Jarvis::Status::Report (%Main::args);
+        print $Main::cgi->header(-type => "text/plain", -cookie => $cookie);
+        print $return_text;
 
     # Fetch.  I.e. get some data.
-    } elsif ($Main::args{'action'} eq "fetch") {
+    } elsif ($action eq "fetch") {
 
-        $return_text = &Jarvis::Dataset::Fetch (%Main::args);
+        my $return_text = &Jarvis::Dataset::Fetch (%Main::args);
+        print $Main::cgi->header(-type => "text/plain", -cookie => $cookie);
+        print $return_text;
 
     # Store.  I.e. alter some data.
-    } elsif ($Main::args{'action'} eq "store") {
+    } elsif ($action eq "store") {
 
-        $return_text = &Jarvis::Dataset::Store (%Main::args);
+        my $return_text = &Jarvis::Dataset::Store (%Main::args);
+        print $Main::cgi->header(-type => "text/plain", -cookie => $cookie);
+        print $return_text;
 
+    # A custom exec for this application?  We hand off entirely for this case,
+    # since the MIME type may be special.  Exec::Do will add the cookie in the
+    # cases where it is doing the header.  But if the exec script itself is
+    # doing all the headers, then there will be no session cookie.
+    #
+    } elsif ($Main::args{'exec'}{$action}) {
+        &Jarvis::Exec::Do (%Main::args);
+
+    # It's the end of the world as we know it.
     } else {
-        die "Unsupported action '" . $Main::args{'action'} . "'!\n";
+        die "Unsupported action '" . $action . "'!\n";
     }
-
-    my $cookie = CGI::Cookie->new (-name => $Main::args{'sname'}, -value => $Main::args{'sid'});
-    print $Main::cgi->header(-type => "text/plain", -cookie => $cookie);
-    print $return_text;
 
     ###############################################################################
     # Cleanup.
