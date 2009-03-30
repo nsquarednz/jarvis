@@ -109,6 +109,8 @@ sub Do {
 
         my $mime_types = MIME::Types->new;
         $mime_type = $mime_types->mimeTypeOf ($filename) || &Jarvis::Error::MyDie ("Cannot determine mime type from supplied filename '$filename'.", %args);;
+
+        delete $param_values{$filename_parameter};
     }
 
     # Now delete some other magic system parameters.  These were for jarvis, not for the
@@ -152,7 +154,7 @@ sub Do {
         &Jarvis::Error::Debug ("Exec returned mime type '" . $mime_type->type . "'", %args);
 
         my $cookie = CGI::Cookie->new (-name => $args{'sname'}, -value => $args{'sid'});
-        print $Main::cgi->header(-type => $mime_type->type, -cookie => $cookie);
+        print $Main::cgi->header(-type => $mime_type->type, 'Content-Disposition' => "inline; filename=$filename", -cookie => $cookie);
     }
 
     # Now print the output.  If the report didn't add headers like it was supposed
