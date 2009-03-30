@@ -103,11 +103,25 @@ MAIN: {
     &Jarvis::Error::Debug ("User Name = " . $Main::args{'username'}, %Main::args);
     &Jarvis::Error::Debug ("Group List = " . $Main::args{'group_list'}, %Main::args);
 
-    # This is a cookie that sets the SESSION.
-    my $cookie = CGI::Cookie->new (-name => $Main::args{'sname'}, -value => $Main::args{'sid'});
-
     # Status.  I.e. are we logged in?
     if ($action eq "status") {
+
+        my $cookie = CGI::Cookie->new (-name => $Main::args{'sname'}, -value => $Main::args{'sid'});
+        my $return_text = &Jarvis::Status::Report (%Main::args);
+        print $Main::cgi->header(-type => "text/plain", -cookie => $cookie);
+        print $return_text;
+
+    # Logout.  Clear session ID cookie, clean login parameters, then return "logged out" status.
+    } elsif ($action eq "logout") {
+
+        $Main::args{'sid'} = '';
+        my $cookie = CGI::Cookie->new (-name => $Main::args{'sname'}, -value => $Main::args{'sid'});
+        if ($Main::args{'logged_in'}) {
+            $Main::args{'logged_in'} = 0;
+            $Main::args{'error_string'} = "Logged out at client request.";
+            $Main::args{'username'} = '';
+            $Main::args{'group_list'} = '';
+        }
 
         my $return_text = &Jarvis::Status::Report (%Main::args);
         print $Main::cgi->header(-type => "text/plain", -cookie => $cookie);
@@ -116,6 +130,7 @@ MAIN: {
     # Fetch.  I.e. get some data.
     } elsif ($action eq "fetch") {
 
+        my $cookie = CGI::Cookie->new (-name => $Main::args{'sname'}, -value => $Main::args{'sid'});
         my $return_text = &Jarvis::Dataset::Fetch (%Main::args);
         print $Main::cgi->header(-type => "text/plain", -cookie => $cookie);
         print $return_text;
@@ -123,6 +138,7 @@ MAIN: {
     # Store.  I.e. alter some data.
     } elsif ($action eq "store") {
 
+        my $cookie = CGI::Cookie->new (-name => $Main::args{'sname'}, -value => $Main::args{'sid'});
         my $return_text = &Jarvis::Dataset::Store (%Main::args);
         print $Main::cgi->header(-type => "text/plain", -cookie => $cookie);
         print $return_text;
