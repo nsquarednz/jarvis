@@ -66,7 +66,6 @@ package Jarvis::Login::Database;
 #       $login_parameters_href (configuration for this module)
 #       $args_href
 #           $$args_href{'cgi'} - CGI object
-#           $$args_href{'dbh'} - DBI object
 #
 # Returns:
 #       ($error_string or "", $username or "", "group1,group2,group3...")
@@ -101,11 +100,13 @@ sub Jarvis::Login::Check {
 
     # Check the username from the user name table.
     my $query = "SELECT $user_password_column FROM $user_table WHERE $user_username_column = ?";
-    my $sth = $$args_href{'dbh'}->prepare ($query) 
-            || &Jarvis::Error::MyDie ("Couldn't prepare statement '$query': " . $$args_href{'dbh'}->errstr, %$args_href);
+
+    my $dbh = &Jarvis::DB::Handle (%$args_href);
+    my $sth = $dbh->prepare ($query)
+            || &Jarvis::Error::MyDie ("Couldn't prepare statement '$query': " . $dbh->errstr, %$args_href);
         
     $sth->execute ($username) 
-            || &Jarvis::Error::MyDie ("Couldn't execute statement '$query': " . $$args_href{'dbh'}->errstr, %$args_href); 
+            || &Jarvis::Error::MyDie ("Couldn't execute statement '$query': " . $dbh->errstr, %$args_href);
             
     my $result_aref = $sth->fetchall_arrayref({});
     if ((scalar @$result_aref) < 1) {
@@ -132,11 +133,11 @@ sub Jarvis::Login::Check {
 
     # Fetch group configuration.
     $query = "SELECT $group_group_column FROM $group_table WHERE $group_username_column = ?";
-    $sth = $$args_href{'dbh'}->prepare ($query)
-            || &Jarvis::Error::MyDie ("Couldn't prepare statement '$query': " . $$args_href{'dbh'}->errstr, %$args_href);
+    $sth = $dbh->prepare ($query)
+            || &Jarvis::Error::MyDie ("Couldn't prepare statement '$query': " . $dbh->errstr, %$args_href);
         
     $sth->execute ($username) 
-            || &Jarvis::Error::MyDie ("Couldn't execute statement '$query': " . $$args_href{'dbh'}->errstr, %$args_href); 
+            || &Jarvis::Error::MyDie ("Couldn't execute statement '$query': " . $dbh->errstr, %$args_href);
             
     $result_aref = $sth->fetchall_arrayref({});
 

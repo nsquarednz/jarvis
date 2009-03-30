@@ -32,13 +32,10 @@
 use strict;
 use warnings;
 
-use Carp;
 use CGI;
 use CGI::Session;
 use DBI;
 use XML::Smart;
-
-use lib "/opt/jarvis/lib";
 
 package Jarvis::Config;
 
@@ -62,7 +59,9 @@ my %yes_value = ('yes' => 1, 'true' => 1, '1' => 1);
 #           $args{'use_placeholders'}   Does this app use placeholders for SQL substitution?
 #           $args{'debug'}              Debug enabled for this app?
 #           $args{'max_rows'}           Value for {{max_rows}}
-#           $args{'dbh'}                Database handle
+#           $args{'dbconnect'}          Database connection string
+#           $args{'dbuser'}             Database username
+#           $args{'dbpass'}             Database password
 #           $args{'sname'}              Session name for/from cookie.
 #           $args{'sid'}                Session ID for/from cookie.
 #           $args{'logged_in'}          Did a user log in?
@@ -158,11 +157,11 @@ sub Setup {
     ###############################################################################
     #
     my $dbxml = $axml->{'database'};
-    my $dbconnect = $dbxml->{'connect'}->content || "dbi:Pg:" . $$args_href{'app_name'};
-    my $dbuser = $dbxml->{'username'}->content;
-    my $dbpass = $dbxml->{'password'}->content;
-
-    $$args_href{'dbh'} = DBI->connect($dbconnect, $dbuser, $dbpass) or die DBI::errstr;
+    if ($dbxml) {
+        $$args_href{'dbconnect'} = $dbxml->{'connect'}->content || "dbi:Pg:" . $$args_href{'app_name'};
+        $$args_href{'dbusername'} = $dbxml->{'username'}->content;
+        $$args_href{'dbpassword'} = $dbxml->{'password'}->content;
+    }
 
     ###############################################################################
     # Login Process.  Happens after DB, 'cos login info can be in DB.

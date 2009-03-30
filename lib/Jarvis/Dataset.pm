@@ -40,6 +40,7 @@ package Jarvis::Dataset;
 
 use Jarvis::Text;
 use Jarvis::Error;
+use Jarvis::DB;
 
 my %yes_value = ('yes' => 1, 'true' => 1, '1' => 1);
 
@@ -231,7 +232,7 @@ sub SqlWithVariables {
 # hash so that it can be presented to the client in JSON.
 #
 # Params: Hash of Args (* indicates mandatory)
-#       *dbh, *logged_in, user_name, group_list
+#       *logged_in, user_name, group_list
 #
 # Returns:
 #       Reference to Hash of returned data.  You may convert to JSON or XML.
@@ -270,8 +271,9 @@ sub Fetch {
     # Prepare
     &Jarvis::Error::Debug ("FETCH = " . $sql, %args);
 
-    my $sth = $args{'dbh'}->prepare ($sql)
-        || &Jarvis::Error::MyDie ("Couldn't prepare statement '$sql': " . $args{'dbh'}->errstr, %args);
+    my $dbh = &Jarvis::DB::Handle (%args);
+    my $sth = $dbh->prepare ($sql)
+        || &Jarvis::Error::MyDie ("Couldn't prepare statement '$sql': " . $dbh->errstr, %args);
 
     # Execute
     my $num_rows = 0;
@@ -314,7 +316,7 @@ sub Fetch {
 # Performs an update to the specified table underlying the named dataset.
 #
 # Params: Hash of Args
-#       *cgi, *user_name, *dbh
+#       *cgi, *user_name
 #
 # Returns:
 #       "OK" on succes
@@ -397,8 +399,9 @@ sub Store {
     # Prepare
     &Jarvis::Error::Debug ("STORE = " . $sql, %args);
 
-    my $sth = $args{'dbh'}->prepare ($sql)
-        || &Jarvis::Error::MyDie ("Couldn't prepare statement '$sql': " . $args{'dbh'}->errstr, %args);
+    my $dbh = &Jarvis::DB::Handle (%args);
+    my $sth = $dbh->prepare ($sql)
+        || &Jarvis::Error::MyDie ("Couldn't prepare statement '$sql': " . $dbh->errstr, %args);
 
     # Execute
     my $num_rows = 0;

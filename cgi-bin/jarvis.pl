@@ -40,6 +40,7 @@ use Jarvis::Config;
 use Jarvis::Dataset;
 use Jarvis::Status;
 use Jarvis::Exec;
+use Jarvis::DB;
 
 package Main;
 
@@ -143,7 +144,7 @@ MAIN: {
     # Cleanup.
     ###############################################################################
     #
-    $Main::args{'dbh'} && $Main::args{'dbh'}->disconnect();
+    &Jarvis::DB::Disconnect (%Main::args);
 }
 
 1;
