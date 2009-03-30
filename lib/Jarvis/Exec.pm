@@ -103,7 +103,7 @@ sub Do {
     my $filename = undef;
     my $mime_type = undef;
 
-    if ($filename_parameter) {
+    if ($add_headers) {
         $filename = $param_values {$filename_parameter} ||
             &Jarvis::Error::MyDie ("Missing CGI parameter '$filename_parameter' required for returned filename.", %args);
 
@@ -136,7 +136,7 @@ sub Do {
     }
 
     # Execute the command
-    &Jarvis::Error::Log ("Executing Command '$command'", %args);
+    &Jarvis::Error::Log ("Executing Command: $command", %args);
     my $output =`$command`;
 
     # Failure?

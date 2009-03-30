@@ -51,8 +51,8 @@ sub EscapeJavaScript {
 # Returns: Escape characters that will bother a SQL '' string.
 sub EscapeSQL {
     my $text = $_[0];
-    $text =~ s|'|''|og;
     $text =~ s|\\|\\\\|og;
+    $text =~ s|'|''|og;
     return $text;
 }
 
@@ -60,8 +60,8 @@ sub EscapeSQL {
 # Returns: Escape characters that will bother a Shell Exec '' string.
 sub EscapeShell {
     my $text = $_[0];
-    $text =~ s|'|'\\''|og;
     $text =~ s|\\|\\\\|og;
+    $text =~ s|'|'\\''|og;
     return $text;
 }
 
