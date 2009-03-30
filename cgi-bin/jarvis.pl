@@ -57,6 +57,12 @@ $Carp::CarpLevel = 1;
 sub Handler {
     my ($msg) = @_;
 
+    # Truncate any thing after a null-TERM.  This is because LDAP error
+    # messages sometimes put some junk in, which means that the browser
+    # thinks the error is binary, and doesn't display it.
+    $msg =~ s/\x00.*$//;
+    $msg =~ s/\s+//;
+
     # Return error.  Note that we do not print stack trace to user, since
     # that is a potential security weakness.
     print $Main::cgi->header("text/plain");

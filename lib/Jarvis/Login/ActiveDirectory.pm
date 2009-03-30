@@ -53,9 +53,9 @@ package Jarvis::Login::ActiveDirectory;
 #        <login module="Jarvis::Login::ActiveDirectory">
 #  	     <parameter name="server" value="<server-address>"/>
 #  	     <parameter name="port" value="389"/>
-#  	     <parameter name="username" value="<bind-username>"/>
-#  	     <parameter name="password" value="<bind-password>"/>
-#            <parameter name="suffix" value="OU=BorisOffices,OU=PORSE HQ USERS,OU=PORSENZ,DC=PORSENZ,DC=LOCAL"/>
+#  	     <parameter name="bind_username" value="<bind-username>"/>
+#  	     <parameter name="bind_password" value="<bind-password>"/>
+#            <parameter name="base_object" value="OU=PORSENZ,DC=PORSENZ,DC=LOCAL"/>
 #        </login>
 #        ...
 #    </app>
@@ -80,14 +80,15 @@ sub Jarvis::Login::Check {
     # Our user name login parameters are here...
     my $server = $$login_parameters_href{'server'};
     my $port = $$login_parameters_href{'port'} || 389;
+    my $bind_username = $$login_parameters_href{'bind_username'} || '';
+    my $bind_password = $$login_parameters_href{'bind_password'} || '';
+    my $base_object = $$login_parameters_href{'base_object'} || '';
     my $suffix = $$login_parameters_href{'suffix'};
 
-    if (! ($server && $suffix)) {
-        return ("Missing configuration for Login module ActiveDirectory.");
-    }
+    $server || return ("Missing 'server' configuration for Login module ActiveDirectory.");
+    $base_object || return ("Missing 'base_object' configuration for Login module ActiveDirectory.");
 
-    # Now see what we got passed.   These give us our bind username/password,
-    # we currently support only "simple" authentication.
+    # Now see what we got passed.
     my $username = $$args_href{'cgi'}->param('username');
     my $password = $$args_href{'cgi'}->param('password');
 
@@ -99,19 +100,59 @@ sub Jarvis::Login::Check {
         return ("No password supplied.");
     }
 
-    # Do that ActiveDirectory thing.  Connect first.
+    # Do that ActiveDirectory thing.  Connect first.  AD uses default LDAP port 389.
     &Jarvis::Error::Debug ("Connecting to ActiveDirectory Server: '$server:$port'.", %$args_href);
     my $ldap = Net::LDAP->new ($server, port => $port) || die "Cannot connect to '$server' on port $port\n";
 
     # Bind with a password.
-    my $name = "CN=$username,$suffix";
-    &Jarvis::Error::Debug ("Binding to ActiveDirectory Server: '$server:$port' as '$name'.", %$args_href);
-    my $mesg = $ldap->bind ($name, password => $password);
+    #   Protocol = 3 (Default)
+    #   Authentication = Simple (Default)
+    #
+    &Jarvis::Error::Debug ("Binding to ActiveDirectory Server: '$server:$port' as '$bind_username'.", %$args_href);
+    my $mesg = $ldap->bind ($bind_username, password => $bind_password);
 
-    $mesg->code && die "Bind to server '$server' failed with " . $mesg->code . " '" . $mesg->error . "'\n";
+    $mesg->code && &Jarvis::Error::MyDie ("Bind to server '$server' failed with " . $mesg->code . " '" . $mesg->error . "'", %$args_href);
 
-    return ("Still working...");
-    # return ("", $username, "blah");
+    # Now search on our base object.
+    #   Scope = Whole Tree (Default)
+    #   Deref = Always
+    #   Types Only = False (default)
+    #
+    &Jarvis::Error::Debug ("Searching for samaccountname = '$username'.", %$args_href);
+    $mesg = $ldap->search (
+        base => $base_object,
+        deref => 'always',
+        attrs => ['memberOf'],
+        filter => "(samaccountname=$username)"
+    );
+
+    # Check that we got success, and exactly one entry.  We can't handle more than
+    # one account with the same login ID.
+    #
+    $mesg->code && &Jarvis::Error::MyDie ("Search for '$username' failed with " . $mesg->code . " '" . $mesg->error . "'", %$args_href);
+    $mesg->count || return "User '$username' not known to ActiveDirectory.";
+    ($mesg->count == 1) || return "User '$username' ambiguous in ActiveDirectory.";
+
+    # Now look at the memberOf attribute of this account.  If they don't belong to
+    # any groups, that's strange, but probably not impossible.  We let the application
+    # sort that out.
+    #
+    my $entry = $mesg->entry (0);
+    my @groups = $entry->get_value ('memberOf');
+
+    # Build up our group_list, which consists only of the "CN" part of the groups.  Actually,
+    # a comma separator was probably a poor choice of separator in our group_list, since
+    # full LDAP group specifications use commas for the CN, OU, DC components.  Oh well.
+    #
+    my $group_list = '';
+    foreach my $group (@groups) {
+        ($group =~ m/^CN=([a-zA-z_\-]+),/) || return "User '$username' is memberOf group with unsupported name syntax.";
+        my $cn_group = $1;
+        &Jarvis::Error::Debug ("Member of '$group' ($cn_group)\n", %$args_href);
+        $group_list .= ($group_list ? "," : "") . $cn_group;
+    }
+
+    return ("", $username, $group_list);
 }
 
 1;
