@@ -47,7 +47,7 @@ sub Report {
 
     my %fields = ();
     $fields{"logged_in"} = $args{'logged_in'};
-    $fields{"user_name"} = $args{'user_name'};
+    $fields{"username"} = $args{'username'};
     $fields{"error_string"} = $args{'error_string'};
     $fields{"group_list"} = $args{'group_list'};
 

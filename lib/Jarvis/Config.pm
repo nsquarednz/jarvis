@@ -65,7 +65,7 @@ my %yes_value = ('yes' => 1, 'true' => 1, '1' => 1);
 #           $args{'sname'}              Session name for/from cookie.
 #           $args{'sid'}                Session ID for/from cookie.
 #           $args{'logged_in'}          Did a user log in?
-#           $args{'user_name'}          Which user logged in?
+#           $args{'username'}          Which user logged in?
 #           $args{'error_string'}       What error if not logged in?
 #           $args{'group_list'}         Comma-separated group list.
 #           $args{'dataset_dir'}        Our dataset directory for this application.
@@ -190,17 +190,17 @@ sub Setup {
     $$args_href{'sname'} = $session->name();
     $$args_href{'sid'} = $session->id();
 
-    # By default these values are all empty.  Note that we never allow user_name
+    # By default these values are all empty.  Note that we never allow username
     # and group_list to be undef, too many things depend on it having some value,
     # even if that is just ''.
     # 
-    my ($error_string, $user_name, $group_list, $logged_in) = ('', '', '', 0);
+    my ($error_string, $username, $group_list, $logged_in) = ('', '', '', 0);
 
     # Existing, successful session?  Fine, we trust this.
-    if ($session->param('logged_in') && $session->param('user_name')) {
+    if ($session->param('logged_in') && $session->param('username')) {
         &Jarvis::Error::Debug ("Already logged in for session '" . $$args_href{'sid'} . "'.", %$args_href);
         $logged_in = $session->param('logged_in') || 0;
-        $user_name = $session->param('user_name') || '';
+        $username = $session->param('username') || '';
         $group_list = $session->param('group_list') || '';
 
     # No successful session?  Login.  Note that we store failed sessions too.
@@ -223,13 +223,13 @@ sub Setup {
                 $login_parameters {$parameter->{'name'}->content} = $parameter->{'value'}->content;
             }
         }
-        ($error_string, $user_name, $group_list) = &Jarvis::Login::Check (\%login_parameters, $args_href);
-        $user_name || ($user_name = '');
+        ($error_string, $username, $group_list) = &Jarvis::Login::Check (\%login_parameters, $args_href);
+        $username || ($username = '');
         $group_list || ($group_list = '');
 
-        $logged_in = (($error_string eq "") && ($user_name ne "")) ? 1 : 0;
+        $logged_in = (($error_string eq "") && ($username ne "")) ? 1 : 0;
         $session->param('logged_in', $logged_in);
-        $session->param('user_name', $user_name);
+        $session->param('username', $username);
         $session->param('group_list', $group_list);
 
     # Fail because login not allowed.
@@ -245,7 +245,7 @@ sub Setup {
 
     # Add to our $args_href since e.g. fetch queries might use them.
     $$args_href{'logged_in'} = $logged_in;
-    $$args_href{'user_name'} = $user_name;
+    $$args_href{'username'} = $username;
     $$args_href{'error_string'} = $error_string;
     $$args_href{'group_list'} = $group_list;
 
@@ -266,7 +266,7 @@ sub Setup {
 # Params:
 #       Permission ("read" or "write")
 #       Hash of Args (* indicates mandatory)
-#               logged_in, user_name, group_list
+#               logged_in, username, group_list
 #
 # Returns:
 #       "" on success.

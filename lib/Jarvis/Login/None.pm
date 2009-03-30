@@ -39,12 +39,12 @@ package Jarvis::Login::None;
 ################################################################################
 # Always returns "yes logged in" as "guest", in group "guest".
 #
-# You can override the returned user_name and and group_list as follows, e.g.
+# You can override the returned username and and group_list as follows, e.g.
 #
 #    <app use_placeholders="yes" format="json" debug="no">
 #        ...
 #        <login module="Jarvis::Login::Database">
-# 	     <parameter name="user_name" value="admin"/>
+# 	     <parameter name="username" value="admin"/>
 #            <parameter name="group_list" value="admin"/>
 #        </login>
 #        ...
@@ -66,10 +66,10 @@ package Jarvis::Login::None;
 sub Jarvis::Login::Check {
     my ($login_parameters_href, $args_href) = @_;
 
-    my $user_name = $$login_parameters_href{'user_name'} || "guest";
+    my $username = $$login_parameters_href{'username'} || $$login_parameters_href{'user_name'} || "guest";
     my $group_list = $$login_parameters_href{'group_list'} || "guest";
 
-    return ("", $user_name, $group_list);
+    return ("", $username, $group_list);
 }
 
 1;

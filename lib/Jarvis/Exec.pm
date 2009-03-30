@@ -50,7 +50,7 @@ use Jarvis::Text;
 # Params:
 #       $param_values_href
 #       Hash of Args (* indicates mandatory)
-#               user_name, group_list
+#               username, group_list
 #
 # Returns:
 #       1
@@ -60,7 +60,7 @@ sub AddSpecialExecVariables {
     my ($param_values_href, %args) = @_;
 
     # These are defined if we have logged in.
-    $$param_values_href{"__username"} = $args{'user_name'};
+    $$param_values_href{"__username"} = $args{'username'};
     $$param_values_href{"__grouplist"} = $args{'group_list'};
 
     return 1;

@@ -51,8 +51,10 @@ package Jarvis::Login::ActiveDirectory;
 #    <app use_placeholders="yes" format="json" debug="no">
 #        ...
 #        <login module="Jarvis::Login::ActiveDirectory">
-#  	     <parameter name="server" value="server-address"/>
+#  	     <parameter name="server" value="<server-address>"/>
 #  	     <parameter name="port" value="389"/>
+#  	     <parameter name="username" value="<bind-username>"/>
+#  	     <parameter name="password" value="<bind-password>"/>
 #            <parameter name="suffix" value="OU=BorisOffices,OU=PORSE HQ USERS,OU=PORSENZ,DC=PORSENZ,DC=LOCAL"/>
 #        </login>
 #        ...
@@ -84,7 +86,8 @@ sub Jarvis::Login::Check {
         return ("Missing configuration for Login module ActiveDirectory.");
     }
 
-    # Now see what we got passed.
+    # Now see what we got passed.   These give us our bind username/password,
+    # we currently support only "simple" authentication.
     my $username = $$args_href{'cgi'}->param('username');
     my $password = $$args_href{'cgi'}->param('password');
 

@@ -115,7 +115,7 @@ sub GetSQL {
 # Params:
 #       $param_values_href
 #       Hash of Args (* indicates mandatory)
-#               user_name, group_list
+#               username, group_list
 #
 # Returns:
 #       1
@@ -129,7 +129,7 @@ sub AddSpecialDatasetVariables {
     # theory, any datasets which allows non-logged-in access is not going to
     # reference __username
     #
-    $$param_values_href{"__username"} = $args{'user_name'};
+    $$param_values_href{"__username"} = $args{'username'};
     $$param_values_href{"__grouplist"} = "('" . join ("','", split (',', $args{'group_list'})) . "')";
     foreach my $group (split (',', $args{'group_list'})) {
         $$param_values_href{"__group:$group"} = 1;
@@ -232,7 +232,7 @@ sub SqlWithVariables {
 # hash so that it can be presented to the client in JSON.
 #
 # Params: Hash of Args (* indicates mandatory)
-#       *logged_in, user_name, group_list
+#       *logged_in, username, group_list
 #
 # Returns:
 #       Reference to Hash of returned data.  You may convert to JSON or XML.
@@ -316,7 +316,7 @@ sub Fetch {
 # Performs an update to the specified table underlying the named dataset.
 #
 # Params: Hash of Args
-#       *cgi, *user_name
+#       *cgi, *username
 #
 # Returns:
 #       "OK" on succes

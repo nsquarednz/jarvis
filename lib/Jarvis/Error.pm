@@ -40,7 +40,7 @@ use Jarvis::Text;
 #       $msg - User message string.
 #       $level - "log", "error", etc.
 #       %args - Hash of Args (* indicates mandatory)
-#           user_name, app_name, dataset_name
+#           username, app_name, dataset_name
 #
 # Returns:
 #       dies
@@ -58,7 +58,7 @@ sub DumpString {
 
     $header .= "[" . $$;
     (defined $args{'app_name'}) && ($header .= "/" . $args{'app_name'});
-    (defined $args{'user_name'}) && ($header .= "/" . $args{'user_name'});
+    (defined $args{'username'}) && ($header .= "/" . $args{'username'});
     (defined $args{'dataset_name'}) && ($header .= "/" . $args{'dataset_name'});
     $header .= "] ";
 
@@ -76,7 +76,7 @@ sub DumpString {
 #
 # Params:
 #       %args - Hash of Args (* indicates mandatory)
-#           user_name, app_name, dataset_name
+#           username, app_name, dataset_name
 #
 # Returns:
 #       dies

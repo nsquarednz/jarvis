@@ -100,7 +100,7 @@ MAIN: {
 
     &Jarvis::Config::Setup (\%Main::args);
 
-    &Jarvis::Error::Debug ("User Name = " . $Main::args{'user_name'}, %Main::args);
+    &Jarvis::Error::Debug ("User Name = " . $Main::args{'username'}, %Main::args);
     &Jarvis::Error::Debug ("Group List = " . $Main::args{'group_list'}, %Main::args);
 
     # This is a cookie that sets the SESSION.
