@@ -1,5 +1,5 @@
 Ext.onReady (function () {       
-    jarvisInit ('spiderfan');
+    jarvisInit ('demo');
  
     jarvisEraseCookie ('CGISESSID');
 });

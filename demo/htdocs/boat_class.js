@@ -138,18 +138,18 @@ Ext.onReady (function () {
         ],
         buttons: [
             {
-                text: 'View Items',
+                text: 'View Boats',
                 iconCls:'detail',
                 handler: function () {
                     if (boat_class_store.getModifiedRecords().length > 0) {
-                        alert ('Cannot view items with uncommitted changes pending.');
+                        alert ('Cannot view boats with uncommitted changes pending.');
                         return;
                     }
                     var rowcol = grid.getSelectionModel().getSelectedCell();
                     if (rowcol != null) {
                         var r = boat_class_store.getAt (rowcol[0]);
                         if (r.get('class') != '') {
-                            location.href = 'item.html?class=' + r.get('class');
+                            location.href = 'boat.html?class=' + r.get('class');
                         }
                     }
                 }

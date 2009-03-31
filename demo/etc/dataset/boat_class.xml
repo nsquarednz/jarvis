@@ -9,12 +9,14 @@ ORDER BY class
 UPDATE boat_class
 SET class = BTRIM ({{class}}),
     active = {{active}},
-    description = NULLIF (BTRIM ({{description}}), '')
+    description = NULLIF (BTRIM ({{description}}), ''),
+    change_user = {{__username}},
+    change_date = now()
 WHERE id = {{id}};
     </update>
     <insert returning="yes">
-INSERT INTO boat_class (class, active, description)
-VALUES (BTRIM ({{class}}), {{active}}, NULLIF (BTRIM ({{description}}), ''))
+INSERT INTO boat_class (class, active, description, change_user, change_date)
+VALUES (BTRIM ({{class}}), {{active}}, NULLIF (BTRIM ({{description}}), ''), {{__username}}, now())
 RETURNING {{_record_id}}::integer as _record_id, id;
     </insert>
     <delete>
