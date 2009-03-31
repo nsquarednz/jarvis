@@ -157,7 +157,7 @@ sub Jarvis::Login::Check {
     }
     $ldap->unbind ();
 
-    # Reconnect.
+    # Reconnect and check the password.
     &Jarvis::Error::Debug ("Connecting to ActiveDirectory Server: '$server:$port'.", %$args_href);
     $ldap = Net::LDAP->new ($server, port => $port) || die "Cannot connect to '$server' on port $port\n";
 
