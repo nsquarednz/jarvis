@@ -103,17 +103,28 @@ function jarvisSendChange (store, dataset_name, fields) {
         // We received a response back from the server, that's a good start.
         success: function (response, request) {
 
-            // Eval the response.  It MUST be valid JSON.
-            var result = Ext.util.JSON.decode (response.responseText);
+            // Eval the response.  It SHOULD be valid JSON.  However, bad JSON is basically
+            // treated the same as good JSON with a failure flag.
+            var result;
+            try {
+                result = Ext.util.JSON.decode (response.responseText);
 
-            // If we succeeded, fire the writeback listener if this was the last update.
-            if (result.success == 1) {
-                if (store.getModifiedRecords().length == 0) {
+                // If we succeeded, fire the writeback listener if this was the last update.
+                if (result.success == 1) {
+                    if (store.getModifiedRecords().length == 0) {
+                        store.fireEvent ('writeback', store, result);
+                    }
+
+                // This indicates that not all updates succeeded.  You should reload your store.
+                } else {
                     store.fireEvent ('writeback', store, result);
                 }
 
-            // This indicates that not all updates succeeded.  You should reload your store.
-            } else {
+            // Response wasn't good JSON.
+            } catch (e) {
+                var result = new Object ();
+                result.success = 0;
+                result.message = response.responseText;
                 store.fireEvent ('writeback', store, result);
             }
         },
