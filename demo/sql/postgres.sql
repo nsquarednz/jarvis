@@ -3,9 +3,12 @@
 -- database, though this script will need adapting.
 --
 CREATE DATABASE jarvis_demo;
+\connect jarvis_demo;
+
 CREATE ROLE "www-data" WITH LOGIN;
 CREATE ROLE "admin";
 GRANT "admin" TO "www-data";
+
 
 -- This table is used to determine who can login.
 CREATE TABLE users (
@@ -24,6 +27,9 @@ CREATE TABLE boat_class (
     class text UNIQUE NOT NULL CHECK (class <> ''),
     active text NOT NULL CHECK (active = 'Y' OR active = 'N'),
     description text);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON boat_class TO admin;
+GRANT UPDATE ON SEQUENCE boat_class_id_seq TO admin;
 
 INSERT INTO boat_class (class, active, description)
     VALUES ('X Class', 'N', 'Product of a deranged mind.');
@@ -44,6 +50,9 @@ CREATE TABLE boat (
     owner text,
     description text,
     PRIMARY KEY (class, name));
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON boat TO admin;
+GRANT UPDATE ON SEQUENCE boat_id_seq TO admin;
 
 INSERT INTO boat (name, registration_num, class, owner, description)
     VALUES ('Flying Fox II', 13423, 'X Class', 'Graham Parker', 'Pink and blue.');

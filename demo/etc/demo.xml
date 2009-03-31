@@ -1,18 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <jarvis>
-    <app name="application1" use_placeholders="yes" format="json" debug="no">
+    <app name="application1" use_placeholders="yes" format="json" debug="yes">
+	<dataset_dir>/opt/jarvis/demo/etc/dataset</dataset_dir>
         <sessiondb store="driver:file;serializer:default;id:md5">
-            <parameter name="Directory" value="/tmp/app1sessions"/>
+            <parameter name="Directory" value="/tmp/demo"/>
         </sessiondb>
         <login module="Jarvis::Login::Database">
-	    <parameter name="user_table">staff</parameter>
-            <parameter name="user_username_column">name</parameter>
-            <parameter name="user_password_column">password</parameter>
-            <parameter name="group_table">staff_group</parameter>
-            <parameter name="group_username_column">name</parameter>
-            <parameter name="group_group_column">group_name</parameter>
+            <parameter name="user_table" value="users"/>
+            <parameter name="user_username_column" value="name"/>
+            <parameter name="user_password_column" value="password"/>
 	</login>
-        <database connect="dbi:Pg:dbname=myappdb" username="" password=""/>
+        <database connect="dbi:Pg:dbname=jarvis_demo" username="" password=""/>
     </app>
     <app name="application2" use_placeholders="no" format="xml" debug="yes" max_rows="500">
         <sessiondb store="driver:file;serializer:default;id:md5">

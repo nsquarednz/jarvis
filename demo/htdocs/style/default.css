@@ -18,10 +18,10 @@ h2 {
 }
 .top_background {
     padding-top: 12px;
-    padding-left: 40px;
+    padding-left: 50px;
     font-size: 160%;
     height: 48px;
-    background: #fff url('/edit/decoration/top_background.png') no-repeat;
+    background: #fff url('/demo/decoration/top_background.png') no-repeat;
 }
 .work_area {
     width: 780;
