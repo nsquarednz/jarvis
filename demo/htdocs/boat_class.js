@@ -92,7 +92,8 @@ Ext.onReady (function () {
                     store: ['Y', 'N'],
                     mode: 'local',
                     triggerAction: 'all',
-                    forceSelection: true
+                    forceSelection: true,
+                    editable: false
                 })
             },
         ],

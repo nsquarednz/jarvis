@@ -96,6 +96,14 @@ Ext.onReady (function () {
                 width: 120,
                 dataIndex: 'class',
                 sortable: true,
+                editor: new Ext.form.ComboBox({
+                    store: boat_class_store,
+                    mode: 'local',
+                    triggerAction: 'all',
+                    displayField: 'class',
+                    valueField: 'class',
+                    forceSelection: true
+                })
             },{
                 header: "Name",
                 width: 120,
@@ -215,7 +223,6 @@ Ext.onReady (function () {
         displayField: 'class',
         valueField: 'class',
         forceSelection: true,
-        editable: false,
         valueNotFoundText: '<Select Boat Class...>',
         listeners: { 'select':
             function (combo, record, index) {

@@ -1,4 +1,4 @@
-<dataset serial="id" read="*" write="admin">
+<dataset serial="id" read="*" write="*">
     <select>
 SELECT id, name,
         COALESCE (registration_num, 0) as registration_num,

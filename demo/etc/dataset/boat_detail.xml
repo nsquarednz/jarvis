@@ -1,40 +1,21 @@
 <dataset serial="id" read="*" write="*">
     <select>
-SELECT id, rank, name, filename,
-        COALESCE (warning, '') AS warning,
-        COALESCE (nickname, '') AS nickname,
-        COALESCE (password, '') AS password,
-        COALESCE (email, '') AS email,
-        COALESCE (url, '') AS url,
-        COALESCE (status, '') AS status,
-        COALESCE (occupation, '') AS occupation,
-        COALESCE (born, 0) AS born,
-        COALESCE (city, '') AS city,
-        COALESCE (job_title, '') AS job_title,
-        COALESCE (intro, '') AS intro,
-        COALESCE (collects, '') AS collects,
-        COALESCE (why_fan, '') AS why_fan,
-        COALESCE (favourite, '') AS favourite
-FROM staff
-WHERE ID = {{id}} AND (({{__group:admin}}::integer IS NOT NULL) OR (name = {{__username}}))
+SELECT id, class, name, 
+        COALESCE (registration_num, 0) AS registration_num,
+        COALESCE (owner, '') AS owner,
+        COALESCE (description, '') AS description
+FROM boat
+WHERE ID = {{id}}
     </select>
     <update>
-UPDATE staff
-SET nickname = NULLIF (BTRIM ({{nickname}}), ''),
-    password = NULLIF (BTRIM ({{password}}), ''),
-    email = NULLIF (BTRIM ({{email}}), ''),
-    url = NULLIF (BTRIM ({{url}}), ''),
-    status = NULLIF (BTRIM ({{status}}), ''),
-    occupation = NULLIF (BTRIM ({{occupation}}), ''),
-    born = NULLIF ({{born}}, 0),
-    city = NULLIF (BTRIM ({{city}}), ''),
-    job_title = NULLIF (BTRIM ({{job_title}}), ''),
-    intro = NULLIF (BTRIM ({{intro}}), ''),
-    collects = NULLIF (BTRIM ({{collects}}), ''),
-    why_fan = NULLIF (BTRIM ({{why_fan}}), ''),
-    favourite = NULLIF (BTRIM ({{favourite}}), ''),
+UPDATE boat
+SET name = BTRIM ({{name}}),
+    class = BTRIM ({{class}}),
+    registration_num = NULLIF ({{registration_num}}, 0),
+    owner = NULLIF (BTRIM ({{owner}}), ''),
+    description = NULLIF (BTRIM ({{description}}), ''),
     change_user = {{__username}},
     change_date = now()
-WHERE ID = {{id}} AND (({{__group:admin}}::integer IS NOT NULL) OR (name = {{__username}}))
+WHERE ID = {{id}}
     </update>
 </dataset>
