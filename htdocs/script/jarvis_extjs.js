@@ -120,7 +120,7 @@ function jarvisSendChange (store, dataset_name, fields) {
                     store.fireEvent ('writeback', store, result);
                 }
 
-            // Response wasn't good JSON.
+            // Response wasn't good JSON.  Assume it was an error message of some kind.
             } catch (e) {
                 var result = new Object ();
                 result.success = 0;
