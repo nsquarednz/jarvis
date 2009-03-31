@@ -67,6 +67,22 @@ function jarvisPostParams (action_name, dataset_name) {
     this.dataset = dataset_name;
 }
 
+// Gets a parameter by looking either at the #<text> part or the ?<content>
+// part of a URL.  We use # sometimes because a script can set its hash
+// part but cannot set its ? part without a page reload.
+//
+function jarvisArg (url, arg_name, default_value) {
+    // This will include the ? and # parts, but they will be ignored.
+    var args = Ext.urlDecode (url.substring(url.indexOf('#')+1, url.length));
+    if (args[arg_name]) {
+        return args[arg_name];
+    }
+
+    // This is just the part after #.  urlDecode thinks it is the part after ?.
+    var args = Ext.urlDecode (url.substring(url.indexOf('?')+1, url.length));
+    return args[arg_name] || default_value;
+}
+
 // Store load failed.  Set this as your "loadexception" handler on your Stores
 // and we will print out the exception message (probably 'need to login') and
 // then will redirect to the login page.  If you have two stores, we'll only
