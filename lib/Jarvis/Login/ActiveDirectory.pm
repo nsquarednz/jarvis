@@ -163,7 +163,7 @@ sub Jarvis::Login::Check {
 
     $mesg = $ldap->bind ($dn, password => $password);
     if ($mesg->code == 49) {
-        return ("Invalid password '$password'.");
+        return ("Invalid password.");
     }
     $mesg->code && &Jarvis::Error::MyDie ("Bind to server '$server:$port' failed with " . $mesg->code . " '" . $mesg->error . "'", %$args_href);
     $ldap->unbind ();
