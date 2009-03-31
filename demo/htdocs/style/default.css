@@ -1,0 +1,55 @@
+body {
+    font-family:helvetica,tahoma,verdana,sans-serif;
+    font-size:13px;
+    background-color:#fff !important;
+}
+p {
+    margin-bottom:15px;
+}
+h1 {
+    font-size:large;
+    margin-bottom:20px;
+}
+h2 {
+    font-size:14px;
+    color:#333;
+    font-weight:bold;
+    margin:10px 0;
+}
+.top_background {
+    padding-top: 12px;
+    padding-left: 40px;
+    font-size: 160%;
+    height: 48px;
+    background: #fff url('/edit/decoration/top_background.png') no-repeat;
+}
+.work_area {
+    width: 780;
+    height: 640;
+    margin-top: 8px;
+    margin-left: 12px;
+}
+.error_message {
+    color: #d00;
+}
+.add {
+    background-image:url(/edit/decoration/add.png) !important;
+}
+.remove {
+    background-image:url(/edit/decoration/remove.png) !important;
+}
+.save {
+    background-image:url(/edit/decoration/save.png) !important;
+}
+.detail {
+    background-image:url(/edit/decoration/detail.png) !important;
+}
+
+/* Put a light border around our extended text fields in grids. */
+.x-grid3-row-body {
+    margin: 0 5 5 5;
+    border: 1px solid #ededed;
+}
+.x-grid3-padded-cell {
+    margin: 5 5 5 5;
+}
