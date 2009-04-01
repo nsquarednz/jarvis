@@ -71,28 +71,57 @@ sub AddSpecialExecVariables {
 ################################################################################
 # Shows our current connection status.
 #
-# Params: Hash of Args (* indicates mandatory)
-#       exec, *logged_in, *user-name, *error_string, *group_list
+# Params: 
+#       $jconfig - Jarvis::Config object
+#           READ
+#               xml
+#               cgi
+#
+#       $action - Name of the action we are requested to perform.
 #
 # Returns:
-#       1.
-#       die on error.
+#       0 if the action is not a known "exec"
+#       1 if the action is known and successful
+#       die on error attempting to perform the action
 ################################################################################
 #
 sub Do {
-    my ($jconfig) = @_;
+    my ($jconfig, $action) = @_;
 
-    # Get and check our exec parameters.
-    my $action = $jconfig->{'action'};
-    my $access = $jconfig->{'exec'}{$action}{'access'};
-    my $command = $jconfig->{'exec'}{$action}{'command'};
-    my $add_headers = $jconfig->{'exec'}{$action}{'add_headers'};
-    my $filename_parameter = $jconfig->{'exec'}{$action}{'filename_parameter'};
+    ###############################################################################
+    # See if we have any extra "exec" actions for this application.
+    ###############################################################################
+    #
+    my $access = undef;
+    my $command = undef;
+    my $add_headers = undef;
+    my $filename_parameter = undef;
 
-    ($add_headers && ! $filename_parameter) && &Jarvis::Error::MyDie ($jconfig, "Config for exec '$action' has 'add_headers' but no 'filename_parameter'");
+    my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
+    if ($axml->{'exec'}) {
+        foreach my $exec (@{ $axml->{'exec'} }) {
+            next if ($action ne $exec->{'action'}->content);
+
+            &Jarvis::Error::Debug ($jconfig, "Found matching custom <exec> action '$action'.");
+
+            $access = $exec->{'access'}->content || &Jarvis::Error::MyDie ($jconfig, "No 'access' defined for exec action '$action'");
+            $command = $exec->{'command'}->content || &Jarvis::Error::MyDie ($jconfig, "No 'access' defined for exec action '$action'");
+            $add_headers = defined ($Jarvis::Config::yes_value {lc ($exec->{'add_headers'}->content || "no")});
+            $filename_parameter = $exec->{'filename_parameter'}->content;
+        }
+    }
+
+    # If no match, that's fine.  Just say we couldn't do it.
+    $command || return 0;
+
+    # Need filename if we're going to add the headers.  This is the name of the CGI
+    # parameter that we should evaluate in order to determine the returned filename
+    # when we pipe the content back to the browser.
+    #
+    ($add_headers && ! $filename_parameter) &&
+        &Jarvis::Error::MyDie ($jconfig, "Config for exec '$action' has 'add_headers' but no 'filename_parameter'");
 
     # Check security.
-    my $allowed_groups = $access;
     my $failure = &Jarvis::Login::CheckAccess ($jconfig, $access);
     ($failure ne '') && &Jarvis::Error::MyDie ($jconfig, "Wanted exec access: $failure");
 
@@ -163,6 +192,8 @@ sub Do {
     # Now print the output.  If the report didn't add headers like it was supposed
     # to, then this will all turn to custard.
     print $output;
+
+    return 1;
 }
 
 1;

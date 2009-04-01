@@ -157,8 +157,8 @@ MAIN: {
     # cases where it is doing the header.  But if the exec script itself is
     # doing all the headers, then there will be no session cookie.
     #
-    } elsif ($jconfig->{'exec'}{$action}) {
-        &Jarvis::Exec::Do ($jconfig);
+    } elsif (&Jarvis::Exec::Do ($jconfig, $action)) {
+        # All is well if this returns true.  The action is treated.
 
     # It's the end of the world as we know it.
     } else {

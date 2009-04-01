@@ -53,9 +53,12 @@ my %yes_value = ('yes' => 1, 'true' => 1, '1' => 1);
 #
 #       $jconfig - Jarvis::Config object
 #           READ
-#               cgi                 Contains data values for {{param}} in SQL
-#               dataset_dir         Where to look for our dataset XML files
-#               dataset_name        Specifies our <dataset_name>.xml DS config file
+#               cgi                 Find our user-supplied "dataset" name.
+#               xml                 Find our app-configured "dataset_dir" dir.
+#           WRITE
+#               dataset_name        Stored for the benefit of error/debug.
+#               use_placeholders    Stored for convenience.
+#               max_rows            Stored for convenience.
 #
 # Returns:
 #       $dsxml - XML::Smart object holding config info read from file.
@@ -65,19 +68,29 @@ sub GetConfigXML {
     my ($jconfig) = @_;
 
     my $cgi = $jconfig->{"cgi"};
-    my $dataset_dir = $jconfig->{"dataset_dir"};
 
-    # Now we require 'dataset' to also be a CGI parameter.
+    # And this MUST contain our dataset dir.
+    my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
+    my $dataset_dir = $axml->{'dataset_dir'}->content ||
+        &Jarvis::Error::MyDie ($jconfig,  "No attribute 'dataset_dir' configured.");
+    &Jarvis::Error::Debug ($jconfig, "Dataset Directory '$dataset_dir'.");
+
+    # Now we require 'dataset' to also be a CGI parameter.  We store this in the
+    # $jconfig 
     my $dataset_name = $cgi->param ('dataset') || die "Missing mandatory parameter 'dataset'!\n";
     ($dataset_name =~ m/^\w+$/) || die "Invalid characters in parameter 'dataset'\n";
-    $jconfig->{"dataset_name"} = $dataset_name;
+    $jconfig->{'dataset_name'} = $dataset_name;
+    &Jarvis::Error::Debug ($jconfig, "Dataset Directory '$dataset_dir'.");
 
-    # Load the dataset-specific XML file.
+    # Load the dataset-specific XML file and double-check it has top-level <dataset> tag.
     my $dsxml_filename = "$dataset_dir/$dataset_name.xml";
     my $dsxml = XML::Smart->new ("$dsxml_filename") || die "Cannot read '$dsxml_filename': $!\n";
     ($dsxml->{dataset}) || die "Missing <dataset> tag in '$dsxml_filename'!\n";
 
-    # Now we have dataset config.  Add to our list of args.
+    # Load a couple of other parameters.  This is a "side-effect".  Yeah, it's a bit yucky.
+    $jconfig->{'use_placeholders'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'use_placeholders'}->content || "no")});
+    $jconfig->{'max_rows'} = lc ($axml->{'max_rows'}->content || 200);
+
     return $dsxml;
 }
 
@@ -242,8 +255,6 @@ sub SqlWithVariables {
 #       $jconfig - Jarvis::Config object
 #           READ
 #               cgi                 Contains data values for {{param}} in SQL
-#               dataset_dir         Where to look for our dataset XML files
-#               dataset_name        Specifies our <dataset_name>.xml DS config file
 #               username            Used for {{username}} in SQL
 #               group_list          Used for {{group_list}} in SQL
 #               with_placeholders   Should we use placeholders or string subst in SQL
@@ -334,8 +345,6 @@ sub Fetch {
 #       $jconfig - Jarvis::Config object
 #           READ
 #               cgi                 Contains data values for {{param}} in SQL
-#               dataset_dir         Where to look for our dataset XML files
-#               dataset_name        Specifies our <dataset_name>.xml DS config file
 #               username            Used for {{username}} in SQL
 #               group_list          Used for {{group_list}} in SQL
 #               with_placeholders   Should we use placeholders or string subst in SQL

@@ -57,12 +57,18 @@ sub Handle {
 
     $dbh && return $dbh;
 
-    $jconfig->{'dbconnect'} || &Jarvis::Error::MyDie ($jconfig, "No 'dbconnect' parameter specified.  Cannot connect to DB.");
-    &Jarvis::Error::Debug ($jconfig, "DB Connect = " . $jconfig->{'dbconnect'});
-    &Jarvis::Error::Debug ($jconfig, "DB Username = " . $jconfig->{'dbusername'});
-    &Jarvis::Error::Debug ($jconfig, "DB Password = " . $jconfig->{'dbpassword'});
+    my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
+    my $dbxml = $axml->{'database'} || &Jarvis::Error::MyDie ($jconfig, "No 'database' config present.  Cannot connect to DB.");
 
-    $dbh = DBI->connect ($jconfig->{'dbconnect'}, $jconfig->{'dbusername'}, $jconfig->{'dbpassword'}) ||
+    my $dbconnect = $dbxml->{'connect'}->content || "dbi:Pg:" . $jconfig->{'app_name'};
+    my $dbusername = $dbxml->{'username'}->content || '';
+    my $dbpassword = $dbxml->{'password'}->content || '';
+
+    &Jarvis::Error::Debug ($jconfig, "DB Connect = $dbconnect");
+    &Jarvis::Error::Debug ($jconfig, "DB Username = $dbusername");
+    &Jarvis::Error::Debug ($jconfig, "DB Password = $dbpassword");
+
+    $dbh = DBI->connect ($dbconnect, $dbusername, $dbpassword) ||
         &Jarvis::Error::MyDie ("Cannot connect to database. " . DBI::errstr);
 }
 
