@@ -68,7 +68,7 @@ package Jarvis::Login::Database;
 #               cgi
 #               Database config indirectly via Jarvis::DB
 #   
-#       $login_parameters_href - Hash of login parameters parsed from
+#       %login_parameters - Hash of login parameters parsed from
 #               the master application XML file by the master Login class.
 #       
 #
@@ -77,15 +77,15 @@ package Jarvis::Login::Database;
 ################################################################################
 #
 sub Jarvis::Login::Database::Check {
-    my ($jconfig, $login_parameters_href) = @_;
+    my ($jconfig, %login_parameters) = @_;
 
     # Our user name login parameters are here...
-    my $user_table = $$login_parameters_href{'user_table'};
-    my $user_username_column = $$login_parameters_href{'user_username_column'};
-    my $user_password_column = $$login_parameters_href{'user_password_column'};
-    my $group_table = $$login_parameters_href{'group_table'};
-    my $group_username_column = $$login_parameters_href{'group_username_column'};
-    my $group_group_column = $$login_parameters_href{'group_group_column'};
+    my $user_table = $login_parameters{'user_table'};
+    my $user_username_column = $login_parameters{'user_username_column'};
+    my $user_password_column = $login_parameters{'user_password_column'};
+    my $group_table = $login_parameters{'group_table'};
+    my $group_username_column = $login_parameters{'group_username_column'};
+    my $group_group_column = $login_parameters{'group_group_column'};
 
     if (! ($user_table && $user_username_column && $user_password_column)) {
         return ("Missing configuration for Login module Database.");

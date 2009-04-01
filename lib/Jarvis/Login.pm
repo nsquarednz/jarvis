@@ -1,14 +1,9 @@
 ###############################################################################
-# Description:  The Config::Setup method will read variables from our
-#               <app_name>.xml (and possibly other sources).  It will perform
-#               a Login attempt if required, and will set other variables
-#               based on the results of the Login.  The derived config is
-#               stored in an %args hash so that other functions can access
-#               it.
+# Description:  This is a wrapper which loads and hands off to a specific
+#               login module depending on the login protocol being used.
 #
-#               The actual login functionality is contained in a login module,
-#               e.g. Database, None, LDAP, etc.  The <app_name>.xml tells this
-#               Config function which module to use for this application.
+#               We will check for session cookies, and will only require login
+#               if we can't locate an active valid session.
 #
 # Licence:
 #       This file is part of the Jarvis WebApp/Database gateway utility.
@@ -130,12 +125,12 @@ sub Check {
         &Jarvis::Error::Debug ($jconfig, "Loading login module '" . $login_module . "'.");
         eval "require $login_module";
         if ($@) {
-            die "Cannot load login module '$login_module': " . $@;
+            &Jarvis::Error::MyDie ($jconfig, "Cannot load login module '$login_module': " . $@);
         }
         my $login_method = $login_module . "::Check";
         {
             no strict 'refs';
-            ($error_string, $username, $group_list) = &$login_method ($jconfig, \%login_parameters);
+            ($error_string, $username, $group_list) = &$login_method ($jconfig, %login_parameters);
         }
 
         $username || ($username = '');

@@ -69,7 +69,7 @@ package Jarvis::Login::ActiveDirectory;
 #           READ
 #               cgi
 #
-#       $login_parameters_href - Hash of login parameters parsed from
+#       %login_parameters - Hash of login parameters parsed from
 #               the master application XML file by the master Login class.
 #
 # Returns:
@@ -77,15 +77,15 @@ package Jarvis::Login::ActiveDirectory;
 ################################################################################
 #
 sub Jarvis::Login::ActiveDirectory::Check {
-    my ($jconfig, $login_parameters_href) = @_;
+    my ($jconfig, %login_parameters) = @_;
 
     # Our user name login parameters are here...
-    my $server = $$login_parameters_href{'server'};
-    my $port = $$login_parameters_href{'port'} || 389;
-    my $bind_username = $$login_parameters_href{'bind_username'} || '';
-    my $bind_password = $$login_parameters_href{'bind_password'} || '';
-    my $base_object = $$login_parameters_href{'base_object'} || '';
-    my $suffix = $$login_parameters_href{'suffix'};
+    my $server = $login_parameters{'server'};
+    my $port = $login_parameters{'port'} || 389;
+    my $bind_username = $login_parameters{'bind_username'} || '';
+    my $bind_password = $login_parameters{'bind_password'} || '';
+    my $base_object = $login_parameters{'base_object'} || '';
+    my $suffix = $login_parameters{'suffix'};
 
     $server || return ("Missing 'server' configuration for Login module ActiveDirectory.");
     $base_object || return ("Missing 'base_object' configuration for Login module ActiveDirectory.");

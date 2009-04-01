@@ -56,7 +56,7 @@ package Jarvis::Login::None;
 # Params:
 #       $jconfig - Jarvis::Config object (not used)
 #
-#       $login_parameters_href - Hash of login parameters parsed from
+#       %login_parameters - Hash of login parameters parsed from
 #               the master application XML file by the master Login class.
 
 #
@@ -65,10 +65,10 @@ package Jarvis::Login::None;
 ################################################################################
 #
 sub Jarvis::Login::None::Check {
-    my ($jconfig, $login_parameters_href) = @_;
+    my ($jconfig, %login_parameters) = @_;
 
-    my $username = $$login_parameters_href{'username'} || "guest";
-    my $group_list = $$login_parameters_href{'group_list'} || "guest";
+    my $username = $login_parameters{'username'} || "guest";
+    my $group_list = $login_parameters{'group_list'} || "guest";
 
     return ("", $username, $group_list);
 }
