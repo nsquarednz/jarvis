@@ -92,21 +92,22 @@ sub Do {
     # See if we have any extra "exec" actions for this application.
     ###############################################################################
     #
-    my $access = undef;
-    my $command = undef;
-    my $add_headers = undef;
-    my $filename_parameter = undef;
+    my $allowed_groups = undef;         # Access groups permitted, or "*" or "**"
+    my $command = undef;                # Command to exec.
+    my $add_headers = undef;            # Should we add headers.
+    my $default_filename = undef;       # A default return filename to use.
+    my $filename_parameter = undef;     # Which CGI parameter contains our filename.
 
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
     if ($axml->{'exec'}) {
         foreach my $exec (@{ $axml->{'exec'} }) {
             next if ($action ne $exec->{'action'}->content);
-
             &Jarvis::Error::Debug ($jconfig, "Found matching custom <exec> action '$action'.");
 
-            $access = $exec->{'access'}->content || &Jarvis::Error::MyDie ($jconfig, "No 'access' defined for exec action '$action'");
-            $command = $exec->{'command'}->content || &Jarvis::Error::MyDie ($jconfig, "No 'access' defined for exec action '$action'");
+            $allowed_groups = $exec->{'access'}->content || &Jarvis::Error::MyDie ($jconfig, "No 'access' defined for exec action '$action'");
+            $command = $exec->{'command'}->content || &Jarvis::Error::MyDie ($jconfig, "No 'command' defined for exec action '$action'");
             $add_headers = defined ($Jarvis::Config::yes_value {lc ($exec->{'add_headers'}->content || "no")});
+            $default_filename = $exec->{'default_filename'}->content;
             $filename_parameter = $exec->{'filename_parameter'}->content;
         }
     }
@@ -114,15 +115,8 @@ sub Do {
     # If no match, that's fine.  Just say we couldn't do it.
     $command || return 0;
 
-    # Need filename if we're going to add the headers.  This is the name of the CGI
-    # parameter that we should evaluate in order to determine the returned filename
-    # when we pipe the content back to the browser.
-    #
-    ($add_headers && ! $filename_parameter) &&
-        &Jarvis::Error::MyDie ($jconfig, "Config for exec '$action' has 'add_headers' but no 'filename_parameter'");
-
     # Check security.
-    my $failure = &Jarvis::Login::CheckAccess ($jconfig, $access);
+    my $failure = &Jarvis::Login::CheckAccess ($jconfig, $allowed_groups);
     ($failure ne '') && &Jarvis::Error::MyDie ($jconfig, "Wanted exec access: $failure");
 
     # Get our parameters.  Note that our special variables like __username will
@@ -131,23 +125,18 @@ sub Do {
     my %param_values = $jconfig->{'cgi'}->Vars;
     &AddSpecialExecVariables ($jconfig, \%param_values);
 
-    # OK, get our filename parameter if required.
-    my $filename = undef;
-    my $mime_type = undef;
+    # Figure out a filename.  It's not mandatory, if we don't have a default
+    # filename and we don't have a filename_parameter supplied and defined then
+    # we will return anonymous content in text/plain format.
+    #
+    my $filename = $param_values {$filename_parameter} || $default_filename;
 
-    if ($add_headers) {
-        $filename = $param_values {$filename_parameter} ||
-            &Jarvis::Error::MyDie ($jconfig, "Missing CGI parameter '$filename_parameter' required for returned filename.");
-
-        my $mime_types = MIME::Types->new;
-        $mime_type = $mime_types->mimeTypeOf ($filename) || &Jarvis::Error::MyDie ($jconfig, "Cannot determine mime type from supplied filename '$filename'.");;
-
-        delete $param_values{$filename_parameter};
-    }
-
-    # Now delete some other magic system parameters.  These were for jarvis, not for the
+    # Delete our magic system parameters.  These were for jarvis, not for the
     # exec.  If you want your application to have a parameter named "action" then
-    # you are out of luck.  Rename it.  Same for "app".
+    # you are out of luck.  Rename it.  Same for "app".  We delete the filename
+    # parameter, that shouldn't in theory be a problem.
+    #
+    delete $param_values{$filename_parameter};
     delete $param_values{"action"};
     delete $param_values{"app"};
 
@@ -182,11 +171,18 @@ sub Do {
     # Are we supposed to add headers?  Does that include a filename header?
     # Note that if we really wanted to, we could squeeze in 
     if ($add_headers) {
+        my $mime_types = MIME::Types->new;
+        my $mime_type = $mime_types->mimeTypeOf ($filename) || MIME::Types->type('text/plain');
 
         &Jarvis::Error::Debug ($jconfig, "Exec returned mime type '" . $mime_type->type . "'");
 
         my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
-        print $jconfig->{'cgi'}->header(-type => $mime_type->type, 'Content-Disposition' => "inline; filename=$filename", -cookie => $cookie);
+        if ($filename) {
+            print $jconfig->{'cgi'}->header(-type => $mime_type->type, 'Content-Disposition' => $filename && "inline; filename=$filename", -cookie => $cookie);
+
+        } else {
+            print $jconfig->{'cgi'}->header(-type => $mime_type->type, -cookie => $cookie);
+        }
     }
 
     # Now print the output.  If the report didn't add headers like it was supposed

@@ -41,6 +41,7 @@ use Jarvis::Login;
 use Jarvis::Dataset;
 use Jarvis::Status;
 use Jarvis::Exec;
+use Jarvis::Plugin;
 use Jarvis::DB;
 
 package Main;
@@ -158,6 +159,13 @@ MAIN: {
     # doing all the headers, then there will be no session cookie.
     #
     } elsif (&Jarvis::Exec::Do ($jconfig, $action)) {
+        # All is well if this returns true.  The action is treated.
+
+    # A custom plugin for this application?  This is very similar to an Exec,
+    # except that where an exec is a `<command>` system call, a Plugin is a
+    # dynamically loaded module method.
+    #
+    } elsif (&Jarvis::Plugin::Do ($jconfig, $action)) {
         # All is well if this returns true.  The action is treated.
 
     # It's the end of the world as we know it.
