@@ -58,18 +58,18 @@ sub Handle {
     $dbh && return $dbh;
 
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
-    my $dbxml = $axml->{'database'} || &Jarvis::Error::MyDie ($jconfig, "No 'database' config present.  Cannot connect to DB.");
+    my $dbxml = $axml->{'database'} || &Jarvis::Error::my_die ($jconfig, "No 'database' config present.  Cannot connect to DB.");
 
     my $dbconnect = $dbxml->{'connect'}->content || "dbi:Pg:" . $jconfig->{'app_name'};
     my $dbusername = $dbxml->{'username'}->content || '';
     my $dbpassword = $dbxml->{'password'}->content || '';
 
-    &Jarvis::Error::Debug ($jconfig, "DB Connect = $dbconnect");
-    &Jarvis::Error::Debug ($jconfig, "DB Username = $dbusername");
-    &Jarvis::Error::Debug ($jconfig, "DB Password = $dbpassword");
+    &Jarvis::Error::debug ($jconfig, "DB Connect = $dbconnect");
+    &Jarvis::Error::debug ($jconfig, "DB Username = $dbusername");
+    &Jarvis::Error::debug ($jconfig, "DB Password = $dbpassword");
 
     $dbh = DBI->connect ($dbconnect, $dbusername, $dbpassword) ||
-        &Jarvis::Error::MyDie ("Cannot connect to database. " . DBI::errstr);
+        &Jarvis::Error::my_die ("Cannot connect to database. " . DBI::errstr);
 }
 
 ################################################################################

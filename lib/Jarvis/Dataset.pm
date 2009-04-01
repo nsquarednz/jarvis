@@ -64,7 +64,7 @@ my %yes_value = ('yes' => 1, 'true' => 1, '1' => 1);
 #       $dsxml - XML::Smart object holding config info read from file.
 ################################################################################
 #
-sub GetConfigXML {
+sub get_config_xml {
     my ($jconfig) = @_;
 
     my $cgi = $jconfig->{"cgi"};
@@ -72,15 +72,15 @@ sub GetConfigXML {
     # And this MUST contain our dataset dir.
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
     my $dataset_dir = $axml->{'dataset_dir'}->content ||
-        &Jarvis::Error::MyDie ($jconfig,  "No attribute 'dataset_dir' configured.");
-    &Jarvis::Error::Debug ($jconfig, "Dataset Directory '$dataset_dir'.");
+        &Jarvis::Error::my_die ($jconfig,  "No attribute 'dataset_dir' configured.");
+    &Jarvis::Error::debug ($jconfig, "Dataset Directory '$dataset_dir'.");
 
     # Now we require 'dataset' to also be a CGI parameter.  We store this in the
     # $jconfig 
     my $dataset_name = $cgi->param ('dataset') || die "Missing mandatory parameter 'dataset'!\n";
     ($dataset_name =~ m/^\w+$/) || die "Invalid characters in parameter 'dataset'\n";
     $jconfig->{'dataset_name'} = $dataset_name;
-    &Jarvis::Error::Debug ($jconfig, "Dataset Directory '$dataset_dir'.");
+    &Jarvis::Error::debug ($jconfig, "Dataset Directory '$dataset_dir'.");
 
     # Load the dataset-specific XML file and double-check it has top-level <dataset> tag.
     my $dsxml_filename = "$dataset_dir/$dataset_name.xml";
@@ -98,7 +98,7 @@ sub GetConfigXML {
 # Get the SQL for the update, insert, and delete.
 #
 # Params:
-#       $jconfig - Jarvis::Config object (used for MyDie)
+#       $jconfig - Jarvis::Config object (used for my_die)
 #       $which   - SQL Type ("fetch", "insert", "update", "delete")
 #       $dsxml   - XML::Smart object for dataset configuration
 #
@@ -111,8 +111,8 @@ sub GetSQL {
     my ($jconfig, $which, $dsxml) = @_;
 
     my $sql = $dsxml->{dataset}{$which}->content;
-    $sql || &Jarvis::Error::MyDie ($jconfig, "This dataset has no SQL of type '$which'.");
-    $sql = &Trim ($sql);
+    $sql || &Jarvis::Error::my_die ($jconfig, "This dataset has no SQL of type '$which'.");
+    $sql = &trim ($sql);
 
     return $sql;
 }
@@ -141,7 +141,7 @@ sub GetSQL {
 #       1
 ################################################################################
 #
-sub AddSpecialDatasetVariables {
+sub add_special_dataset_variables {
 
     my ($jconfig, $param_values_href) = @_;
 
@@ -173,7 +173,7 @@ sub AddSpecialDatasetVariables {
 #       die on error.
 ################################################################################
 #
-sub SqlWithPlaceholders {
+sub sql_with_placeholders {
 
     my ($sql) = @_;
 
@@ -209,7 +209,7 @@ sub SqlWithPlaceholders {
 #       die on error.
 ################################################################################
 #
-sub SqlWithVariables {
+sub sql_with_variables {
 
     my ($sql, %param_values) = @_;
 
@@ -265,14 +265,14 @@ sub SqlWithVariables {
 #       die on error (including permissions error)
 ################################################################################
 #
-sub Fetch {
+sub fetch {
     my ($jconfig) = @_;
 
-    my $dsxml = &GetConfigXML ($jconfig) || die "Cannot load configuration for dataset.\n";
+    my $dsxml = &get_config_xml ($jconfig) || die "Cannot load configuration for dataset.\n";
 
     my $allowed_groups = $dsxml->{dataset}{"read"};
-    my $failure = &Jarvis::Login::CheckAccess ($jconfig, $allowed_groups);
-    $failure && &Jarvis::Error::MyDie ($jconfig, "Wanted read access: $failure");
+    my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
+    $failure && &Jarvis::Error::my_die ($jconfig, "Wanted read access: $failure");
 
     my $sql = &GetSQL ($jconfig, 'select', $dsxml);
 
@@ -280,26 +280,26 @@ sub Fetch {
     # special variables like __username will override sneaky user-supplied values.
     #
     my %param_values = $jconfig->{'cgi'}->Vars;
-    &AddSpecialDatasetVariables ($jconfig, \%param_values);
+    &add_special_dataset_variables ($jconfig, \%param_values);
 
     my @arg_values = ();
     if ($jconfig->{'use_placeholders'}) {
-        my ($sql_with_placeholders, @variable_names) = &SqlWithPlaceholders ($sql);
+        my ($sql_with_placeholders, @variable_names) = &sql_with_placeholders ($sql);
 
         $sql = $sql_with_placeholders;
         @arg_values = map { $param_values{$_} } @variable_names;
 
     } else {
-        my $sql_with_variables = &SqlWithVariables ($sql, %param_values);
+        my $sql_with_variables = &sql_with_variables ($sql, %param_values);
         $sql = $sql_with_variables;
     }
 
     # Prepare
-    &Jarvis::Error::Debug ($jconfig, "FETCH = " . $sql);
+    &Jarvis::Error::debug ($jconfig, "FETCH = " . $sql);
 
     my $dbh = &Jarvis::DB::Handle ($jconfig);
     my $sth = $dbh->prepare ($sql)
-        || &Jarvis::Error::MyDie ($jconfig, "Couldn't prepare statement '$sql': " . $dbh->errstr);
+        || &Jarvis::Error::my_die ($jconfig, "Couldn't prepare statement '$sql': " . $dbh->errstr);
 
     # Execute
     my $num_rows = 0;
@@ -356,24 +356,24 @@ sub Fetch {
 #       die on hard error.
 ################################################################################
 #
-sub Store {
+sub store {
     my ($jconfig) = @_;
 
-    my $dsxml = &GetConfigXML ($jconfig) || die "Cannot load configuration for dataset.\n";
+    my $dsxml = &get_config_xml ($jconfig) || die "Cannot load configuration for dataset.\n";
 
     my $allowed_groups = $dsxml->{dataset}{"write"};
-    my $failure = &Jarvis::Login::CheckAccess ($jconfig, $allowed_groups);
-    $failure && &Jarvis::Error::MyDie ($jconfig, "Wanted write access: $failure");
+    my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
+    $failure && &Jarvis::Error::my_die ($jconfig, "Wanted write access: $failure");
 
     # Figure out what field is our "serial" ID.  Normally it is "id", but it
     # could change.
     my $serial_name = $dsxml->{dataset}{serial};
-    $serial_name || &Jarvis::Error::MyDie ($jconfig, "This dataset has no serial ID parameter.");
+    $serial_name || &Jarvis::Error::my_die ($jconfig, "This dataset has no serial ID parameter.");
 
     # Check we have some changes and parse 'em from the JSON.  We get an
     # array of hashes.  Each array entry is a change record.
     my $changes_json = $jconfig->{'cgi'}->param ('fields')
-         || die &Jarvis::Error::MyDie("Missing mandatory store parameter 'fields'.");
+         || die &Jarvis::Error::my_die("Missing mandatory store parameter 'fields'.");
 
     my $fields_href = JSON::XS->new->utf8->decode ($changes_json);
     # Choose our statement and find the SQL and variable names.
@@ -390,7 +390,7 @@ sub Store {
     # Remove => DELETE.  Must have a serial code present.
     if ($transaction_type eq "remove") {
         ((defined $serial_value) && ($serial_value ne ''))
-            || &Jarvis::Error::MyDie ($jconfig, "Cannot delete entry with missing serial.");
+            || &Jarvis::Error::my_die ($jconfig, "Cannot delete entry with missing serial.");
 
         $sql = &GetSQL ($jconfig, 'delete', $dsxml);
 
@@ -402,38 +402,38 @@ sub Store {
         } else {
             $sql = &GetSQL ($jconfig, 'insert', $dsxml);
             $returning = defined ($yes_value {lc ($dsxml->{dataset}{'insert'}{'returning'} || "no")});
-            &Jarvis::Error::Debug ($jconfig, "Insert Returning = " . $returning);
+            &Jarvis::Error::debug ($jconfig, "Insert Returning = " . $returning);
         }
 
     } else {
-        &Jarvis::Error::MyDie ($jconfig, "Unsupported transaction type '$transaction_type'.");
+        &Jarvis::Error::my_die ($jconfig, "Unsupported transaction type '$transaction_type'.");
     }
 
     # Handle our parameters.  Either inline or with placeholders.  Note that our
     # special variables like __username will override sneaky user-supplied values.
     #
     my %param_values = %{ $fields_href };
-    &AddSpecialDatasetVariables ($jconfig, \%param_values);
+    &add_special_dataset_variables ($jconfig, \%param_values);
 
     my @arg_values = ();
     if ($jconfig->{'use_placeholders'}) {
-        my ($sql_with_placeholders, @variable_names) = &SqlWithPlaceholders ($sql);
+        my ($sql_with_placeholders, @variable_names) = &sql_with_placeholders ($sql);
 
         $sql = $sql_with_placeholders;
         @arg_values = map { $param_values{$_} } @variable_names;
-        &Jarvis::Error::Debug ($jconfig, "Statement Args = " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values));
+        &Jarvis::Error::debug ($jconfig, "Statement Args = " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values));
 
     } else {
-        my $sql_with_variables = &SqlWithVariables ($sql, %param_values);
+        my $sql_with_variables = &sql_with_variables ($sql, %param_values);
         $sql = $sql_with_variables;
     }
 
     # Prepare
-    &Jarvis::Error::Debug ($jconfig, "STORE = " . $sql);
+    &Jarvis::Error::debug ($jconfig, "STORE = " . $sql);
 
     my $dbh = &Jarvis::DB::Handle ($jconfig);
     my $sth = $dbh->prepare ($sql)
-        || &Jarvis::Error::MyDie ($jconfig, "Couldn't prepare statement '$sql': " . $dbh->errstr);
+        || &Jarvis::Error::my_die ($jconfig, "Couldn't prepare statement '$sql': " . $dbh->errstr);
 
     # Execute
     my $num_rows = 0;
@@ -450,12 +450,12 @@ sub Store {
         $sth->finish;
 
         if ($jconfig->{'format'} eq "json") {
-            return "{ \"success\": 0, \"message\": \"" . &EscapeJavaScript (&Trim($message)) . "\"}";
+            return "{ \"success\": 0, \"message\": \"" . &escape_java_script (&trim($message)) . "\"}";
 
         } else {
             my $xml = XML::Smart->new ();
             $xml->{success} = 0;
-            $xml->{message} = &Trim($message);
+            $xml->{message} = &trim($message);
             return $xml->data ();
         }
     }

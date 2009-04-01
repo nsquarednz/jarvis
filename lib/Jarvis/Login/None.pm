@@ -64,7 +64,7 @@ package Jarvis::Login::None;
 #       ($error_string or "", $username or "", "group1,group2,group3...")
 ################################################################################
 #
-sub Jarvis::Login::None::Check {
+sub Jarvis::Login::None::check {
     my ($jconfig, %login_parameters) = @_;
 
     my $username = $login_parameters{'username'} || "guest";

@@ -1,5 +1,5 @@
 ###############################################################################
-# Description:  Error logging functions - Debug, Log.  Also a MyDie function
+# Description:  Error logging functions - Debug, Log.  Also a my_die function
 #               which calls "die" but with some extra session info prepended
 #               to the die message string.
 #
@@ -46,7 +46,7 @@ use Jarvis::Text;
 #       dies
 ################################################################################
 #
-sub DumpString {
+sub dump_string {
     my ($jconfig, $level, $msg) = @_;
 
     my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime();
@@ -62,7 +62,7 @@ sub DumpString {
     (defined $jconfig->{'dataset_name'}) && ($header .= "/" . $jconfig->{'dataset_name'});
     $header .= "] ";
 
-    $msg = &Trim ($msg);
+    $msg = &trim ($msg);
     if ($msg !~ m/\n$/) {
         $msg .= "\n";
     }
@@ -72,7 +72,7 @@ sub DumpString {
 }
 
 ################################################################################
-# Dies with some standard "where are we" info.  Uses DumpString.
+# Dies with some standard "where are we" info.  Uses dump_string.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -82,42 +82,42 @@ sub DumpString {
 #       dies
 ################################################################################
 #
-sub MyDie {
+sub my_die {
     my ($jconfig, $msg) = @_;
 
-    die &DumpString ($jconfig, 'fatal', $msg);
+    die &dump_string ($jconfig, 'fatal', $msg);
 }
 
 ################################################################################
-# Same but just debug.  Uses DumpString.
+# Same but just debug.  Uses dump_string.
 #
-# Params: Same as MyDie.
+# Params: Same as my_die.
 #
 # Returns:
 #       Prints to STDERR and returns 1.
 ################################################################################
 #
-sub Debug {
+sub debug {
     my ($jconfig, $msg) = @_;
 
     $jconfig->{'debug'} || return;
 
-    print STDERR &DumpString ($jconfig, 'debug', $msg);
+    print STDERR &dump_string ($jconfig, 'debug', $msg);
 }
 
 ################################################################################
-# Same as debug, but always prints.  Uses DumpString.
+# Same as debug, but always prints.  Uses dump_string.
 #
-# Params: Same as MyDie and Debug.
+# Params: Same as my_die and Debug.
 #
 # Returns:
 #       Prints to STDERR and returns 1.
 ################################################################################
 #
-sub Log {
+sub log {
     my ($jconfig, $msg) = @_;
 
-    print STDERR &DumpString ($jconfig, 'log', $msg);
+    print STDERR &dump_string ($jconfig, 'log', $msg);
 }
 
 1;

@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-sub plugin::Demo::Do {
+sub plugin::Demo::do {
     my ($jconfig, %args) = @_;
 
     my $output = "";

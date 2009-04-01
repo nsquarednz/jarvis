@@ -60,7 +60,7 @@ $Carp::CarpLevel = 1;
 # Setup error handler.
 ###############################################################################
 #
-sub Handler {
+sub handler {
     my ($msg) = @_;
 
     # Truncate any thing after a null-TERM.  This is because LDAP error
@@ -86,7 +86,7 @@ sub Handler {
 #
 MAIN: {
     $SIG{__WARN__} = sub { die shift };
-    $SIG{__DIE__} = \&Main::Handler;
+    $SIG{__DIE__} = \&Main::handler;
 
     ###############################################################################
     # AppName: (mandatory parameter)
@@ -108,16 +108,16 @@ MAIN: {
     $jconfig->{'action'} = $action;
     my $allow_new_login = (($action eq "status") || ($action eq "fetch"));
 
-    &Jarvis::Login::Check ($jconfig, $allow_new_login);
+    &Jarvis::Login::check ($jconfig, $allow_new_login);
 
-    &Jarvis::Error::Debug ($jconfig, "User Name = " . $jconfig->{'username'});
-    &Jarvis::Error::Debug ($jconfig, "Group List = " . $jconfig->{'group_list'});
+    &Jarvis::Error::debug ($jconfig, "User Name = " . $jconfig->{'username'});
+    &Jarvis::Error::debug ($jconfig, "Group List = " . $jconfig->{'group_list'});
 
     # Status.  I.e. are we logged in?
     if ($action eq "status") {
 
         my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
-        my $return_text = &Jarvis::Status::Report ($jconfig);
+        my $return_text = &Jarvis::Status::report ($jconfig);
         print $cgi->header(-type => "text/plain", -cookie => $cookie);
         print $return_text;
 
@@ -133,7 +133,7 @@ MAIN: {
             $jconfig->{'group_list'} = '';
         }
 
-        my $return_text = &Jarvis::Status::Report ($jconfig);
+        my $return_text = &Jarvis::Status::report ($jconfig);
         print $cgi->header(-type => "text/plain", -cookie => $cookie);
         print $return_text;
 
@@ -141,7 +141,7 @@ MAIN: {
     } elsif ($action eq "fetch") {
 
         my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
-        my $return_text = &Jarvis::Dataset::Fetch ($jconfig);
+        my $return_text = &Jarvis::Dataset::fetch ($jconfig);
         print $cgi->header(-type => "text/plain", -cookie => $cookie);
         print $return_text;
 
@@ -149,7 +149,7 @@ MAIN: {
     } elsif ($action eq "store") {
 
         my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
-        my $return_text = &Jarvis::Dataset::Store ($jconfig);
+        my $return_text = &Jarvis::Dataset::store ($jconfig);
         print $cgi->header(-type => "text/plain", -cookie => $cookie);
         print $return_text;
 
@@ -158,14 +158,14 @@ MAIN: {
     # cases where it is doing the header.  But if the exec script itself is
     # doing all the headers, then there will be no session cookie.
     #
-    } elsif (&Jarvis::Exec::Do ($jconfig, $action)) {
+    } elsif (&Jarvis::Exec::do ($jconfig, $action)) {
         # All is well if this returns true.  The action is treated.
 
     # A custom plugin for this application?  This is very similar to an Exec,
     # except that where an exec is a `<command>` system call, a Plugin is a
     # dynamically loaded module method.
     #
-    } elsif (&Jarvis::Plugin::Do ($jconfig, $action)) {
+    } elsif (&Jarvis::Plugin::do ($jconfig, $action)) {
         # All is well if this returns true.  The action is treated.
 
     # It's the end of the world as we know it.

@@ -4,7 +4,7 @@
 #       usernames and passwords from a database table, and optionally
 #       fetches group ownership from a second database table.
 #
-#       Refer to the documentation for the "Check" function for how
+#       Refer to the documentation for the "check" function for how
 #       to configure your <application>.xml to use this login module.
 #
 # Licence:
@@ -76,7 +76,7 @@ package Jarvis::Login::Database;
 #       ($error_string or "", $username or "", "group1,group2,group3...")
 ################################################################################
 #
-sub Jarvis::Login::Database::Check {
+sub Jarvis::Login::Database::check {
     my ($jconfig, %login_parameters) = @_;
 
     # Our user name login parameters are here...
@@ -108,10 +108,10 @@ sub Jarvis::Login::Database::Check {
 
     my $dbh = &Jarvis::DB::Handle ($jconfig);
     my $sth = $dbh->prepare ($query)
-            || &Jarvis::Error::MyDie ($jconfig, "Couldn't prepare statement '$query': " . $dbh->errstr);
+            || &Jarvis::Error::my_die ($jconfig, "Couldn't prepare statement '$query': " . $dbh->errstr);
         
     $sth->execute ($username) 
-            || &Jarvis::Error::MyDie ($jconfig, "Couldn't execute statement '$query': " . $dbh->errstr);
+            || &Jarvis::Error::my_die ($jconfig, "Couldn't execute statement '$query': " . $dbh->errstr);
             
     my $result_aref = $sth->fetchall_arrayref({});
     if ((scalar @$result_aref) < 1) {
@@ -132,22 +132,22 @@ sub Jarvis::Login::Database::Check {
 
     # Need our group configuration, otherwise just put them in group 'default'.
     if (! ($group_table && $group_username_column && $group_group_column)) {
-        &Jarvis::Error::Debug ($jconfig, "No group configuration.  Place in group 'default'.");
+        &Jarvis::Error::debug ($jconfig, "No group configuration.  Place in group 'default'.");
         return ("", $username, 'default');
     }
 
     # Fetch group configuration.
     $query = "SELECT $group_group_column FROM $group_table WHERE $group_username_column = ?";
     $sth = $dbh->prepare ($query)
-            || &Jarvis::Error::MyDie ($jconfig, "Couldn't prepare statement '$query': " . $dbh->errstr);
+            || &Jarvis::Error::my_die ($jconfig, "Couldn't prepare statement '$query': " . $dbh->errstr);
         
     $sth->execute ($username) 
-            || &Jarvis::Error::MyDie ($jconfig, "Couldn't execute statement '$query': " . $dbh->errstr);
+            || &Jarvis::Error::my_die ($jconfig, "Couldn't execute statement '$query': " . $dbh->errstr);
             
     $result_aref = $sth->fetchall_arrayref({});
 
     my $group_list = join (",", map { $_->{$group_group_column} } @$result_aref);
-    &Jarvis::Error::Debug ($jconfig, "Group list = '$group_list'.");
+    &Jarvis::Error::debug ($jconfig, "Group list = '$group_list'.");
 
     return ("", $username, $group_list);
 }

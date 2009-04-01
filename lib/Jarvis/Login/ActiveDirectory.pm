@@ -3,7 +3,7 @@
 #       Jarvis supports pluggable Login modules.  This module checks usernames
 #       and passwords via ActiveDirectory (Microsoft's LDAP Implementation).
 #
-#       Refer to the documentation for the "Check" function for how
+#       Refer to the documentation for the "check" function for how
 #       to configure your <application>.xml to use this login module.
 #
 # Licence:
@@ -76,7 +76,7 @@ package Jarvis::Login::ActiveDirectory;
 #       ($error_string or "", $username or "", "group1,group2,group3...")
 ################################################################################
 #
-sub Jarvis::Login::ActiveDirectory::Check {
+sub Jarvis::Login::ActiveDirectory::check {
     my ($jconfig, %login_parameters) = @_;
 
     # Our user name login parameters are here...
@@ -103,24 +103,24 @@ sub Jarvis::Login::ActiveDirectory::Check {
     }
 
     # Do that ActiveDirectory thing.  Connect first.  AD uses default LDAP port 389.
-    &Jarvis::Error::Debug ($jconfig, "Connecting to ActiveDirectory Server: '$server:$port'.");
+    &Jarvis::Error::debug ($jconfig, "Connecting to ActiveDirectory Server: '$server:$port'.");
     my $ldap = Net::LDAP->new ($server, port => $port) || die "Cannot connect to '$server' on port $port\n";
 
     # Bind with a password.
     #   Protocol = 3 (Default)
     #   Authentication = Simple (Default)
     #
-    &Jarvis::Error::Debug ($jconfig, "Binding to ActiveDirectory Server: '$server:$port' as '$bind_username'.");
+    &Jarvis::Error::debug ($jconfig, "Binding to ActiveDirectory Server: '$server:$port' as '$bind_username'.");
     my $mesg = $ldap->bind ($bind_username, password => $bind_password);
 
-    $mesg->code && &Jarvis::Error::MyDie ($jconfig, "Bind to server '$server:$port' failed with " . $mesg->code . " '" . $mesg->error . "'");
+    $mesg->code && &Jarvis::Error::my_die ($jconfig, "Bind to server '$server:$port' failed with " . $mesg->code . " '" . $mesg->error . "'");
 
     # Now search on our base object.
     #   Scope = Whole Tree (Default)
     #   Deref = Always
     #   Types Only = False (default)
     #
-    &Jarvis::Error::Debug ($jconfig, "Searching for samaccountname = '$username'.");
+    &Jarvis::Error::debug ($jconfig, "Searching for samaccountname = '$username'.");
     $mesg = $ldap->search (
         base => $base_object,
         deref => 'always',
@@ -131,7 +131,7 @@ sub Jarvis::Login::ActiveDirectory::Check {
     # Check that we got success, and exactly one entry.  We can't handle more than
     # one account with the same login ID.
     #
-    $mesg->code && &Jarvis::Error::MyDie ($jconfig, "Search for '$username' failed with " . $mesg->code . " '" . $mesg->error . "'");
+    $mesg->code && &Jarvis::Error::my_die ($jconfig, "Search for '$username' failed with " . $mesg->code . " '" . $mesg->error . "'");
     $mesg->count || return "User '$username' not known to ActiveDirectory.";
     ($mesg->count == 1) || return "User '$username' ambiguous in ActiveDirectory.";
 
@@ -139,7 +139,7 @@ sub Jarvis::Login::ActiveDirectory::Check {
     #
     my $entry = $mesg->entry (0);
     my $dn = $entry->dn ();
-    &Jarvis::Error::Debug ($jconfig, "User DN '$dn'\n");
+    &Jarvis::Error::debug ($jconfig, "User DN '$dn'\n");
 
     # Now look at the memberOf attribute of this account.  If they don't belong to
     # any groups, that's strange, but probably not impossible.  We let the application
@@ -154,20 +154,20 @@ sub Jarvis::Login::ActiveDirectory::Check {
     foreach my $group (@groups) {
         ($group =~ m/^CN=([a-zA-z_\-]+),/) || return "User '$username' is memberOf group with unsupported name syntax.";
         my $cn_group = $1;
-        &Jarvis::Error::Debug ($jconfig, "Member of '$group' ($cn_group)\n");
+        &Jarvis::Error::debug ($jconfig, "Member of '$group' ($cn_group)\n");
         $group_list .= ($group_list ? "," : "") . $cn_group;
     }
     $ldap->unbind ();
 
     # Reconnect and check the password.
-    &Jarvis::Error::Debug ($jconfig, "Connecting to ActiveDirectory Server: '$server:$port'.");
+    &Jarvis::Error::debug ($jconfig, "Connecting to ActiveDirectory Server: '$server:$port'.");
     $ldap = Net::LDAP->new ($server, port => $port) || die "Cannot connect to '$server' on port $port\n";
 
     $mesg = $ldap->bind ($dn, password => $password);
     if ($mesg->code == 49) {
         return ("Invalid password.");
     }
-    $mesg->code && &Jarvis::Error::MyDie ($jconfig, "Bind to server '$server:$port' failed with " . $mesg->code . " '" . $mesg->error . "'");
+    $mesg->code && &Jarvis::Error::my_die ($jconfig, "Bind to server '$server:$port' failed with " . $mesg->code . " '" . $mesg->error . "'");
     $ldap->unbind ();
 
     return ("", $username, $group_list);

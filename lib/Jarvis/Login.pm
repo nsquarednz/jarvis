@@ -60,7 +60,7 @@ use Jarvis::Error;
 #           If not, then we are restricted to only validating existing logins.
 ################################################################################
 #
-sub Check {
+sub check {
     my ($jconfig, $allow_new_login) = @_;
 
     ###############################################################################
@@ -72,7 +72,7 @@ sub Check {
 
     # Where are our sessions stored?
     my $sid_store = $axml->{'sessiondb'}->{'store'}->content || "driver:file;serializer:default;id:md5";
-    &Jarvis::Error::Debug ($jconfig, "SID Store '$sid_store'.");
+    &Jarvis::Error::debug ($jconfig, "SID Store '$sid_store'.");
 
     my %sid_params = ();
     if ($axml->{'sessiondb'}->{'parameter'}) {
@@ -94,7 +94,7 @@ sub Check {
 
     # Existing, successful session?  Fine, we trust this.
     if ($session->param('logged_in') && $session->param('username')) {
-        &Jarvis::Error::Debug ($jconfig, "Already logged in for session '" . $jconfig->{'sid'} . "'.");
+        &Jarvis::Error::debug ($jconfig, "Already logged in for session '" . $jconfig->{'sid'} . "'.");
         $logged_in = $session->param('logged_in') || 0;
         $username = $session->param('username') || '';
         $group_list = $session->param('group_list') || '';
@@ -107,7 +107,7 @@ sub Check {
     # "username" won't get misinterpreted as an attempt to login.
     # 
     } elsif ($allow_new_login) {
-        &Jarvis::Error::Log ($jconfig, "Login attempt on '" . $jconfig->{'sid'} . "'.");
+        &Jarvis::Error::log ($jconfig, "Login attempt on '" . $jconfig->{'sid'} . "'.");
 
         # Get our login parameter values.  We were using $axml->{login}{parameter}('[@]', 'name');
         # but that seemed to cause all sorts of DataDumper and cleanup problems.  This seems to
@@ -115,19 +115,19 @@ sub Check {
         my %login_parameters = ();
         if ($axml->{'login'}{'parameter'}) {
             foreach my $parameter ($axml->{'login'}{'parameter'}('@')) {
-                &Jarvis::Error::Debug ($jconfig, "Login Parameter: " . $parameter->{'name'}->content . " -> " . $parameter->{'value'}->content);
+                &Jarvis::Error::debug ($jconfig, "Login Parameter: " . $parameter->{'name'}->content . " -> " . $parameter->{'value'}->content);
                 $login_parameters {$parameter->{'name'}->content} = $parameter->{'value'}->content;
             }
         }
 
         my $login_module = $axml->{login}{module} || die "Application '" . $jconfig->{'app_name'} . "' has no defined login module.\n";
 
-        &Jarvis::Error::Debug ($jconfig, "Loading login module '" . $login_module . "'.");
+        &Jarvis::Error::debug ($jconfig, "Loading login module '" . $login_module . "'.");
         eval "require $login_module";
         if ($@) {
-            &Jarvis::Error::MyDie ($jconfig, "Cannot load login module '$login_module': " . $@);
+            &Jarvis::Error::my_die ($jconfig, "Cannot load login module '$login_module': " . $@);
         }
-        my $login_method = $login_module . "::Check";
+        my $login_method = $login_module . "::check";
         {
             no strict 'refs';
             ($error_string, $username, $group_list) = &$login_method ($jconfig, %login_parameters);
@@ -141,13 +141,13 @@ sub Check {
         $session->param('username', $username);
         $session->param('group_list', $group_list);
 
-        $logged_in && &Jarvis::Error::Log ($jconfig, "Login succeeded for '$username' in '$group_list'");
+        $logged_in && &Jarvis::Error::log ($jconfig, "Login succeeded for '$username' in '$group_list'");
 
     # Fail because login not allowed.
     } else {
         $error_string = "Not logged and login disallowed for this request";
     }
-    $logged_in || &Jarvis::Error::Log ($jconfig, "Login fail: $error_string");
+    $logged_in || &Jarvis::Error::log ($jconfig, "Login fail: $error_string");
 
     # Set/extend session expiry on successful sessions.  Flush new/modified session data.
     if ($logged_in) {
@@ -190,7 +190,7 @@ sub Check {
 #       "<Failure description message>" on failure.
 ################################################################################
 #
-sub CheckAccess {
+sub check_access {
     my ($jconfig, $allowed_groups) = @_;
 
     # Check permissions

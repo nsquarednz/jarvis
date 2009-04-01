@@ -59,7 +59,7 @@ use Jarvis::Text;
 #       1
 ################################################################################
 #
-sub AddSpecialExecVariables {
+sub add_special_exec_variables {
     my ($jconfig, $param_values_href) = @_;
 
     # These are defined if we have logged in.
@@ -85,7 +85,7 @@ sub AddSpecialExecVariables {
 #       die on error attempting to perform the action
 ################################################################################
 #
-sub Do {
+sub do {
     my ($jconfig, $action) = @_;
 
     ###############################################################################
@@ -102,10 +102,10 @@ sub Do {
     if ($axml->{'exec'}) {
         foreach my $exec (@{ $axml->{'exec'} }) {
             next if ($action ne $exec->{'action'}->content);
-            &Jarvis::Error::Debug ($jconfig, "Found matching custom <exec> action '$action'.");
+            &Jarvis::Error::debug ($jconfig, "Found matching custom <exec> action '$action'.");
 
-            $allowed_groups = $exec->{'access'}->content || &Jarvis::Error::MyDie ($jconfig, "No 'access' defined for exec action '$action'");
-            $command = $exec->{'command'}->content || &Jarvis::Error::MyDie ($jconfig, "No 'command' defined for exec action '$action'");
+            $allowed_groups = $exec->{'access'}->content || &Jarvis::Error::my_die ($jconfig, "No 'access' defined for exec action '$action'");
+            $command = $exec->{'command'}->content || &Jarvis::Error::my_die ($jconfig, "No 'command' defined for exec action '$action'");
             $add_headers = defined ($Jarvis::Config::yes_value {lc ($exec->{'add_headers'}->content || "no")});
             $default_filename = $exec->{'default_filename'}->content;
             $filename_parameter = $exec->{'filename_parameter'}->content;
@@ -116,14 +116,14 @@ sub Do {
     $command || return 0;
 
     # Check security.
-    my $failure = &Jarvis::Login::CheckAccess ($jconfig, $allowed_groups);
-    ($failure ne '') && &Jarvis::Error::MyDie ($jconfig, "Wanted exec access: $failure");
+    my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
+    ($failure ne '') && &Jarvis::Error::my_die ($jconfig, "Wanted exec access: $failure");
 
     # Get our parameters.  Note that our special variables like __username will
     # override sneaky user-supplied values.
     #
     my %param_values = $jconfig->{'cgi'}->Vars;
-    &AddSpecialExecVariables ($jconfig, \%param_values);
+    &add_special_exec_variables ($jconfig, \%param_values);
 
     # Figure out a filename.  It's not mandatory, if we don't have a default
     # filename and we don't have a filename_parameter supplied and defined then
@@ -146,26 +146,26 @@ sub Do {
     # by the user, so we need to watch out for any funny business.
     foreach my $param (sort (keys %param_values)) {
         if ($param !~ m/[a-zA-Z0-9_\-]+/) {
-            &Jarvis::Error::MyDie ("Unsupported characters in exec parameter name '$param'\n");
+            &Jarvis::Error::my_die ("Unsupported characters in exec parameter name '$param'\n");
         }
 
         # With the values we are more forgiving, but we quote them up hard in single
         # quotes for the shell.
         my $param_value = $param_values{$param};
-        &Jarvis::Error::Debug ($jconfig, "Exec Parameter '$param' = '$param_value'");
+        &Jarvis::Error::debug ($jconfig, "Exec Parameter '$param' = '$param_value'");
 
-        $param_value = &EscapeShell ($param_value);
+        $param_value = &escape_shell ($param_value);
         $command .= " $param='$param_value'";
     }
 
     # Execute the command
-    &Jarvis::Error::Log ($jconfig, "Executing Command: $command");
+    &Jarvis::Error::log ($jconfig, "Executing Command: $command");
     my $output =`$command`;
 
     # Failure?
     my $status = $?;
     if ($status != 0) {
-        &Jarvis::Error::MyDie ($jconfig, "Command failed with status $status.\n$output");
+        &Jarvis::Error::my_die ($jconfig, "Command failed with status $status.\n$output");
     }
 
     # Are we supposed to add headers?  Does that include a filename header?
@@ -174,7 +174,7 @@ sub Do {
         my $mime_types = MIME::Types->new;
         my $mime_type = $mime_types->mimeTypeOf ($filename) || MIME::Types->type('text/plain');
 
-        &Jarvis::Error::Debug ($jconfig, "Exec returned mime type '" . $mime_type->type . "'");
+        &Jarvis::Error::debug ($jconfig, "Exec returned mime type '" . $mime_type->type . "'");
 
         my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
         if ($filename) {

@@ -27,7 +27,7 @@ package Jarvis::Text;
 
 BEGIN {
     our @ISA = qw (Exporter);
-    our @EXPORT = qw (EscapeJavaScript EscapeSQL EscapeShell CleanName Trim);
+    our @EXPORT = qw (escape_java_script escape_sql escape_shell trim);
 
     require Exporter;
 }
@@ -38,7 +38,7 @@ BEGIN {
 
 # ARGS: TextString
 # Returns: Escape characters that will bother javascript.
-sub EscapeJavaScript {
+sub escape_java_script {
     my $text = $_[0];
     $text =~ s|\\|\\\\|og;
     $text =~ s|'|\\'|og;
@@ -49,7 +49,7 @@ sub EscapeJavaScript {
 
 # ARGS: TextString
 # Returns: Escape characters that will bother a SQL '' string.
-sub EscapeSQL {
+sub escape_sql {
     my $text = $_[0];
     $text =~ s|\\|\\\\|og;
     $text =~ s|'|''|og;
@@ -58,7 +58,7 @@ sub EscapeSQL {
 
 # ARGS: TextString
 # Returns: Escape characters that will bother a Shell Exec '' string.
-sub EscapeShell {
+sub escape_shell {
     my $text = $_[0];
     $text =~ s|\\|\\\\|og;
     $text =~ s|'|'\\''|og;
@@ -66,20 +66,8 @@ sub EscapeShell {
 }
 
 # ARGS: TextString
-# Returns: Turn into a unique lowercase clean word.
-sub CleanName {
-    my $text = $_[0];
-    $text = lc ($text);
-    $text =~ s/\W+/_/g;
-    $text =~ s/_+/_/g;
-    $text =~ s/^_//g;
-    $text =~ s/_$//g;    
-    return $text;
-}
-
-# ARGS: TextString
-# Returns: Trims leading and trailing whitespace.
-sub Trim {
+# Returns: trims leading and trailing whitespace.
+sub trim {
     my $text = $_[0];
     $text =~ s/^\s+//;
     $text =~ s/\s+$//g;

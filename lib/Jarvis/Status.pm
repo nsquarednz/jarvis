@@ -43,7 +43,7 @@ use Jarvis::Text;
 #       die on error.
 ################################################################################
 #
-sub Report {
+sub report {
     my ($jconfig) = @_;
 
     my %fields = ();

@@ -4,7 +4,7 @@
 #               which we dynamically load.  We will load the specified module
 #               and then call:
 #
-#                   <module>::Do ($jconfig, %plugin_parameters)
+#                   <module>::do ($jconfig, %plugin_parameters)
 #
 #               Where $jconfig is our Jarvis::Config option, and the
 #               %plugin_parameters is a hash of name/value parameters loaded
@@ -61,7 +61,7 @@ use Jarvis::Text;
 #       die on error attempting to perform the action
 ################################################################################
 #
-sub Do {
+sub do {
     my ($jconfig, $action) = @_;
 
     ###############################################################################
@@ -79,11 +79,11 @@ sub Do {
     if ($axml->{'plugin'}) {
         foreach my $plugin (@{ $axml->{'plugin'} }) {
             next if ($action ne $plugin->{'action'}->content);
-            &Jarvis::Error::Debug ($jconfig, "Found matching custom <plugin> action '$action'.");
+            &Jarvis::Error::debug ($jconfig, "Found matching custom <plugin> action '$action'.");
 
-            $allowed_groups = $plugin->{'access'}->content || &Jarvis::Error::MyDie ($jconfig, "No 'access' defined for plugin action '$action'");
+            $allowed_groups = $plugin->{'access'}->content || &Jarvis::Error::my_die ($jconfig, "No 'access' defined for plugin action '$action'");
             $lib = $plugin->{'lib'}->content;
-            $module = $plugin->{'module'}->content || &Jarvis::Error::MyDie ($jconfig, "No 'module' defined for plugin action '$action'");
+            $module = $plugin->{'module'}->content || &Jarvis::Error::my_die ($jconfig, "No 'module' defined for plugin action '$action'");
             $add_headers = defined ($Jarvis::Config::yes_value {lc ($plugin->{'add_headers'}->content || "no")});
             $default_filename = $plugin->{'default_filename'}->content;
             $filename_parameter = $plugin->{'filename_parameter'}->content;
@@ -94,8 +94,8 @@ sub Do {
     $module || return 0;
 
     # Check security.
-    my $failure = &Jarvis::Login::CheckAccess ($jconfig, $allowed_groups);
-    ($failure ne '') && &Jarvis::Error::MyDie ($jconfig, "Wanted plugin access: $failure");
+    my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
+    ($failure ne '') && &Jarvis::Error::my_die ($jconfig, "Wanted plugin access: $failure");
 
     # Get our parameters.  These are the configured parameters from the XML file,
     # which we handily load up for you, to avoid duplicating this code in every
@@ -106,7 +106,7 @@ sub Do {
     my %plugin_parameters = ();
     if ($axml->{'plugin'}{'parameter'}) {
         foreach my $parameter ($axml->{'plugin'}{'parameter'}('@')) {
-            &Jarvis::Error::Debug ($jconfig, "Plugin Parameter: " . $parameter->{'name'}->content . " -> " . $parameter->{'value'}->content);
+            &Jarvis::Error::debug ($jconfig, "Plugin Parameter: " . $parameter->{'name'}->content . " -> " . $parameter->{'value'}->content);
             $plugin_parameters {$parameter->{'name'}->content} = $parameter->{'value'}->content;
         }
     }
@@ -119,19 +119,19 @@ sub Do {
 
     # Now load the module.
     #
-    &Jarvis::Error::Debug ($jconfig, "Using plugin lib '$lib'.");
-    &Jarvis::Error::Debug ($jconfig, "Loading plugin module '$module'.");
+    &Jarvis::Error::debug ($jconfig, "Using plugin lib '$lib'.");
+    &Jarvis::Error::debug ($jconfig, "Loading plugin module '$module'.");
 
     {
         eval "use lib \"$lib\" ; require $module";
         if ($@) {
-            &Jarvis::Error::MyDie ($jconfig, "Cannot load login module '$module': " . $@);
+            &Jarvis::Error::my_die ($jconfig, "Cannot load login module '$module': " . $@);
         }
     }
 
-    # The module loaded OK, now try the "Do" method.
-    my $method = $module . "::Do";
-    &Jarvis::Error::Log ($jconfig, "Executing plugin method '$method'");
+    # The module loaded OK, now try the "do" method.
+    my $method = $module . "::do";
+    &Jarvis::Error::log ($jconfig, "Executing plugin method '$method'");
     my $output;
     {
         no strict 'refs';
@@ -144,7 +144,7 @@ sub Do {
         my $mime_types = MIME::Types->new;
         my $mime_type = $mime_types->mimeTypeOf ($filename) || MIME::Types->type('text/plain');
 
-        &Jarvis::Error::Debug ($jconfig, "Plugin returned mime type '" . $mime_type->type . "'");
+        &Jarvis::Error::debug ($jconfig, "Plugin returned mime type '" . $mime_type->type . "'");
 
         my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
         if ($filename) {
