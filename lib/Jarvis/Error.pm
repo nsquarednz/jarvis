@@ -37,17 +37,17 @@ use Jarvis::Text;
 # Makes a standard message to print out.
 #
 # Params:
-#       $msg - User message string.
+#       $jconfig - Jarvis::Config object
+#           READ: username, app_name, dataset_name
+#       $msg - User message string. We will extend with extra info from $jconfig.
 #       $level - "log", "error", etc.
-#       %args - Hash of Args (* indicates mandatory)
-#           username, app_name, dataset_name
 #
 # Returns:
 #       dies
 ################################################################################
 #
 sub DumpString {
-    my ($msg, $level, %args) = @_;
+    my ($jconfig, $level, $msg) = @_;
 
     my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime();
     my @days = ('Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat');
@@ -57,9 +57,9 @@ sub DumpString {
         $days[$wday], $months[$mon], $mday, $hour, $min, $sec, $year + 1900;
 
     $header .= "[" . $$;
-    (defined $args{'app_name'}) && ($header .= "/" . $args{'app_name'});
-    (defined $args{'username'}) && ($header .= "/" . $args{'username'});
-    (defined $args{'dataset_name'}) && ($header .= "/" . $args{'dataset_name'});
+    (defined $jconfig->{'app_name'}) && ($header .= "/" . $jconfig->{'app_name'});
+    (defined $jconfig->{'username'}) && ($header .= "/" . $jconfig->{'username'});
+    (defined $jconfig->{'dataset_name'}) && ($header .= "/" . $jconfig->{'dataset_name'});
     $header .= "] ";
 
     $msg = &Trim ($msg);
@@ -72,24 +72,24 @@ sub DumpString {
 }
 
 ################################################################################
-# Dies with some standard "where are we" info.
+# Dies with some standard "where are we" info.  Uses DumpString.
 #
 # Params:
-#       %args - Hash of Args (* indicates mandatory)
-#           username, app_name, dataset_name
+#       $jconfig - Jarvis::Config object
+#       $msg - Message to print
 #
 # Returns:
 #       dies
 ################################################################################
 #
 sub MyDie {
-    my ($msg, %args) = @_;
+    my ($jconfig, $msg) = @_;
 
-    die &DumpString ($msg, 'fatal', %args);
+    die &DumpString ($jconfig, 'fatal', $msg);
 }
 
 ################################################################################
-# Same but just debug.
+# Same but just debug.  Uses DumpString.
 #
 # Params: Same as MyDie.
 #
@@ -98,15 +98,15 @@ sub MyDie {
 ################################################################################
 #
 sub Debug {
-    my ($msg, %args) = @_;
+    my ($jconfig, $msg) = @_;
 
-    $args{'debug'} || return;
+    $jconfig->{'debug'} || return;
 
-    print STDERR &DumpString ($msg, 'debug', %args);
+    print STDERR &DumpString ($jconfig, 'debug', $msg);
 }
 
 ################################################################################
-# Same as debug, but always prints.
+# Same as debug, but always prints.  Uses DumpString.
 #
 # Params: Same as MyDie and Debug.
 #
@@ -115,9 +115,9 @@ sub Debug {
 ################################################################################
 #
 sub Log {
-    my ($msg, %args) = @_;
+    my ($jconfig, $msg) = @_;
 
-    print STDERR &DumpString ($msg, 'log', %args);
+    print STDERR &DumpString ($jconfig, 'log', $msg);
 }
 
 1;

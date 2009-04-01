@@ -37,6 +37,7 @@ use lib "/opt/jarvis/lib";
 
 use Jarvis::Error;
 use Jarvis::Config;
+use Jarvis::Login;
 use Jarvis::Dataset;
 use Jarvis::Status;
 use Jarvis::Exec;
@@ -44,9 +45,13 @@ use Jarvis::DB;
 
 package Main;
 
-$Main::cgi = new CGI();
-$Main::jarvis_etc = $ENV{'JARVIS_ETC'} || "/opt/jarvis/etc";
-%Main::args = ();
+# This is our CGI object.  We pass it into our Jasper::Config, but we also
+# use it in our "die" handler.
+my $cgi = new CGI;
+
+# This is our Jasper Config object which is passed around everywhere, and is
+# used in our "die" handler so it needs to be module wide.
+my $jconfig = undef;
 
 $Carp::CarpLevel = 1;
 
@@ -65,12 +70,12 @@ sub Handler {
 
     # Return error.  Note that we do not print stack trace to user, since
     # that is a potential security weakness.
-    print $Main::cgi->header("text/plain");
-    print $Main::cgi->url () . "\n";
+    print $cgi->header("text/plain");
+    print $cgi->url () . "\n";
     print $msg;
 
     # Print to error log.  Include stack trace if debug is enabled.
-    print STDERR ($Main::args{'debug'} ? Carp::longmess $msg : Carp::shortmess $msg);
+    print STDERR ($jconfig->{'debug'} ? Carp::longmess $msg : Carp::shortmess $msg);
     exit 0;
 }
 
@@ -86,67 +91,65 @@ MAIN: {
     # AppName: (mandatory parameter)
     ###############################################################################
     #
-    my $app_name = $Main::cgi->param ('app') || die "Missing mandatory parameter 'app'!\n";
+    my $app_name = $cgi->param ('app') || die "Missing mandatory parameter 'app'!\n";
     ($app_name =~ m/^\w+$/) || die "Invalid characters in parameter 'app'\n";
 
-    $Main::args{'cgi'} = $Main::cgi;
-    $Main::args{'app_name'} = $app_name;
-    $Main::args{'etc_dir'} = "$Main::jarvis_etc";
+    $jconfig = new Jarvis::Config ($app_name, 'etc_dir' => ($ENV{'JARVIS_ETC'} || "/opt/jarvis/etc"));
 
     ###############################################################################
     # Action: "status", "fetch", "update".
     ###############################################################################
     #
     # Must have an action.
-    my $action = $Main::cgi->param ('action') || die "Missing mandatory parameter 'action'!\n";
+    my $action = $cgi->param ('action') || die "Missing mandatory parameter 'action'!\n";
     ($action =~ m/^\w+$/) || die "Invalid characters in parameter 'action'\n";
 
-    $Main::args{'action'} = $action;
-    $Main::args{'allow_login'} = (($action eq "status") || ($action eq "fetch"));
+    $jconfig->{'action'} = $action;
+    my $allow_new_login = (($action eq "status") || ($action eq "fetch"));
 
-    &Jarvis::Config::Setup (\%Main::args);
+    &Jarvis::Login::Check ($jconfig, $allow_new_login);
 
-    &Jarvis::Error::Debug ("User Name = " . $Main::args{'username'}, %Main::args);
-    &Jarvis::Error::Debug ("Group List = " . $Main::args{'group_list'}, %Main::args);
+    &Jarvis::Error::Debug ($jconfig, "User Name = " . $jconfig->{'username'});
+    &Jarvis::Error::Debug ($jconfig, "Group List = " . $jconfig->{'group_list'});
 
     # Status.  I.e. are we logged in?
     if ($action eq "status") {
 
-        my $cookie = CGI::Cookie->new (-name => $Main::args{'sname'}, -value => $Main::args{'sid'});
-        my $return_text = &Jarvis::Status::Report (%Main::args);
-        print $Main::cgi->header(-type => "text/plain", -cookie => $cookie);
+        my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
+        my $return_text = &Jarvis::Status::Report ($jconfig);
+        print $cgi->header(-type => "text/plain", -cookie => $cookie);
         print $return_text;
 
     # Logout.  Clear session ID cookie, clean login parameters, then return "logged out" status.
     } elsif ($action eq "logout") {
 
-        $Main::args{'sid'} = '';
-        my $cookie = CGI::Cookie->new (-name => $Main::args{'sname'}, -value => $Main::args{'sid'});
-        if ($Main::args{'logged_in'}) {
-            $Main::args{'logged_in'} = 0;
-            $Main::args{'error_string'} = "Logged out at client request.";
-            $Main::args{'username'} = '';
-            $Main::args{'group_list'} = '';
+        $jconfig->{'sid'} = '';
+        my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
+        if ($jconfig->{'logged_in'}) {
+            $jconfig->{'logged_in'} = 0;
+            $jconfig->{'error_string'} = "Logged out at client request.";
+            $jconfig->{'username'} = '';
+            $jconfig->{'group_list'} = '';
         }
 
-        my $return_text = &Jarvis::Status::Report (%Main::args);
-        print $Main::cgi->header(-type => "text/plain", -cookie => $cookie);
+        my $return_text = &Jarvis::Status::Report ($jconfig);
+        print $cgi->header(-type => "text/plain", -cookie => $cookie);
         print $return_text;
 
     # Fetch.  I.e. get some data.
     } elsif ($action eq "fetch") {
 
-        my $cookie = CGI::Cookie->new (-name => $Main::args{'sname'}, -value => $Main::args{'sid'});
-        my $return_text = &Jarvis::Dataset::Fetch (%Main::args);
-        print $Main::cgi->header(-type => "text/plain", -cookie => $cookie);
+        my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
+        my $return_text = &Jarvis::Dataset::Fetch ($jconfig);
+        print $cgi->header(-type => "text/plain", -cookie => $cookie);
         print $return_text;
 
     # Store.  I.e. alter some data.
     } elsif ($action eq "store") {
 
-        my $cookie = CGI::Cookie->new (-name => $Main::args{'sname'}, -value => $Main::args{'sid'});
-        my $return_text = &Jarvis::Dataset::Store (%Main::args);
-        print $Main::cgi->header(-type => "text/plain", -cookie => $cookie);
+        my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
+        my $return_text = &Jarvis::Dataset::Store ($jconfig);
+        print $cgi->header(-type => "text/plain", -cookie => $cookie);
         print $return_text;
 
     # A custom exec for this application?  We hand off entirely for this case,
@@ -154,8 +157,8 @@ MAIN: {
     # cases where it is doing the header.  But if the exec script itself is
     # doing all the headers, then there will be no session cookie.
     #
-    } elsif ($Main::args{'exec'}{$action}) {
-        &Jarvis::Exec::Do (%Main::args);
+    } elsif ($jconfig->{'exec'}{$action}) {
+        &Jarvis::Exec::Do ($jconfig);
 
     # It's the end of the world as we know it.
     } else {
@@ -166,7 +169,7 @@ MAIN: {
     # Cleanup.
     ###############################################################################
     #
-    &Jarvis::DB::Disconnect (%Main::args);
+    &Jarvis::DB::Disconnect ($jconfig);
 }
 
 1;

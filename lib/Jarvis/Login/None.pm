@@ -54,17 +54,18 @@ package Jarvis::Login::None;
 # separated list of groups.
 #
 # Params:
-#       $login_parameters_href (configuration for this module)
-#       $args_href
-#           $$args_href{'cgi'} - CGI object (Not used)
-#           $$args_href{'dbh'} - DBI object (Not used)
+#       $jconfig - Jarvis::Config object (not used)
+#
+#       $login_parameters_href - Hash of login parameters parsed from
+#               the master application XML file by the master Login class.
+
 #
 # Returns:
 #       ($error_string or "", $username or "", "group1,group2,group3...")
 ################################################################################
 #
-sub Jarvis::Login::Check {
-    my ($login_parameters_href, $args_href) = @_;
+sub Jarvis::Login::None::Check {
+    my ($jconfig, $login_parameters_href) = @_;
 
     my $username = $$login_parameters_href{'username'} || "guest";
     my $group_list = $$login_parameters_href{'group_list'} || "guest";

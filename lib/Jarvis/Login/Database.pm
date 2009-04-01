@@ -63,16 +63,21 @@ package Jarvis::Login::Database;
 #    </app>
 #
 # Params:
-#       $login_parameters_href (configuration for this module)
-#       $args_href
-#           $$args_href{'cgi'} - CGI object
+#       $jconfig - Jarvis::Config object
+#           READ
+#               cgi
+#               Database config indirectly via Jarvis::DB
+#   
+#       $login_parameters_href - Hash of login parameters parsed from
+#               the master application XML file by the master Login class.
+#       
 #
 # Returns:
 #       ($error_string or "", $username or "", "group1,group2,group3...")
 ################################################################################
 #
-sub Jarvis::Login::Check {
-    my ($login_parameters_href, $args_href) = @_;
+sub Jarvis::Login::Database::Check {
+    my ($jconfig, $login_parameters_href) = @_;
 
     # Our user name login parameters are here...
     my $user_table = $$login_parameters_href{'user_table'};
@@ -87,8 +92,8 @@ sub Jarvis::Login::Check {
     }
 
     # Now see what we got passed.
-    my $username = $$args_href{'cgi'}->param('username');
-    my $password = $$args_href{'cgi'}->param('password');
+    my $username = $jconfig->{'cgi'}->param('username');
+    my $password = $jconfig->{'cgi'}->param('password');
 
     # No info?
     if (! ((defined $username) && ($username ne ""))) {
@@ -101,12 +106,12 @@ sub Jarvis::Login::Check {
     # Check the username from the user name table.
     my $query = "SELECT $user_password_column FROM $user_table WHERE $user_username_column = ?";
 
-    my $dbh = &Jarvis::DB::Handle (%$args_href);
+    my $dbh = &Jarvis::DB::Handle ($jconfig);
     my $sth = $dbh->prepare ($query)
-            || &Jarvis::Error::MyDie ("Couldn't prepare statement '$query': " . $dbh->errstr, %$args_href);
+            || &Jarvis::Error::MyDie ($jconfig, "Couldn't prepare statement '$query': " . $dbh->errstr);
         
     $sth->execute ($username) 
-            || &Jarvis::Error::MyDie ("Couldn't execute statement '$query': " . $dbh->errstr, %$args_href);
+            || &Jarvis::Error::MyDie ($jconfig, "Couldn't execute statement '$query': " . $dbh->errstr);
             
     my $result_aref = $sth->fetchall_arrayref({});
     if ((scalar @$result_aref) < 1) {
@@ -127,22 +132,22 @@ sub Jarvis::Login::Check {
 
     # Need our group configuration, otherwise just put them in group 'default'.
     if (! ($group_table && $group_username_column && $group_group_column)) {
-        &Jarvis::Error::Debug ("No group configuration.  Place in group 'default'.", %$args_href);
+        &Jarvis::Error::Debug ($jconfig, "No group configuration.  Place in group 'default'.");
         return ("", $username, 'default');
     }
 
     # Fetch group configuration.
     $query = "SELECT $group_group_column FROM $group_table WHERE $group_username_column = ?";
     $sth = $dbh->prepare ($query)
-            || &Jarvis::Error::MyDie ("Couldn't prepare statement '$query': " . $dbh->errstr, %$args_href);
+            || &Jarvis::Error::MyDie ($jconfig, "Couldn't prepare statement '$query': " . $dbh->errstr);
         
     $sth->execute ($username) 
-            || &Jarvis::Error::MyDie ("Couldn't execute statement '$query': " . $dbh->errstr, %$args_href);
+            || &Jarvis::Error::MyDie ($jconfig, "Couldn't execute statement '$query': " . $dbh->errstr);
             
     $result_aref = $sth->fetchall_arrayref({});
 
     my $group_list = join (",", map { $_->{$group_group_column} } @$result_aref);
-    &Jarvis::Error::Debug ("Group list = '$group_list'.", %$args_href);
+    &Jarvis::Error::Debug ($jconfig, "Group list = '$group_list'.");
 
     return ("", $username, $group_list);
 }

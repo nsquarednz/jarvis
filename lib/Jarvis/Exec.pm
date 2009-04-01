@@ -48,20 +48,23 @@ use Jarvis::Text;
 #   __grouplist -> <group1>,<group2>,...
 #
 # Params:
-#       $param_values_href
-#       Hash of Args (* indicates mandatory)
-#               username, group_list
+#       $jconfig - Jarvis::Config object
+#           READ
+#               username
+#               group_list
+#
+#       $param_values_href - hash of special variables that we create
 #
 # Returns:
 #       1
 ################################################################################
 #
 sub AddSpecialExecVariables {
-    my ($param_values_href, %args) = @_;
+    my ($jconfig, $param_values_href) = @_;
 
     # These are defined if we have logged in.
-    $$param_values_href{"__username"} = $args{'username'};
-    $$param_values_href{"__grouplist"} = $args{'group_list'};
+    $$param_values_href{"__username"} = $jconfig->{'username'};
+    $$param_values_href{"__grouplist"} = $jconfig->{'group_list'};
 
     return 1;
 }
@@ -77,27 +80,27 @@ sub AddSpecialExecVariables {
 ################################################################################
 #
 sub Do {
-    my (%args) = @_;
+    my ($jconfig) = @_;
 
     # Get and check our exec parameters.
-    my $action = $args{'action'};
-    my $access = $args{'exec'}{$action}{'access'};
-    my $command = $args{'exec'}{$action}{'command'};
-    my $add_headers = $args{'exec'}{$action}{'add_headers'};
-    my $filename_parameter = $args{'exec'}{$action}{'filename_parameter'};
+    my $action = $jconfig->{'action'};
+    my $access = $jconfig->{'exec'}{$action}{'access'};
+    my $command = $jconfig->{'exec'}{$action}{'command'};
+    my $add_headers = $jconfig->{'exec'}{$action}{'add_headers'};
+    my $filename_parameter = $jconfig->{'exec'}{$action}{'filename_parameter'};
 
-    ($add_headers && ! $filename_parameter) && &Jarvis::Error::MyDie ("Config for exec '$action' has 'add_headers' but no 'filename_parameter'", %args);
+    ($add_headers && ! $filename_parameter) && &Jarvis::Error::MyDie ($jconfig, "Config for exec '$action' has 'add_headers' but no 'filename_parameter'");
 
     # Check security.
     my $allowed_groups = $access;
-    my $failure = &Jarvis::Config::CheckAccess ($access, %args);
-    ($failure ne '') && &Jarvis::Error::MyDie ("Wanted exec access: $failure", %args);
+    my $failure = &Jarvis::Login::CheckAccess ($jconfig, $access);
+    ($failure ne '') && &Jarvis::Error::MyDie ($jconfig, "Wanted exec access: $failure");
 
     # Get our parameters.  Note that our special variables like __username will
     # override sneaky user-supplied values.
     #
-    my %param_values = $args{'cgi'}->Vars;
-    &AddSpecialExecVariables (\%param_values, %args);
+    my %param_values = $jconfig->{'cgi'}->Vars;
+    &AddSpecialExecVariables ($jconfig, \%param_values);
 
     # OK, get our filename parameter if required.
     my $filename = undef;
@@ -105,10 +108,10 @@ sub Do {
 
     if ($add_headers) {
         $filename = $param_values {$filename_parameter} ||
-            &Jarvis::Error::MyDie ("Missing CGI parameter '$filename_parameter' required for returned filename.", %args);
+            &Jarvis::Error::MyDie ($jconfig, "Missing CGI parameter '$filename_parameter' required for returned filename.");
 
         my $mime_types = MIME::Types->new;
-        $mime_type = $mime_types->mimeTypeOf ($filename) || &Jarvis::Error::MyDie ("Cannot determine mime type from supplied filename '$filename'.", %args);;
+        $mime_type = $mime_types->mimeTypeOf ($filename) || &Jarvis::Error::MyDie ($jconfig, "Cannot determine mime type from supplied filename '$filename'.");;
 
         delete $param_values{$filename_parameter};
     }
@@ -131,30 +134,30 @@ sub Do {
         # With the values we are more forgiving, but we quote them up hard in single
         # quotes for the shell.
         my $param_value = $param_values{$param};
-        &Jarvis::Error::Debug ("Exec Parameter '$param' = '$param_value'", %args);
+        &Jarvis::Error::Debug ($jconfig, "Exec Parameter '$param' = '$param_value'");
 
         $param_value = &EscapeShell ($param_value);
         $command .= " $param='$param_value'";
     }
 
     # Execute the command
-    &Jarvis::Error::Log ("Executing Command: $command", %args);
+    &Jarvis::Error::Log ($jconfig, "Executing Command: $command");
     my $output =`$command`;
 
     # Failure?
     my $status = $?;
     if ($status != 0) {
-        &Jarvis::Error::MyDie ("Command failed with status $status.\n$output", %args);
+        &Jarvis::Error::MyDie ($jconfig, "Command failed with status $status.\n$output");
     }
 
     # Are we supposed to add headers?  Does that include a filename header?
     # Note that if we really wanted to, we could squeeze in 
     if ($add_headers) {
 
-        &Jarvis::Error::Debug ("Exec returned mime type '" . $mime_type->type . "'", %args);
+        &Jarvis::Error::Debug ($jconfig, "Exec returned mime type '" . $mime_type->type . "'");
 
-        my $cookie = CGI::Cookie->new (-name => $args{'sname'}, -value => $args{'sid'});
-        print $Main::cgi->header(-type => $mime_type->type, 'Content-Disposition' => "inline; filename=$filename", -cookie => $cookie);
+        my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
+        print $jconfig->{'cgi'}->header(-type => $mime_type->type, 'Content-Disposition' => "inline; filename=$filename", -cookie => $cookie);
     }
 
     # Now print the output.  If the report didn't add headers like it was supposed

@@ -42,28 +42,27 @@ my $dbh = undef;
 # Connect to DB (if required) and return DBH.
 #
 # Params:
-#       %args - The global settings hash.
-#
-#   You Must SPECIFY
-#           $args{'dbconnect'}          Database connection string
-#           $args{'dbuser'}             Database username
-#           $args{'dbpass'}             Database password
+#       $jconfig - Jarvis::Config object
+#           READ
+#               dbconnect           Database connection string
+#               dbuser              Database username
+#               dbpass              Database password
 #
 # Returns:
 #       1
 ################################################################################
 #
 sub Handle {
-    my (%args) = @_;
+    my ($jconfig) = @_;
 
     $dbh && return $dbh;
 
-    $args{'dbconnect'} || &Jarvis::Error::MyDie ("No 'dbconnect' parameter specified.  Cannot connect to DB.", %args);
-    &Jarvis::Error::Log ("DB Connect = " . $args{'dbconnect'}, %args);
-    &Jarvis::Error::Log ("DB Username = " . $args{'dbusername'}, %args);
-    &Jarvis::Error::Log ("DB Password = " . $args{'dbpassword'}, %args);
+    $jconfig->{'dbconnect'} || &Jarvis::Error::MyDie ($jconfig, "No 'dbconnect' parameter specified.  Cannot connect to DB.");
+    &Jarvis::Error::Debug ($jconfig, "DB Connect = " . $jconfig->{'dbconnect'});
+    &Jarvis::Error::Debug ($jconfig, "DB Username = " . $jconfig->{'dbusername'});
+    &Jarvis::Error::Debug ($jconfig, "DB Password = " . $jconfig->{'dbpassword'});
 
-    $dbh = DBI->connect ($args{'dbconnect'}, $args{'dbusername'}, $args{'dbpassword'}) ||
+    $dbh = DBI->connect ($jconfig->{'dbconnect'}, $jconfig->{'dbusername'}, $jconfig->{'dbpassword'}) ||
         &Jarvis::Error::MyDie ("Cannot connect to database. " . DBI::errstr);
 }
 
@@ -71,14 +70,14 @@ sub Handle {
 # Disconnect from DB (if required).
 #
 # Params:
-#       %args - The global settings hash.
+#       $jconfig - Jarvis::Config object (not used)
 #
 # Returns:
 #       1
 ################################################################################
 #
 sub Disconnect {
-    my (%args) = @_;
+    my ($jconfig) = @_;
 
     $dbh && $dbh->disconnect();
 }

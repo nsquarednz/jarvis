@@ -34,8 +34,9 @@ use Jarvis::Text;
 ################################################################################
 # Shows our current connection status.
 #
-# Params: Hash of Args (* indicates mandatory)
-#       *logged_in, *user-name, *error_string, *group_list
+# Params:
+#       $jconfig - Jarvis::Config object
+#           READ: logged_in, username, error_string, group_list
 #
 # Returns:
 #       1.
@@ -43,17 +44,17 @@ use Jarvis::Text;
 ################################################################################
 #
 sub Report {
-    my (%args) = @_;
+    my ($jconfig) = @_;
 
     my %fields = ();
-    $fields{"logged_in"} = $args{'logged_in'};
-    $fields{"username"} = $args{'username'};
-    $fields{"error_string"} = $args{'error_string'};
-    $fields{"group_list"} = $args{'group_list'};
+    $fields{"logged_in"} = $jconfig->{'logged_in'};
+    $fields{"username"} = $jconfig->{'username'};
+    $fields{"error_string"} = $jconfig->{'error_string'};
+    $fields{"group_list"} = $jconfig->{'group_list'};
 
     my @data = (\%fields);
 
-    if ($args{'format'} eq "json") {
+    if ($jconfig->{'format'} eq "json") {
         my %return_hash = ( "data" => \@data );
         my $json = JSON::XS->new->pretty(1);
         return $json->encode ( \%return_hash );
