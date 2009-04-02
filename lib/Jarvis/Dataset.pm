@@ -57,8 +57,8 @@ my %yes_value = ('yes' => 1, 'true' => 1, '1' => 1);
 #               xml                 Find our app-configured "dataset_dir" dir.
 #           WRITE
 #               dataset_name        Stored for the benefit of error/debug.
-#               use_placeholders    Stored for convenience.
-#               max_rows            Stored for convenience.
+#               use_placeholders    Should we use placeholders?  Or just insert text?
+#               max_rows            Passed through as {{__max_rows}} to SQL.
 #
 # Returns:
 #       $dsxml - XML::Smart object holding config info read from file.
@@ -107,7 +107,7 @@ sub get_config_xml {
 #       die on error.
 ################################################################################
 #
-sub GetSQL {
+sub get_sql {
     my ($jconfig, $which, $dsxml) = @_;
 
     my $sql = $dsxml->{dataset}{$which}->content;
@@ -274,7 +274,7 @@ sub fetch {
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
     $failure && &Jarvis::Error::my_die ($jconfig, "Wanted read access: $failure");
 
-    my $sql = &GetSQL ($jconfig, 'select', $dsxml);
+    my $sql = &get_sql ($jconfig, 'select', $dsxml);
 
     # Handle our parameters.  Either inline or with placeholders.  Note that our
     # special variables like __username will override sneaky user-supplied values.
@@ -303,12 +303,13 @@ sub fetch {
 
     # Execute
     my $num_rows = 0;
+    my $err_handler = $SIG{__DIE__};
     eval {
-        my $err_handler = $SIG{__DIE__};
         $SIG{__DIE__} = sub {};
         $num_rows = $sth->execute (@arg_values);
-        $SIG{__DIE__} = $err_handler;
     };
+    $SIG{__DIE__} = $err_handler;
+
     if ($@) {
         print STDERR "ERROR: Couldn't execute select '$sql' with args '" . join ("','", map { $_ || 'NULL' } @arg_values) . "'\n";
         print STDERR $sth->errstr . "!\n";
@@ -392,15 +393,15 @@ sub store {
         ((defined $serial_value) && ($serial_value ne ''))
             || &Jarvis::Error::my_die ($jconfig, "Cannot delete entry with missing serial.");
 
-        $sql = &GetSQL ($jconfig, 'delete', $dsxml);
+        $sql = &get_sql ($jconfig, 'delete', $dsxml);
 
     # Update => INSERT or UPDATE.
     } elsif ($transaction_type eq "update") {
         if ((defined $serial_value) && ($serial_value > 0)) {
-            $sql = &GetSQL ($jconfig, 'update', $dsxml);
+            $sql = &get_sql ($jconfig, 'update', $dsxml);
 
         } else {
-            $sql = &GetSQL ($jconfig, 'insert', $dsxml);
+            $sql = &get_sql ($jconfig, 'insert', $dsxml);
             $returning = defined ($yes_value {lc ($dsxml->{dataset}{'insert'}{'returning'} || "no")});
             &Jarvis::Error::debug ($jconfig, "Insert Returning = " . $returning);
         }
@@ -437,12 +438,13 @@ sub store {
 
     # Execute
     my $num_rows = 0;
+    my $err_handler = $SIG{__DIE__};
     eval {
-        my $err_handler = $SIG{__DIE__};
         $SIG{__DIE__} = sub {};
         $num_rows = $sth->execute (@arg_values);
-        $SIG{__DIE__} = $err_handler;
     };
+    $SIG{__DIE__} = $err_handler;
+
     if ($@) {
         print STDERR "ERROR: Couldn't execute $transaction_type '$sql' with args '" . join ("','", map { $_ || 'NULL' } @arg_values) . "'\n";
         print STDERR $sth->errstr . "!\n";
