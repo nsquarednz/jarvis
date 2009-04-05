@@ -43,7 +43,7 @@ Ext.onReady (function () {
             'update' : function (store, record, operation) {
                 if (operation == Ext.data.Record.COMMIT) {
                     tabs.setDisabled (true);
-                    jarvisUpdate (store, 'boat_detail', record);
+                    jarvisSendChange ('update', store, 'boat_detail', record);
                 }
                 setButtons ();
             },

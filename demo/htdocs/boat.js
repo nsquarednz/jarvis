@@ -29,13 +29,13 @@ Ext.onReady (function () {
             'remove' : function (store, record, index) {
                 if (record.get('id') != 0) {
                     grid.getTopToolbar().items.get (2).getEl ().innerHTML = '&nbsp;<b>DELETING...</b>';
-                    jarvisRemove (store, 'boat', record);
+                    jarvisSendChange ('delete', store, 'boat', record);
                 }
             },
             'update' : function (store, record, operation) {
                 if (operation == Ext.data.Record.COMMIT) {
                     grid.getTopToolbar().items.get (2).getEl ().innerHTML = '&nbsp;<b>UPDATING...</b>';
-                    jarvisUpdate (store, 'boat', record);
+                    jarvisSendChange (((record.get ('id') == 0) ? 'insert' : 'update'), store, 'boat', record);
                 }
                 setButtons ();
             },
