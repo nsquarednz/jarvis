@@ -6,10 +6,6 @@ Ext.onReady (function () {
     var args = Ext.urlDecode (url.substring(url.indexOf('?')+1, url.length));
     var preload_class = args.class || '';
 
-    // Stores the current forced_title ('' if not forced).  Used when creating
-    // new rows.
-    var forced_title = '';
-
     // create the main Data Store for the boat list
     var boat_store = new Ext.data.JsonStore ({
         url: jarvisPostUrl (),              // We will use POST because we add extra params.
@@ -60,7 +56,7 @@ Ext.onReady (function () {
         url: jarvisUrl ('fetch', 'boat_class'),      // This is a simple GET, we have no extra params.
         root: 'data',
         idProperty: 'class',
-        fields: ['class', 'heading', 'forced_title'],
+        fields: ['class'],
         listeners: {
             'load' : function () {
                 if (boat_class_filter.store.getCount() > 0) {
@@ -141,13 +137,11 @@ Ext.onReady (function () {
                     }
                     var r = new Ext.data.Record ({ });
                     r.set ('id', 0);
+                    r.set ('name', '');
                     r.set ('class', class);
-                    r.set ('published', new Date());
-                    r.set ('title', forced_title);
-                    r.set ('draft', 'DRAFT');
-                    r.set ('warning_flag', '');
+                    r.set ('registration_num', 0);
                     boat_store.insert (0, r);
-                    grid.startEditing (0, (forced_title == '') ? 2 : 1)
+                    grid.startEditing (0, 0)
                     setButtons ();
                 }
             },

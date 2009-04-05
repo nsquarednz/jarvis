@@ -22,10 +22,11 @@ WHERE id = {{id}};
     </update>
     <insert>
 INSERT INTO boat (name, registration_num, class, owner, description, change_user, change_date)
-VALUES ({{rank}}, BTRIM ({{name}}),
-        NULLIF (BTRIM ({{nickname}}), ''),
-        NULLIF (BTRIM ({{password}}), ''),
-        NULLIF (BTRIM ({{email}}), ''),
+VALUES ({{name}},
+        NULLIF ({{registration_num}}, 0),
+        NULLIF (BTRIM ({{class}}), ''),
+        NULLIF (BTRIM ({{owner}}), ''),
+        NULLIF (BTRIM ({{description}}), ''),
         {{__username}}, now());
     </insert>
     <delete>

@@ -12,17 +12,17 @@
         <!-- This gives a sample configuration where the Login validation is performed by
              database lookup.  These values should work with the demo PostgreSQL
              database SQL included with this distribution.
-             
+             -->            
         <login module="Jarvis::Login::Database">
             <parameter name="user_table" value="users"/>
             <parameter name="user_username_column" value="name"/>
             <parameter name="user_password_column" value="password"/>
 	</login>
-        -->
         
         <!-- This is an example of configuring ActiveDirectory lookup.  The values here
              are totally fictitious.  You will need to supply real values.
-             
+             -->
+        <!--
         <login module="Jarvis::Login::ActiveDirectory">
             <parameter name="server" value="pdc.company.org"/>
             <parameter name="bind_username" value="public"/>
@@ -40,10 +40,12 @@
              This will log you in and give you a session cookie so that you can
              the run Exec and Plugin actions.
              -->
+        <!--
         <login module="Jarvis::Login::None">
             <parameter name="username" value="nobody"/>
             <parameter name="group_list" value="nogroup"/>
         </login>
+        -->
 
         <!-- Here is a database connection which works with the provided demo PostgreSQL
              script assuming that the postgres environment PATH variables are set up for
