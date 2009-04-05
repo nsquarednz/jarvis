@@ -36,6 +36,7 @@ use DBI;
 use JSON::XS;
 use XML::Smart;
 use Text::CSV;
+use IO::String;
 
 package Jarvis::Dataset;
 
@@ -322,7 +323,7 @@ sub fetch {
     my $rows_aref = $sth->fetchall_arrayref({});
     $sth->finish;
 
-    # Return content in requested format.
+    # Return content in requested format.  JSON is simple.
     if ($jconfig->{'format'} eq "json") {
         my %return_data = ();
         $return_data {"fetched"} = $num_rows;
@@ -331,6 +332,7 @@ sub fetch {
         my $json = JSON::XS->new->pretty(1);
         return $json->encode ( \%return_data );
 
+    # XML is also simple.
     } elsif ($jconfig->{'format'} eq "xml") {
         my $xml = XML::Smart->new ();
         $xml->{fetched} = $num_rows;
@@ -338,17 +340,32 @@ sub fetch {
 
         return $xml->data ();
 
+    # CSV format is the trickiest.
     } elsif ($jconfig->{'format'} eq "csv") {
+
+        # Get the list of column names from our fetch statement.
         my @field_names = @{ $sth->{NAME} };
         my %field_index = ();
 
         @field_index { @field_names } = (0 .. $#field_names);
 
-        foreach my $i (0 .. $#field_names) {
-            print STDERR "$i: $field_names[$i]\n";
+        # Create a string IO handle to print CSV into.
+        my $output = '';
+        my $io = IO::String->new ($output);
+
+        # Create a CSV object and print the header line.
+        my $csv = Text::CSV->new ();
+        $csv->print ($io, \@field_names);
+        print $io "\n";
+
+        # Now print the data.
+        foreach my $row_href (@$rows_aref) {
+            my @columns = map { $$row_href{$_} } @field_names;
+            $csv->print ($io, \@columns);
+            print $io "\n";
         }
-        my $csv = Text::CSV->new();
-        $csv->print (*STDOUT, \@field_names);
+
+        return $output;
 
     } else {
         &Jarvis::Error::my_die ($jconfig, "Unsupported format '" . $jconfig->{'format'} ."' for Dataset::fetch return data.\n");

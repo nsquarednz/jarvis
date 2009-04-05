@@ -1,4 +1,4 @@
-<dataset serial="id" read="*" write="*">
+<dataset read="*" write="*">
     <select>
 SELECT id, class, active,
     COALESCE (description, '') AS description
