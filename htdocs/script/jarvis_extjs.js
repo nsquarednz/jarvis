@@ -109,22 +109,35 @@ function jarvisLoadException (proxy, options, response, e) {
     document.location.href = login_page;
 };
 
-// Common submit method (does delete/update/insert).  Needs:
+// Common submit method (does delete/update/insert). 
 //
-//      store        - The store to update.
-//      dataset_name - Name of the .xml file containing dataset config.
-//      fields       - Copy of "record.data" that we extend with some extra magic attributes:
-//                          _operation_type: (Mandatory) 'update' or 'delete'
-//                          _record_id:      (Mandatory) Internal ExtJS Store ID.
+//      transaction_type - 'delete', 'update', 'insert'
+//      store            - The store to update.
+//      dataset_name     - Name of the .xml file containing dataset config.
+//      record           - The Ext.data.Record structure holding data.
 //
 // When the update attempt is over we will fire the store's 'writeback' listener with arguments
+//
 //      store        - This store.
 //      result       - object containing attributes:
 //                          success: (Mandatory) 1 (succeeded), 0 (failed)
 //                          message: (Optional) Error message text, present if update failed.
 //                          data:    (Optional) Array of returned objects.  E.g. if SQL used INSERT RETURNING.
 //
-function jarvisSendChange (store, dataset_name, fields) {
+function jarvisSendChange (transaction_type, store, dataset_name, record) {
+
+    // Fields is a copy of "record.data" that we extend with some extra magic attributes:
+    //
+    //     _operation_type: (Mandatory) 'update' or 'delete'
+    //     _record_id:      (Mandatory) Internal ExtJS Store ID.
+    //
+    // Note that _record_id is the INTERNAL ExtJS ID.  Not the database "id" column.
+    //
+    var fields = record.data;
+    fields._record_id = record.id;          
+    fields._transaction_type = transaction_type;
+
+    // Perform the request over ajax.
     Ext.Ajax.request({
         url: jarvis_home,
 
@@ -173,22 +186,6 @@ function jarvisSendChange (store, dataset_name, fields) {
             fields: Ext.util.JSON.encode (fields)
         }
     });
-}
-
-// Transaction Type = Remove.  Deletes a single row in the specified store.
-function jarvisRemove (store, dataset_name, record) {
-    var fields = record.data;
-    fields._record_id = record.id;          // This is the INTERNAL ExtJS ID.  Not the database "id" column.
-    fields._transaction_type = 'remove';
-    jarvisSendChange (store, dataset_name, fields);
-}
-
-// Transaction Type = Update.  Creates OR Updates a single row in the specified store.
-function jarvisUpdate (store, dataset_name, record) {
-    var fields = record.data;
-    fields._record_id = record.id;          // This is the INTERNAL ExtJS ID.  Not the database "id" column.
-    fields._transaction_type = 'update';    
-    jarvisSendChange (store, dataset_name, fields);
 }
 
 // Add a cookie.
