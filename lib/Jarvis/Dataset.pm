@@ -374,7 +374,7 @@ sub store {
     # Check we have some changes and parse 'em from the JSON.  We get an
     # array of hashes.  Each array entry is a change record.
     my $changes_json = $jconfig->{'cgi'}->param ('fields')
-         || die &Jarvis::Error::my_die("Missing mandatory store parameter 'fields'.");
+         || die &Jarvis::Error::my_die($jconfig, "Missing mandatory store parameter 'fields'.");
 
     my $fields_href = JSON::XS->new->utf8->decode ($changes_json);
     # Choose our statement and find the SQL and variable names.
