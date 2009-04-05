@@ -30,6 +30,7 @@ use XML::Smart;
 package Jarvis::Status;
 
 use Jarvis::Text;
+use Jarvis::Error;
 
 ################################################################################
 # Shows our current connection status.
@@ -59,11 +60,14 @@ sub report {
         my $json = JSON::XS->new->pretty(1);
         return $json->encode ( \%return_hash );
 
-    } else {
+    } elsif ($jconfig->{'format'} eq "xml") {
         my $xml = XML::Smart->new ();
         $xml->{data} = \@data;
 
         return $xml->data ();
+
+    } else {
+        &Jarvis::Error::my_die ($jconfig, "Unsupported format '" . $jconfig->{'format'} ."' in Status::report\n");
     }
 }
 

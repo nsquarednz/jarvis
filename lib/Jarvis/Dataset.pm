@@ -35,6 +35,7 @@ use warnings;
 use DBI;
 use JSON::XS;
 use XML::Smart;
+use Text::CSV;
 
 package Jarvis::Dataset;
 
@@ -258,7 +259,7 @@ sub sql_with_variables {
 #               username            Used for {{username}} in SQL
 #               group_list          Used for {{group_list}} in SQL
 #               with_placeholders   Should we use placeholders or string subst in SQL
-#               format              Either "json" or "xml".
+#               format              Either "json" or "xml" or "csv".
 #
 # Returns:
 #       Reference to Hash of returned data.  You may convert to JSON or XML.
@@ -330,12 +331,27 @@ sub fetch {
         my $json = JSON::XS->new->pretty(1);
         return $json->encode ( \%return_data );
 
-    } else {
+    } elsif ($jconfig->{'format'} eq "xml") {
         my $xml = XML::Smart->new ();
         $xml->{fetched} = $num_rows;
         $xml->{data}{row} = $rows_aref;
 
         return $xml->data ();
+
+    } elsif ($jconfig->{'format'} eq "csv") {
+        my @field_names = @{ $sth->{NAME} };
+        my %field_index = ();
+
+        @field_index { @field_names } = (0 .. $#field_names);
+
+        foreach my $i (0 .. $#field_names) {
+            print STDERR "$i: $field_names[$i]\n";
+        }
+        my $csv = Text::CSV->new();
+        $csv->print (*STDOUT, \@field_names);
+
+    } else {
+        &Jarvis::Error::my_die ($jconfig, "Unsupported format '" . $jconfig->{'format'} ."' for Dataset::fetch return data.\n");
     }
 }
 
@@ -349,7 +365,7 @@ sub fetch {
 #               username            Used for {{username}} in SQL
 #               group_list          Used for {{group_list}} in SQL
 #               with_placeholders   Should we use placeholders or string subst in SQL
-#               format              Either "json" or "xml".
+#               format              Either "json" or "xml" (not "csv").
 #
 # Returns:
 #       "OK" on succes
@@ -366,45 +382,34 @@ sub store {
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
     $failure && &Jarvis::Error::my_die ($jconfig, "Wanted write access: $failure");
 
-    # Figure out what field is our "serial" ID.  Normally it is "id", but it
-    # could change.
-    my $serial_name = $dsxml->{dataset}{serial};
-    $serial_name || &Jarvis::Error::my_die ($jconfig, "This dataset has no serial ID parameter.");
-
     # Check we have some changes and parse 'em from the JSON.  We get an
     # array of hashes.  Each array entry is a change record.
     my $changes_json = $jconfig->{'cgi'}->param ('fields')
          || die &Jarvis::Error::my_die($jconfig, "Missing mandatory store parameter 'fields'.");
 
     my $fields_href = JSON::XS->new->utf8->decode ($changes_json);
+
     # Choose our statement and find the SQL and variable names.
     my $transaction_type = $$fields_href{'_transaction_type'};
-
-    # Note: Serial value may be undefined, if we are creating a new record.
-    my $serial_value = $$fields_href{$serial_name};
     my $sql = undef;
     my @variable_names = undef;
 
     # Does this insert return rows?
     my $returning = 0;
 
-    # Remove => DELETE.  Must have a serial code present.
-    if ($transaction_type eq "remove") {
-        ((defined $serial_value) && ($serial_value ne ''))
-            || &Jarvis::Error::my_die ($jconfig, "Cannot delete entry with missing serial.");
-
+    # DELETE
+    if ($transaction_type eq "delete") {
         $sql = &get_sql ($jconfig, 'delete', $dsxml);
 
-    # Update => INSERT or UPDATE.
+    # UPDATE
     } elsif ($transaction_type eq "update") {
-        if ((defined $serial_value) && ($serial_value > 0)) {
-            $sql = &get_sql ($jconfig, 'update', $dsxml);
+        $sql = &get_sql ($jconfig, 'update', $dsxml);
 
-        } else {
-            $sql = &get_sql ($jconfig, 'insert', $dsxml);
-            $returning = defined ($yes_value {lc ($dsxml->{dataset}{'insert'}{'returning'} || "no")});
-            &Jarvis::Error::debug ($jconfig, "Insert Returning = " . $returning);
-        }
+    # INSERT, possibly returning.
+    } elsif ($transaction_type eq "insert") {
+        $sql = &get_sql ($jconfig, 'insert', $dsxml);
+        $returning = defined ($yes_value {lc ($dsxml->{dataset}{'insert'}{'returning'} || "no")});
+        &Jarvis::Error::debug ($jconfig, "Insert Returning = " . $returning);
 
     } else {
         &Jarvis::Error::my_die ($jconfig, "Unsupported transaction type '$transaction_type'.");
@@ -454,11 +459,14 @@ sub store {
         if ($jconfig->{'format'} eq "json") {
             return "{ \"success\": 0, \"message\": \"" . &escape_java_script (&trim($message)) . "\"}";
 
-        } else {
+        } elsif ($jconfig->{'format'} eq "xml") {
             my $xml = XML::Smart->new ();
             $xml->{success} = 0;
             $xml->{message} = &trim($message);
             return $xml->data ();
+
+        } else {
+            &Jarvis::Error::my_die ($jconfig, "Unsupported format '" . $jconfig->{'format'} ."' in Dataset::store error.\n");
         }
     }
 
@@ -476,13 +484,16 @@ sub store {
         my $json = JSON::XS->new->pretty(1);
         return $json->encode ( \%return_data );
 
-    } else {
+    } elsif ($jconfig->{'format'} eq "xml") {
         my $xml = XML::Smart->new ();
         $xml->{success} = 1;
         $xml->{updated} = $num_rows;
         $returning && ($xml->{data}{row} = $rows_aref);
 
         return $xml->data ();
+
+    } else {
+        &Jarvis::Error::my_die ($jconfig, "Unsupported format '" . $jconfig->{'format'} ."' for Dataset::store return data.\n");
     }
 }
 

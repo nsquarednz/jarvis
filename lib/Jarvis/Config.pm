@@ -108,7 +108,6 @@ sub new {
 
     # This is used by several things, so let's store it in our config.
     $self->{'format'} = lc ($self->{'cgi'}->param ('format') || $axml->{'format'}->content || "json");
-    (($self->{'format'} eq "json") || ($self->{'format'} eq "xml")) || die "Unsupported format '$self->{'format'}'!\n";
 
     return $self;
 }
