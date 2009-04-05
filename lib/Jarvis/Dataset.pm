@@ -313,7 +313,7 @@ sub fetch {
     $SIG{__DIE__} = $err_handler;
 
     if ($@) {
-        print STDERR "ERROR: Couldn't execute select '$sql' with args '" . join ("','", map { $_ || 'NULL' } @arg_values) . "'\n";
+        print STDERR "ERROR: Couldn't execute select '$sql' with args " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) . "\n";
         print STDERR $sth->errstr . "!\n";
         my $message = $sth->errstr;
         $sth->finish;
@@ -468,7 +468,7 @@ sub store {
     $SIG{__DIE__} = $err_handler;
 
     if ($@) {
-        print STDERR "ERROR: Couldn't execute $transaction_type '$sql' with args '" . join ("','", map { $_ || 'NULL' } @arg_values) . "'\n";
+        print STDERR "ERROR: Couldn't execute $transaction_type '$sql' with args " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) . "\n";
         print STDERR $sth->errstr . "!\n";
         my $message = $sth->errstr;
         $sth->finish;

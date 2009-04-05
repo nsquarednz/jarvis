@@ -71,7 +71,7 @@ sub handler {
 
     # Return error.  Note that we do not print stack trace to user, since
     # that is a potential security weakness.
-    print $cgi->header("text/plain");
+    print $cgi->header(-type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt");
     print $cgi->url () . "\n";
     print $msg;
 

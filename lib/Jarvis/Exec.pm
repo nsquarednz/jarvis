@@ -178,7 +178,7 @@ sub do {
 
         my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
         if ($filename) {
-            print $jconfig->{'cgi'}->header(-type => $mime_type->type, 'Content-Disposition' => $filename && "inline; filename=$filename", -cookie => $cookie);
+            print $jconfig->{'cgi'}->header(-type => $mime_type->type, 'Content-Disposition' => "inline; filename=$filename", -cookie => $cookie);
 
         } else {
             print $jconfig->{'cgi'}->header(-type => $mime_type->type, -cookie => $cookie);
