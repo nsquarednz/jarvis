@@ -86,7 +86,7 @@ sub new {
     #
     # Process the global XML config file.
     my $xml_filename = $self->{'etc_dir'} . "/" . $self->{'app_name'} . ".xml";
-    my $xml = XML::Smart->new ("$xml_filename") || die "Cannot read '$xml_filename': $!\n";
+    my $xml = XML::Smart->new ("$xml_filename") || &Jarvis::Error::my_die ($self, "Cannot read '$xml_filename': $!.");
     ($xml->{jarvis}) || die "Missing <jarvis> tag in '$xml_filename'!\n";
 
     $self->{'xml'} = $xml;

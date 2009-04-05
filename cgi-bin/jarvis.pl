@@ -73,7 +73,7 @@ sub handler {
     # that is a potential security weakness.
     print $cgi->header(-type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt");
     print $cgi->url () . "\n";
-    print $msg;
+    print "$msg";
 
     # Print to error log.  Include stack trace if debug is enabled.
     print STDERR ($jconfig->{'debug'} ? Carp::longmess $msg : Carp::shortmess $msg);

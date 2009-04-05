@@ -57,15 +57,16 @@ sub dump_string {
         $days[$wday], $months[$mon], $mday, $hour, $min, $sec, $year + 1900;
 
     $header .= "[" . $$;
-    (defined $jconfig->{'app_name'}) && ($header .= "/" . $jconfig->{'app_name'});
-    (defined $jconfig->{'username'}) && ($header .= "/" . $jconfig->{'username'});
-    (defined $jconfig->{'dataset_name'}) && ($header .= "/" . $jconfig->{'dataset_name'});
+    ($jconfig->{'app_name'}) && ($header .= "/" . $jconfig->{'app_name'});
+    ($jconfig->{'username'}) && ($header .= "/" . $jconfig->{'username'});
+    ($jconfig->{'dataset_name'}) && ($header .= "/" . $jconfig->{'dataset_name'});
     $header .= "] ";
 
-    $msg = &trim ($msg);
-    if ($msg !~ m/\n$/) {
-        $msg .= "\n";
-    }
+    # This newline is tidy.  It also stops Perl from appending an "at line..."
+    # to the message if/when we die with this message.
+    #
+    $msg = &trim ($msg) . "\n";
+
     $header && (length ($msg) + length ($header) > 132) && ($header .= "\n");
 
     return "$header$msg";
@@ -77,15 +78,16 @@ sub dump_string {
 # Params:
 #       $jconfig - Jarvis::Config object
 #       $msg - Message to print
+#       $level - Optional level override.
 #
 # Returns:
 #       dies
 ################################################################################
 #
 sub my_die {
-    my ($jconfig, $msg) = @_;
+    my ($jconfig, $msg, $level) = @_;
 
-    die &dump_string ($jconfig, 'fatal', $msg);
+    die &dump_string ($jconfig, $level || 'fatal', $msg);
 }
 
 ################################################################################
