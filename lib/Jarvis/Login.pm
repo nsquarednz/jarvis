@@ -91,6 +91,7 @@ sub check {
     # even if that is just ''.
     # 
     my ($error_string, $username, $group_list, $logged_in) = ('', '', '', 0);
+    my $already_logged_in = 0;
 
     # Existing, successful session?  Fine, we trust this.
     if ($session->param('logged_in') && $session->param('username')) {
@@ -98,6 +99,7 @@ sub check {
         $logged_in = $session->param('logged_in') || 0;
         $username = $session->param('username') || '';
         $group_list = $session->param('group_list') || '';
+        $already_logged_in = 1;
 
     # No successful session?  Login.  Note that we store failed sessions too.
     # 
@@ -107,7 +109,6 @@ sub check {
     # "username" won't get misinterpreted as an attempt to login.
     # 
     } elsif ($allow_new_login) {
-        &Jarvis::Error::log ($jconfig, "Login attempt on '" . $jconfig->{'sid'} . "'.");
 
         # Get our login parameter values.  We were using $axml->{login}{parameter}('[@]', 'name');
         # but that seemed to cause all sorts of DataDumper and cleanup problems.  This seems to
@@ -141,13 +142,19 @@ sub check {
         $session->param('username', $username);
         $session->param('group_list', $group_list);
 
-        $logged_in && &Jarvis::Error::log ($jconfig, "Login succeeded for '$username' in '$group_list'");
-
     # Fail because login not allowed.
     } else {
         $error_string = "Not logged and login disallowed for this request";
     }
-    $logged_in || &Jarvis::Error::log ($jconfig, "Login fail: $error_string");
+
+    # Log the attempt ONLY IF they supplied a username and we weren't already logged in.
+    if ($username && ! $already_logged_in) {
+        if ($logged_in) {
+            &Jarvis::Error::log ($jconfig, "Login succeeded for '$username' in '$group_list'");
+        } else {
+            &Jarvis::Error::log ($jconfig, "Login fail on '" . $jconfig->{'sid'} . "': $error_string");
+        }
+    }
 
     # Set/extend session expiry on successful sessions.  Flush new/modified session data.
     if ($logged_in) {
