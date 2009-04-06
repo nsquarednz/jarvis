@@ -130,7 +130,7 @@ sub check {
         &Jarvis::Error::debug ($jconfig, "Loading login module '" . $login_module . "'.");
         eval "require $login_module";
         if ($@) {
-            &Jarvis::Error::my_die ($jconfig, "Cannot load login module '$login_module': " . $@);
+            die "Cannot load login module '$login_module': " . $@;
         }
         my $login_method = $login_module . "::check";
         {

@@ -67,7 +67,7 @@ sub report {
         return $xml->data ();
 
     } else {
-        &Jarvis::Error::my_die ($jconfig, "Unsupported format '" . $jconfig->{'format'} ."' in Status::report\n");
+        die "Unsupported format '" . $jconfig->{'format'} ."' in Status::report\n";
     }
 }
 

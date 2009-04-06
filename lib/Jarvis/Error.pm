@@ -1,7 +1,6 @@
 ###############################################################################
-# Description:  Error logging functions - Debug, Log.  Also a my_die function
-#               which calls "die" but with some extra session info prepended
-#               to the die message string.
+# Description:  Error logging functions - Debug, Log.  If you want to die,
+#               just call "die".  We will take care of that elsewhere.
 #
 # Licence:
 #       This file is part of the Jarvis WebApp/Database gateway utility.
@@ -91,7 +90,9 @@ sub my_die {
 ################################################################################
 # Same but just debug.  Uses dump_string.
 #
-# Params: Same as my_die.
+# Params:
+#       $jconfig - Jarvis::Config object
+#       $msg - Message to print
 #
 # Returns:
 #       Prints to STDERR and returns 1.
@@ -108,7 +109,7 @@ sub debug {
 ################################################################################
 # Same as debug, but always prints.  Uses dump_string.
 #
-# Params: Same as my_die and Debug.
+# Params: Same as Debug.
 #
 # Returns:
 #       Prints to STDERR and returns 1.

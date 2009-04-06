@@ -81,9 +81,9 @@ sub do {
             next if ($action ne $plugin->{'action'}->content);
             &Jarvis::Error::debug ($jconfig, "Found matching custom <plugin> action '$action'.");
 
-            $allowed_groups = $plugin->{'access'}->content || &Jarvis::Error::my_die ($jconfig, "No 'access' defined for plugin action '$action'");
+            $allowed_groups = $plugin->{'access'}->content || die "No 'access' defined for plugin action '$action'";
             $lib = $plugin->{'lib'}->content;
-            $module = $plugin->{'module'}->content || &Jarvis::Error::my_die ($jconfig, "No 'module' defined for plugin action '$action'");
+            $module = $plugin->{'module'}->content || die "No 'module' defined for plugin action '$action'";
             $add_headers = defined ($Jarvis::Config::yes_value {lc ($plugin->{'add_headers'}->content || "no")});
             $default_filename = $plugin->{'default_filename'}->content;
             $filename_parameter = $plugin->{'filename_parameter'}->content;
@@ -95,7 +95,7 @@ sub do {
 
     # Check security.
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
-    ($failure ne '') && &Jarvis::Error::my_die ($jconfig, "Wanted plugin access: $failure");
+    ($failure ne '') && die "Wanted plugin access: $failure";
 
     # Get our parameters.  These are the configured parameters from the XML file,
     # which we handily load up for you, to avoid duplicating this code in every
@@ -125,7 +125,7 @@ sub do {
     {
         eval "use lib \"$lib\" ; require $module";
         if ($@) {
-            &Jarvis::Error::my_die ($jconfig, "Cannot load login module '$module': " . $@);
+            die "Cannot load login module '$module': " . $@;
         }
     }
 

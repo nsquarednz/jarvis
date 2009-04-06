@@ -74,7 +74,7 @@ sub get_config_xml {
     # And this MUST contain our dataset dir.
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
     my $dataset_dir = $axml->{'dataset_dir'}->content ||
-        &Jarvis::Error::my_die ($jconfig,  "No attribute 'dataset_dir' configured.");
+        die "No attribute 'dataset_dir' configured.";
     &Jarvis::Error::debug ($jconfig, "Dataset Directory '$dataset_dir'.");
 
     # Now we require 'dataset' to also be a CGI parameter.  We store this in the
@@ -100,7 +100,7 @@ sub get_config_xml {
 # Get the SQL for the update, insert, and delete.
 #
 # Params:
-#       $jconfig - Jarvis::Config object (used for my_die)
+#       $jconfig - Jarvis::Config object (NOT USED YET)
 #       $which   - SQL Type ("fetch", "insert", "update", "delete")
 #       $dsxml   - XML::Smart object for dataset configuration
 #
@@ -113,7 +113,7 @@ sub get_sql {
     my ($jconfig, $which, $dsxml) = @_;
 
     my $sql = $dsxml->{dataset}{$which}->content;
-    $sql || &Jarvis::Error::my_die ($jconfig, "This dataset has no SQL of type '$which'.");
+    $sql || die "This dataset has no SQL of type '$which'.";
     $sql = &trim ($sql);
 
     return $sql;
@@ -274,7 +274,7 @@ sub fetch {
 
     my $allowed_groups = $dsxml->{dataset}{"read"};
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
-    $failure && &Jarvis::Error::my_die ($jconfig, "Wanted read access: $failure\n");
+    $failure && die "Wanted read access: $failure\n";
 
     my $sql = &get_sql ($jconfig, 'select', $dsxml);
 
@@ -301,7 +301,7 @@ sub fetch {
 
     my $dbh = &Jarvis::DB::Handle ($jconfig);
     my $sth = $dbh->prepare ($sql)
-        || &Jarvis::Error::my_die ($jconfig, "Couldn't prepare statement '$sql': " . $dbh->errstr);
+        || die "Couldn't prepare statement '$sql': " . $dbh->errstr;
 
     # Execute
     my $num_rows = 0;
@@ -368,7 +368,7 @@ sub fetch {
         return $output;
 
     } else {
-        &Jarvis::Error::my_die ($jconfig, "Unsupported format '" . $jconfig->{'format'} ."' for Dataset::fetch return data.\n");
+        die "Unsupported format '" . $jconfig->{'format'} ."' for Dataset::fetch return data.\n";
     }
 }
 
@@ -397,12 +397,12 @@ sub store {
 
     my $allowed_groups = $dsxml->{dataset}{"write"};
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
-    $failure && &Jarvis::Error::my_die ($jconfig, "Wanted write access: $failure");
+    $failure && die "Wanted write access: $failure";
 
     # Check we have some changes and parse 'em from the JSON.  We get an
     # array of hashes.  Each array entry is a change record.
     my $changes_json = $jconfig->{'cgi'}->param ('fields')
-         || die &Jarvis::Error::my_die($jconfig, "Missing mandatory store parameter 'fields'.");
+         || die "Missing mandatory store parameter 'fields'.";
 
     my $fields_href = JSON::XS->new->utf8->decode ($changes_json);
 
@@ -429,7 +429,7 @@ sub store {
         &Jarvis::Error::debug ($jconfig, "Insert Returning = " . $returning);
 
     } else {
-        &Jarvis::Error::my_die ($jconfig, "Unsupported transaction type '$transaction_type'.");
+        die "Unsupported transaction type '$transaction_type'.";
     }
 
     # Handle our parameters.  Either inline or with placeholders.  Note that our
@@ -456,7 +456,7 @@ sub store {
 
     my $dbh = &Jarvis::DB::Handle ($jconfig);
     my $sth = $dbh->prepare ($sql)
-        || &Jarvis::Error::my_die ($jconfig, "Couldn't prepare statement '$sql': " . $dbh->errstr);
+        || die "Couldn't prepare statement '$sql': " . $dbh->errstr;
 
     # Execute
     my $num_rows = 0;
@@ -483,7 +483,7 @@ sub store {
             return $xml->data ();
 
         } else {
-            &Jarvis::Error::my_die ($jconfig, "Unsupported format '" . $jconfig->{'format'} ."' in Dataset::store error.\n");
+            die "Unsupported format '" . $jconfig->{'format'} ."' in Dataset::store error.\n";
         }
     }
 
@@ -510,7 +510,7 @@ sub store {
         return $xml->data ();
 
     } else {
-        &Jarvis::Error::my_die ($jconfig, "Unsupported format '" . $jconfig->{'format'} ."' for Dataset::store return data.\n");
+        die "Unsupported format '" . $jconfig->{'format'} ."' for Dataset::store return data.\n";
     }
 }
 

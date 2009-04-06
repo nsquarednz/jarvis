@@ -104,8 +104,8 @@ sub do {
             next if ($action ne $exec->{'action'}->content);
             &Jarvis::Error::debug ($jconfig, "Found matching custom <exec> action '$action'.");
 
-            $allowed_groups = $exec->{'access'}->content || &Jarvis::Error::my_die ($jconfig, "No 'access' defined for exec action '$action'");
-            $command = $exec->{'command'}->content || &Jarvis::Error::my_die ($jconfig, "No 'command' defined for exec action '$action'");
+            $allowed_groups = $exec->{'access'}->content || die "No 'access' defined for exec action '$action'";
+            $command = $exec->{'command'}->content || die "No 'command' defined for exec action '$action'";
             $add_headers = defined ($Jarvis::Config::yes_value {lc ($exec->{'add_headers'}->content || "no")});
             $default_filename = $exec->{'default_filename'}->content;
             $filename_parameter = $exec->{'filename_parameter'}->content;
@@ -117,7 +117,7 @@ sub do {
 
     # Check security.
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
-    ($failure ne '') && &Jarvis::Error::my_die ($jconfig, "Wanted exec access: $failure");
+    ($failure ne '') && die "Wanted exec access: $failure";
 
     # Get our parameters.  Note that our special variables like __username will
     # override sneaky user-supplied values.
@@ -146,7 +146,7 @@ sub do {
     # by the user, so we need to watch out for any funny business.
     foreach my $param (sort (keys %param_values)) {
         if ($param !~ m/[a-zA-Z0-9_\-]+/) {
-            &Jarvis::Error::my_die ("Unsupported characters in exec parameter name '$param'\n");
+            die "Unsupported characters in exec parameter name '$param'\n";
         }
 
         # With the values we are more forgiving, but we quote them up hard in single
@@ -165,7 +165,7 @@ sub do {
     # Failure?
     my $status = $?;
     if ($status != 0) {
-        &Jarvis::Error::my_die ($jconfig, "Command failed with status $status.\n$output");
+        die "Command failed with status $status.\n$output";
     }
 
     # Are we supposed to add headers?  Does that include a filename header?

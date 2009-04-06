@@ -102,10 +102,10 @@ sub Jarvis::Login::Database::check {
 
     my $dbh = &Jarvis::DB::Handle ($jconfig);
     my $sth = $dbh->prepare ($query)
-            || &Jarvis::Error::my_die ($jconfig, "Couldn't prepare statement '$query': " . $dbh->errstr);
+            || die "Couldn't prepare statement '$query': " . $dbh->errstr;
         
     $sth->execute ($username) 
-            || &Jarvis::Error::my_die ($jconfig, "Couldn't execute statement '$query': " . $dbh->errstr);
+            || die "Couldn't execute statement '$query': " . $dbh->errstr;
             
     my $result_aref = $sth->fetchall_arrayref({});
     if ((scalar @$result_aref) < 1) {
@@ -133,10 +133,10 @@ sub Jarvis::Login::Database::check {
     # Fetch group configuration.
     $query = "SELECT $group_group_column FROM $group_table WHERE $group_username_column = ?";
     $sth = $dbh->prepare ($query)
-            || &Jarvis::Error::my_die ($jconfig, "Couldn't prepare statement '$query': " . $dbh->errstr);
+            || die "Couldn't prepare statement '$query': " . $dbh->errstr;
         
     $sth->execute ($username) 
-            || &Jarvis::Error::my_die ($jconfig, "Couldn't execute statement '$query': " . $dbh->errstr);
+            || die "Couldn't execute statement '$query': " . $dbh->errstr;
             
     $result_aref = $sth->fetchall_arrayref({});
 

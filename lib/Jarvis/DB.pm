@@ -58,7 +58,7 @@ sub Handle {
     $dbh && return $dbh;
 
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
-    my $dbxml = $axml->{'database'} || &Jarvis::Error::my_die ($jconfig, "No 'database' config present.  Cannot connect to DB.");
+    my $dbxml = $axml->{'database'} || die "No 'database' config present.  Cannot connect to DB.";
 
     my $dbconnect = $dbxml->{'connect'}->content || "dbi:Pg:" . $jconfig->{'app_name'};
     my $dbusername = $dbxml->{'username'}->content || '';
@@ -69,7 +69,7 @@ sub Handle {
     &Jarvis::Error::debug ($jconfig, "DB Password = $dbpassword");
 
     $dbh = DBI->connect ($dbconnect, $dbusername, $dbpassword) ||
-        &Jarvis::Error::my_die ("Cannot connect to database. " . DBI::errstr);
+        die "Cannot connect to database. " . DBI::errstr;
 }
 
 ################################################################################

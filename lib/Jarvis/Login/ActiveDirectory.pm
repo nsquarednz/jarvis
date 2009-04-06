@@ -107,7 +107,7 @@ sub Jarvis::Login::ActiveDirectory::check {
     &Jarvis::Error::debug ($jconfig, "Binding to ActiveDirectory Server: '$server:$port' as '$bind_username'.");
     my $mesg = $ldap->bind ($bind_username, password => $bind_password);
 
-    $mesg->code && &Jarvis::Error::my_die ($jconfig, "Bind to server '$server:$port' failed with " . $mesg->code . " '" . $mesg->error . "'");
+    $mesg->code && die "Bind to server '$server:$port' failed with " . $mesg->code . " '" . $mesg->error . "'";
 
     # Now search on our base object.
     #   Scope = Whole Tree (Default)
@@ -125,7 +125,7 @@ sub Jarvis::Login::ActiveDirectory::check {
     # Check that we got success, and exactly one entry.  We can't handle more than
     # one account with the same login ID.
     #
-    $mesg->code && &Jarvis::Error::my_die ($jconfig, "Search for '$username' failed with " . $mesg->code . " '" . $mesg->error . "'");
+    $mesg->code && die "Search for '$username' failed with " . $mesg->code . " '" . $mesg->error . "'";
     $mesg->count || return "User '$username' not known to ActiveDirectory.";
     ($mesg->count == 1) || return "User '$username' ambiguous in ActiveDirectory.";
 
@@ -161,7 +161,7 @@ sub Jarvis::Login::ActiveDirectory::check {
     if ($mesg->code == 49) {
         return ("Incorrect password.");
     }
-    $mesg->code && &Jarvis::Error::my_die ($jconfig, "Bind to server '$server:$port' failed with " . $mesg->code . " '" . $mesg->error . "'");
+    $mesg->code && die "Bind to server '$server:$port' failed with " . $mesg->code . " '" . $mesg->error . "'";
     $ldap->unbind ();
 
     return ("", $username, $group_list);
