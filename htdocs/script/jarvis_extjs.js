@@ -106,7 +106,7 @@ function jarvisLoadException (proxy, options, response, e) {
         alert (response.responseText);
         done_alert = 1;
     }
-    document.location.href = login_page;
+    document.location.href = login_page + '?from=' + escape (document.location.href);
 };
 
 // Common submit method (does delete/update/insert). 
