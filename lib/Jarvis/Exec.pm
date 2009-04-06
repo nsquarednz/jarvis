@@ -154,8 +154,20 @@ sub do {
         my $param_value = $param_values{$param};
         &Jarvis::Error::debug ($jconfig, "Exec Parameter '$param' = '$param_value'");
 
-        $param_value = &escape_shell ($param_value);
-        $command .= " $param='$param_value'";
+        # MS Windows, we use double quotes.
+        if ($^O eq "MSWin32") {
+            $param_value = &escape_shell_windows ($param_value);
+            $command .= " $param=\"$param_value\"";
+
+        # These unix variants we use single quotes.
+        } elsif (($^O eq "linux") || ($^O eq "solaris") || ($^O eq "darwin")) {
+            $param_value = &escape_shell_unix ($param_value);
+            $command .= " $param='$param_value'";
+
+        # Not safe to continue.
+        } else {
+            die "Do not know how to escape Exec arguments for '$^O'.";
+        }
     }
 
     # Execute the command

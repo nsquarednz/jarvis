@@ -27,7 +27,8 @@ package Jarvis::Text;
 
 BEGIN {
     our @ISA = qw (Exporter);
-    our @EXPORT = qw (escape_java_script escape_sql escape_shell trim);
+    our @EXPORT = qw (escape_java_script escape_sql escape_shell_unix
+                      escape_shell_windows trim);
 
     require Exporter;
 }
@@ -57,11 +58,20 @@ sub escape_sql {
 }
 
 # ARGS: TextString
-# Returns: Escape characters that will bother a Shell Exec '' string.
-sub escape_shell {
+# Returns: Escape characters that will bother a Unix Shell Exec '' string.
+sub escape_shell_unix {
     my $text = $_[0];
     $text =~ s|\\|\\\\|og;
     $text =~ s|'|'\\''|og;
+    return $text;
+}
+
+# ARGS: TextString
+# Returns: Escape characters that will bother a Windows Shell Exec "" string.
+sub escape_shell_windows {
+    my $text = $_[0];
+    $text =~ s|\\|\\\\|og;
+    $text =~ s|"|\\"|og;
     return $text;
 }
 
