@@ -274,7 +274,7 @@ sub fetch {
 
     my $allowed_groups = $dsxml->{dataset}{"read"};
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
-    $failure && &Jarvis::Error::my_die ($jconfig, "Wanted read access: $failure");
+    $failure && &Jarvis::Error::my_die ($jconfig, "Wanted read access: $failure\n");
 
     my $sql = &get_sql ($jconfig, 'select', $dsxml);
 

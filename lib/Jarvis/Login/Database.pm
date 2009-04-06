@@ -68,6 +68,8 @@ package Jarvis::Login::Database;
 #               cgi
 #               Database config indirectly via Jarvis::DB
 #   
+#       $username - The offered username
+#       $password - The offered password
 #       %login_parameters - Hash of login parameters parsed from
 #               the master application XML file by the master Login class.
 #       
@@ -77,7 +79,11 @@ package Jarvis::Login::Database;
 ################################################################################
 #
 sub Jarvis::Login::Database::check {
-    my ($jconfig, %login_parameters) = @_;
+    my ($jconfig, $username, $password, %login_parameters) = @_;
+
+    # No info?
+    $username || return ("No username supplied.");
+    $password || return ("No password supplied.");
 
     # Our user name login parameters are here...
     my $user_table = $login_parameters{'user_table'};
@@ -89,18 +95,6 @@ sub Jarvis::Login::Database::check {
 
     if (! ($user_table && $user_username_column && $user_password_column)) {
         return ("Missing configuration for Login module Database.");
-    }
-
-    # Now see what we got passed.
-    my $username = $jconfig->{'cgi'}->param('username');
-    my $password = $jconfig->{'cgi'}->param('password');
-
-    # No info?
-    if (! ((defined $username) && ($username ne ""))) {
-        return ("No username supplied.");
-
-    } elsif (! ((defined $password) && ($password ne ""))) {
-        return ("No password supplied.");
     }
 
     # Check the username from the user name table.
@@ -124,10 +118,10 @@ sub Jarvis::Login::Database::check {
     my $stored_password = $$result_href{'password'} || '';
 
     if ($stored_password eq '') {
-        return ("No password stored for user '$username'.");
+        return ("Account has no password.");
     }
     if ($stored_password ne $password) {
-        return ("Incorrect password for user '$username'.");
+        return ("Incorrect password.");
     }
 
     # Need our group configuration, otherwise just put them in group 'default'.

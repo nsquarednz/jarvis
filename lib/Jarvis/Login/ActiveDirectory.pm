@@ -69,6 +69,8 @@ package Jarvis::Login::ActiveDirectory;
 #           READ
 #               cgi
 #
+#       $username - The offered username
+#       $password - The offered password
 #       %login_parameters - Hash of login parameters parsed from
 #               the master application XML file by the master Login class.
 #
@@ -77,7 +79,11 @@ package Jarvis::Login::ActiveDirectory;
 ################################################################################
 #
 sub Jarvis::Login::ActiveDirectory::check {
-    my ($jconfig, %login_parameters) = @_;
+    my ($jconfig, $username, $password, %login_parameters) = @_;
+
+    # No info?
+    $username || return ("No username supplied.");
+    $password || return ("No password supplied.");
 
     # Our user name login parameters are here...
     my $server = $login_parameters{'server'};
@@ -89,18 +95,6 @@ sub Jarvis::Login::ActiveDirectory::check {
 
     $server || return ("Missing 'server' configuration for Login module ActiveDirectory.");
     $base_object || return ("Missing 'base_object' configuration for Login module ActiveDirectory.");
-
-    # Now see what we got passed.  These are the user's provided info that we will validate.
-    my $username = $jconfig->{'cgi'}->param('username');
-    my $password = $jconfig->{'cgi'}->param('password');
-
-    # No info?
-    if (! ((defined $username) && ($username ne ""))) {
-        return ("No username supplied.");
-
-    } elsif (! ((defined $password) && ($password ne ""))) {
-        return ("No password supplied.");
-    }
 
     # Do that ActiveDirectory thing.  Connect first.  AD uses default LDAP port 389.
     &Jarvis::Error::debug ($jconfig, "Connecting to ActiveDirectory Server: '$server:$port'.");
@@ -165,7 +159,7 @@ sub Jarvis::Login::ActiveDirectory::check {
 
     $mesg = $ldap->bind ($dn, password => $password);
     if ($mesg->code == 49) {
-        return ("Invalid password.");
+        return ("Incorrect password.");
     }
     $mesg->code && &Jarvis::Error::my_die ($jconfig, "Bind to server '$server:$port' failed with " . $mesg->code . " '" . $mesg->error . "'");
     $ldap->unbind ();

@@ -56,6 +56,8 @@ package Jarvis::Login::None;
 # Params:
 #       $jconfig - Jarvis::Config object (not used)
 #
+#       $username - The offered username (IGNORED)
+#       $password - The offered password (IGNORED)
 #       %login_parameters - Hash of login parameters parsed from
 #               the master application XML file by the master Login class.
 
@@ -65,7 +67,7 @@ package Jarvis::Login::None;
 ################################################################################
 #
 sub Jarvis::Login::None::check {
-    my ($jconfig, %login_parameters) = @_;
+    my ($jconfig, $username, $password, %login_parameters) = @_;
 
     my $username = $login_parameters{'username'} || "guest";
     my $group_list = $login_parameters{'group_list'} || "guest";

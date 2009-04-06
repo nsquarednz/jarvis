@@ -65,7 +65,7 @@ sub dump_string {
     # This newline is tidy.  It also stops Perl from appending an "at line..."
     # to the message if/when we die with this message.
     #
-    $msg = &trim ($msg) . "\n";
+    $msg =~ s/\s*$/\n/;
 
     $header && (length ($msg) + length ($header) > 132) && ($header .= "\n");
 

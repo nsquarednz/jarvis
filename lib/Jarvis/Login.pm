@@ -86,6 +86,10 @@ sub check {
     $jconfig->{'sname'} = $session->name();
     $jconfig->{'sid'} = $session->id();
 
+    # Now see what we got passed.  These are the user's provided info that we will validate.
+    my $offered_username = $jconfig->{'cgi'}->param('username') || '';
+    my $offered_password = $jconfig->{'cgi'}->param('password') || '';
+
     # By default these values are all empty.  Note that we never allow username
     # and group_list to be undef, too many things depend on it having some value,
     # even if that is just ''.
@@ -131,7 +135,7 @@ sub check {
         my $login_method = $login_module . "::check";
         {
             no strict 'refs';
-            ($error_string, $username, $group_list) = &$login_method ($jconfig, %login_parameters);
+            ($error_string, $username, $group_list) = &$login_method ($jconfig, $offered_username, $offered_password, %login_parameters);
         }
 
         $username || ($username = '');
@@ -147,12 +151,13 @@ sub check {
         $error_string = "Not logged and login disallowed for this request";
     }
 
-    # Log the attempt ONLY IF they supplied a username and we weren't already logged in.
-    if ($username && ! $already_logged_in) {
+    # Log the results if we actually tried to login, with a user and all.
+    if (! $already_logged_in) {
         if ($logged_in) {
-            &Jarvis::Error::log ($jconfig, "Login succeeded for '$username' in '$group_list'");
-        } else {
-            &Jarvis::Error::log ($jconfig, "Login fail on '" . $jconfig->{'sid'} . "': $error_string");
+            &Jarvis::Error::log ($jconfig, "Login for '$username ($group_list)' on '" . $jconfig->{'sid'} . "'.");
+
+        } elsif ($offered_username) {
+            &Jarvis::Error::log ($jconfig, "Login fail for '$offered_username' on '" . $jconfig->{'sid'} . "': $error_string.");
         }
     }
 
@@ -202,7 +207,7 @@ sub check_access {
 
     # Check permissions
     if ($allowed_groups eq "") {
-        return "This resource does not allow access to anybody.";
+        return "Resource has no access.";
 
     # Allow access to all even those not logged in.
     } elsif ($allowed_groups eq "**") {
@@ -210,7 +215,7 @@ sub check_access {
 
     # Allow access to any logged in user.
     } elsif ($allowed_groups eq "*") {
-        $jconfig->{'logged_in'} || return "Successful login is required in order to access this resource.";
+        $jconfig->{'logged_in'} || return "Login required.";
 
     # Allow access to a specific comma-separated group list.
     } else {
@@ -224,7 +229,7 @@ sub check_access {
             }
             last if $allowed;
         }
-        $allowed || return "Logged-in user does not belong to any permitted access group for this resource.";
+        $allowed || return "Not in a permitted group.";
     }
     return "";
 }
