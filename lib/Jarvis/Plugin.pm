@@ -74,6 +74,7 @@ sub do {
     my $add_headers = undef;            # Should we add headers.
     my $default_filename = undef;       # A default return filename to use.
     my $filename_parameter = undef;     # Which CGI parameter contains our filename.
+    my %plugin_parameters = ();         # Taken from XML and handed to plugin
 
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
     if ($axml->{'plugin'}) {
@@ -87,6 +88,19 @@ sub do {
             $add_headers = defined ($Jarvis::Config::yes_value {lc ($plugin->{'add_headers'}->content || "no")});
             $default_filename = $plugin->{'default_filename'}->content;
             $filename_parameter = $plugin->{'filename_parameter'}->content;
+
+            # Get our parameters.  These are the configured parameters from the XML file,
+            # which we handily load up for you, to avoid duplicating this code in every
+            # module.  If you want CGI parameters from within your module, then you can access
+            # the $jconfig->{'cgi'} CGI object.  Ditto for anything else you might want from
+            # the $jconfig->{'xml'} XML::Smartt object.
+            #
+            if ($plugin->{'parameter'}) {
+                foreach my $parameter ($plugin->{'parameter'}('@')) {
+                    &Jarvis::Error::debug ($jconfig, "Plugin Parameter: " . $parameter->{'name'}->content . " -> " . $parameter->{'value'}->content);
+                    $plugin_parameters {$parameter->{'name'}->content} = $parameter->{'value'}->content;
+                }
+            }
         }
     }
 
@@ -96,20 +110,6 @@ sub do {
     # Check security.
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
     ($failure ne '') && die "Wanted plugin access: $failure";
-
-    # Get our parameters.  These are the configured parameters from the XML file,
-    # which we handily load up for you, to avoid duplicating this code in every
-    # module.  If you want CGI parameters from within your module, then you can access
-    # the $jconfig->{'cgi'} CGI object.  Ditto for anything else you might want from
-    # the $jconfig->{'xml'} XML::Smartt object.
-    #
-    my %plugin_parameters = ();
-    if ($axml->{'plugin'}{'parameter'}) {
-        foreach my $parameter ($axml->{'plugin'}{'parameter'}('@')) {
-            &Jarvis::Error::debug ($jconfig, "Plugin Parameter: " . $parameter->{'name'}->content . " -> " . $parameter->{'value'}->content);
-            $plugin_parameters {$parameter->{'name'}->content} = $parameter->{'value'}->content;
-        }
-    }
 
     # Figure out a filename.  It's not mandatory, if we don't have a default
     # filename and we don't have a filename_parameter supplied and defined then
