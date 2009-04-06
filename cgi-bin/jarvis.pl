@@ -72,11 +72,12 @@ sub handler {
     # Return error.  Note that we do not print stack trace to user, since
     # that is a potential security weakness.
     print $cgi->header(-type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt");
-    print $cgi->url () . "\n";
-    print "$msg";
+    print $msg;
 
     # Print to error log.  Include stack trace if debug is enabled.
-    print STDERR ($jconfig->{'debug'} ? Carp::longmess $msg : Carp::shortmess $msg);
+    my $long_msg = &Jarvis::Error::dump_string ($jconfig, 'fatal', $msg);
+    print STDERR ($jconfig->{'debug'} ? Carp::longmess $long_msg : Carp::shortmess $long_msg);
+
     exit 0;
 }
 

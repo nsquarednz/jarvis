@@ -73,21 +73,19 @@ sub dump_string {
 }
 
 ################################################################################
-# Dies with some standard "where are we" info.  Uses dump_string.
+# THIS IS COMPLETELY DEPRECATED.  PLEASE JUST CALL "die".
 #
 # Params:
 #       $jconfig - Jarvis::Config object
 #       $msg - Message to print
-#       $level - Optional level override.
 #
 # Returns:
 #       dies
 ################################################################################
 #
 sub my_die {
-    my ($jconfig, $msg, $level) = @_;
-
-    die &dump_string ($jconfig, $level || 'fatal', $msg);
+    my ($jconfig, $msg) = @_;
+    die $msg;
 }
 
 ################################################################################
