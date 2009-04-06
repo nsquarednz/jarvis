@@ -69,7 +69,7 @@ package Jarvis::Login::None;
 sub Jarvis::Login::None::check {
     my ($jconfig, $username, $password, %login_parameters) = @_;
 
-    my $username = $login_parameters{'username'} || "guest";
+    $username = $login_parameters{'username'} || "guest";
     my $group_list = $login_parameters{'group_list'} || "guest";
 
     return ("", $username, $group_list);
