@@ -74,6 +74,11 @@ sub check {
     my $sid_store = $axml->{'sessiondb'}->{'store'}->content || "driver:file;serializer:default;id:md5";
     &Jarvis::Error::debug ($jconfig, "SID Store '$sid_store'.");
 
+    # Use a different cookie name?
+    my $sid_cookie_name = $axml->{'sessiondb'}->{'cookie'}->content;
+    $sid_cookie_name && CGI::Session->name($sid_cookie_name);
+    &Jarvis::Error::debug ($jconfig, "SID Cookie Name '$sid_cookie_name'.");
+
     my %sid_params = ();
     if ($axml->{'sessiondb'}->{'parameter'}) {
         foreach my $sid_param (@{ $axml->{'sessiondb'}->{'parameter'} }) {
