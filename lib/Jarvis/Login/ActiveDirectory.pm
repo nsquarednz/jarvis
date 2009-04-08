@@ -133,7 +133,7 @@ sub Jarvis::Login::ActiveDirectory::check {
     #
     my $entry = $mesg->entry (0);
     my $dn = $entry->dn ();
-    &Jarvis::Error::debug ($jconfig, "User DN '$dn'\n");
+    &Jarvis::Error::debug ($jconfig, "User DN '$dn'");
 
     # Now look at the memberOf attribute of this account.  If they don't belong to
     # any groups, that's strange, but probably not impossible.  We let the application
@@ -146,10 +146,15 @@ sub Jarvis::Login::ActiveDirectory::check {
     my @groups = $entry->get_value ('memberOf');
     my $group_list = '';
     foreach my $group (@groups) {
-        ($group =~ m/^CN=([a-zA-z_\-]+),/) || return "User '$username' is memberOf group with unsupported name syntax.";
-        my $cn_group = $1;
-        &Jarvis::Error::debug ($jconfig, "Member of '$group' ($cn_group)\n");
-        $group_list .= ($group_list ? "," : "") . $cn_group;
+        &Jarvis::Error::debug ($jconfig, "Checking group '$group'.");
+        if ($group =~ m/^CN=([^,]+),/) {
+            my $cn_group = $1;
+            &Jarvis::Error::debug ($jconfig, "Identified as member of '$cn_group'.");
+            $group_list .= ($group_list ? "," : "") . $cn_group;
+        } else {
+            &Jarvis::Error::log ($jconfig, "User '$username' is memberOf group with unsupported name syntax." );
+        }
+        
     }
     $ldap->unbind ();
 
