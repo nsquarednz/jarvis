@@ -29,7 +29,7 @@
 
 // Default Values for EXT
 // Default is from the extjs website.
-Ext.BLANK_IMAGE_URL = '/edit/decoration/s.png';
+Ext.BLANK_IMAGE_URL = '/ext/resources/images/default/s.gif';
 
 // Global parameters
 var application = 'default';
