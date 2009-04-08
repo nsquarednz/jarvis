@@ -326,6 +326,12 @@ sub fetch {
     # Return content in requested format.  JSON is simple.
     if ($jconfig->{'format'} eq "json") {
         my %return_data = ();
+
+        $return_data {"logged_in"} = $jconfig->{'logged_in'};
+        $return_data {"username"} = $jconfig->{'username'};
+        $return_data {"error_string"} = $jconfig->{'error_string'};
+        $return_data {"group_list"} = $jconfig->{'group_list'};
+
         $return_data {"fetched"} = $num_rows;
         $return_data {"data"} = $rows_aref;
 
@@ -335,6 +341,12 @@ sub fetch {
     # XML is also simple.
     } elsif ($jconfig->{'format'} eq "xml") {
         my $xml = XML::Smart->new ();
+
+        $xml->{logged_in} = $jconfig->{'logged_in'};
+        $xml->{username} = $jconfig->{'username'};
+        $xml->{error_string} = $jconfig->{'error_string'};
+        $xml->{group_list} = $jconfig->{'group_list'};
+
         $xml->{fetched} = $num_rows;
         $xml->{data}{row} = $rows_aref;
 
