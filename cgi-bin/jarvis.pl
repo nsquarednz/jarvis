@@ -40,6 +40,7 @@ use Jarvis::Config;
 use Jarvis::Login;
 use Jarvis::Dataset;
 use Jarvis::Status;
+use Jarvis::Habitat;
 use Jarvis::Exec;
 use Jarvis::Plugin;
 use Jarvis::DB;
@@ -119,6 +120,14 @@ MAIN: {
 
         my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
         my $return_text = &Jarvis::Status::report ($jconfig);
+        print $cgi->header(-type => "text/plain", -cookie => $cookie);
+        print $return_text;
+
+    # Habitat.  Echo the contents of the "<context>...</context>" block in our app-name.xml.
+    } elsif ($action eq "habitat") {
+
+        my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
+        my $return_text = &Jarvis::Habitat::print ($jconfig);
         print $cgi->header(-type => "text/plain", -cookie => $cookie);
         print $return_text;
 

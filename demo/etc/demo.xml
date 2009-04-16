@@ -4,6 +4,25 @@
         <!-- This is where our <dataset>.xml are all stored -->
 	<dataset_dir>/opt/jarvis/demo/etc/dataset</dataset_dir>
 
+        <!-- This is how you might define a JSON habitat.  100% example.
+             If your requested format is non-XML (e.g. JSON, we will strip the
+             outer <habitat> tags for you.  Other than that, you're on your own.
+             -->
+
+        <habitat><![CDATA[hargs: {
+    install_type: 'production'
+}]]></habitat>
+
+
+        <!-- XML Habitat. Contents are entirely free form.  This is 100% example only.
+             For requests with &format=xml we will include the <habitat></habitat>.
+            -->
+        <habitat>
+            <install_type>production</install_type>
+            <parameter name="pname" value="some_value"/>
+            <parameter name="another" value="a_different_value"/>
+        </habitat>
+        
         <!-- This defines how our sessions are stored.  See CGI::Session. -->
         <sessiondb store="driver:file;serializer:default;id:md5" expiry="+2h">
             <parameter name="Directory" value="/tmp/demo"/>
