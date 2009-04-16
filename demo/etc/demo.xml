@@ -7,16 +7,22 @@
         <!-- This is how you might define a JSON habitat.  100% example.
              If your requested format is non-XML (e.g. JSON, we will strip the
              outer <habitat> tags for you.  Other than that, you're on your own.
-             -->
 
+             BE WARNED.  Your HABITAT is PUBLIC.  Login is not required in order
+             to view the habitat.
+             -->
+        <!--
         <habitat><![CDATA[hargs: {
     install_type: 'production'
 }]]></habitat>
-
+        -->
 
         <!-- XML Habitat. Contents are entirely free form.  This is 100% example only.
              For requests with &format=xml we will include the <habitat></habitat>.
-            -->
+            
+             BE WARNED.  Your HABITAT is PUBLIC.  Login is not required in order
+             to view the habitat.
+        -->
         <habitat>
             <install_type>production</install_type>
             <parameter name="pname" value="some_value"/>
