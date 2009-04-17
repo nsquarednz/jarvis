@@ -100,7 +100,8 @@ MAIN: {
     $jconfig = new Jarvis::Config ($app_name, 'etc_dir' => ($ENV{'JARVIS_ETC'} || "/opt/jarvis/etc"));
 
     ###############################################################################
-    # Action: "status", "fetch", "update".
+    # Action: "status", "habitat", "logout", "fetch", "update",  or custom
+    #           action from Exec or Plugin.
     ###############################################################################
     #
     # Must have an action.
