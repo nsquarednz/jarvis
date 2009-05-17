@@ -106,10 +106,25 @@ function jarvisLoadException (proxy, options, response, e) {
         alert (response.responseText);
         done_alert = 1;
     }
-    document.location.href = login_page + '?from=' + escape (location.pathname + location.hash);
+
+    // Load exception.  Let's see if we need to login first, perhaps?  If that's the
+    // problem, then send them to the login page.
+    var status_store = new Ext.data.JsonStore ({
+        url: jarvisUrl ('status'),
+        root: 'data',
+        fields: ['error_string', 'logged_in', 'group_list', 'username'],
+        listeners: {
+            'load': function (store, records, options) {
+                if ((records.length > 0) && ! records[0].get ('logged_in')) {
+                    document.location.href = login_page + '?from=' + escape (location.pathname + location.hash);
+                }
+            }
+        }
+    });
+    status_store.load ();
 };
 
-// Common submit method (does delete/update/insert). 
+// Common submit method (does delete/update/insert).
 //
 //      transaction_type - 'delete', 'update', 'insert'
 //      store            - The store to update.
@@ -134,7 +149,7 @@ function jarvisSendChange (transaction_type, store, dataset_name, record) {
     // Note that _record_id is the INTERNAL ExtJS ID.  Not the database "id" column.
     //
     var fields = record.data;
-    fields._record_id = record.id;          
+    fields._record_id = record.id;
     fields._transaction_type = transaction_type;
 
     // Perform the request over ajax.
