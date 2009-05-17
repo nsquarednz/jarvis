@@ -1,7 +1,0 @@
-<dataset read="**" write="">
-    <select>
-SELECT id, name
-FROM users
-ORDER BY name
-    </select>
-</dataset>
