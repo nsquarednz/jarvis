@@ -37,7 +37,7 @@ var login_page  = 'login.html';
 var jarvis_home = '/jarvis-bin/jarvis.pl';
 
 // Track how many changes we still have outstanding.
-var changesPending = 0;
+var num_pending = 0;
 
 // Init our parameters.
 function jarvisInit (new_application, new_login_page) {
@@ -142,8 +142,9 @@ function jarvisLoadException (proxy, options, response, e) {
 //                          message: (Optional) Error message text, present if update failed.
 //                          data:    (Optional) Array of returned objects.  E.g. if SQL used INSERT RETURNING.
 //
-//      record          - The original record which invoked the update.
-//      changesPending  - Number of remaining changes still queued.
+//      transaction_type - 'update', 'insert' or 'delete' as supplied for request
+//      record           - The original record which invoked the update.
+//      num_pending      - Number of remaining changes still queued.
 //
 function jarvisSendChange (transaction_type, store, dataset_name, record) {
 
@@ -159,15 +160,15 @@ function jarvisSendChange (transaction_type, store, dataset_name, record) {
     fields._transaction_type = transaction_type;
 
     // One more request to track in our counter.
-    changesPending++;
+    num_pending++;
 
     // Perform the request over ajax.
     Ext.Ajax.request({
         url: jarvis_home,
 
         // We received a response back from the server, that's a good start.
-        success: function (response, requestOptions) {
-            changesPending--;   // One less request.
+        success: function (response, request_options) {
+            num_pending--;   // One less request.
 
             // Eval the response.  It SHOULD be valid JSON.  However, bad JSON is basically
             // treated the same as good JSON with a failure flag.
@@ -181,18 +182,18 @@ function jarvisSendChange (transaction_type, store, dataset_name, record) {
                 result.success = 0;
                 result.message = 'Bad JSON: ' + response.responseText;
             }
-            store.fireEvent ('writeback', store, result, record, changesPending);
+            store.fireEvent ('writeback', store, result, transaction_type, record, num_pending);
         },
 
         // Total failure.  Script failed.  It might have managed to update
         // our changes, but we have no way to tell.  You should reload your store.
-        failure: function (response, requestOptions) {
-            changesPending--;   // One less request.
+        failure: function (response, request_options) {
+            num_pending--;   // One less request.
 
             var result = new Object ();
             result.success = 0;
             result.message = 'Server responded with error.  Updates lost.';
-            store.fireEvent ('writeback', store, result, record, changesPending);
+            store.fireEvent ('writeback', store, result, transaction_type, record, num_pending);
         },
 
         params: {
@@ -200,8 +201,7 @@ function jarvisSendChange (transaction_type, store, dataset_name, record) {
             app: application,
             dataset: dataset_name,
             fields: Ext.util.JSON.encode (fields)
-        },
-        record: record
+        }
     });
 }
 
