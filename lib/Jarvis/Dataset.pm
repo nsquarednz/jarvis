@@ -61,6 +61,8 @@ my %yes_value = ('yes' => 1, 'true' => 1, '1' => 1);
 #               dataset_name        Stored for the benefit of error/debug.
 #               use_placeholders    Should we use placeholders?  Or just insert text?
 #               max_rows            Passed through as {{__max_rows}} to SQL.
+#               start_param         Name of the CGI param specifying page start row num
+#               limit_param         Name of the CGI param specifying page limit row num
 #
 # Returns:
 #       $dsxml - XML::Smart object holding config info read from file.
@@ -78,11 +80,11 @@ sub get_config_xml {
     &Jarvis::Error::debug ($jconfig, "Dataset Directory '$dataset_dir'.");
 
     # Now we require 'dataset' to also be a CGI parameter.  We store this in the
-    # $jconfig 
+    # $jconfig
     my $dataset_name = $cgi->param ('dataset') || die "Missing mandatory parameter 'dataset'!\n";
     ($dataset_name =~ m/^\w+$/) || die "Invalid characters in parameter 'dataset'\n";
     $jconfig->{'dataset_name'} = $dataset_name;
-    &Jarvis::Error::debug ($jconfig, "Dataset Directory '$dataset_dir'.");
+    &Jarvis::Error::debug ($jconfig, "Dataset Name '$dataset_name'.");
 
     # Load the dataset-specific XML file and double-check it has top-level <dataset> tag.
     my $dsxml_filename = "$dataset_dir/$dataset_name.xml";
@@ -92,6 +94,8 @@ sub get_config_xml {
     # Load a couple of other parameters.  This is a "side-effect".  Yeah, it's a bit yucky.
     $jconfig->{'use_placeholders'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'use_placeholders'}->content || "no")});
     $jconfig->{'max_rows'} = lc ($axml->{'max_rows'}->content || 200);
+    $jconfig->{'start_param'} = lc ($axml->{'start_param'}->content || 'page_start');
+    $jconfig->{'limit_param'} = lc ($axml->{'limit_param'}->content || 'page_limit');
 
     return $dsxml;
 }
@@ -322,6 +326,30 @@ sub fetch {
 
     my $rows_aref = $sth->fetchall_arrayref({});
     $sth->finish;
+
+    # "num_rows" is the number of rows BEFORE paging limit/start is applied.  Now
+    # we might truncate if __start and __limit are present.
+    #
+    my $limit = $jconfig->{'cgi'}->param ($jconfig->{'limit_param'}) || 0;
+    my $start = $jconfig->{'cgi'}->param ($jconfig->{'start_param'}) || 0;
+
+    if ($limit > 0) {
+        ($start > 0) || ($start = 0); # Check we have a real zero, not ''
+
+        &Jarvis::Error::debug ($jconfig, "Limit = $limit, Offset = $start, Num Rows = $num_rows.");
+
+        if ($start > $#$rows_aref) {
+            &Jarvis::Error::debug ($jconfig, "Page start over-run.  No data fetched perhaps.");
+            @$rows_aref = ();
+
+        } else {
+            if (($start + ($limit - 1)) > $#$rows_aref) {
+                &Jarvis::Error::debug ($jconfig, "Page finish over-run.  Partial page.");
+                $limit = 1 + ($#$rows_aref - $start);
+            }
+            @$rows_aref = @$rows_aref[$start .. $start + ($limit - 1)];
+        }
+    }
 
     # Return content in requested format.  JSON is simple.
     if ($jconfig->{'format'} eq "json") {
