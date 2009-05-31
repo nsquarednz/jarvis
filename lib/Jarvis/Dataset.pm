@@ -44,6 +44,8 @@ use Jarvis::Text;
 use Jarvis::Error;
 use Jarvis::DB;
 
+use sort 'stable';      # Don't mix up records when server-side sorting
+
 my %yes_value = ('yes' => 1, 'true' => 1, '1' => 1);
 
 ###############################################################################
@@ -61,8 +63,10 @@ my %yes_value = ('yes' => 1, 'true' => 1, '1' => 1);
 #               dataset_name        Stored for the benefit of error/debug.
 #               use_placeholders    Should we use placeholders?  Or just insert text?
 #               max_rows            Passed through as {{__max_rows}} to SQL.
-#               start_param         Name of the CGI param specifying page start row num
-#               limit_param         Name of the CGI param specifying page limit row num
+#               page_start_param    Name of the CGI param specifying page start row num
+#               page_limit_param    Name of the CGI param specifying page limit row num
+#               sort_field_param    Name of the CGI param specifying page sort field
+#               sort_dir_param      Name of the CGI param specifying page sort direction
 #
 # Returns:
 #       $dsxml - XML::Smart object holding config info read from file.
@@ -94,8 +98,10 @@ sub get_config_xml {
     # Load a couple of other parameters.  This is a "side-effect".  Yeah, it's a bit yucky.
     $jconfig->{'use_placeholders'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'use_placeholders'}->content || "no")});
     $jconfig->{'max_rows'} = lc ($axml->{'max_rows'}->content || 200);
-    $jconfig->{'start_param'} = lc ($axml->{'start_param'}->content || 'page_start');
-    $jconfig->{'limit_param'} = lc ($axml->{'limit_param'}->content || 'page_limit');
+    $jconfig->{'page_start_param'} = lc ($axml->{'page_start_param'}->content || 'page_start');
+    $jconfig->{'page_limit_param'} = lc ($axml->{'page_limit_param'}->content || 'page_limit');
+    $jconfig->{'sort_field_param'} = lc ($axml->{'sort_field_param'}->content || 'sort_field');
+    $jconfig->{'sort_dir_param'} = lc ($axml->{'sort_dir_param'}->content || 'sort_dir');
 
     return $dsxml;
 }
@@ -327,11 +333,31 @@ sub fetch {
     my $rows_aref = $sth->fetchall_arrayref({});
     $sth->finish;
 
+    # Do we want to do server side sorting?  This happens BEFORE paging.
+    #
+    my $sort_field = $jconfig->{'cgi'}->param ($jconfig->{'sort_field_param'}) || '';
+    my $sort_dir = $jconfig->{'cgi'}->param ($jconfig->{'sort_dir_param'}) || 'ASC';
+
+    if ($sort_field) {
+        &Jarvis::Error::debug ($jconfig, "Server Sort on '$sort_field', Dir = '$sort_dir'.");
+        my $field_names_aref = $sth->{NAME};
+
+        if (! grep { /$sort_field/ } @$field_names_aref) {
+            &Jarvis::Error::log ($jconfig, "Unknown sort field: '$sort_field'.");
+
+        } elsif (uc (substr ($sort_dir, 0, 1)) eq 'D') {
+            @$rows_aref = sort { $b->{$sort_field} cmp $a->{$sort_field} } @$rows_aref;
+
+        } else {
+            @$rows_aref = sort { $a->{$sort_field} cmp $b->{$sort_field} } @$rows_aref;
+        }
+    }
+
     # "num_rows" is the number of rows BEFORE paging limit/start is applied.  Now
     # we might truncate if __start and __limit are present.
     #
-    my $limit = $jconfig->{'cgi'}->param ($jconfig->{'limit_param'}) || 0;
-    my $start = $jconfig->{'cgi'}->param ($jconfig->{'start_param'}) || 0;
+    my $limit = $jconfig->{'cgi'}->param ($jconfig->{'page_limit_param'}) || 0;
+    my $start = $jconfig->{'cgi'}->param ($jconfig->{'page_start_param'}) || 0;
 
     if ($limit > 0) {
         ($start > 0) || ($start = 0); # Check we have a real zero, not ''
