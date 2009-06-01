@@ -308,6 +308,7 @@ sub fetch {
 
     # Prepare
     &Jarvis::Error::debug ($jconfig, "FETCH = " . $sql);
+    &Jarvis::Error::debug ($jconfig, "ARGS = " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values));
 
     my $dbh = &Jarvis::DB::Handle ($jconfig);
     my $sth = $dbh->prepare ($sql)
@@ -353,8 +354,7 @@ sub fetch {
         }
     }
 
-    # "num_rows" is the number of rows BEFORE paging limit/start is applied.  Now
-    # we might truncate if __start and __limit are present.
+    # Should we truncate the data to a specific page?
     #
     my $limit = $jconfig->{'cgi'}->param ($jconfig->{'page_limit_param'}) || 0;
     my $start = $jconfig->{'cgi'}->param ($jconfig->{'page_start_param'}) || 0;
