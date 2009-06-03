@@ -347,10 +347,10 @@ sub fetch {
             &Jarvis::Error::log ($jconfig, "Unknown sort field: '$sort_field'.");
 
         } elsif (uc (substr ($sort_dir, 0, 1)) eq 'D') {
-            @$rows_aref = sort { $b->{$sort_field} cmp $a->{$sort_field} } @$rows_aref;
+            @$rows_aref = sort { ($b->{$sort_field} || chr(255)) cmp ($a->{$sort_field} || chr(255)) } @$rows_aref;
 
         } else {
-            @$rows_aref = sort { $a->{$sort_field} cmp $b->{$sort_field} } @$rows_aref;
+            @$rows_aref = sort { ($a->{$sort_field} || chr(255)) cmp ($b->{$sort_field} || chr(255)) } @$rows_aref;
         }
     }
 
