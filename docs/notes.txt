@@ -1,0 +1,19 @@
+Here are my scratch notes.  I'll convert these into real documentation
+when I have a few more.
+
+Installation:
+
+The following perl modules are required under Ubuntu.
+
+REQUIRED
+sudo apt-get install libcgi-session-perl
+sudo apt-get install libxml-smart-perl
+sudo apt-get install libjson-perl
+sudu apt-get install libtext-csv-perl
+sudu apt-get install libio-string-perl
+sudu apt-get install libmime-types-perl
+
+OPTIONAL
+sudo apt-get install libdbd-sybase-perl     (DB = SQL Server)
+sudo apt-get install libdbd-pg-perl         (DB = PostgreSQL)
+sudo apt-get install libnet-ldap-perl       (Login = LDAP or ActiveDirectory)
