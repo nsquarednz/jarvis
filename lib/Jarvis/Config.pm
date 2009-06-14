@@ -67,11 +67,13 @@ sub new {
     my ($class, $app_name, %args) = @_;
 
     my $self = {};
-    bless $self, 'Jarvis::Config'; 
+    bless $self, 'Jarvis::Config';
 
-    # Check our parameters for correctness.
+    # Check our parameters for correctness.  Note that jarvis.pl has already
+    # validated this, but other callers might not have, so we re-validate.
+    #
     $self->{'app_name'} = $app_name || die "Missing parameter 'app_name'\n";
-    ($self->{'app_name'} =~ m/^\w+$/) || die "Invalid characters in parameter 'app_name'.\n";
+    ($self->{'app_name'} =~ m/^[\w\-]+$/) || die "Invalid characters in parameter 'app_name'.\n";
 
     # We'll need a CGI handle.
     $self->{'cgi'} = $args{'cgi'} || new CGI;

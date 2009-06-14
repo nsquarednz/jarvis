@@ -86,7 +86,7 @@ sub get_config_xml {
     # Now we require 'dataset' to also be a CGI parameter.  We store this in the
     # $jconfig
     my $dataset_name = $cgi->param ('dataset') || die "Missing mandatory parameter 'dataset'!\n";
-    ($dataset_name =~ m/^\w+$/) || die "Invalid characters in parameter 'dataset'\n";
+    ($dataset_name =~ m/^[\w\-]+$/) || die "Invalid characters in parameter 'dataset'\n";
     $jconfig->{'dataset_name'} = $dataset_name;
     &Jarvis::Error::debug ($jconfig, "Dataset Name '$dataset_name'.");
 
@@ -130,10 +130,12 @@ sub get_sql {
 }
 
 ################################################################################
-# Adds some special variables to our name -> value map.  Note that our special
-# variables are added AFTER the user-provided variables.  That means that you
-# can securely rely upon the values of __username, __grouplist, etc.  If the
-# caller attempts to supply them, ours will replace the hacked values.
+# Go through the list of user-supplied variables and decide which ones are
+# safe to pass to the dataset in our name -> value map.
+#
+# Then add some special variables.
+#
+# Any variable which starts with "__" is safe.  Specifically.
 #
 #   __username  -> <logged-in-username>
 #   __grouplist -> ('<group1>', '<group2>', ...)
@@ -146,32 +148,48 @@ sub get_sql {
 #               group_list
 #               max_rows
 #
-#       Hash of Args (* indicates mandatory)
-#               username, group_list
+#       $raw_params_href - User-supplied (unsafe) hash of variables.
 #
 # Returns:
 #       1
 ################################################################################
 #
-sub add_special_dataset_variables {
+sub safe_dataset_variables {
 
-    my ($jconfig, $param_values_href) = @_;
+    my ($jconfig, $raw_params_href) = @_;
+
+    my %safe_params = ();
+
+    # First set the default parameters configured in the config file.
+    my $pxml = $jconfig->{'xml'}{'jarvis'}{'app'}{'default_parameters'};
+    if ($pxml && $pxml->{'parameter'}) {
+        foreach my $parameter ($pxml->{'parameter'}('@')) {
+            &Jarvis::Error::debug ($jconfig, "Default Parameter: " . $parameter->{'name'}->content . " -> " . $parameter->{'value'}->content);
+            $safe_params {$parameter->{'name'}->content} = $parameter->{'value'}->content;
+        }
+    }
+
+    # Copy through the SAFE user-provided parameters.  One leading underscore
+    # is permitted, but never TWO leading underscores.  No special characters.
+    foreach my $name (keys %$raw_params_href) {
+        if ($name =~ m/^_?[a-z][a-z0-9_\-]*$/i) {
+            &Jarvis::Error::debug ($jconfig, "User Parameter: $name -> " . $$raw_params_href {$name});
+            $safe_params{$name} = $$raw_params_href {$name};
+        }
+    }
 
     # These are '' if we have not logged in, but must ALWAYS be defined.  In
     # theory, any datasets which allows non-logged-in access is not going to
     # reference __username
     #
-    $$param_values_href{"__username"} = $jconfig->{'username'};
-    $$param_values_href{"__grouplist"} = "('" . join ("','", split (',', $jconfig->{'group_list'})) . "')";
+    $safe_params{"__username"} = $jconfig->{'username'};
+    $safe_params{"__grouplist"} = "('" . join ("','", split (',', $jconfig->{'group_list'})) . "')";
     foreach my $group (split (',', $jconfig->{'group_list'})) {
-        $$param_values_href{"__group:$group"} = 1;
+        $safe_params{"__group:$group"} = 1;
     }
+    &Jarvis::Error::debug ($jconfig, "Username: " . $safe_params{"__username"} . ", Group List: " . $safe_params{"__grouplist"});
 
-    # These can be passed by the client, we just set defaults if needed.
-    $$param_values_href{"__max_rows"} || ($$param_values_href{"__max_rows"} = $jconfig->{'max_rows'});
-    $$param_values_href{"__first_row"} || ($$param_values_href{"__first_row"} = 1);
-
-    return 1;
+    return %safe_params;
 }
 
 ################################################################################
@@ -214,7 +232,7 @@ sub sql_with_placeholders {
 #
 # Params:
 #       SQL text.
-#       Param Values hash
+#       Safe Param Values hash
 #
 # Returns:
 #       ($sql_with_variables).
@@ -223,7 +241,7 @@ sub sql_with_placeholders {
 #
 sub sql_with_variables {
 
-    my ($sql, %param_values) = @_;
+    my ($sql, %safe_params) = @_;
 
     # Parse the update SQL to get a prepared statement, pulling out the list
     # of names of variables we need to replace for each execution.
@@ -234,7 +252,7 @@ sub sql_with_variables {
     foreach my $idx (0 .. $#bits) {
         if ($idx % 2) {
             my $variable_name = $bits[$idx];
-            my $variable_value = $param_values{$variable_name};
+            my $variable_value = $safe_params{$variable_name};
             if (! defined $variable_value) {
                 $variable_value = 'NULL';
 
@@ -289,20 +307,21 @@ sub fetch {
     my $sql = &get_sql ($jconfig, 'select', $dsxml);
 
     # Handle our parameters.  Either inline or with placeholders.  Note that our
-    # special variables like __username will override sneaky user-supplied values.
+    # special variables like __username are safe, and cannot come from user-defined
+    # values.
     #
-    my %param_values = $jconfig->{'cgi'}->Vars;
-    &add_special_dataset_variables ($jconfig, \%param_values);
+    my %raw_params = $jconfig->{'cgi'}->Vars;
+    my %safe_params = &safe_dataset_variables ($jconfig, \%raw_params);
 
     my @arg_values = ();
     if ($jconfig->{'use_placeholders'}) {
         my ($sql_with_placeholders, @variable_names) = &sql_with_placeholders ($sql);
 
         $sql = $sql_with_placeholders;
-        @arg_values = map { $param_values{$_} } @variable_names;
+        @arg_values = map { $safe_params{$_} } @variable_names;
 
     } else {
-        my $sql_with_variables = &sql_with_variables ($sql, %param_values);
+        my $sql_with_variables = &sql_with_variables ($sql, %safe_params);
         $sql = $sql_with_variables;
     }
 
@@ -499,21 +518,22 @@ sub store {
     }
 
     # Handle our parameters.  Either inline or with placeholders.  Note that our
-    # special variables like __username will override sneaky user-supplied values.
+    # special variables like __username are safe, and cannot come from user-defined
+    # values.
     #
-    my %param_values = %{ $fields_href };
-    &add_special_dataset_variables ($jconfig, \%param_values);
+    my %raw_params = %{ $fields_href };
+    my %safe_params = &safe_dataset_variables ($jconfig, \%raw_params);
 
     my @arg_values = ();
     if ($jconfig->{'use_placeholders'}) {
         my ($sql_with_placeholders, @variable_names) = &sql_with_placeholders ($sql);
 
         $sql = $sql_with_placeholders;
-        @arg_values = map { $param_values{$_} } @variable_names;
+        @arg_values = map { $safe_params{$_} } @variable_names;
         &Jarvis::Error::debug ($jconfig, "Statement Args = " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values));
 
     } else {
-        my $sql_with_variables = &sql_with_variables ($sql, %param_values);
+        my $sql_with_variables = &sql_with_variables ($sql, %safe_params);
         $sql = $sql_with_variables;
     }
 
