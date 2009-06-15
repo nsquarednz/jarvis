@@ -238,3 +238,15 @@ function jarvisReadCookie (name) {
 function jarvisEraseCookie(name) {
     jarvisCreateCookie (name, "", -1);
 }
+
+// Say if our comma-separated groups list contains a nominated group.
+function jarvisInGroup (wanted, group_list) {
+    var group_array = group_list.split (',');
+    for (i=0; i<group_array.length; i++) {
+        if (group_array[i] == wanted) {
+            return true;
+        }
+    }
+    return false;
+}
+
