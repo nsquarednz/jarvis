@@ -123,7 +123,7 @@ sub get_sql {
     my ($jconfig, $which, $dsxml) = @_;
 
     my $sql = $dsxml->{dataset}{$which}->content;
-    $sql || die "This dataset has no SQL of type '$which'.";
+    $sql || die "Dataset '" . ($jconfig->{'dataset_name'} || '') . "' has no SQL of type '$which'.";
     $sql = &trim ($sql);
 
     return $sql;
@@ -298,7 +298,7 @@ sub sql_with_variables {
 sub fetch {
     my ($jconfig) = @_;
 
-    my $dsxml = &get_config_xml ($jconfig) || die "Cannot load configuration for dataset.\n";
+    my $dsxml = &get_config_xml ($jconfig) || die "Cannot load configuration for dataset '" . ($jconfig->{'dataset_name'} || '') . "'.\n";
 
     my $allowed_groups = $dsxml->{dataset}{"read"};
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
