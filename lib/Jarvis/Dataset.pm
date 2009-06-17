@@ -147,13 +147,15 @@ sub get_sql {
 #
 #       $raw_params_href - User-supplied (unsafe) hash of variables.
 #
+#       $rest_args_aref - A ref to our REST args (slash-separated after dataset)
+#
 # Returns:
 #       1
 ################################################################################
 #
 sub safe_dataset_variables {
 
-    my ($jconfig, $raw_params_href) = @_;
+    my ($jconfig, $raw_params_href, $rest_args_aref) = @_;
 
     my %safe_params = ();
 
@@ -173,6 +175,15 @@ sub safe_dataset_variables {
             &Jarvis::Error::debug ($jconfig, "User Parameter: $name -> " . $$raw_params_href {$name});
             $safe_params{$name} = $$raw_params_href {$name};
         }
+    }
+
+    # And our REST args go through as variable "1", "2", etc...
+    foreach my $i (0 .. $#$rest_args_aref) {
+        my $name = ($i + 1);
+        my $value = $$rest_args_aref[$i];
+
+        &Jarvis::Error::debug ($jconfig, "Rest Arg: $name -> $value");
+        $safe_params{$name} = $value;
     }
 
     # These are '' if we have not logged in, but must ALWAYS be defined.  In
@@ -275,6 +286,39 @@ sub sql_with_variables {
 }
 
 ################################################################################
+# Take an array of variable names, and substitute a value for each one from
+# our hash of name -> value parameters.  The variable names come from {{name}},
+# and may include a series of names, e.g. {{id|1}} which means:
+#
+#       - Use a supplied user parameter "id" if it exists.
+#       - If no "id", try REST parameter #1.  E.g /<app>/<dataset>/<id>
+#       - If no rest parameter, use NULL
+#
+# Params:
+#       $variable_names_aref - Array of variable names.
+#       $safe_params_href - Hash of name -> values.
+#
+# Returns:
+#       @arg_values
+#       die on error.
+################################################################################
+#
+sub names_to_values {
+    my ($variable_names_aref, $safe_params_href) = @_;
+
+    my @arg_values = ();
+    foreach my $name (@$variable_names_aref) {
+        my $value = undef;
+        foreach my $option (split ('\|', $name)) {
+            $value = $$safe_params_href {$option};
+            last if (defined $value);
+        }
+        push (@arg_values, $value);
+    }
+    return @arg_values;
+}
+
+################################################################################
 # Loads the data for the current data set, and puts it into our return data
 # hash so that it can be presented to the client in JSON.
 #
@@ -287,13 +331,15 @@ sub sql_with_variables {
 #               with_placeholders   Should we use placeholders or string subst in SQL
 #               format              Either "json" or "xml" or "csv".
 #
+#       $rest_args_aref - A ref to our REST args (slash-separated after dataset)
+#
 # Returns:
 #       Reference to Hash of returned data.  You may convert to JSON or XML.
 #       die on error (including permissions error)
 ################################################################################
 #
 sub fetch {
-    my ($jconfig) = @_;
+    my ($jconfig, $rest_args_aref) = @_;
 
     my $dsxml = &get_config_xml ($jconfig) || die "Cannot load configuration for dataset '" . ($jconfig->{'dataset_name'} || '') . "'.\n";
 
@@ -308,14 +354,14 @@ sub fetch {
     # values.
     #
     my %raw_params = $jconfig->{'cgi'}->Vars;
-    my %safe_params = &safe_dataset_variables ($jconfig, \%raw_params);
+    my %safe_params = &safe_dataset_variables ($jconfig, \%raw_params, $rest_args_aref);
 
     my @arg_values = ();
     if ($jconfig->{'use_placeholders'}) {
         my ($sql_with_placeholders, @variable_names) = &sql_with_placeholders ($sql);
 
         $sql = $sql_with_placeholders;
-        @arg_values = map { $safe_params{$_} } @variable_names;
+        @arg_values = &names_to_values (\@variable_names, \%safe_params);
 
     } else {
         my $sql_with_variables = &sql_with_variables ($sql, %safe_params);
@@ -466,6 +512,8 @@ sub fetch {
 #               with_placeholders   Should we use placeholders or string subst in SQL
 #               format              Either "json" or "xml" (not "csv").
 #
+#       $rest_args_aref - A ref to our REST args (slash-separated after dataset)
+#
 # Returns:
 #       "OK" on succes
 #       "Error message" on soft error (duplicate key, etc.).
@@ -473,7 +521,7 @@ sub fetch {
 ################################################################################
 #
 sub store {
-    my ($jconfig) = @_;
+    my ($jconfig, $rest_args_aref) = @_;
 
     my $dsxml = &get_config_xml ($jconfig) || die "Cannot load configuration for dataset.\n";
 
@@ -549,14 +597,14 @@ sub store {
     # values.
     #
     my %raw_params = %{ $fields_href };
-    my %safe_params = &safe_dataset_variables ($jconfig, \%raw_params);
+    my %safe_params = &safe_dataset_variables ($jconfig, \%raw_params, $rest_args_aref);
 
     my @arg_values = ();
     if ($jconfig->{'use_placeholders'}) {
         my ($sql_with_placeholders, @variable_names) = &sql_with_placeholders ($sql);
 
         $sql = $sql_with_placeholders;
-        @arg_values = map { $safe_params{$_} } @variable_names;
+        @arg_values = &names_to_values (\@variable_names, \%safe_params);
         &Jarvis::Error::debug ($jconfig, "Statement Args = " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values));
 
     } else {

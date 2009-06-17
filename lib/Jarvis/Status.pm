@@ -38,6 +38,7 @@ use Jarvis::Error;
 # Params:
 #       $jconfig - Jarvis::Config object
 #           READ: logged_in, username, error_string, group_list
+#       $rest_args_aref - A ref to our REST args (slash-separated after dataset)
 #
 # Returns:
 #       1.
@@ -45,7 +46,7 @@ use Jarvis::Error;
 ################################################################################
 #
 sub report {
-    my ($jconfig) = @_;
+    my ($jconfig, $rest_args_aref) = @_;
 
     my %fields = ();
     $fields{"logged_in"} = $jconfig->{'logged_in'};

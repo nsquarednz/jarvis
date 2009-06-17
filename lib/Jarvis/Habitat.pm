@@ -40,7 +40,8 @@ use Jarvis::Error;
 #
 # Params:
 #       $jconfig - Jarvis::Config object
-#           READ: logged_in, username, error_string, group_list
+#           READ: xml
+#       $rest_args_aref - A ref to our REST args (slash-separated after dataset)
 #
 # Returns:
 #       1.
@@ -48,7 +49,7 @@ use Jarvis::Error;
 ################################################################################
 #
 sub print {
-    my ($jconfig) = @_;
+    my ($jconfig, $rest_args_aref) = @_;
 
     my $xml = $jconfig->{'xml'};
     my $cxml = $xml->{jarvis}{app}{habitat} || new XML::Smart ();

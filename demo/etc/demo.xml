@@ -19,7 +19,7 @@
 
         <!-- XML Habitat. Contents are entirely free form.  This is 100% example only.
              For requests with &format=xml we will include the <habitat></habitat>.
-            
+
              BE WARNED.  Your HABITAT is PUBLIC.  Login is not required in order
              to view the habitat.
         -->
@@ -28,7 +28,7 @@
             <parameter name="pname" value="some_value"/>
             <parameter name="another" value="a_different_value"/>
         </habitat>
-        
+
         <!-- This defines how our sessions are stored.  See CGI::Session. -->
         <sessiondb store="driver:file;serializer:default;id:md5" expiry="+2h">
             <parameter name="Directory" value="/tmp/demo"/>
@@ -37,13 +37,17 @@
         <!-- This gives a sample configuration where the Login validation is performed by
              database lookup.  These values should work with the demo PostgreSQL
              database SQL included with this distribution.
-             -->            
-        <login module="Jarvis::Login::Database">
+             -->
+<!--        <login module="Jarvis::Login::Database">
             <parameter name="user_table" value="users"/>
             <parameter name="user_username_column" value="name"/>
             <parameter name="user_password_column" value="password"/>
-	</login>
-        
+	</login>-->
+        <login module="Jarvis::Login::None">
+            <parameter name="username" value="admin"/>
+            <parameter name="group_list" value="admin"/>
+        </login>
+
         <!-- This is an example of configuring ActiveDirectory lookup.  The values here
              are totally fictitious.  You will need to supply real values.
              -->
@@ -77,7 +81,7 @@
              your Apache user (e.g. www-data).
              -->
         <database connect="dbi:Pg:dbname=jarvis_demo" username="" password=""/>
-        
+
         <!-- This is a SQL server example.  You may need additional setup.
         <database connect="dbi:Sybase:server=SERVERNAME" username="username" password="password"/>
         -->
