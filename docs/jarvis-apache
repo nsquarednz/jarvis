@@ -1,0 +1,11 @@
+# Copy this file into /etc/apache2/conf.d and restart apache with
+# "apache2ctl restart".
+#
+
+# This assumes that you have unpacked into /opt/jarvis/
+ScriptAlias /jarvis-bin/ "/opt/jarvis/cgi-bin/"
+
+# This provides the ExtJS "helper library" script.
+Alias /jarvis/ "/opt/jarvis/htdocs/"
+
+

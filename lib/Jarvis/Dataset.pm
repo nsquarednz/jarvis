@@ -57,10 +57,9 @@ my %yes_value = ('yes' => 1, 'true' => 1, '1' => 1);
 #
 #       $jconfig - Jarvis::Config object
 #           READ
-#               cgi                 Find our user-supplied "dataset" name.
 #               xml                 Find our app-configured "dataset_dir" dir.
+#               dataset_name        What dataset do we want?
 #           WRITE
-#               dataset_name        Stored for the benefit of error/debug.
 #               use_placeholders    Should we use placeholders?  Or just insert text?
 #               max_rows            Passed through as {{__max_rows}} to SQL.
 #               page_start_param    Name of the CGI param specifying page start row num
@@ -85,9 +84,7 @@ sub get_config_xml {
 
     # Now we require 'dataset' to also be a CGI parameter.  We store this in the
     # $jconfig
-    my $dataset_name = $cgi->param ('dataset') || die "Missing mandatory parameter 'dataset'!\n";
-    ($dataset_name =~ m/^[\w\-]+$/) || die "Invalid characters in parameter 'dataset'\n";
-    $jconfig->{'dataset_name'} = $dataset_name;
+    my $dataset_name = $jconfig->{'dataset_name'};
     &Jarvis::Error::debug ($jconfig, "Dataset Name '$dataset_name'.");
 
     # Load the dataset-specific XML file and double-check it has top-level <dataset> tag.
@@ -484,15 +481,45 @@ sub store {
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
     $failure && die "Wanted write access: $failure";
 
+    # Fields we need to extract from given data.
+    my $fields_href = undef;
+
+    # Get our submitted content.  This works for POST (insert) on non-XML data.  If the
+    # content_type was "application/xml" then I think we will find our content in the
+    # 'XForms:Model' parameter instead.
+    my $content = $jconfig->{'cgi'}->param ('POSTDATA');
+
+    # This is for POST (insert) on XML data.
+    if (! $content) {
+        $content = $jconfig->{'cgi'}->param ('XForms:Model');
+    }
+
+    # This works for DELETE (delete) and PUT (update) on any content.
+    if (! $content) {
+        while (<STDIN>) {
+            print STDERR "STDIN: " . $_;
+            $content .= $_;
+        }
+    }
+    $content || die "Cannot find client-submitted change content.";
+
     # Check we have some changes and parse 'em from the JSON.  We get an
     # array of hashes.  Each array entry is a change record.
-    my $changes_json = $jconfig->{'cgi'}->param ('fields')
-         || die "Missing mandatory store parameter 'fields'.";
+    my $content_type = $jconfig->{'cgi'}->content_type () || '';
+    if ($content_type =~ m|^application/json(; .*)?$|) {
+        $fields_href = JSON::XS->new->utf8->decode ($content);
 
-    my $fields_href = JSON::XS->new->utf8->decode ($changes_json);
+    # XML in here please.
+    } elsif ($content_type =~ m|^application/xml(; .*)?$|) {
+        die "XML content... currently in development\n";
+
+    # Unsupported format.
+    } else {
+        die "Unsupported content type for changes: '$content_type'\n";
+    }
 
     # Choose our statement and find the SQL and variable names.
-    my $transaction_type = $$fields_href{'_transaction_type'};
+    my $transaction_type = $jconfig->{'action'};
     my $sql = undef;
     my @variable_names = undef;
 

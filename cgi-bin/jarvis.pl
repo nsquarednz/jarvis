@@ -94,76 +94,102 @@ MAIN: {
     $SIG{__DIE__} = \&Main::handler;
 
     ###############################################################################
-    # AppName: (mandatory parameter)
+    # Determine app name (and possibly data-set).
     ###############################################################################
     #
-    my $app_name = $cgi->param ('app') || die "Missing mandatory parameter 'app'!\n";
-    ($app_name =~ m/^[\w\-]+$/) || die "Invalid characters in parameter 'app'\n";
+    my $path = $cgi->path_info() ||
+        die "Missing path info.  Send http://.../jarvis.pl/<app-name>/<dataset-name> in URI!\n";
+
+    ($path =~ m|^/([\w\-]+)$|) || ($path =~ m|^/([\w\-]+)/([\w\-]+)$|) ||
+        die "Invalid path info '$path'.    Send http://.../jarvis.pl/<app-name>/<dataset-name> in URI!\n";
+
+    my ($app_name, $dataset_name) = ($1, $2);
 
     $jconfig = new Jarvis::Config ($app_name, 'etc_dir' => ($ENV{'JARVIS_ETC'} || $default_jarvis_etc));
+    $dataset_name && ($jconfig->{'dataset_name'} = $dataset_name);
 
     ###############################################################################
     # Action: "status", "habitat", "logout", "fetch", "update",  or custom
     #           action from Exec or Plugin.
     ###############################################################################
     #
-    # Must have an action.
-    my $action = $cgi->param ('action') || die "Missing mandatory parameter 'action'!\n";
+    my $method = $cgi->request_method();
+    my $action = lc ($method) || die "Missing request method!\n";
     ($action =~ m/^\w+$/) || die "Invalid characters in parameter 'action'\n";
 
+    # These aren't REST standard, but we accept 'em anyhow.
+    if ($action eq 'get') { $action = 'select' };
+    if ($action eq 'fetch') { $action = 'select' };
+    if ($action eq 'post') { $action = 'insert' };
+    if ($action eq 'create') { $action = 'insert' };
+    if ($action eq 'put') { $action = 'update' };
+
     $jconfig->{'action'} = $action;
-    my $allow_new_login = (($action eq "status") || ($action eq "fetch"));
 
-    &Jarvis::Login::check ($jconfig, $allow_new_login);
+    &Jarvis::Login::check ($jconfig);
 
+    &Jarvis::Error::debug ($jconfig, "Action = $action ($method)");
     &Jarvis::Error::debug ($jconfig, "User Name = " . $jconfig->{'username'});
     &Jarvis::Error::debug ($jconfig, "Group List = " . $jconfig->{'group_list'});
 
-    # Status.  I.e. are we logged in?
-    if ($action eq "status") {
+    # All special datasets start with "__".
+    #
+    # Note that our Plugin and Execs may expect "/appname/<something-else>" so
+    # we should be careful not to trample on them.  We only interpret these
+    # special datasets for the four main CRUD actions.
+    #
+    if ($dataset_name && ($dataset_name =~ m/^__/) &&
+        (($action eq "select") || ($action eq "insert") || ($action eq "update") || ($action eq "delete"))) {
 
-        my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
-        my $return_text = &Jarvis::Status::report ($jconfig);
-        print $cgi->header(-type => "text/plain", -cookie => $cookie);
-        print $return_text;
+        my $return_text = undef;
 
-    # Habitat.  Echo the contents of the "<context>...</context>" block in our app-name.xml.
-    } elsif ($action eq "habitat") {
+        # Status.  I.e. are we logged in?
+        if ($dataset_name eq "__status") {
+            $return_text = &Jarvis::Status::report ($jconfig);
 
-        my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
-        my $return_text = &Jarvis::Habitat::print ($jconfig);
-        print $cgi->header(-type => "text/plain", -cookie => $cookie);
-        print $return_text;
+        # Habitat.  Echo the contents of the "<context>...</context>" block in our app-name.xml.
+        } elsif ($dataset_name eq "__habitat") {
+            $return_text = &Jarvis::Habitat::print ($jconfig);
 
-    # Logout.  Clear session ID cookie, clean login parameters, then return "logged out" status.
-    } elsif ($action eq "logout") {
+        # Logout.  Clear session ID cookie, clean login parameters, then return "logged out" status.
+        } elsif ($dataset_name eq "__logout") {
+            $jconfig->{'sid'} = '';
+            if ($jconfig->{'logged_in'}) {
+                $jconfig->{'logged_in'} = 0;
+                $jconfig->{'error_string'} = "Logged out at client request.";
+                $jconfig->{'username'} = '';
+                $jconfig->{'group_list'} = '';
+            }
+            $return_text = &Jarvis::Status::report ($jconfig);
 
-        $jconfig->{'sid'} = '';
-        my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
-        if ($jconfig->{'logged_in'}) {
-            $jconfig->{'logged_in'} = 0;
-            $jconfig->{'error_string'} = "Logged out at client request.";
-            $jconfig->{'username'} = '';
-            $jconfig->{'group_list'} = '';
+        # Starts with __ so must be special, but we don't know it.
+        } else {
+            die "Unknown special dataset '$dataset_name'!\n";
         }
 
-        my $return_text = &Jarvis::Status::report ($jconfig);
+        my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
         print $cgi->header(-type => "text/plain", -cookie => $cookie);
         print $return_text;
 
-    # Fetch.  I.e. get some data.
-    } elsif ($action eq "fetch") {
+    # Fetch a regular dataset.
+    } elsif ($action eq "select") {
+
+        # Check we have a dataset.
+        $dataset_name || die "Action '$action' ($method) requires /<app-name>/<dataset-name> in URI not '$path'!\n";
 
         my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
         my $return_text = &Jarvis::Dataset::fetch ($jconfig);
+
         print $cgi->header(-type => "text/plain", -cookie => $cookie);
         print $return_text;
 
-    # Store.  I.e. alter some data.
-    } elsif ($action eq "store") {
+    # Modify a regular dataset.
+    } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete")) {
 
+        $dataset_name || die "Action '$action' ($method) requires /<app-name>/<dataset-name> in URI '$path'!\n";
         my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
         my $return_text = &Jarvis::Dataset::store ($jconfig);
+
         print $cgi->header(-type => "text/plain", -cookie => $cookie);
         print $return_text;
 
@@ -184,7 +210,7 @@ MAIN: {
 
     # It's the end of the world as we know it.
     } else {
-        die "Unsupported action '" . $action . "'!\n";
+        die "Unsupported action '" . $action . "' ($method)!\n";
     }
 
     ###############################################################################

@@ -55,13 +55,10 @@ use Jarvis::Error;
 #               group_list          Comma-separated group list.
 #               sname               Name of the session cookie.  Typically "CGISESSID".
 #               sid                 Session ID.  A big long number.
-#
-#       $allow_new_login - Are we allowed to actually perform the login process?
-#           If not, then we are restricted to only validating existing logins.
 ################################################################################
 #
 sub check {
-    my ($jconfig, $allow_new_login) = @_;
+    my ($jconfig) = @_;
 
     ###############################################################################
     # Login Process.  Happens after DB, 'cos login info can be in DB.
@@ -98,7 +95,7 @@ sub check {
     # By default these values are all empty.  Note that we never allow username
     # and group_list to be undef, too many things depend on it having some value,
     # even if that is just ''.
-    # 
+    #
     my ($error_string, $username, $group_list, $logged_in) = ('', '', '', 0);
     my $already_logged_in = 0;
 
@@ -111,13 +108,13 @@ sub check {
         $already_logged_in = 1;
 
     # No successful session?  Login.  Note that we store failed sessions too.
-    # 
+    #
     # Note that not all actions allow you to provide a username and password for
     # login purposes.  "status" does, and so does "fetch".  But the others don't.
-    # For exec scripts that's good, since it means that a report parameter named 
+    # For exec scripts that's good, since it means that a report parameter named
     # "username" won't get misinterpreted as an attempt to login.
-    # 
-    } elsif ($allow_new_login) {
+    #
+    } else {
 
         # Get our login parameter values.  We were using $axml->{login}{parameter}('[@]', 'name');
         # but that seemed to cause all sorts of DataDumper and cleanup problems.  This seems to
@@ -150,10 +147,6 @@ sub check {
         $session->param('logged_in', $logged_in);
         $session->param('username', $username);
         $session->param('group_list', $group_list);
-
-    # Fail because login not allowed.
-    } else {
-        $error_string = "Not logged and login disallowed for this request";
     }
 
     # Log the results if we actually tried to login, with a user and all.

@@ -50,24 +50,12 @@ function jarvisInit (new_application, new_login_page) {
 }
 
 // URL builder.
-function jarvisUrl (action_name, dataset_name) {
-    var url = jarvis_home + '?app=' + application + '&action=' + action_name;
+function jarvisUrl (dataset_name) {
+    var url = jarvis_home + '/' + application;
     if (dataset_name) {
-        url = url + '&dataset=' + dataset_name;
+        url = url + '/' + dataset_name;
     }
     return url;
-}
-
-// Alternate POST URL without args.
-function jarvisPostUrl () {
-    return jarvis_home;
-}
-
-// Fill the standard post params.  Caller can then add their own params.
-function jarvisPostParams (action_name, dataset_name) {
-    this.app = application;
-    this.action = action_name;
-    this.dataset = dataset_name;
 }
 
 // Gets a parameter by looking at the #<name> part of a full URL specification.
@@ -113,7 +101,7 @@ function jarvisLoadException (proxy, options, response, e) {
     // Load exception.  Let's see if we need to login first, perhaps?  If that's the
     // problem, then send them to the login page.
     var status_store = new Ext.data.JsonStore ({
-        url: jarvisUrl ('status'),
+        url: jarvisUrl ('__status'),
         root: 'data',
         fields: ['error_string', 'logged_in', 'group_list', 'username'],
         listeners: {
@@ -157,14 +145,33 @@ function jarvisSendChange (transaction_type, store, dataset_name, record) {
     //
     var fields = record.data;
     fields._record_id = record.id;
-    fields._transaction_type = transaction_type;
+
+    // Convert to standards.
+    var request_method;
+    if (transaction_type == 'insert') {
+        request_method = 'POST';
+
+    } else if (transaction_type == 'update') {
+        request_method = 'PUT';
+
+    } else if (transaction_type == 'delete') {
+        request_method = 'DELETE';
+
+    } else {
+        request_method = transaction_type;
+    }
+
+    // This is for pre-RESTful Jarvis.
+    //
+    // fields._transaction_type = transaction_type;
 
     // One more request to track in our counter.
     num_pending++;
 
     // Perform the request over ajax.
     Ext.Ajax.request({
-        url: jarvis_home,
+        url: jarvisUrl (dataset_name),
+        method: request_method,
 
         // We received a response back from the server, that's a good start.
         success: function (response, request_options) {
@@ -196,12 +203,8 @@ function jarvisSendChange (transaction_type, store, dataset_name, record) {
             store.fireEvent ('writeback', store, result, transaction_type, record, num_pending);
         },
 
-        params: {
-            action: 'store',
-            app: application,
-            dataset: dataset_name,
-            fields: Ext.util.JSON.encode (fields)
-        }
+        // Send data in the body.
+        jsonData: Ext.util.JSON.encode (fields)
     });
 }
 
