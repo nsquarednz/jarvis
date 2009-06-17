@@ -41,7 +41,7 @@ package Jarvis::Config;
 
 use Jarvis::Error;
 
-%Jarvis::Config::yes_value = ('yes' => 1, 'true' => 1, '1' => 1);
+%Jarvis::Config::yes_value = ('yes' => 1, 'true' => 1, 'on' => 1, '1' => 1);
 
 ################################################################################
 # Setup our entire jarvis config, based on the application name provided, which

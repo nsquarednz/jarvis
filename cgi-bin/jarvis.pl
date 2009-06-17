@@ -47,6 +47,9 @@ use Jarvis::DB;
 
 package Main;
 
+# Default jarvis etc.
+my $default_jarvis_etc = "/opt/jarvis/etc";
+
 # This is our CGI object.  We pass it into our Jasper::Config, but we also
 # use it in our "die" handler.
 my $cgi = new CGI;
@@ -97,7 +100,7 @@ MAIN: {
     my $app_name = $cgi->param ('app') || die "Missing mandatory parameter 'app'!\n";
     ($app_name =~ m/^[\w\-]+$/) || die "Invalid characters in parameter 'app'\n";
 
-    $jconfig = new Jarvis::Config ($app_name, 'etc_dir' => ($ENV{'JARVIS_ETC'} || "/opt/jarvis/etc"));
+    $jconfig = new Jarvis::Config ($app_name, 'etc_dir' => ($ENV{'JARVIS_ETC'} || $default_jarvis_etc));
 
     ###############################################################################
     # Action: "status", "habitat", "logout", "fetch", "update",  or custom

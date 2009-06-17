@@ -96,7 +96,7 @@ sub get_config_xml {
     ($dsxml->{dataset}) || die "Missing <dataset> tag in '$dsxml_filename'!\n";
 
     # Load a couple of other parameters.  This is a "side-effect".  Yeah, it's a bit yucky.
-    $jconfig->{'use_placeholders'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'use_placeholders'}->content || "no")});
+    $jconfig->{'use_placeholders'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'use_placeholders'}->content || "yes")});
     $jconfig->{'max_rows'} = lc ($axml->{'max_rows'}->content || 200);
     $jconfig->{'page_start_param'} = lc ($axml->{'page_start_param'}->content || 'page_start');
     $jconfig->{'page_limit_param'} = lc ($axml->{'page_limit_param'}->content || 'page_limit');
