@@ -30,7 +30,7 @@ VALUES ({{name}},
         {{__username}}, now());
     </insert>
     <delete>
-DELETE FROM staff
+DELETE FROM boat
 WHERE id = {{id}};
     </delete>
 </dataset>

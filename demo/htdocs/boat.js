@@ -8,7 +8,7 @@ Ext.onReady (function () {
 
     // create the main Data Store for the boat list
     var boat_store = new Ext.data.JsonStore ({
-        url: jarvisPostUrl (),              // We will use POST because we add extra params.
+        proxy: new Ext.data.HttpProxy ({ url: jarvisUrl ('boat'), method: 'GET' }),
         root: 'data',
         idProperty: 'id',
         fields: ['id', 'name', 'class', 'registration_num', 'owner' ],
@@ -53,7 +53,7 @@ Ext.onReady (function () {
 
     // create the sub-set Data Store for the link_section pulldown
     var boat_class_store = new Ext.data.JsonStore ({
-        url: jarvisUrl ('fetch', 'boat_class'),      // This is a simple GET, we have no extra params.
+        url: jarvisUrl ('boat_class'),
         root: 'data',
         idProperty: 'class',
         fields: ['class'],
@@ -157,7 +157,7 @@ Ext.onReady (function () {
                                 alert ('Cannot delete with uncommitted changes pending.');
                                 return;
                             }
-                            if (! confirm ("Really delete entry: '" + Ext.util.Format.date (r.get('published'), 'Y-m-d') + "'")) {
+                            if (! confirm ("Really delete entry: '" + r.get('name') + "'")) {
                                 return;
                             }
                         }
@@ -220,7 +220,7 @@ Ext.onReady (function () {
         valueNotFoundText: '<Select Boat Class...>',
         listeners: { 'select':
             function (combo, record, index) {
-                var params = new jarvisPostParams ('fetch', 'boat')
+                var params = {};
                 params.class = record.get ('class');
                 boat_store.load ({'params': params});
             }
