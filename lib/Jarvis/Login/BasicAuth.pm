@@ -69,31 +69,31 @@ package Jarvis::Login::BasicAuth;
 ###############################################################################
 
 ################################################################################
-# Determines if we are "logged in".  In this case we look at CGI variables.
-# The username is not actually offered by the client.  Instead, we have a single
-# user, and we have a hard-coded username and group for them.
+# Determines if we are "logged in".  In this case we look at CGI variables
+# supplied by the server, specifically REMOTE_USER which is filled when the
+# service is configured to use Apache Authentication.
 #
-# Note that this plugin allows only a SINGLE user specification.  In the future
-# we may want to distinguish between different users.  My solution for that is
-# to allow multiple "Login" blocks in the top-level configuration file.  If
-# we have many users, each with their own unique client certificates, then we
-# probably need a custom module.  We'll deal with that if and when it arrives.
-#
-# In each parameter entry, you MUST specify username.  Group list is optional,
-# if missing, the user will be placed in a single group with groupname equal to
-# the username.  The CN is the common name.  It is currently treated as an
-# EXACT match against the CN on the certificate.  The IP address must be an
-# exact match if present.
+# Note the use of FakeBasicAuth which ties SLL certificate DNs to basic
+# auth names without passwords.
 #
 # To use this method, specify the following login parameters.
 #  
 #    <app use_placeholders="yes" format="json" debug="no">
 #        ...
 #        <login module="Jarvis::Login::BasicAuth">
-#  	     <parameter name="require_https" value="yes"/>
+#	     # Default is "no", HTTPS not required.
+#  	     <parameter name="require_https" value="yes"/>	
+#
+#	     # Default is '', no remote IP checking.
 #  	     <parameter name="remote_ip" value="192.168.1.1"/>
+#
+#	     # Default is '', no remote user checking.
 #	     <parameter name="remote_user" value="Exact Common Name"/>
+#
+#	     # Default is '', (i.e. use the DEFAULT_USER basic auth username)
 #  	     <parameter name="username" value="default"/>
+#
+#	     # Default is use a single group eponymous to the username.
 #  	     <parameter name="group_list" value="default"/>
 #        </login>
 #        ...
@@ -137,16 +137,25 @@ sub Jarvis::Login::BasicAuth::check {
 	}
     }
 
-    # Now check the user.
+    # Now check the remote user user.
     if ($remote_user ne '') {
-        my $actual_ip = $ENV{"HTTP_X_FORWARDED_FOR"} || $ENV{"HTTP_CLIENT_IP"} || $ENV{"REMOTE_ADDR"} || '';
-	if ($actual_ip ne $remote_ip) {
-            return ("Access not authorized from actual remote IP address.");
+        my $actual_user = $ENV{"REMOTE_USER"} || '';
+	if ($actual_user ne $remote_user) {
+            return ("Access not authorized for this user in BasicAuth login module.");
 	}
     }
 
+    # Now determine which username to use.
     if (! $username) {
-        return ("Missing configuration for Login module BasicAuth.");
+	$username = $remote_user;
+    }
+    if (! $username) {
+        return ("No remote user and no configured default username.");
+    }
+
+    # And determine the group list.
+    if (! $group_list) {
+   	$group_list = $username;
     }
 
     return ("", $username, $group_list);
