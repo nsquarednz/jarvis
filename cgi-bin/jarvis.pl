@@ -137,6 +137,10 @@ MAIN: {
         &Jarvis::Error::debug ($jconfig, "Rest Arg " . ($i + 1) . " = " . $rest_args[$i]);
     }
 
+    # foreach my $env (keys %ENV) {
+    #     &Jarvis::Error::debug ($jconfig, "$env = $ENV{$env}");
+    # }
+
     ###############################################################################
     # Action: "status", "habitat", "logout", "fetch", "update",  or custom
     #           action from Exec or Plugin.
@@ -157,9 +161,11 @@ MAIN: {
 
     &Jarvis::Login::check ($jconfig);
 
-    &Jarvis::Error::debug ($jconfig, "Action = $action ($method)");
     &Jarvis::Error::debug ($jconfig, "User Name = " . $jconfig->{'username'});
     &Jarvis::Error::debug ($jconfig, "Group List = " . $jconfig->{'group_list'});
+    &Jarvis::Error::debug ($jconfig, "Logged In = " . $jconfig->{'logged_in'});
+    &Jarvis::Error::debug ($jconfig, "Error String = " . $jconfig->{'error_string'});
+    &Jarvis::Error::debug ($jconfig, "Action = $action ($method)");
 
     # All special datasets start with "__".
     #
@@ -204,7 +210,7 @@ MAIN: {
     } elsif ($action eq "select") {
 
         # Check we have a dataset.
-        $dataset_name || die "Action '$action' ($method) requires $script_name/<app>[/<dataset>[/<arg1>...]] in URI!\n";
+        $dataset_name || die "Action '$action' ($method) requires $script_name/$app_name/<dataset>[/<arg1>...] in URI!\n";
 
         my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
         my $return_text = &Jarvis::Dataset::fetch ($jconfig, \@rest_args);
@@ -215,7 +221,7 @@ MAIN: {
     # Modify a regular dataset.
     } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete")) {
 
-        $dataset_name || die "Action '$action' ($method) requires $script_name/<app>[/<dataset>[/<arg1>...]] in URI!\n";
+        $dataset_name || die "Action '$action' ($method) requires $script_name/$app_name/<dataset>[/<arg1>...] in URI!\n";
         my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
         my $return_text = &Jarvis::Dataset::store ($jconfig, \@rest_args);
 
