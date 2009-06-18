@@ -97,8 +97,9 @@ MAIN: {
     # Determine app name (and possibly data-set).
     ###############################################################################
     #
+    my $script_name = $cgi->script_name();
     my $path = $cgi->path_info() ||
-        die "Missing path info.  Send http://.../jarvis.pl/<app>[/<dataset>[/<arg1>...]] in URI!\n";
+        die "Missing path info.  Send $script_name/<app>[/<dataset>[/<arg1>...]] in URI!\n";
 
     # Clean up our path to remove & args, # names, and finally leading and trailing
     # spaces and slashes.
@@ -120,7 +121,7 @@ MAIN: {
     $dataset_name || ($dataset_name = '');
 
     # Check app_name and dataset are OK format
-    $app_name || die "Missing app name.  Send http://.../jarvis.pl/<app>[/<dataset>[/<arg1>...]] in URI!\n";
+    $app_name || die "Missing app name.  Send $script_name/<app>[/<dataset>[/<arg1>...]] in URI!\n";
     $app_name =~ m|^[\w\-]+$| || die "Invalid app_name '$app_name'!\n";
     ($dataset_name eq '') || ($dataset_name =~ m|^[\w\-]+$|) || die "Invalid dataset_name '$dataset_name'!\n";
 
@@ -203,7 +204,7 @@ MAIN: {
     } elsif ($action eq "select") {
 
         # Check we have a dataset.
-        $dataset_name || die "Action '$action' ($method) requires /<app>[/<dataset>[/<arg1>...]] in URI not '/$path'!\n";
+        $dataset_name || die "Action '$action' ($method) requires $script_name/<app>[/<dataset>[/<arg1>...]] in URI!\n";
 
         my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
         my $return_text = &Jarvis::Dataset::fetch ($jconfig, \@rest_args);
@@ -214,7 +215,7 @@ MAIN: {
     # Modify a regular dataset.
     } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete")) {
 
-        $dataset_name || die "Action '$action' ($method) requires /<app>[/<dataset>[/<arg1>...]] in URI not '/$path'!\n";
+        $dataset_name || die "Action '$action' ($method) requires $script_name/<app>[/<dataset>[/<arg1>...]] in URI!\n";
         my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
         my $return_text = &Jarvis::Dataset::store ($jconfig, \@rest_args);
 
