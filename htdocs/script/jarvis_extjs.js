@@ -188,7 +188,6 @@ function jarvisSendChange (transaction_type, store, dataset_name, records) {
         // We received a response back from the server, that's a good start.
         success: function (response, request_options) {
             num_pending--;   // One less request.
-
             // Eval the response.  It SHOULD be valid JSON.  However, bad JSON is basically
             // treated the same as good JSON with a failure flag.
             var result;

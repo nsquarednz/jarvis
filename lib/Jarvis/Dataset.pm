@@ -648,6 +648,7 @@ sub store {
 
     # Loop for each set of updates.
     my $success = 1;
+    my $modified = 0;
     my @results = ();
     my $message = '';
 
@@ -680,6 +681,7 @@ sub store {
         eval {
             $SIG{__DIE__} = sub {};
             $row_result{'modified'} = $sth->execute (@arg_values);
+            $modified = $modified + $row_result{'modified'};
         };
         $SIG{__DIE__} = $err_handler;
 
@@ -720,9 +722,11 @@ sub store {
         $sth->finish;
     }
 
+    my $state = undef;
     if ((! $success) && $jconfig->{'rollback_on_error'}) {
         &Jarvis::Error::debug ($jconfig, "Error detected and 'rollback_on_error' configured.");
         $dbh->rollback ();
+        $state = 'rollback';
 
     } else {
         if ($success) {
@@ -732,6 +736,7 @@ sub store {
             &Jarvis::Error::debug ($jconfig, "Some changes failed.  Committing anyhow.");
         }
         $dbh->commit ();
+        $state = 'commit';
     }
 
     # Return content in requested format.
@@ -743,32 +748,36 @@ sub store {
     #
     if ($jconfig->{'format'} eq "json") {
         my %return_data = ();
-        $return_data {"success"} = 1;
+        $return_data {'success'} = 1;
+        $return_data {'state'} = $state;
+        $return_data {'modified'} = $modified;
 
         if ($success && $return_array) {
-            $return_data {"rows"} = \@results;
+            $return_data {'rows'} = \@results;
 
         } elsif ($success) {
-            $results[0]{'returning'} && ($return_data {"data"} = $results[0]{'returning'});
+            $results[0]{'returning'} && ($return_data {'returning'} = $results[0]{'returning'});
 
         } else {
-            $return_data {"message"} = &trim($message);
+            $return_data {'message'} = &trim($message);
         }
         my $json = JSON::XS->new->pretty(1);
         return $json->encode ( \%return_data );
 
     } elsif ($jconfig->{'format'} eq "xml") {
         my $xml = XML::Smart->new ();
-        $xml->{success} = $success;
+        $xml->{'success'} = $success;
+        $xml->{'state'} = $state;
+        $xml->{'modified'} = $modified;
 
         if ($success && $return_array) {
-            $xml->{results}{rows} = \@results;
+            $xml->{'results'}{'rows'} = \@results;
 
         } elsif ($success) {
-            $results[0]{'returning'} && ($xml->{results}{rows} = $results[0]{'returning'});
+            $results[0]{'returning'} && ($xml->{'returning'} = $results[0]{'returning'});
 
         } else {
-            $xml->{message} = &trim($message);
+            $xml->{'message'} = &trim($message);
         }
         return $xml->data ();
 
