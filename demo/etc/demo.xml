@@ -2,7 +2,7 @@
 <jarvis>
     <app name="application1" use_placeholders="yes" format="json" debug="yes">
         <!-- This is where our <dataset>.xml are all stored -->
-	<dataset_dir>/opt/jarvis/demo/etc/dataset</dataset_dir>
+	<dataset_dir>/opt/jarvis/demo/etc/datasetsadf</dataset_dir>
 
         <!-- This is how you might define a JSON habitat.  100% example.
              If your requested format is non-XML (e.g. JSON, we will strip the
