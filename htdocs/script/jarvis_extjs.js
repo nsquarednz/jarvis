@@ -106,7 +106,7 @@ function jarvisLoadException (proxy, options, response, e) {
         fields: ['error_string', 'logged_in', 'group_list', 'username'],
         listeners: {
             'load': function (store, records, options) {
-                if ((records.length > 0) && ! records[0].get ('logged_in')) {
+                if ((records.length > 0) && (records[0].get ('logged_in') != 1)) {
                     document.location.href = login_page + '?from=' + escape (location.pathname + location.hash);
                 }
             }
@@ -131,10 +131,10 @@ function jarvisLoadException (proxy, options, response, e) {
 //                          data:    (Optional) Array of returned objects.  E.g. if SQL used INSERT RETURNING.
 //
 //      transaction_type - 'update', 'insert' or 'delete' as supplied for request
-//      record           - The original record which invoked the update.
+//      records          - Record(s) to send.  May be hash (1 record) or array of hashes.
 //      num_pending      - Number of remaining changes still queued.
 //
-function jarvisSendChange (transaction_type, store, dataset_name, record) {
+function jarvisSendChange (transaction_type, store, dataset_name, records) {
 
     // Fields is a copy of "record.data" that we extend with some extra magic attributes:
     //
@@ -143,8 +143,20 @@ function jarvisSendChange (transaction_type, store, dataset_name, record) {
     //
     // Note that _record_id is the INTERNAL ExtJS ID.  Not the database "id" column.
     //
-    var fields = record.data;
-    fields._record_id = record.id;
+    var fields = [];
+
+    // Is it an array?
+    if (typeof records.length === 'number') {
+        for (var i = 0; i < records.length; i++) {
+            fields.push (records[i].data);
+            fields[i]._record_id = records[i].id;
+        }
+
+    // Or just a single record.
+    } else {
+        fields = records.data;
+        fields._record_id = records.id;
+    }
 
     // Convert to standards.
     var request_method;
@@ -181,6 +193,7 @@ function jarvisSendChange (transaction_type, store, dataset_name, record) {
             // treated the same as good JSON with a failure flag.
             var result;
             try {
+                alert (response.responseText);
                 result = Ext.util.JSON.decode (response.responseText);
 
             // Response wasn't good JSON.  Assume it was an error message of some kind.
@@ -189,7 +202,8 @@ function jarvisSendChange (transaction_type, store, dataset_name, record) {
                 result.success = 0;
                 result.message = 'Bad JSON: ' + response.responseText;
             }
-            store.fireEvent ('writeback', store, result, transaction_type, record, num_pending);
+            var listener = (typeof records.length === 'number') ? 'writebackarray' : 'writeback';
+            store.fireEvent (listener, store, result, transaction_type, records, num_pending);
         },
 
         // Total failure.  Script failed.  It might have managed to update
@@ -200,7 +214,8 @@ function jarvisSendChange (transaction_type, store, dataset_name, record) {
             var result = new Object ();
             result.success = 0;
             result.message = 'Server responded with error.  Updates lost.';
-            store.fireEvent ('writeback', store, result, transaction_type, record, num_pending);
+            var listener = (typeof records.length === 'number') ? 'writebackarray' : 'writeback';
+            store.fireEvent (listener, store, result, transaction_type, records, num_pending);
         },
 
         // Send data in the body.

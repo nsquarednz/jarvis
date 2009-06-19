@@ -131,7 +131,7 @@ MAIN: {
     # Debug can now occur, since we have called Config!
     &Jarvis::Error::debug ($jconfig, "Base Path = $path");
     &Jarvis::Error::debug ($jconfig, "App Name = $app_name");
-    &Jarvis::Error::debug ($jconfig, "Dataset Name = $app_name");
+    &Jarvis::Error::debug ($jconfig, "Dataset Name = $dataset_name");
 
     foreach my $i (0 .. $#rest_args) {
         &Jarvis::Error::debug ($jconfig, "Rest Arg " . ($i + 1) . " = " . $rest_args[$i]);
@@ -180,14 +180,17 @@ MAIN: {
 
         # Status.  I.e. are we logged in?
         if ($dataset_name eq "__status") {
+            &Jarvis::Error::debug ($jconfig, "Returning status special dataset.");
             $return_text = &Jarvis::Status::report ($jconfig, \@rest_args);
 
         # Habitat.  Echo the contents of the "<context>...</context>" block in our app-name.xml.
         } elsif ($dataset_name eq "__habitat") {
+            &Jarvis::Error::debug ($jconfig, "Returning habitat special dataset.");
             $return_text = &Jarvis::Habitat::print ($jconfig, \@rest_args);
 
         # Logout.  Clear session ID cookie, clean login parameters, then return "logged out" status.
         } elsif ($dataset_name eq "__logout") {
+            &Jarvis::Error::debug ($jconfig, "Returning logout special dataset.");
             $jconfig->{'sid'} = '';
             if ($jconfig->{'logged_in'}) {
                 $jconfig->{'logged_in'} = 0;
