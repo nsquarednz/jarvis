@@ -546,7 +546,6 @@ sub store {
     # This works for DELETE (delete) and PUT (update) on any content.
     if (! $content) {
         while (<STDIN>) {
-            print STDERR "STDIN: " . $_;
             $content .= $_;
         }
     }
@@ -585,7 +584,6 @@ sub store {
         #
         my @rows = ();
         if ($cxml->{'request'}{'rows'}) {
-            print STDERR "ROWS\n";
             foreach my $row (@{ $cxml->{'request'}{'rows'} }) {
                 my %fields =%{ $row };
                 push (@rows, \%fields);
@@ -593,7 +591,6 @@ sub store {
             $return_array = 1;
 
         } else {
-            print STDERR "SINGLE\n";
             my %fields = %{ $cxml->{'request'} };
             push (@rows, \%fields);
         }
