@@ -61,7 +61,6 @@ my %yes_value = ('yes' => 1, 'true' => 1, '1' => 1);
 #               dataset_name        What dataset do we want?
 #           WRITE
 #               use_placeholders    Should we use placeholders?  Or just insert text?
-#               max_rows            Passed through as {{__max_rows}} to SQL.
 #               page_start_param    Name of the CGI param specifying page start row num
 #               page_limit_param    Name of the CGI param specifying page limit row num
 #               sort_field_param    Name of the CGI param specifying page sort field
@@ -94,7 +93,6 @@ sub get_config_xml {
 
     # Load a couple of other parameters.  This is a "side-effect".  Yeah, it's a bit yucky.
     $jconfig->{'use_placeholders'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'use_placeholders'}->content || "yes")});
-    $jconfig->{'max_rows'} = lc ($axml->{'max_rows'}->content || 200);
     $jconfig->{'page_start_param'} = lc ($axml->{'page_start_param'}->content || 'page_start');
     $jconfig->{'page_limit_param'} = lc ($axml->{'page_limit_param'}->content || 'page_limit');
     $jconfig->{'sort_field_param'} = lc ($axml->{'sort_field_param'}->content || 'sort_field');
@@ -146,7 +144,6 @@ sub get_sql {
 #           READ
 #               username
 #               group_list
-#               max_rows
 #
 #       $raw_params_href - User-supplied (unsafe) hash of variables.
 #
