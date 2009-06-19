@@ -559,7 +559,7 @@ sub store {
     # array of hashes.  Each array entry is a change record.
     my $return_array = 0;
     my $content_type = $jconfig->{'cgi'}->content_type () || '';
-    if ($content_type =~ m|^application/json(; .*)?$|) {
+    if ($content_type =~ m|^[a-z]+/json(; .*)?$|) {
         my $ref = JSON::XS->new->utf8->decode ($content);
 
         # User may pass a single hash record, OR an array of hash records.  We normalise
@@ -577,8 +577,27 @@ sub store {
         }
 
     # XML in here please.
-    } elsif ($content_type =~ m|^application/xml(; .*)?$|) {
-        die "XML content... currently in development\n";
+    } elsif ($content_type =~ m|^[a-z]+/xml(; .*)?$|) {
+        my $cxml = XML::Smart->new ($content);
+
+        # Fields may either sit at the top level, or you may provide an array of
+        # records in a <rows> array.
+        #
+        my @rows = ();
+        if ($cxml->{'request'}{'rows'}) {
+            print STDERR "ROWS\n";
+            foreach my $row (@{ $cxml->{'request'}{'rows'} }) {
+                my %fields =%{ $row };
+                push (@rows, \%fields);
+            }
+            $return_array = 1;
+
+        } else {
+            print STDERR "SINGLE\n";
+            my %fields = %{ $cxml->{'request'} };
+            push (@rows, \%fields);
+        }
+        $fields_aref = \@rows;
 
     # Unsupported format.
     } else {
