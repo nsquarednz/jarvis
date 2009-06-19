@@ -193,7 +193,6 @@ function jarvisSendChange (transaction_type, store, dataset_name, records) {
             // treated the same as good JSON with a failure flag.
             var result;
             try {
-                alert (response.responseText);
                 result = Ext.util.JSON.decode (response.responseText);
 
             // Response wasn't good JSON.  Assume it was an error message of some kind.

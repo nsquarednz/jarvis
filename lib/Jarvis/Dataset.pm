@@ -100,6 +100,9 @@ sub get_config_xml {
     $jconfig->{'sort_field_param'} = lc ($axml->{'sort_field_param'}->content || 'sort_field');
     $jconfig->{'sort_dir_param'} = lc ($axml->{'sort_dir_param'}->content || 'sort_dir');
 
+    $jconfig->{'stop_on_error'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'stop_on_error'}->content || "yes")});
+    $jconfig->{'rollback_on_error'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'rollback_on_error'}->content || "yes")});
+
     return $dsxml;
 }
 
@@ -377,11 +380,11 @@ sub fetch {
         || die "Couldn't prepare statement '$sql': " . $dbh->errstr;
 
     # Execute
-    my $num_rows = 0;
+    my $status = 0;
     my $err_handler = $SIG{__DIE__};
     eval {
         $SIG{__DIE__} = sub {};
-        $num_rows = $sth->execute (@arg_values);
+        $status = $sth->execute (@arg_values);
     };
     $SIG{__DIE__} = $err_handler;
 
@@ -394,6 +397,7 @@ sub fetch {
     }
 
     my $rows_aref = $sth->fetchall_arrayref({});
+    my $num_rows = scalar @$rows_aref;
     $sth->finish;
 
     # Do we want to do server side sorting?  This happens BEFORE paging.
@@ -529,9 +533,6 @@ sub store {
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
     $failure && die "Wanted write access: $failure";
 
-    # Fields we need to extract from given data.
-    my $fields_href = undef;
-
     # Get our submitted content.  This works for POST (insert) on non-XML data.  If the
     # content_type was "application/xml" then I think we will find our content in the
     # 'XForms:Model' parameter instead.
@@ -551,11 +552,29 @@ sub store {
     }
     $content || die "Cannot find client-submitted change content.";
 
+    # Fields we need to store.  This is an ARRAY ref to multiple rows each a HASH REF
+    my $fields_aref = undef;
+
     # Check we have some changes and parse 'em from the JSON.  We get an
     # array of hashes.  Each array entry is a change record.
+    my $return_array = 0;
     my $content_type = $jconfig->{'cgi'}->content_type () || '';
     if ($content_type =~ m|^application/json(; .*)?$|) {
-        $fields_href = JSON::XS->new->utf8->decode ($content);
+        my $ref = JSON::XS->new->utf8->decode ($content);
+
+        # User may pass a single hash record, OR an array of hash records.  We normalise
+        # to always be an array of hashes.
+        if (ref $ref eq 'HASH') {
+            my @fields = ($ref);
+            $fields_aref = \@fields;
+
+        } elsif (ref $ref eq 'ARRAY') {
+            $return_array = 1;
+            $fields_aref = $ref;
+
+        } else {
+            die "Bad JSON ref type " . (ref $ref);
+        }
 
     # XML in here please.
     } elsif ($content_type =~ m|^application/xml(; .*)?$|) {
@@ -568,23 +587,22 @@ sub store {
 
     # Choose our statement and find the SQL and variable names.
     my $transaction_type = $jconfig->{'action'};
-    my $sql = undef;
-    my @variable_names = undef;
+    my $base_sql = undef;
 
     # Does this insert return rows?
     my $returning = 0;
 
     # DELETE
     if ($transaction_type eq "delete") {
-        $sql = &get_sql ($jconfig, 'delete', $dsxml);
+        $base_sql = &get_sql ($jconfig, 'delete', $dsxml);
 
     # UPDATE
     } elsif ($transaction_type eq "update") {
-        $sql = &get_sql ($jconfig, 'update', $dsxml);
+        $base_sql = &get_sql ($jconfig, 'update', $dsxml);
 
     # INSERT, possibly returning.
     } elsif ($transaction_type eq "insert") {
-        $sql = &get_sql ($jconfig, 'insert', $dsxml);
+        $base_sql = &get_sql ($jconfig, 'insert', $dsxml);
         $returning = defined ($yes_value {lc ($dsxml->{dataset}{'insert'}{'returning'} || "no")});
         &Jarvis::Error::debug ($jconfig, "Insert Returning = " . $returning);
 
@@ -592,82 +610,147 @@ sub store {
         die "Unsupported transaction type '$transaction_type'.";
     }
 
-    # Handle our parameters.  Either inline or with placeholders.  Note that our
-    # special variables like __username are safe, and cannot come from user-defined
-    # values.
+    # For placeholders, we can do this once outside the update loop.  For textual
+    # substitution it's far less efficient of course.
     #
-    my %raw_params = %{ $fields_href };
-    my %safe_params = &safe_dataset_variables ($jconfig, \%raw_params, $rest_args_aref);
+    my $dbh = &Jarvis::DB::Handle ($jconfig);
+    $dbh->begin_work() || die;
 
-    my @arg_values = ();
+    my $sth = undef;
+    my $sql = undef;
+    my @variable_names = undef;                 # Used only for placeholder case.
+
     if ($jconfig->{'use_placeholders'}) {
-        my ($sql_with_placeholders, @variable_names) = &sql_with_placeholders ($sql);
+        ($sql, @variable_names) = &sql_with_placeholders ($base_sql);
 
-        $sql = $sql_with_placeholders;
-        @arg_values = &names_to_values (\@variable_names, \%safe_params);
-        &Jarvis::Error::debug ($jconfig, "Statement Args = " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values));
-
-    } else {
-        my $sql_with_variables = &sql_with_variables ($sql, %safe_params);
-        $sql = $sql_with_variables;
+        &Jarvis::Error::debug ($jconfig, "STORE = " . $sql);
+        $sth = $dbh->prepare ($sql) || die "Couldn't prepare statement '$sql': " . $dbh->errstr;
     }
 
-    # Prepare
-    &Jarvis::Error::debug ($jconfig, "STORE = " . $sql);
+    # Loop for each set of updates.
+    my $success = 1;
+    my @results = ();
+    my $message = '';
 
-    my $dbh = &Jarvis::DB::Handle ($jconfig);
-    my $sth = $dbh->prepare ($sql)
-        || die "Couldn't prepare statement '$sql': " . $dbh->errstr;
+    foreach my $fields_href (@$fields_aref) {
+        my %row_result = ();
 
-    # Execute
-    my $num_rows = 0;
-    my $err_handler = $SIG{__DIE__};
-    eval {
-        $SIG{__DIE__} = sub {};
-        $num_rows = $sth->execute (@arg_values);
-    };
-    $SIG{__DIE__} = $err_handler;
+        # Handle our parameters.  Either inline or with placeholders.  Note that our
+        # special variables like __username are safe, and cannot come from user-defined
+        # values.
+        #
+        my %raw_params = %{ $fields_href };
+        my %safe_params = &safe_dataset_variables ($jconfig, \%raw_params, $rest_args_aref);
 
-    if ($@) {
-        print STDERR "ERROR: Couldn't execute $transaction_type '$sql' with args " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) . "\n";
-        print STDERR $sth->errstr . "!\n";
-        my $message = $sth->errstr;
-        $sth->finish;
-
-        if ($jconfig->{'format'} eq "json") {
-            return "{ \"success\": 0, \"message\": \"" . &escape_java_script (&trim($message)) . "\"}";
-
-        } elsif ($jconfig->{'format'} eq "xml") {
-            my $xml = XML::Smart->new ();
-            $xml->{success} = 0;
-            $xml->{message} = &trim($message);
-            return $xml->data ();
+        my @arg_values = ();
+        if ($jconfig->{'use_placeholders'}) {
+            @arg_values = &names_to_values (\@variable_names, \%safe_params);
+            &Jarvis::Error::debug ($jconfig, "ARGS = " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values));
 
         } else {
-            die "Unsupported format '" . $jconfig->{'format'} ."' in Dataset::store error.\n";
+            $sql = &sql_with_variables ($base_sql, %safe_params);
+
+            &Jarvis::Error::debug ($jconfig, "STORE = " . $sql);
+            $sth = $dbh->prepare ($sql) || die "Couldn't prepare statement '$sql': " . $dbh->errstr;
         }
+
+        # Prepare
+        # Execute
+        my $num_rows = 0;
+        my $err_handler = $SIG{__DIE__};
+        eval {
+            $SIG{__DIE__} = sub {};
+            $row_result{'modified'} = $sth->execute (@arg_values);
+        };
+        $SIG{__DIE__} = $err_handler;
+
+        if ($@) {
+            print STDERR "ERROR: Couldn't execute $transaction_type '$sql' with args " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) . "\n";
+            print STDERR $sth->errstr . "!\n";
+            $row_result{'success'} = 0;
+            $row_result{'message'} = $sth->errstr;
+            $success = 0;
+            $message || ($message = $sth->errstr);
+            if ($jconfig->{'stop_on_error'}) {
+                &Jarvis::Error::debug ($jconfig, "Error detected and 'stop_on_error' configured.");
+                last;
+            }
+
+        } else {
+            $row_result{'success'} = 1;
+        }
+
+        # Fetch the results, if this operation indicates that it returns values.
+        if ($returning) {
+            my $returning_aref = $sth->fetchall_arrayref({}) || undef;
+            if ($returning_aref) {
+                $row_result{'returning'} = $returning_aref;
+            }
+        }
+
+        # Not using placeholders, free statement each loop.
+        if (! $jconfig->{'use_placeholders'}) {
+            $sth->finish;
+        }
+
+        push (@results, \%row_result);
     }
 
-    # Fetch the results, if this INSERT indicates that it returns values.
-    my $rows_aref = $returning ? $sth->fetchall_arrayref({}) : undef;
-    $sth->finish;
+    # Using placeholders, free statement only at the end.
+    if ($jconfig->{'use_placeholders'}) {
+        $sth->finish;
+    }
+
+    if ((! $success) && $jconfig->{'rollback_on_error'}) {
+        &Jarvis::Error::debug ($jconfig, "Error detected and 'rollback_on_error' configured.");
+        $dbh->rollback ();
+
+    } else {
+        if ($success) {
+            &Jarvis::Error::debug ($jconfig, "All successful.  Committing all changes.");
+
+        } else {
+            &Jarvis::Error::debug ($jconfig, "Some changes failed.  Committing anyhow.");
+        }
+        $dbh->commit ();
+    }
 
     # Return content in requested format.
+    &Jarvis::Error::debug ($jconfig, "Return Array = $return_array.");
+
+    # Note here that our return structure is different depending on whether you handed us
+    # just one record (not in an array), or if you gave us an array of records.  An array
+    # containing one record is NOT the same as a single record not in an array.
+    #
     if ($jconfig->{'format'} eq "json") {
         my %return_data = ();
         $return_data {"success"} = 1;
-        $return_data {"updated"} = $num_rows;
-        $returning && ($return_data {"data"} = $rows_aref);
 
+        if ($success && $return_array) {
+            $return_data {"rows"} = \@results;
+
+        } elsif ($success) {
+            $results[0]{'returning'} && ($return_data {"data"} = $results[0]{'returning'});
+
+        } else {
+            $return_data {"message"} = &trim($message);
+        }
         my $json = JSON::XS->new->pretty(1);
         return $json->encode ( \%return_data );
 
     } elsif ($jconfig->{'format'} eq "xml") {
         my $xml = XML::Smart->new ();
-        $xml->{success} = 1;
-        $xml->{updated} = $num_rows;
-        $returning && ($xml->{data}{row} = $rows_aref);
+        $xml->{success} = $success;
 
+        if ($success && $return_array) {
+            $xml->{results}{rows} = \@results;
+
+        } elsif ($success) {
+            $results[0]{'returning'} && ($xml->{results}{rows} = $results[0]{'returning'});
+
+        } else {
+            $xml->{message} = &trim($message);
+        }
         return $xml->data ();
 
     } else {
