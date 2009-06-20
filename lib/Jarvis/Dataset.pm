@@ -172,7 +172,7 @@ sub safe_dataset_variables {
     # is permitted, but never TWO leading underscores.  No special characters.
     foreach my $name (keys %$raw_params_href) {
         if ($name =~ m/^_?[a-z][a-z0-9_\-]*$/i) {
-            &Jarvis::Error::debug ($jconfig, "User Parameter: $name -> " . $$raw_params_href {$name});
+            &Jarvis::Error::debug ($jconfig, "User Parameter: $name -> " . ($$raw_params_href {$name} || '<undefined>'));
             $safe_params{$name} = $$raw_params_href {$name};
         }
     }
@@ -742,7 +742,7 @@ sub store {
     #
     if ($jconfig->{'format'} eq "json") {
         my %return_data = ();
-        $return_data {'success'} = 1;
+        $return_data {'success'} = $success;
         $return_data {'state'} = $state;
         $return_data {'modified'} = $modified;
 
