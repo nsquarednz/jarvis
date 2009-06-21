@@ -187,7 +187,12 @@ sub sql_with_variables {
     foreach my $idx (0 .. $#bits) {
         if ($idx % 2) {
             my $variable_name = $bits[$idx];
-            my $variable_value = $safe_params{$variable_name};
+            my $variable_value = undef;
+            foreach my $option (split ('\|', $variable_name)) {
+                $variable_value = $safe_params {$option};
+                last if (defined $variable_value);
+            }
+
             if (! defined $variable_value) {
                 $variable_value = 'NULL';
 
