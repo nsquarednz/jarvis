@@ -2,10 +2,10 @@
 # Description:
 #       Jarvis supports pluggable Login modules.  This module checks server
 #	environment variables to determine if the user has:
-#	
+#
 #	  - Basic Authentication remote user is as expected, and
 #	  - OPTIONALLY: Has the correct remote IP address, and
-#	  - OPTIONALLY: Accessed via HTTPS 
+#	  - OPTIONALLY: Accessed via HTTPS
 #
 #	For the last case, the server may have required them client
 #	present a client certificate, but we don't know about that.
@@ -38,17 +38,17 @@
 #
 # Licence:
 #       This file is part of the Jarvis WebApp/BasicAuth gateway utility.
-# 
+#
 #       Jarvis is free software: you can redistribute it and/or modify
 #       it under the terms of the GNU General Public License as published by
 #       the Free Software Foundation, either version 3 of the License, or
 #       (at your option) any later version.
-# 
+#
 #       Jarvis is distributed in the hope that it will be useful,
 #       but WITHOUT ANY WARRANTY; without even the implied warranty of
 #       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #       GNU General Public License for more details.
-# 
+#
 #       You should have received a copy of the GNU General Public License
 #       along with Jarvis.  If not, see <http://www.gnu.org/licenses/>.
 #
@@ -77,12 +77,12 @@ package Jarvis::Login::BasicAuth;
 # auth names without passwords.
 #
 # To use this method, specify the following login parameters.
-#  
+#
 #    <app use_placeholders="yes" format="json" debug="no">
 #        ...
 #        <login module="Jarvis::Login::BasicAuth">
 #	     # Default is "no", HTTPS not required.
-#  	     <parameter name="require_https" value="yes"/>	
+#  	     <parameter name="require_https" value="yes"/>
 #
 #	     # Default is '', no remote IP checking.
 #  	     <parameter name="remote_ip" value="192.168.1.1"/>
@@ -104,10 +104,10 @@ package Jarvis::Login::BasicAuth;
 #           READ
 #               cgi
 #               BasicAuth config indirectly via Jarvis::DB
-#   
+#
 #       %login_parameters - Hash of login parameters parsed from
 #               the master application XML file by the master Login class.
-#       
+#
 #
 # Returns:
 #       ($error_string or "", $username or "", "group1,group2,group3...")
@@ -137,12 +137,19 @@ sub Jarvis::Login::BasicAuth::check {
 	}
     }
 
-    # Now check the remote user user.
+    # Specific remote user?
     if ($remote_user ne '') {
         my $actual_user = $ENV{"REMOTE_USER"} || '';
 	if ($actual_user ne $remote_user) {
             return ("Access not authorized for this user in BasicAuth login module.");
 	}
+
+    # Any remote user is permitted.
+    } else {
+        my $actual_user = $ENV{"REMOTE_USER"} || '';
+        if ($actual_user eq '') {
+            return ("No actual remote user provided by BasicAuth mechanism.");
+        }
     }
 
     # Now determine which username to use.
