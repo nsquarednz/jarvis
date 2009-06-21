@@ -167,15 +167,16 @@ MAIN: {
     &Jarvis::Error::debug ($jconfig, "Error String = " . $jconfig->{'error_string'});
     &Jarvis::Error::debug ($jconfig, "Action = $action ($method)");
 
+    # Check we have a dataset.
+    $dataset_name || die "All requests requires $script_name/$app_name/<dataset-or-special>[/<arg1>...] in URI!\n";
+
     # All special datasets start with "__".
     #
     # Note that our Plugin and Execs may expect "/appname/<something-else>" so
     # we should be careful not to trample on them.  We only interpret these
     # special datasets for the four main CRUD actions.
     #
-    if ($dataset_name && ($dataset_name =~ m/^__/) &&
-        (($action eq "select") || ($action eq "insert") || ($action eq "update") || ($action eq "delete"))) {
-
+    if ($dataset_name =~ m/^__/) {
         my $return_text = undef;
 
         # Status.  I.e. are we logged in?
@@ -209,11 +210,23 @@ MAIN: {
         print $cgi->header(-type => "text/plain", -cookie => $cookie);
         print $return_text;
 
+    # A custom exec for this application?  We hand off entirely for this case,
+    # since the MIME type may be special.  Exec::Do will add the cookie in the
+    # cases where it is doing the header.  But if the exec script itself is
+    # doing all the headers, then there will be no session cookie.
+    #
+    } elsif (&Jarvis::Exec::do ($jconfig, $dataset_name, \@rest_args)) {
+        # All is well if this returns true.  The action is treated.
+
+    # A custom plugin for this application?  This is very similar to an Exec,
+    # except that where an exec is a `<command>` system call, a Plugin is a
+    # dynamically loaded module method.
+    #
+    } elsif (&Jarvis::Plugin::do ($jconfig, $dataset_name, \@rest_args)) {
+        # All is well if this returns true.  The action is treated.
+
     # Fetch a regular dataset.
     } elsif ($action eq "select") {
-
-        # Check we have a dataset.
-        $dataset_name || die "Action '$action' ($method) requires $script_name/$app_name/<dataset>[/<arg1>...] in URI!\n";
 
         my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
         my $return_text = &Jarvis::Dataset::fetch ($jconfig, \@rest_args);
@@ -224,27 +237,11 @@ MAIN: {
     # Modify a regular dataset.
     } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete")) {
 
-        $dataset_name || die "Action '$action' ($method) requires $script_name/$app_name/<dataset>[/<arg1>...] in URI!\n";
         my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
         my $return_text = &Jarvis::Dataset::store ($jconfig, \@rest_args);
 
         print $cgi->header(-type => "text/plain", -cookie => $cookie);
         print $return_text;
-
-    # A custom exec for this application?  We hand off entirely for this case,
-    # since the MIME type may be special.  Exec::Do will add the cookie in the
-    # cases where it is doing the header.  But if the exec script itself is
-    # doing all the headers, then there will be no session cookie.
-    #
-    } elsif (&Jarvis::Exec::do ($jconfig, $action, \@rest_args)) {
-        # All is well if this returns true.  The action is treated.
-
-    # A custom plugin for this application?  This is very similar to an Exec,
-    # except that where an exec is a `<command>` system call, a Plugin is a
-    # dynamically loaded module method.
-    #
-    } elsif (&Jarvis::Plugin::do ($jconfig, $action, \@rest_args)) {
-        # All is well if this returns true.  The action is treated.
 
     # It's the end of the world as we know it.
     } else {

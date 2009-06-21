@@ -128,79 +128,6 @@ sub get_sql {
 }
 
 ################################################################################
-# Go through the list of user-supplied variables and decide which ones are
-# safe to pass to the dataset in our name -> value map.
-#
-# Then add some special variables.
-#
-# Any variable which starts with "__" is safe.  Specifically.
-#
-#   __username  -> <logged-in-username>
-#   __grouplist -> ('<group1>', '<group2>', ...)
-#   __group:<groupname>  ->  1 (iff belong to <groupname>) or NULL
-#
-# Params:
-#       $jconfig - Jarvis::Config object
-#           READ
-#               username
-#               group_list
-#
-#       $raw_params_href - User-supplied (unsafe) hash of variables.
-#
-#       $rest_args_aref - A ref to our REST args (slash-separated after dataset)
-#
-# Returns:
-#       1
-################################################################################
-#
-sub safe_dataset_variables {
-
-    my ($jconfig, $raw_params_href, $rest_args_aref) = @_;
-
-    my %safe_params = ();
-
-    # First set the default parameters configured in the config file.
-    my $pxml = $jconfig->{'xml'}{'jarvis'}{'app'}{'default_parameters'};
-    if ($pxml && $pxml->{'parameter'}) {
-        foreach my $parameter ($pxml->{'parameter'}('@')) {
-            &Jarvis::Error::debug ($jconfig, "Default Parameter: " . $parameter->{'name'}->content . " -> " . $parameter->{'value'}->content);
-            $safe_params {$parameter->{'name'}->content} = $parameter->{'value'}->content;
-        }
-    }
-
-    # Copy through the SAFE user-provided parameters.  One leading underscore
-    # is permitted, but never TWO leading underscores.  No special characters.
-    foreach my $name (keys %$raw_params_href) {
-        if ($name =~ m/^_?[a-z][a-z0-9_\-]*$/i) {
-            &Jarvis::Error::debug ($jconfig, "User Parameter: $name -> " . ($$raw_params_href {$name} || '<undefined>'));
-            $safe_params{$name} = $$raw_params_href {$name};
-        }
-    }
-
-    # And our REST args go through as variable "1", "2", etc...
-    foreach my $i (0 .. $#$rest_args_aref) {
-        my $name = ($i + 1);
-        my $value = $$rest_args_aref[$i];
-
-        &Jarvis::Error::debug ($jconfig, "Rest Arg: $name -> $value");
-        $safe_params{$name} = $value;
-    }
-
-    # These are '' if we have not logged in, but must ALWAYS be defined.  In
-    # theory, any datasets which allows non-logged-in access is not going to
-    # reference __username
-    #
-    $safe_params{"__username"} = $jconfig->{'username'};
-    $safe_params{"__grouplist"} = "('" . join ("','", split (',', $jconfig->{'group_list'})) . "')";
-    foreach my $group (split (',', $jconfig->{'group_list'})) {
-        $safe_params{"__group:$group"} = 1;
-    }
-    &Jarvis::Error::debug ($jconfig, "Username: " . $safe_params{"__username"} . ", Group List: " . $safe_params{"__grouplist"});
-
-    return %safe_params;
-}
-
-################################################################################
 # Expand the SQL, replace args with ?, and return list of arg names.
 #
 # Params:
@@ -354,7 +281,7 @@ sub fetch {
     # values.
     #
     my %raw_params = $jconfig->{'cgi'}->Vars;
-    my %safe_params = &safe_dataset_variables ($jconfig, \%raw_params, $rest_args_aref);
+    my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%raw_params, $rest_args_aref);
 
     my @arg_values = ();
     if ($jconfig->{'use_placeholders'}) {
@@ -654,7 +581,7 @@ sub store {
         # values.
         #
         my %raw_params = %{ $fields_href };
-        my %safe_params = &safe_dataset_variables ($jconfig, \%raw_params, $rest_args_aref);
+        my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%raw_params, $rest_args_aref);
 
         my @arg_values = ();
         if ($jconfig->{'use_placeholders'}) {

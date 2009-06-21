@@ -2,7 +2,7 @@
 <jarvis>
     <app name="application1" use_placeholders="yes" format="json" debug="yes">
         <!-- This is where our <dataset>.xml are all stored -->
-	<dataset_dir>/opt/jarvis/demo/etc/datasetsadf</dataset_dir>
+	<dataset_dir>/opt/jarvis/demo/etc/dataset</dataset_dir>
 
         <!-- This is how you might define a JSON habitat.  100% example.
              If your requested format is non-XML (e.g. JSON, we will strip the
@@ -94,7 +94,7 @@
              Login is required before you can use "exec" actions, even when using module
              None.  See the note above on using the "status" action to obtain a session cookie.
              -->
-        <exec action="echo" access="*" command="echo" add_headers="yes" filename_parameter="filename"/>
+        <exec dataset="echo" access="*" command="echo" add_headers="yes" filename_parameter="filename"/>
 
         <!-- This action ignores includes a '#' so that command line parameters are commented
              out.  It cats an image back through the socket.  Try saving the image and you will
@@ -106,13 +106,13 @@
 
              http://localhost/jarvis-bin/jarvis.pl?app=demo&action=png&filename=boat.png
              -->
-        <exec action="png" access="*" command="cat /opt/jarvis/demo/htdocs/decoration/top_background.png # "
+        <exec dataset="png" access="*" command="cat /opt/jarvis/demo/htdocs/decoration/top_background.png # "
               add_headers="yes" default_filename="bg.png" filename_parameter="filename"/>
 
         <!-- This shows how to use a Plugin.  It executes the plugin::Test::Do ()
              method.  Any returned output is put to the browser.
              -->
-        <plugin action="plug" access="*" lib="/opt/jarvis/demo" module="plugin::Demo" add_headers="yes" filename_parameter="filename">
+        <plugin dataset="plug" access="*" lib="/opt/jarvis/demo" module="plugin::Demo" add_headers="yes" filename_parameter="filename">
             <parameter name="smtp_server" value="192.168.70.100"/>
             <parameter name="category" value="kiwisaver"/>
         </plugin>

@@ -1,7 +1,7 @@
 ###############################################################################
-# Description:  Performs a custom <exec> action defined in the <app_name>.xml
+# Description:  Performs a custom <exec> dataset defined in the <app_name>.xml
 #               file for this application.  A good example of this would be
-#               an exec action which handed off to a report script like
+#               an exec dataset which handed off to a report script like
 #               javis.
 #
 # Licence:
@@ -35,61 +35,29 @@ use Jarvis::Error;
 use Jarvis::Text;
 
 ################################################################################
-# Adds some special variables to our name -> value map.  Note that our special
-# variables are added AFTER the user-provided variables.  That means that you
-# can securely rely upon the values of __username, __grouplist, etc.  If the
-# caller attempts to supply them, ours will replace the hacked values.
-#
-# Note that this is a subset of the special variables available in datasets.
-# Note also that in datasets, the group list is contained in brackets with
-# quotes.  Here we pass a simple comma-separated-string.
-#
-#   __username  -> <logged-in-username>
-#   __grouplist -> <group1>,<group2>,...
-#
-# Params:
-#       $jconfig - Jarvis::Config object
-#           READ
-#               username
-#               group_list
-#
-#       $param_values_href - hash of special variables that we create
-#
-# Returns:
-#       1
-################################################################################
-#
-sub add_special_exec_variables {
-    my ($jconfig, $param_values_href) = @_;
-
-    # These are defined if we have logged in.
-    $$param_values_href{"__username"} = $jconfig->{'username'};
-    $$param_values_href{"__grouplist"} = $jconfig->{'group_list'};
-
-    return 1;
-}
-################################################################################
 # Shows our current connection status.
 #
-# Params: 
+# Params:
 #       $jconfig - Jarvis::Config object
 #           READ
 #               xml
 #               cgi
 #
-#       $action - Name of the action we are requested to perform.
+#       $dataset_name - Name of the special "exec" dataset we are requested to perform.
+#
+#       $rest_args_aref - A ref to our REST args (slash-separated after dataset)
 #
 # Returns:
-#       0 if the action is not a known "exec"
-#       1 if the action is known and successful
-#       die on error attempting to perform the action
+#       0 if the dataset is not a known "exec" dataset
+#       1 if the dataset is known and successful
+#       die on error attempting to perform the dataset
 ################################################################################
 #
 sub do {
-    my ($jconfig, $action) = @_;
+    my ($jconfig, $dataset, $rest_args_aref) = @_;
 
     ###############################################################################
-    # See if we have any extra "exec" actions for this application.
+    # See if we have any extra "exec" dataset for this application.
     ###############################################################################
     #
     my $allowed_groups = undef;         # Access groups permitted, or "*" or "**"
@@ -101,11 +69,11 @@ sub do {
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
     if ($axml->{'exec'}) {
         foreach my $exec (@{ $axml->{'exec'} }) {
-            next if ($action ne $exec->{'action'}->content);
-            &Jarvis::Error::debug ($jconfig, "Found matching custom <exec> action '$action'.");
+            next if ($dataset ne lc ($exec->{'dataset'}->content));
+            &Jarvis::Error::debug ($jconfig, "Found matching custom <exec> dataset '$dataset'.");
 
-            $allowed_groups = $exec->{'access'}->content || die "No 'access' defined for exec action '$action'";
-            $command = $exec->{'command'}->content || die "No 'command' defined for exec action '$action'";
+            $allowed_groups = $exec->{'access'}->content || die "No 'access' defined for exec dataset '$dataset'";
+            $command = $exec->{'command'}->content || die "No 'command' defined for exec dataset '$dataset'";
             $add_headers = defined ($Jarvis::Config::yes_value {lc ($exec->{'add_headers'}->content || "no")});
             $default_filename = $exec->{'default_filename'}->content;
             $filename_parameter = $exec->{'filename_parameter'}->content;
@@ -123,7 +91,6 @@ sub do {
     # override sneaky user-supplied values.
     #
     my %param_values = $jconfig->{'cgi'}->Vars;
-    &add_special_exec_variables ($jconfig, \%param_values);
 
     # Figure out a filename.  It's not mandatory, if we don't have a default
     # filename and we don't have a filename_parameter supplied and defined then
@@ -131,27 +98,17 @@ sub do {
     #
     my $filename = $param_values {$filename_parameter} || $default_filename;
 
-    # Delete our magic system parameters.  These were for jarvis, not for the
-    # exec.  If you want your application to have a parameter named "action" then
-    # you are out of luck.  Rename it.  Same for "app".  We delete the filename
-    # parameter, that shouldn't in theory be a problem.
-    #
-    delete $param_values{$filename_parameter};
-    delete $param_values{"action"};
-    delete $param_values{"app"};
+    # Now pull out only the safe variables.  Add our rest args too.
+    my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%param_values, $rest_args_aref, 'exec', 'p');
 
     # Add parameters to our command.  Die if any of the parameter names look dodgy.
     # This isn't a problem with datasets, since there we only look at parameters that
     # are coded into our SQL string.  But here we will take ALL parameters supplied
     # by the user, so we need to watch out for any funny business.
-    foreach my $param (sort (keys %param_values)) {
-        if ($param !~ m/[a-zA-Z0-9_\-]+/) {
-            die "Unsupported characters in exec parameter name '$param'\n";
-        }
-
+    foreach my $param (sort (keys %safe_params)) {
         # With the values we are more forgiving, but we quote them up hard in single
         # quotes for the shell.
-        my $param_value = $param_values{$param};
+        my $param_value = $safe_params{$param};
         &Jarvis::Error::debug ($jconfig, "Exec Parameter '$param' = '$param_value'");
 
         # MS Windows, we use double quotes.
@@ -181,7 +138,7 @@ sub do {
     }
 
     # Are we supposed to add headers?  Does that include a filename header?
-    # Note that if we really wanted to, we could squeeze in 
+    # Note that if we really wanted to, we could squeeze in
     if ($add_headers) {
         my $mime_types = MIME::Types->new;
         my $mime_type = $mime_types->mimeTypeOf ($filename) || MIME::Types->type('text/plain');
