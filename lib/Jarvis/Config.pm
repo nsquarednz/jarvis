@@ -174,13 +174,20 @@ sub safe_variables {
         $safe_params{$name} = $value;
     }
 
-    # These are '' if we have not logged in, but must ALWAYS be defined.  In
-    # theory, any datasets which allows non-logged-in access is not going to
-    # reference __username
+    # Our secure variables.  Note that __username and __group_list are null if
+    # the user hasn't logged in
     #
     $safe_params{"__username"} = $jconfig->{'username'};
     $safe_params{"__group_list"} = $jconfig->{'group_list'};
-    &Jarvis::Error::debug ($jconfig, "Username: " . $safe_params{"__username"} . ", Group List: " . $safe_params{"__group_list"});
+    &Jarvis::Error::debug ($jconfig, "Username: __username = " . $safe_params{"__username"});
+    &Jarvis::Error::debug ($jconfig, "Group List: __group_list = " . $safe_params{"__group_list"});
+
+    # And our separate groups.
+    foreach my $group (split (',', $jconfig->{'group_list'})) {
+        $safe_params{"__group:$group"} = 1;
+        &Jarvis::Error::debug ($jconfig, "Group: __group:$group = 1");
+    }
+
 
     return %safe_params;
 }
