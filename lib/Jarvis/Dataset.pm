@@ -122,6 +122,7 @@ sub get_sql {
 
     my $sql = $dsxml->{dataset}{$which}->content;
     $sql || die "Dataset '" . ($jconfig->{'dataset_name'} || '') . "' has no SQL of type '$which'.";
+    $sql =~ s/^\s*\-\-.*$//gm;   # Remove SQL comments
     $sql = &trim ($sql);
 
     return $sql;
