@@ -200,9 +200,6 @@ sub sql_with_variables {
             } elsif ($variable_value =~ m/^\-?[0-9]+(\.[0-9]+)?$/) {
                 # Numeric, do not quote.
 
-            } elsif ($variable_name eq "__grouplist") {
-                # Array, do not quote.
-
             } else {
                 $variable_value =~ s/'/''/;
                 $variable_value = "'" . $variable_value . "'";
@@ -603,6 +600,7 @@ sub store {
 
         # Prepare
         # Execute
+        my $stop = 0;
         my $num_rows = 0;
         my $err_handler = $SIG{__DIE__};
         eval {
@@ -619,29 +617,34 @@ sub store {
             $row_result{'message'} = $sth->errstr;
             $success = 0;
             $message || ($message = $sth->errstr);
+
             if ($jconfig->{'stop_on_error'}) {
                 &Jarvis::Error::debug ($jconfig, "Error detected and 'stop_on_error' configured.");
-                last;
+                $stop = 1;
             }
 
+
+        # Suceeded.  Set per-row status, and fetch the returned results, if this
+        # operation indicates that it returns values.
+        #
         } else {
             $row_result{'success'} = 1;
-        }
 
-        # Fetch the results, if this operation indicates that it returns values.
-        if ($returning) {
-            my $returning_aref = $sth->fetchall_arrayref({}) || undef;
-            if ($returning_aref) {
-                $row_result{'returning'} = $returning_aref;
+            if ($returning) {
+                my $returning_aref = $sth->fetchall_arrayref({}) || undef;
+                if ($returning_aref) {
+                    $row_result{'returning'} = $returning_aref;
+                }
             }
+
         }
 
         # Not using placeholders, free statement each loop.
         if (! $jconfig->{'use_placeholders'}) {
             $sth->finish;
         }
-
         push (@results, \%row_result);
+        last if $stop;
     }
 
     # Using placeholders, free statement only at the end.
@@ -678,15 +681,16 @@ sub store {
         $return_data {'success'} = $success;
         $return_data {'state'} = $state;
         $return_data {'modified'} = $modified;
+        $success || ($return_data {'message'} = &trim($message));
 
-        if ($success && $return_array) {
+        # Always return the array data.
+        if ($return_array) {
             $return_data {'rows'} = \@results;
+        }
 
-        } elsif ($success) {
+        # Return non-array fields in success case only.
+        if ($success && ! $return_array) {
             $results[0]{'returning'} && ($return_data {'returning'} = $results[0]{'returning'});
-
-        } else {
-            $return_data {'message'} = &trim($message);
         }
         my $json = JSON::XS->new->pretty(1);
         return $json->encode ( \%return_data );
@@ -696,15 +700,16 @@ sub store {
         $xml->{'success'} = $success;
         $xml->{'state'} = $state;
         $xml->{'modified'} = $modified;
+        $success || ($xml->{'message'} = &trim($message));
 
-        if ($success && $return_array) {
+        # Always return the array data.
+        if ($return_array) {
             $xml->{'results'}{'rows'} = \@results;
+        }
 
-        } elsif ($success) {
+        # Return non-array fields in success case only.
+        if ($success && ! $return_array) {
             $results[0]{'returning'} && ($xml->{'returning'} = $results[0]{'returning'});
-
-        } else {
-            $xml->{'message'} = &trim($message);
         }
         return $xml->data ();
 
