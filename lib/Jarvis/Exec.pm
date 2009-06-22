@@ -85,7 +85,10 @@ sub do {
 
     # Check security.
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
-    ($failure ne '') && die "Wanted exec access: $failure";
+    if ($failure ne '') {
+        $jconfig->{'status'} = "401 Unauthorized";
+        die "Wanted exec access: $failure";
+    }
 
     # Get our parameters.  Note that our special variables like __username will
     # override sneaky user-supplied values.

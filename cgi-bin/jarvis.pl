@@ -75,7 +75,8 @@ sub handler {
 
     # Return error.  Note that we do not print stack trace to user, since
     # that is a potential security weakness.
-    print $cgi->header(-type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt");
+    my $status = $jconfig->{'status'} || "500 Internal Server Error";
+    print $cgi->header(-status => $status, -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt");
     print $msg;
 
     # Print to error log.  Include stack trace if debug is enabled.
@@ -97,6 +98,7 @@ MAIN: {
     # Determine app name (and possibly data-set).
     ###############################################################################
     #
+
     my $script_name = $cgi->script_name();
     my $path = $cgi->path_info() ||
         die "Missing path info.  Send $script_name/<app>[/<dataset>[/<arg1>...]] in URI!\n";

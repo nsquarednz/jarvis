@@ -88,6 +88,13 @@ sub get_config_xml {
 
     # Load the dataset-specific XML file and double-check it has top-level <dataset> tag.
     my $dsxml_filename = "$dataset_dir/$dataset_name.xml";
+
+    # Check it exists.
+    if (! -f $dataset_dir) {
+        $jconfig->{'status'} = '404 Not Found';
+        die "No such dataset '$dataset_name' in application '" . $jconfig->{'app_name'} . "'";
+    }
+
     my $dsxml = XML::Smart->new ("$dsxml_filename") || die "Cannot read '$dsxml_filename': $!\n";
     ($dsxml->{dataset}) || die "Missing <dataset> tag in '$dsxml_filename'!\n";
 
@@ -275,7 +282,10 @@ sub fetch {
 
     my $allowed_groups = $dsxml->{dataset}{"read"};
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
-    $failure && die "Wanted read access: $failure\n";
+    if ($failure ne '') {
+        $jconfig->{'status'} = "401 Unauthorized";
+        die "Wanted read access: $failure";
+    }
 
     my $sql = &get_sql ($jconfig, 'select', $dsxml);
 
@@ -458,7 +468,10 @@ sub store {
 
     my $allowed_groups = $dsxml->{dataset}{"write"};
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
-    $failure && die "Wanted write access: $failure";
+    if ($failure ne '') {
+        $jconfig->{'status'} = "401 Unauthorized";
+        die "Wanted write access: $failure";
+    }
 
     # Get our submitted content.  This works for POST (insert) on non-XML data.  If the
     # content_type was "application/xml" then I think we will find our content in the

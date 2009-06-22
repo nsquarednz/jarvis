@@ -109,7 +109,10 @@ sub do {
 
     # Check security.
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
-    ($failure ne '') && die "Wanted plugin access: $failure";
+    if ($failure ne '') {
+        $jconfig->{'status'} = "401 Unauthorized";
+        die "Wanted plugin access: $failure";
+    }
 
     # Figure out a filename.  It's not mandatory, if we don't have a default
     # filename and we don't have a filename_parameter supplied and defined then
