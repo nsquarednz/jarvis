@@ -614,6 +614,7 @@ sub store {
             print STDERR "ERROR: Couldn't execute $transaction_type '$sql' with args " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) . "\n";
             print STDERR $sth->errstr . "!\n";
             $row_result{'success'} = 0;
+            $row_result{'modified'} = 0;
             $row_result{'message'} = $sth->errstr;
             $success = 0;
             $message || ($message = $sth->errstr);
