@@ -54,16 +54,13 @@ sub report {
     $fields{"error_string"} = $jconfig->{'error_string'};
     $fields{"group_list"} = $jconfig->{'group_list'};
 
-    my @data = (\%fields);
-
     if ($jconfig->{'format'} eq "json") {
-        my %return_hash = ( "data" => \@data );
         my $json = JSON::XS->new->pretty(1);
-        return $json->encode ( \%return_hash );
+        return $json->encode ( \%fields );
 
     } elsif ($jconfig->{'format'} eq "xml") {
         my $xml = XML::Smart->new ();
-        $xml->{data} = \@data;
+        $xml->{root} = \%fields;
 
         return $xml->data ();
 

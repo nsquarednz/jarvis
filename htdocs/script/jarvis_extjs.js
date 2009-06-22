@@ -98,21 +98,24 @@ function jarvisLoadException (proxy, options, response, e) {
         done_alert = 1;
     }
 
-    // Load exception.  Let's see if we need to login first, perhaps?  If that's the
-    // problem, then send them to the login page.
-    var status_store = new Ext.data.JsonStore ({
+    // Perform the request over ajax.
+    Ext.Ajax.request({
         url: jarvisUrl ('__status'),
-        root: 'data',
-        fields: ['error_string', 'logged_in', 'group_list', 'username'],
-        listeners: {
-            'load': function (store, records, options) {
-                if ((records.length > 0) && (records[0].get ('logged_in') != 1)) {
+
+        // We received a response back from the server, that's a good start.
+        success: function (response, request_options) {
+            try {
+                var result = Ext.util.JSON.decode (response.responseText);
+                if (result.logged_in == 0) {
                     document.location.href = login_page + '?from=' + escape (location.pathname + location.hash);
                 }
+
+            // Well, something bad here.  Could be anything.  We tried.
+            } catch (e) {
+                // Do nothing further.
             }
         }
     });
-    status_store.load ();
 };
 
 // Common submit method (does delete/update/insert).
