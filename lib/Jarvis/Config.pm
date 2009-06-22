@@ -180,7 +180,7 @@ sub safe_variables {
     #
     $safe_params{"__username"} = $jconfig->{'username'};
     $safe_params{"__group_list"} = $jconfig->{'group_list'};
-    &Jarvis::Error::debug ($jconfig, "Username: " . $safe_params{"__username"} . ", Group List: " . $safe_params{"__grouplist"});
+    &Jarvis::Error::debug ($jconfig, "Username: " . $safe_params{"__username"} . ", Group List: " . $safe_params{"__group_list"});
 
     return %safe_params;
 }

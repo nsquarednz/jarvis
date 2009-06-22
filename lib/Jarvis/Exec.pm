@@ -99,7 +99,7 @@ sub do {
     my $filename = $param_values {$filename_parameter} || $default_filename;
 
     # Now pull out only the safe variables.  Add our rest args too.
-    my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%param_values, $rest_args_aref, 'exec', 'p');
+    my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%param_values, $rest_args_aref, 'p');
 
     # Add parameters to our command.  Die if any of the parameter names look dodgy.
     # This isn't a problem with datasets, since there we only look at parameters that
