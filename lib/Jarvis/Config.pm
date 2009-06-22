@@ -134,8 +134,6 @@ sub new {
 #
 #       $raw_params_href - User-supplied (unsafe) hash of variables.
 #
-#       $vartype - 'sql' (default), 'exec'
-#
 #       $rest_args_aref - A ref to our REST args (slash-separated after dataset)
 #
 # Returns:
@@ -144,10 +142,9 @@ sub new {
 #
 sub safe_variables {
 
-    my ($jconfig, $raw_params_href, $rest_args_aref, $vartype, $rest_arg_prefix) = @_;
+    my ($jconfig, $raw_params_href, $rest_args_aref, $rest_arg_prefix) = @_;
 
     my %safe_params = ();
-    $vartype = $vartype || 'sql';
     $rest_arg_prefix = $rest_arg_prefix || '';
 
     # First set the default parameters configured in the config file.
@@ -182,16 +179,7 @@ sub safe_variables {
     # reference __username
     #
     $safe_params{"__username"} = $jconfig->{'username'};
-
-    if ($vartype eq 'sql') {
-        $safe_params{"__grouplist"} = "('" . join ("','", split (',', $jconfig->{'group_list'})) . "')";
-        foreach my $group (split (',', $jconfig->{'group_list'})) {
-            $safe_params{"__group:$group"} = 1;
-        }
-
-    } elsif ($vartype eq 'exec') {
-        $safe_params{"__grouplist"} = $jconfig->{'group_list'};
-    }
+    $safe_params{"__group_list"} = $jconfig->{'group_list'};
     &Jarvis::Error::debug ($jconfig, "Username: " . $safe_params{"__username"} . ", Group List: " . $safe_params{"__grouplist"});
 
     return %safe_params;
