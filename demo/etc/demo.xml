@@ -114,7 +114,7 @@
         <exec dataset="png" access="*" command="cat /opt/jarvis/demo/htdocs/decoration/top_background.png # "
               add_headers="yes" default_filename="bg.png" filename_parameter="filename"/>
 
-        <!-- This shows how to use a Plugin.  It executes the plugin::Test::Do ()
+        <!-- This shows how to use a Plugin.  It executes the do ()
              method.  Any returned output is put to the browser.
              -->
         <plugin dataset="plug" access="*" lib="/opt/jarvis/demo" module="plugin::Demo" add_headers="yes" filename_parameter="filename">
