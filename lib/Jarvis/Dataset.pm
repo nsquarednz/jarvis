@@ -90,7 +90,7 @@ sub get_config_xml {
     my $dsxml_filename = "$dataset_dir/$dataset_name.xml";
 
     # Check it exists.
-    if (! -f $dataset_dir) {
+    if (! -f $dsxml_filename) {
         $jconfig->{'status'} = '404 Not Found';
         die "No such dataset '$dataset_name' in application '" . $jconfig->{'app_name'} . "'";
     }
