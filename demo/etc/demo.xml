@@ -34,6 +34,11 @@
             <parameter name="Directory" value="/tmp/demo"/>
         </sessiondb>
 
+        <!-- Global default parameters -->
+        <default_parameters>
+            <parameter name="max_rows" value="500"/>
+        </default_parameters>
+
         <!-- This gives a sample configuration where the Login validation is performed by
              database lookup.  These values should work with the demo PostgreSQL
              database SQL included with this distribution.
