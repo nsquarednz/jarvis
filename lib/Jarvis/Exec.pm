@@ -130,6 +130,11 @@ sub do {
         }
     }
 
+    # Set DEBUG if required.
+    if ($jconfig->{'debug'}) {
+        $ENV{'DEBUG'} = 1;
+    }
+
     # Execute the command
     &Jarvis::Error::log ($jconfig, "Executing Command: $command");
     my $output =`$command`;
