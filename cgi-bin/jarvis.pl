@@ -148,7 +148,17 @@ MAIN: {
     #           action from Exec or Plugin.
     ###############################################################################
     #
-    my $method = $cgi->request_method();
+    my $method = $cgi->request_method() || '';
+
+    my $method_param = $jconfig->{'method_param'};
+    if ($method_param) {
+        my $new_method = $cgi->param($method_param);
+        if ($new_method) {
+            &Jarvis::Error::debug ($jconfig, "Using Method '$new_method' instead of '" . $method ."'");
+            $method = $new_method;
+        }
+    }
+
     my $action = lc ($method) || die "Missing request method!\n";
     ($action =~ m/^\w+$/) || die "Invalid characters in parameter 'action'\n";
 
@@ -167,7 +177,8 @@ MAIN: {
     &Jarvis::Error::debug ($jconfig, "Group List = " . $jconfig->{'group_list'});
     &Jarvis::Error::debug ($jconfig, "Logged In = " . $jconfig->{'logged_in'});
     &Jarvis::Error::debug ($jconfig, "Error String = " . $jconfig->{'error_string'});
-    &Jarvis::Error::debug ($jconfig, "Action = $action ($method)");
+    &Jarvis::Error::debug ($jconfig, "Method = $method");
+    &Jarvis::Error::debug ($jconfig, "Action = $action");
 
     # Check we have a dataset.
     $dataset_name || die "All requests requires $script_name/$app_name/<dataset-or-special>[/<arg1>...] in URI!\n";

@@ -111,6 +111,10 @@ sub new {
     # This is used by several things, so let's store it in our config.
     $self->{'format'} = lc ($self->{'cgi'}->param ('format') || $axml->{'format'}->content || "json");
 
+    # This is an optional METHOD overide parameter, similar to Ruby on Rails.
+    # It bypasses a problem where non-proxied Flex can only send GET/POST requests.
+    $self->{'method_param'} = $self->{'cgi'}->param ('method_param') || "_method";
+
     return $self;
 }
 
