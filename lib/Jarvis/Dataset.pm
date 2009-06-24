@@ -399,13 +399,13 @@ sub fetch {
     } elsif ($jconfig->{'format'} eq "xml") {
         my $xml = XML::Smart->new ();
 
-        $xml->{logged_in} = $jconfig->{'logged_in'};
-        $xml->{username} = $jconfig->{'username'};
-        $xml->{error_string} = $jconfig->{'error_string'};
-        $xml->{group_list} = $jconfig->{'group_list'};
+        $xml->{'response'}{'logged_in'} = $jconfig->{'logged_in'};
+        $xml->{'response'}{'username'} = $jconfig->{'username'};
+        $xml->{'response'}{'error_string'} = $jconfig->{'error_string'};
+        $xml->{'response'}{'group_list'} = $jconfig->{'group_list'};
 
-        $xml->{fetched} = $num_rows;
-        $xml->{data}{row} = $rows_aref;
+        $xml->{'response'}{'fetched'} = $num_rows;
+        $xml->{'response'}{'data'}{'row'} = $rows_aref;
 
         return $xml->data ();
 
@@ -520,11 +520,11 @@ sub store {
         my $cxml = XML::Smart->new ($content);
 
         # Fields may either sit at the top level, or you may provide an array of
-        # records in a <rows> array.
+        # records in a <row> array.
         #
         my @rows = ();
-        if ($cxml->{'request'}{'rows'}) {
-            foreach my $row (@{ $cxml->{'request'}{'rows'} }) {
+        if ($cxml->{'request'}{'row'}) {
+            foreach my $row (@{ $cxml->{'request'}{'row'} }) {
                 my %fields =%{ $row };
                 push (@rows, \%fields);
             }
@@ -699,7 +699,7 @@ sub store {
 
         # Always return the array data.
         if ($return_array) {
-            $return_data {'rows'} = \@results;
+            $return_data {'row'} = \@results;
         }
 
         # Return non-array fields in success case only.
@@ -711,19 +711,19 @@ sub store {
 
     } elsif ($jconfig->{'format'} eq "xml") {
         my $xml = XML::Smart->new ();
-        $xml->{'success'} = $success;
-        $xml->{'state'} = $state;
-        $xml->{'modified'} = $modified;
-        $success || ($xml->{'message'} = &trim($message));
+        $xml->{'response'}{'success'} = $success;
+        $xml->{'response'}{'state'} = $state;
+        $xml->{'response'}{'modified'} = $modified;
+        $success || ($xml->{'response'}{'message'} = &trim($message));
 
         # Always return the array data.
         if ($return_array) {
-            $xml->{'results'}{'rows'} = \@results;
+            $xml->{'response'}{'results'}->{'row'} = \@results;
         }
 
         # Return non-array fields in success case only.
         if ($success && ! $return_array) {
-            $results[0]{'returning'} && ($xml->{'returning'} = $results[0]{'returning'});
+            $results[0]{'returning'} && ($xml->{'response'}{'returning'} = $results[0]{'returning'});
         }
         return $xml->data ();
 
