@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <jarvis>
-    <app name="application1" use_placeholders="yes" format="json" debug="yes">
+    <app name="application1" use_placeholders="yes" format="xml" debug="yes">
         <!-- This is where our <dataset>.xml are all stored -->
 	<dataset_dir>/opt/jarvis/demo/etc/dataset</dataset_dir>
 
