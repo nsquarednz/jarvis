@@ -173,12 +173,12 @@ MAIN: {
 
     &Jarvis::Login::check ($jconfig);
 
-    &Jarvis::Error::debug ($jconfig, "User Name = " . $jconfig->{'username'});
-    &Jarvis::Error::debug ($jconfig, "Group List = " . $jconfig->{'group_list'});
+    &Jarvis::Error::debug ($jconfig, "User Name = '" . $jconfig->{'username'} . "'");
+    &Jarvis::Error::debug ($jconfig, "Group List = '" . $jconfig->{'group_list'} . "'");
     &Jarvis::Error::debug ($jconfig, "Logged In = " . $jconfig->{'logged_in'});
-    &Jarvis::Error::debug ($jconfig, "Error String = " . $jconfig->{'error_string'});
-    &Jarvis::Error::debug ($jconfig, "Method = $method");
-    &Jarvis::Error::debug ($jconfig, "Action = $action");
+    &Jarvis::Error::debug ($jconfig, "Error String = '" . $jconfig->{'error_string'} . "'");
+    &Jarvis::Error::debug ($jconfig, "Method = '" . $method . "'");
+    &Jarvis::Error::debug ($jconfig, "Action = '" . $action . "'");
 
     # Check we have a dataset.
     $dataset_name || die "All requests requires $script_name/$app_name/<dataset-or-special>[/<arg1>...] in URI!\n";

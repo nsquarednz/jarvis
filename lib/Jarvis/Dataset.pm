@@ -490,6 +490,7 @@ sub store {
         }
     }
     $content || die "Cannot find client-submitted change content.";
+    &Jarvis::Error::debug ($jconfig, "Request Content Length = " . length ($content));
 
     # Fields we need to store.  This is an ARRAY ref to multiple rows each a HASH REF
     my $fields_aref = undef;
@@ -498,6 +499,8 @@ sub store {
     # array of hashes.  Each array entry is a change record.
     my $return_array = 0;
     my $content_type = $jconfig->{'cgi'}->content_type () || '';
+
+    &Jarvis::Error::debug ($jconfig, "Request Content Type = '" . $content_type . "'");
     if ($content_type =~ m|^[a-z]+/json(; .*)?$|) {
         my $ref = JSON::XS->new->utf8->decode ($content);
 
@@ -518,6 +521,9 @@ sub store {
     # XML in here please.
     } elsif ($content_type =~ m|^[a-z]+/xml(; .*)?$|) {
         my $cxml = XML::Smart->new ($content);
+
+        # Sanity check on outer object.
+        $cxml->{'request'} || die "Missing top-level 'request' element in submitted XML content.\n";
 
         # Fields may either sit at the top level, or you may provide an array of
         # records in a <row> array.
