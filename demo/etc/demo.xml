@@ -43,15 +43,28 @@
              database lookup.  These values should work with the demo PostgreSQL
              database SQL included with this distribution.
              -->
-<!--        <login module="Jarvis::Login::Database">
+        <!--
+        <login module="Jarvis::Login::Database">
             <parameter name="user_table" value="users"/>
             <parameter name="user_username_column" value="name"/>
             <parameter name="user_password_column" value="password"/>
 	</login>-->
+
+        <!-- This is a "no username or password required" login mechanism. -->
         <login module="Jarvis::Login::None">
             <parameter name="username" value="admin"/>
             <parameter name="group_list" value="admin"/>
         </login>
+
+        <!-- This defines simply one single user who may login with a fixed password. -->
+        <!--
+        <login module="Jarvis::Login::Single">
+            <parameter name="require_https" value="no"/>
+            <parameter name="remote_ip" value="127.0.0.1"/>
+            <parameter name="username" value="bob"/>
+            <parameter name="password" value="test"/>
+            <parameter name="group_list" value="default"/>
+        </login>-->
 
         <!-- This is an example of configuring ActiveDirectory lookup.  The values here
              are totally fictitious.  You will need to supply real values.
