@@ -131,7 +131,7 @@
         <!-- This shows how to use a Plugin.  It executes the do ()
              method.  Any returned output is put to the browser.
              -->
-        <plugin dataset="plug" access="*" lib="/opt/jarvis/demo" module="plugin::Demo" add_headers="yes" filename_parameter="filename">
+        <plugin dataset="Plug" access="*" lib="/opt/jarvis/demo" module="plugin::Demo" add_headers="yes" filename_parameter="filename">
             <parameter name="smtp_server" value="192.168.70.100"/>
             <parameter name="category" value="kiwisaver"/>
         </plugin>

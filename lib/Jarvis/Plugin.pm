@@ -79,7 +79,7 @@ sub do {
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
     if ($axml->{'plugin'}) {
         foreach my $plugin (@{ $axml->{'plugin'} }) {
-            next if ($dataset ne lc ($plugin->{'dataset'}->content));
+            next if ($dataset ne $plugin->{'dataset'}->content);
             &Jarvis::Error::debug ($jconfig, "Found matching custom <plugin> dataset '$dataset'.");
 
             $allowed_groups = $plugin->{'access'}->content || die "No 'access' defined for plugin dataset '$dataset'";

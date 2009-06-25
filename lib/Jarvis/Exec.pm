@@ -69,7 +69,7 @@ sub do {
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
     if ($axml->{'exec'}) {
         foreach my $exec (@{ $axml->{'exec'} }) {
-            next if ($dataset ne lc ($exec->{'dataset'}->content));
+            next if ($dataset ne $exec->{'dataset'}->content);
             &Jarvis::Error::debug ($jconfig, "Found matching custom <exec> dataset '$dataset'.");
 
             $allowed_groups = $exec->{'access'}->content || die "No 'access' defined for exec dataset '$dataset'";
