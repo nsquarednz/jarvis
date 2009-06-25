@@ -76,9 +76,16 @@ sub Jarvis::Login::Single::check {
     my $expected_password = $login_parameters{'password'};
     my $group_list = $login_parameters{'group_list'} || $expected_username;
 
-    # Check basic configuration.
-    if (! $expected_username || ! $expected_password) {
-        return ("Login module Single is not properly configured.");
+
+    # Check basic configuration.  We must have EITHER remote_ip OR a password
+    # You can have both, that would be evern better.
+    if (! $remote_ip && ! $expected_password) {
+        return ("Login module Single is not properly configured.  Specify remote_ip and/or password.");
+    }
+
+    # Also we must have a username.
+    if (! $expected_username) {
+        return ("Login module Single is not properly configured.  Specify username.");
     }
 
     # Do we force HTTPS for this request?
@@ -94,12 +101,12 @@ sub Jarvis::Login::Single::check {
         }
     }
 
-    # Check the username is correct.
-    $username || return ("Missing parameter 'username'");
-    $password || return ("Missing parameter 'password'");
-
-    ($username eq $expected_username) || return ("Specified username is not known to this system.");
-    ($password eq $expected_password) || return ("Password is incorrect.");
+    # If we're using password authentication, then check username and password.
+    if ($expected_password) {
+        $username || return ("Username must be supplied.");
+        ($username eq $expected_username) || return ("Specified username is not known to this system.");
+        ($password eq $expected_password) || return ("Password is incorrect.");
+    }
 
     return ("", $expected_username, $group_list);
 }
