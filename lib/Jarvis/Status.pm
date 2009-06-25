@@ -60,7 +60,7 @@ sub report {
 
     } elsif ($jconfig->{'format'} eq "xml") {
         my $xml = XML::Smart->new ();
-        $xml->{root} = \%fields;
+        $xml->{'response'} = \%fields;
 
         return $xml->data ();
 
