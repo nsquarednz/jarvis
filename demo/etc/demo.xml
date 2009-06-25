@@ -56,7 +56,8 @@
             <parameter name="group_list" value="admin"/>
         </login>
 
-        <!-- This defines simply one single user who may login with a fixed password. -->
+        <!-- This defines simply one single user who may login with a fixed password,
+             AND/OR from a fixed IP address. -->
         <!--
         <login module="Jarvis::Login::Single">
             <parameter name="require_https" value="no"/>
