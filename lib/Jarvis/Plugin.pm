@@ -128,7 +128,7 @@ sub do {
     {
         eval "use lib \"$lib\" ; require $module";
         if ($@) {
-            die "Cannot load login module '$module': " . $@;
+            die "Cannot load plugin module '$module': " . $@;
         }
     }
 
