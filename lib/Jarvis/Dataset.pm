@@ -103,9 +103,6 @@ sub get_config_xml {
     $jconfig->{'sort_field_param'} = lc ($axml->{'sort_field_param'}->content || 'sort_field');
     $jconfig->{'sort_dir_param'} = lc ($axml->{'sort_dir_param'}->content || 'sort_dir');
 
-    $jconfig->{'stop_on_error'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'stop_on_error'}->content || "yes")});
-    $jconfig->{'rollback_on_error'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'rollback_on_error'}->content || "yes")});
-
     return $dsxml;
 }
 
@@ -558,19 +555,46 @@ sub store {
     my $dbh = &Jarvis::DB::Handle ($jconfig);
     $dbh->begin_work() || die;
 
-    # Get our STM.  This has everything attached.
-    my $stm = &parse_statement ($jconfig, $dsxml, $dbh, $transaction_type) ||
-        die "Dataset '" . ($jconfig->{'dataset_name'} || '') . "' has no SQL of type '$transaction_type'.";
-
-
     # Loop for each set of updates.
     my $success = 1;
     my $modified = 0;
     my @results = ();
     my $message = '';
 
+    # Execute our "before" statement.  This statement is NOT permitted to fail.  If it does,
+    # then we immediately barf
+    {
+        my $bstm = &parse_statement ($jconfig, $dsxml, $dbh, 'before');
+        if ($bstm) {
+            my %bsafe_params = &Jarvis::Config::safe_variables ($jconfig, {}, $rest_args_aref);
+            my @barg_values = &names_to_values ($jconfig, $bstm->{'vnames_aref'}, \%bsafe_params);
+
+            my $err_handler = $SIG{__DIE__};
+            eval {
+                $SIG{__DIE__} = sub {};
+                $bstm->{'sth'}->execute (@barg_values);
+            };
+            $SIG{__DIE__} = $err_handler;
+
+            if ($@) {
+                &statement_stderr ($jconfig, $bstm, \@barg_values);
+                $success = 0;
+                $message || ($message = $bstm->{'sth'}->errstr);
+            }
+        }
+    }
+
+    # Get our main STM.  This has everything attached.
+    my $stm = &parse_statement ($jconfig, $dsxml, $dbh, $transaction_type) ||
+        die "Dataset '" . ($jconfig->{'dataset_name'} || '') . "' has no SQL of type '$transaction_type'.";
+
     foreach my $fields_href (@$fields_aref) {
-        my %row_result = ();
+
+        # Stop as soon as anything goes wrong.
+        if (! $success) {
+            &Jarvis::Error::debug ($jconfig, "Error detected.  Stopping.");
+            last;
+        }
 
         # Handle our parameters.  Always with placeholders.  Note that our special variables
         # like __username are safe, and cannot come from user-defined values.
@@ -580,8 +604,8 @@ sub store {
 
         my @arg_values = &names_to_values ($jconfig, $stm->{'vnames_aref'}, \%safe_params);
 
-        # Prepare
         # Execute
+        my %row_result = ();
         my $stop = 0;
         my $num_rows = 0;
         my $err_handler = $SIG{__DIE__};
@@ -600,12 +624,6 @@ sub store {
             $success = 0;
             $message || ($message = $stm->{'sth'}->errstr);
 
-            if ($jconfig->{'stop_on_error'}) {
-                &Jarvis::Error::debug ($jconfig, "Error detected and 'stop_on_error' configured.");
-                $stop = 1;
-            }
-
-
         # Suceeded.  Set per-row status, and fetch the returned results, if this
         # operation indicates that it returns values.
         #
@@ -622,27 +640,42 @@ sub store {
         }
 
         push (@results, \%row_result);
-        last if $stop;
     }
 
     # Using placeholders, free statement only at the end.
     $stm->{'sth'}->finish;
 
-    my $state = undef;
-    if ((! $success) && $jconfig->{'rollback_on_error'}) {
-        &Jarvis::Error::debug ($jconfig, "Error detected and 'rollback_on_error' configured.");
+    # Execute our "after" statement.
+    if ($success) {
+        my $astm = &parse_statement ($jconfig, $dsxml, $dbh, 'after');
+        if ($astm) {
+            my %asafe_params = &Jarvis::Config::safe_variables ($jconfig, {}, $rest_args_aref);
+            my @aarg_values = &names_to_values ($jconfig, $astm->{'vnames_aref'}, \%asafe_params);
+
+            my $err_handler = $SIG{__DIE__};
+            eval {
+                $SIG{__DIE__} = sub {};
+                $astm->{'sth'}->execute (@aarg_values);
+            };
+            $SIG{__DIE__} = $err_handler;
+
+            if ($@) {
+                &statement_stderr ($jconfig, $astm, \@aarg_values);
+                $success = 0;
+                $message || ($message = $astm->{'sth'}->errstr);
+            }
+        }
+    }
+
+    # Determine if we're going to rollback.
+    my $state = $success ? 'commit' : 'rollback';
+    if (! $success) {
+        &Jarvis::Error::debug ($jconfig, "Error detected.  Rolling back.");
         $dbh->rollback ();
-        $state = 'rollback';
 
     } else {
-        if ($success) {
-            &Jarvis::Error::debug ($jconfig, "All successful.  Committing all changes.");
-
-        } else {
-            &Jarvis::Error::debug ($jconfig, "Some changes failed.  Committing anyhow.");
-        }
+        &Jarvis::Error::debug ($jconfig, "All successful.  Committing all changes.");
         $dbh->commit ();
-        $state = 'commit';
     }
 
     # Return content in requested format.
