@@ -60,7 +60,6 @@ my %yes_value = ('yes' => 1, 'true' => 1, '1' => 1);
 #               xml                 Find our app-configured "dataset_dir" dir.
 #               dataset_name        What dataset do we want?
 #           WRITE
-#               use_placeholders    Should we use placeholders?  Or just insert text?
 #               page_start_param    Name of the CGI param specifying page start row num
 #               page_limit_param    Name of the CGI param specifying page limit row num
 #               sort_field_param    Name of the CGI param specifying page sort field
@@ -99,7 +98,6 @@ sub get_config_xml {
     ($dsxml->{dataset}) || die "Missing <dataset> tag in '$dsxml_filename'!\n";
 
     # Load a couple of other parameters.  This is a "side-effect".  Yeah, it's a bit yucky.
-    $jconfig->{'use_placeholders'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'use_placeholders'}->content || "yes")});
     $jconfig->{'page_start_param'} = lc ($axml->{'page_start_param'}->content || 'page_start');
     $jconfig->{'page_limit_param'} = lc ($axml->{'page_limit_param'}->content || 'page_limit');
     $jconfig->{'sort_field_param'} = lc ($axml->{'sort_field_param'}->content || 'sort_field');
@@ -112,7 +110,7 @@ sub get_config_xml {
 }
 
 ################################################################################
-# Get the SQL for the update, insert, and delete.
+# Get the SQL for the update, insert, and delete or whatever.
 #
 # Params:
 #       $jconfig - Jarvis::Config object (NOT USED YET)
@@ -120,19 +118,18 @@ sub get_config_xml {
 #       $dsxml   - XML::Smart object for dataset configuration
 #
 # Returns:
-#       ($sql, @variable_names).
+#       $raw_sql
 #       die on error.
 ################################################################################
 #
 sub get_sql {
     my ($jconfig, $which, $dsxml) = @_;
 
-    my $sql = $dsxml->{dataset}{$which}->content;
-    $sql || die "Dataset '" . ($jconfig->{'dataset_name'} || '') . "' has no SQL of type '$which'.";
-    $sql =~ s/^\s*\-\-.*$//gm;   # Remove SQL comments
-    $sql = &trim ($sql);
+    my $raw_sql = $dsxml->{dataset}{$which}->content || return undef;
+    $raw_sql =~ s/^\s*\-\-.*$//gm;   # Remove SQL comments
+    $raw_sql = &trim ($raw_sql);
 
-    return $sql;
+    return $raw_sql;
 }
 
 ################################################################################
@@ -142,8 +139,7 @@ sub get_sql {
 #       SQL text.
 #
 # Returns:
-#       ($sql_with_placeholders, @variable_names).
-#       die on error.
+#       ($sql_ph, @variable_names).
 ################################################################################
 #
 sub sql_with_placeholders {
@@ -152,7 +148,7 @@ sub sql_with_placeholders {
 
     # Parse the update SQL to get a prepared statement, pulling out the list
     # of names of variables we need to replace for each execution.
-    my $sql_with_placeholders = "";
+    my $sql_ph = "";
     my @bits = split (/\{\{?\$?([^\}]+)\}\}?/i, $sql);
     my @variable_names = ();
 
@@ -160,66 +156,14 @@ sub sql_with_placeholders {
     foreach my $idx (0 .. $#bits) {
         if ($idx % 2) {
             push (@variable_names, $bits[$idx]);
-            $sql_with_placeholders .= "?";
+            $sql_ph .= "?";
 
         } else {
-            $sql_with_placeholders .= $bits[$idx];
+            $sql_ph .= $bits[$idx];
         }
     }
 
-    return ($sql_with_placeholders, @variable_names);
-}
-
-################################################################################
-# Expand the SQL, replace args with ?, and return list of arg names.
-#
-# Params:
-#       SQL text.
-#       Safe Param Values hash
-#
-# Returns:
-#       ($sql_with_variables).
-#       die on error.
-################################################################################
-#
-sub sql_with_variables {
-
-    my ($sql, %safe_params) = @_;
-
-    # Parse the update SQL to get a prepared statement, pulling out the list
-    # of names of variables we need to replace for each execution.
-    my $sql_with_variables = "";
-    my @bits = split (/\{\{?\$?([^\}]+)\}\}?/i, $sql);
-
-    my $num_params = 0;
-    foreach my $idx (0 .. $#bits) {
-        if ($idx % 2) {
-            my $variable_name = $bits[$idx];
-            my $variable_value = undef;
-            foreach my $option (split ('\|', $variable_name)) {
-                $variable_value = $safe_params {$option};
-                last if (defined $variable_value);
-            }
-
-            if (! defined $variable_value) {
-                $variable_value = 'NULL';
-
-            } elsif ($variable_value =~ m/^\-?[0-9]+(\.[0-9]+)?$/) {
-                # Numeric, do not quote.
-
-            } else {
-                $variable_value =~ s/'/''/;
-                $variable_value = "'" . $variable_value . "'";
-            }
-
-            $sql_with_variables .= $variable_value;
-
-        } else {
-            $sql_with_variables .= $bits[$idx];
-        }
-    }
-
-    return $sql_with_variables;
+    return ($sql_ph, @variable_names);
 }
 
 ################################################################################
@@ -265,7 +209,6 @@ sub names_to_values {
 #               cgi                 Contains data values for {{param}} in SQL
 #               username            Used for {{username}} in SQL
 #               group_list          Used for {{group_list}} in SQL
-#               with_placeholders   Should we use placeholders or string subst in SQL
 #               format              Either "json" or "xml" or "csv".
 #
 #       $rest_args_aref - A ref to our REST args (slash-separated after dataset)
@@ -287,34 +230,25 @@ sub fetch {
         die "Wanted read access: $failure";
     }
 
-    my $sql = &get_sql ($jconfig, 'select', $dsxml);
+    my $raw_sql = &get_sql ($jconfig, 'select', $dsxml) ||
+        die "Dataset '" . ($jconfig->{'dataset_name'} || '') . "' has no SQL of type 'select'.";
 
-    # Handle our parameters.  Either inline or with placeholders.  Note that our
-    # special variables like __username are safe, and cannot come from user-defined
-    # values.
+    # Handle our parameters.  Always with placeholders.  Note that our special variables
+    # like __username are safe, and cannot come from user-defined values.
     #
     my %raw_params = $jconfig->{'cgi'}->Vars;
     my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%raw_params, $rest_args_aref);
 
-    my @arg_values = ();
-    if ($jconfig->{'use_placeholders'}) {
-        my ($sql_with_placeholders, @variable_names) = &sql_with_placeholders ($sql);
-
-        $sql = $sql_with_placeholders;
-        @arg_values = &names_to_values (\@variable_names, \%safe_params);
-
-    } else {
-        my $sql_with_variables = &sql_with_variables ($sql, %safe_params);
-        $sql = $sql_with_variables;
-    }
+    my ($sql_ph, @variable_names) = &sql_with_placeholders ($raw_sql);
+    my @arg_values = &names_to_values (\@variable_names, \%safe_params);
 
     # Prepare
-    &Jarvis::Error::debug ($jconfig, "FETCH = " . $sql);
+    &Jarvis::Error::debug ($jconfig, "FETCH = " . $sql_ph);
     &Jarvis::Error::debug ($jconfig, "ARGS = " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values));
 
     my $dbh = &Jarvis::DB::Handle ($jconfig);
-    my $sth = $dbh->prepare ($sql)
-        || die "Couldn't prepare statement '$sql': " . $dbh->errstr;
+    my $sth = $dbh->prepare ($sql_ph)
+        || die "Couldn't prepare statement '$sql_ph': " . $dbh->errstr;
 
     # Execute
     my $status = 0;
@@ -326,7 +260,7 @@ sub fetch {
     $SIG{__DIE__} = $err_handler;
 
     if ($@) {
-        print STDERR "ERROR: Couldn't execute select '$sql' with args " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) . "\n";
+        print STDERR "ERROR: Couldn't execute select '$sql_ph' with args " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) . "\n";
         print STDERR $sth->errstr . "!\n";
         my $message = $sth->errstr;
         $sth->finish;
@@ -450,7 +384,6 @@ sub fetch {
 #               cgi                 Contains data values for {{param}} in SQL
 #               username            Used for {{username}} in SQL
 #               group_list          Used for {{group_list}} in SQL
-#               with_placeholders   Should we use placeholders or string subst in SQL
 #               format              Either "json" or "xml" (not "csv").
 #
 #       $rest_args_aref - A ref to our REST args (slash-separated after dataset)
@@ -549,45 +482,26 @@ sub store {
 
     # Choose our statement and find the SQL and variable names.
     my $transaction_type = $jconfig->{'action'};
-    my $base_sql = undef;
+    &Jarvis::Error::debug ($jconfig, "Transaction Type = '$transaction_type'");
+    ($transaction_type eq "delete") || ($transaction_type eq "update")|| ($transaction_type eq "insert") ||
+        die "Unsupported transaction type '$transaction_type'.";
+
+    # Get and check the raw SQL, before parameter -> ? substitution.
+    my $raw_sql = &get_sql ($jconfig, $transaction_type, $dsxml) ||
+        die "Dataset '" . ($jconfig->{'dataset_name'} || '') . "' has no SQL of type '$transaction_type'.";
 
     # Does this insert return rows?
-    my $returning = 0;
+    my $returning = defined ($yes_value {lc ($dsxml->{dataset}{$transaction_type}{'returning'} || "no")});
+    &Jarvis::Error::debug ($jconfig, "Returning? = " . $returning);
 
-    # DELETE
-    if ($transaction_type eq "delete") {
-        $base_sql = &get_sql ($jconfig, 'delete', $dsxml);
-
-    # UPDATE
-    } elsif ($transaction_type eq "update") {
-        $base_sql = &get_sql ($jconfig, 'update', $dsxml);
-
-    # INSERT, possibly returning.
-    } elsif ($transaction_type eq "insert") {
-        $base_sql = &get_sql ($jconfig, 'insert', $dsxml);
-        $returning = defined ($yes_value {lc ($dsxml->{dataset}{'insert'}{'returning'} || "no")});
-        &Jarvis::Error::debug ($jconfig, "Insert Returning = " . $returning);
-
-    } else {
-        die "Unsupported transaction type '$transaction_type'.";
-    }
-
-    # For placeholders, we can do this once outside the update loop.  For textual
-    # substitution it's far less efficient of course.
-    #
+    # Shared database handle.
     my $dbh = &Jarvis::DB::Handle ($jconfig);
     $dbh->begin_work() || die;
 
-    my $sth = undef;
-    my $sql = undef;
-    my @variable_names = undef;                 # Used only for placeholder case.
-
-    if ($jconfig->{'use_placeholders'}) {
-        ($sql, @variable_names) = &sql_with_placeholders ($base_sql);
-
-        &Jarvis::Error::debug ($jconfig, "STORE = " . $sql);
-        $sth = $dbh->prepare ($sql) || die "Couldn't prepare statement '$sql': " . $dbh->errstr;
-    }
+    # Get our SQL with placeholders and prepare it.
+    my ($sql_ph, @variable_names) = &sql_with_placeholders ($raw_sql);
+    &Jarvis::Error::debug ($jconfig, "STORE = " . $sql_ph);
+    my $sth = $dbh->prepare ($sql_ph) || die "Couldn't prepare statement '$sql_ph': " . $dbh->errstr;
 
     # Loop for each set of updates.
     my $success = 1;
@@ -598,24 +512,14 @@ sub store {
     foreach my $fields_href (@$fields_aref) {
         my %row_result = ();
 
-        # Handle our parameters.  Either inline or with placeholders.  Note that our
-        # special variables like __username are safe, and cannot come from user-defined
-        # values.
+        # Handle our parameters.  Always with placeholders.  Note that our special variables
+        # like __username are safe, and cannot come from user-defined values.
         #
         my %raw_params = %{ $fields_href };
         my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%raw_params, $rest_args_aref);
 
-        my @arg_values = ();
-        if ($jconfig->{'use_placeholders'}) {
-            @arg_values = &names_to_values (\@variable_names, \%safe_params);
-            &Jarvis::Error::debug ($jconfig, "ARGS = " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values));
-
-        } else {
-            $sql = &sql_with_variables ($base_sql, %safe_params);
-
-            &Jarvis::Error::debug ($jconfig, "STORE = " . $sql);
-            $sth = $dbh->prepare ($sql) || die "Couldn't prepare statement '$sql': " . $dbh->errstr;
-        }
+        my @arg_values = &names_to_values (\@variable_names, \%safe_params);
+        &Jarvis::Error::debug ($jconfig, "ARGS = " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values));
 
         # Prepare
         # Execute
@@ -630,7 +534,7 @@ sub store {
         $SIG{__DIE__} = $err_handler;
 
         if ($@) {
-            print STDERR "ERROR: Couldn't execute $transaction_type '$sql' with args " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) . "\n";
+            print STDERR "ERROR: Couldn't execute $transaction_type '$sql_ph' with args " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) . "\n";
             print STDERR $sth->errstr . "!\n";
             $row_result{'success'} = 0;
             $row_result{'modified'} = 0;
@@ -659,18 +563,12 @@ sub store {
 
         }
 
-        # Not using placeholders, free statement each loop.
-        if (! $jconfig->{'use_placeholders'}) {
-            $sth->finish;
-        }
         push (@results, \%row_result);
         last if $stop;
     }
 
     # Using placeholders, free statement only at the end.
-    if ($jconfig->{'use_placeholders'}) {
-        $sth->finish;
-    }
+    $sth->finish;
 
     my $state = undef;
     if ((! $success) && $jconfig->{'rollback_on_error'}) {

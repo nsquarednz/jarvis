@@ -48,7 +48,7 @@ package Jarvis::Login::ActiveDirectory;
 #
 # To use this method, specify the following login parameters.
 #
-#    <app use_placeholders="yes" format="json" debug="no">
+#    <app format="json" debug="no">
 #        ...
 #        <login module="Jarvis::Login::ActiveDirectory">
 #  	     <parameter name="server" value="<server-address>"/>

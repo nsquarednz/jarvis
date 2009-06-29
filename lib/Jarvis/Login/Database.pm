@@ -9,17 +9,17 @@
 #
 # Licence:
 #       This file is part of the Jarvis WebApp/Database gateway utility.
-# 
+#
 #       Jarvis is free software: you can redistribute it and/or modify
 #       it under the terms of the GNU General Public License as published by
 #       the Free Software Foundation, either version 3 of the License, or
 #       (at your option) any later version.
-# 
+#
 #       Jarvis is distributed in the hope that it will be useful,
 #       but WITHOUT ANY WARRANTY; without even the implied warranty of
 #       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #       GNU General Public License for more details.
-# 
+#
 #       You should have received a copy of the GNU General Public License
 #       along with Jarvis.  If not, see <http://www.gnu.org/licenses/>.
 #
@@ -41,15 +41,15 @@ package Jarvis::Login::Database;
 
 ################################################################################
 # Determines if we are "logged in".  In this case we look at CGI variables
-# for the existing user/pass.  We validate this by checking a table in the 
+# for the existing user/pass.  We validate this by checking a table in the
 # currently open database.  The user and pass columns are both within this same
 # table.
 #
 # To use this method, specify the following login parameters.  Note that you
 # can omit the group name parameters, in which case all users will be placed
 # into a single group named "default".
-#  
-#    <app use_placeholders="yes" format="json" debug="no">
+#
+#    <app format="json" debug="no">
 #        ...
 #        <login module="Jarvis::Login::Database">
 #  	     <parameter name="user_table" value="staff"/>
@@ -67,12 +67,12 @@ package Jarvis::Login::Database;
 #           READ
 #               cgi
 #               Database config indirectly via Jarvis::DB
-#   
+#
 #       $username - The offered username
 #       $password - The offered password
 #       %login_parameters - Hash of login parameters parsed from
 #               the master application XML file by the master Login class.
-#       
+#
 #
 # Returns:
 #       ($error_string or "", $username or "", "group1,group2,group3...")
@@ -103,10 +103,10 @@ sub Jarvis::Login::Database::check {
     my $dbh = &Jarvis::DB::Handle ($jconfig);
     my $sth = $dbh->prepare ($query)
             || die "Couldn't prepare statement '$query': " . $dbh->errstr;
-        
-    $sth->execute ($username) 
+
+    $sth->execute ($username)
             || die "Couldn't execute statement '$query': " . $dbh->errstr;
-            
+
     my $result_aref = $sth->fetchall_arrayref({});
     if ((scalar @$result_aref) < 1) {
         return ("User '$username' not known.");
@@ -134,10 +134,10 @@ sub Jarvis::Login::Database::check {
     $query = "SELECT $group_group_column FROM $group_table WHERE $group_username_column = ?";
     $sth = $dbh->prepare ($query)
             || die "Couldn't prepare statement '$query': " . $dbh->errstr;
-        
-    $sth->execute ($username) 
+
+    $sth->execute ($username)
             || die "Couldn't execute statement '$query': " . $dbh->errstr;
-            
+
     $result_aref = $sth->fetchall_arrayref({});
 
     my $group_list = join (",", map { $_->{$group_group_column} } @$result_aref);

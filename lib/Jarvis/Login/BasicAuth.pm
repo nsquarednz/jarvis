@@ -78,7 +78,7 @@ package Jarvis::Login::BasicAuth;
 #
 # To use this method, specify the following login parameters.
 #
-#    <app use_placeholders="yes" format="json" debug="no">
+#    <app format="json" debug="no">
 #        ...
 #        <login module="Jarvis::Login::BasicAuth">
 #	     # Default is "no", HTTPS not required.
