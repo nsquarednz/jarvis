@@ -139,7 +139,7 @@ sub get_sql {
 #       SQL text.
 #
 # Returns:
-#       ($sql_ph, @variable_names).
+#       ($sql_with_placeholders, @variable_names).
 ################################################################################
 #
 sub sql_with_placeholders {
@@ -148,7 +148,7 @@ sub sql_with_placeholders {
 
     # Parse the update SQL to get a prepared statement, pulling out the list
     # of names of variables we need to replace for each execution.
-    my $sql_ph = "";
+    my $sql_with_placeholders = "";
     my @bits = split (/\{\{?\$?([^\}]+)\}\}?/i, $sql);
     my @variable_names = ();
 
@@ -156,14 +156,14 @@ sub sql_with_placeholders {
     foreach my $idx (0 .. $#bits) {
         if ($idx % 2) {
             push (@variable_names, $bits[$idx]);
-            $sql_ph .= "?";
+            $sql_with_placeholders .= "?";
 
         } else {
-            $sql_ph .= $bits[$idx];
+            $sql_with_placeholders .= $bits[$idx];
         }
     }
 
-    return ($sql_ph, @variable_names);
+    return ($sql_with_placeholders, @variable_names);
 }
 
 ################################################################################
@@ -185,7 +185,7 @@ sub sql_with_placeholders {
 ################################################################################
 #
 sub names_to_values {
-    my ($variable_names_aref, $safe_params_href) = @_;
+    my ($jconfig, $variable_names_aref, $safe_params_href) = @_;
 
     my @arg_values = ();
     foreach my $name (@$variable_names_aref) {
@@ -196,7 +196,81 @@ sub names_to_values {
         }
         push (@arg_values, $value);
     }
+    &Jarvis::Error::debug ($jconfig, "ARGS = " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values));
     return @arg_values;
+}
+
+################################################################################
+# Loads a specified SQL statement from the datasets, transforms the SQL into
+# placeholder, pulls out the variable names, and prepares a statement.
+#
+# Params:
+#       $jconfig - Jarvis::Config object
+#       $dsxml - Dataset XML object
+#       $dbh - Database handle
+#       $transaction_type - Type of SQL to get.
+#
+# Returns:
+#       STM hash with keys
+#               {'transaction_type'}
+#               {'raw_sql'}
+#               {'sql_with_placeholders'}
+#               {'returning'}
+#               {'sth'}
+#               {'vnames_aref'}
+#
+#       Or undef if no SQL.
+################################################################################
+#
+sub parse_statement {
+    my ($jconfig, $dsxml, $dbh, $transaction_type) = @_;
+
+    my $obj = {};
+
+    # Get and check the raw SQL, before parameter -> ? substitution.
+    $obj->{'transaction_type'} = $transaction_type;
+    $obj->{'raw_sql'} = &get_sql ($jconfig, $transaction_type, $dsxml) || return undef;
+    &Jarvis::Error::debug ($jconfig, "SQL for '$transaction_type' = " . $obj->{'raw_sql'});
+
+    # Does this insert return rows?
+    $obj->{'returning'} = defined ($yes_value {lc ($dsxml->{dataset}{$transaction_type}{'returning'} || "no")});
+    &Jarvis::Error::debug ($jconfig, "Returning? = " . $obj->{'returning'});
+
+    # Get our SQL with placeholders and prepare it.
+    my ($sql_with_placeholders, @variable_names) = &sql_with_placeholders ($obj->{'raw_sql'});
+    $obj->{'sql_with_placeholders'} = $sql_with_placeholders;
+    $obj->{'vnames_aref'} = \@variable_names;
+    &Jarvis::Error::debug ($jconfig, "SQL with placeholders = " . $obj->{'sql_with_placeholders'});
+    &Jarvis::Error::debug ($jconfig, "Variable Names = '" . join (',', @{ $obj->{'vnames_aref'} }) . "'");
+
+    $obj->{'sth'} = $dbh->prepare ($sql_with_placeholders)
+        || die "Couldn't prepare statement '$sql_with_placeholders': " . $dbh->errstr;
+
+    return $obj;
+}
+
+################################################################################
+# Prints some warning text if one of our STM executes fails.
+#
+# Params:
+#       $jconfig - Jarvis::Config object
+#       $stm - A STM object created by &parse_statement.
+#
+# Returns:
+#       <nothing>
+################################################################################
+sub statement_stderr {
+    my ($jconfig, $stm, $arg_values_aref) = @_;
+
+    print STDERR "ERROR: Couldn't execute '" .
+        $stm->{'transaction_type'} .
+        "', SQL '" .
+        $stm->{'sql_with_placeholders'} .
+        "' with args " .
+        join (",", map { (defined $_) ? "'$_'" : 'NULL' } @$arg_values_aref) .
+        "\n";
+
+    print STDERR $stm->{'sth'}->errstr . "!\n";
 }
 
 ################################################################################
@@ -230,7 +304,11 @@ sub fetch {
         die "Wanted read access: $failure";
     }
 
-    my $raw_sql = &get_sql ($jconfig, 'select', $dsxml) ||
+    # Attach to the database.
+    my $dbh = &Jarvis::DB::Handle ($jconfig);
+
+    # Get our STM.  This has everything attached.
+    my $stm = &parse_statement ($jconfig, $dsxml, $dbh, 'select') ||
         die "Dataset '" . ($jconfig->{'dataset_name'} || '') . "' has no SQL of type 'select'.";
 
     # Handle our parameters.  Always with placeholders.  Note that our special variables
@@ -239,37 +317,27 @@ sub fetch {
     my %raw_params = $jconfig->{'cgi'}->Vars;
     my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%raw_params, $rest_args_aref);
 
-    my ($sql_ph, @variable_names) = &sql_with_placeholders ($raw_sql);
-    my @arg_values = &names_to_values (\@variable_names, \%safe_params);
-
-    # Prepare
-    &Jarvis::Error::debug ($jconfig, "FETCH = " . $sql_ph);
-    &Jarvis::Error::debug ($jconfig, "ARGS = " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values));
-
-    my $dbh = &Jarvis::DB::Handle ($jconfig);
-    my $sth = $dbh->prepare ($sql_ph)
-        || die "Couldn't prepare statement '$sql_ph': " . $dbh->errstr;
+    my @arg_values = &names_to_values ($jconfig, $stm->{'vnames_aref'}, \%safe_params);
 
     # Execute
     my $status = 0;
     my $err_handler = $SIG{__DIE__};
     eval {
         $SIG{__DIE__} = sub {};
-        $status = $sth->execute (@arg_values);
+        $status = $stm->{'sth'}->execute (@arg_values);
     };
     $SIG{__DIE__} = $err_handler;
 
     if ($@) {
-        print STDERR "ERROR: Couldn't execute select '$sql_ph' with args " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) . "\n";
-        print STDERR $sth->errstr . "!\n";
-        my $message = $sth->errstr;
-        $sth->finish;
+        &statement_stderr ($jconfig, $stm, \@arg_values);
+        my $message = $stm->{'sth'}->errstr;
+        $stm->{'sth'}->finish;
         return $message;
     }
 
-    my $rows_aref = $sth->fetchall_arrayref({});
+    my $rows_aref = $stm->{'sth'}->fetchall_arrayref({});
     my $num_rows = scalar @$rows_aref;
-    $sth->finish;
+    $stm->{'sth'}->finish;
 
     # Do we want to do server side sorting?  This happens BEFORE paging.
     #
@@ -278,7 +346,7 @@ sub fetch {
 
     if ($sort_field) {
         &Jarvis::Error::debug ($jconfig, "Server Sort on '$sort_field', Dir = '$sort_dir'.");
-        my $field_names_aref = $sth->{NAME};
+        my $field_names_aref = $stm->{'sth'}->{NAME};
 
         if (! grep { /$sort_field/ } @$field_names_aref) {
             &Jarvis::Error::log ($jconfig, "Unknown sort field: '$sort_field'.");
@@ -347,7 +415,7 @@ sub fetch {
     } elsif ($jconfig->{'format'} eq "csv") {
 
         # Get the list of column names from our fetch statement.
-        my @field_names = @{ $sth->{NAME} };
+        my @field_names = @{ $stm->{'sth'}->{NAME} };
         my %field_index = ();
 
         @field_index { @field_names } = (0 .. $#field_names);
@@ -486,22 +554,14 @@ sub store {
     ($transaction_type eq "delete") || ($transaction_type eq "update")|| ($transaction_type eq "insert") ||
         die "Unsupported transaction type '$transaction_type'.";
 
-    # Get and check the raw SQL, before parameter -> ? substitution.
-    my $raw_sql = &get_sql ($jconfig, $transaction_type, $dsxml) ||
-        die "Dataset '" . ($jconfig->{'dataset_name'} || '') . "' has no SQL of type '$transaction_type'.";
-
-    # Does this insert return rows?
-    my $returning = defined ($yes_value {lc ($dsxml->{dataset}{$transaction_type}{'returning'} || "no")});
-    &Jarvis::Error::debug ($jconfig, "Returning? = " . $returning);
-
     # Shared database handle.
     my $dbh = &Jarvis::DB::Handle ($jconfig);
     $dbh->begin_work() || die;
 
-    # Get our SQL with placeholders and prepare it.
-    my ($sql_ph, @variable_names) = &sql_with_placeholders ($raw_sql);
-    &Jarvis::Error::debug ($jconfig, "STORE = " . $sql_ph);
-    my $sth = $dbh->prepare ($sql_ph) || die "Couldn't prepare statement '$sql_ph': " . $dbh->errstr;
+    # Get our STM.  This has everything attached.
+    my $stm = &parse_statement ($jconfig, $dsxml, $dbh, $transaction_type) ||
+        die "Dataset '" . ($jconfig->{'dataset_name'} || '') . "' has no SQL of type '$transaction_type'.";
+
 
     # Loop for each set of updates.
     my $success = 1;
@@ -518,8 +578,7 @@ sub store {
         my %raw_params = %{ $fields_href };
         my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%raw_params, $rest_args_aref);
 
-        my @arg_values = &names_to_values (\@variable_names, \%safe_params);
-        &Jarvis::Error::debug ($jconfig, "ARGS = " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values));
+        my @arg_values = &names_to_values ($jconfig, $stm->{'vnames_aref'}, \%safe_params);
 
         # Prepare
         # Execute
@@ -528,19 +587,18 @@ sub store {
         my $err_handler = $SIG{__DIE__};
         eval {
             $SIG{__DIE__} = sub {};
-            $row_result{'modified'} = $sth->execute (@arg_values);
+            $row_result{'modified'} = $stm->{'sth'}->execute (@arg_values);
             $modified = $modified + $row_result{'modified'};
         };
         $SIG{__DIE__} = $err_handler;
 
         if ($@) {
-            print STDERR "ERROR: Couldn't execute $transaction_type '$sql_ph' with args " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) . "\n";
-            print STDERR $sth->errstr . "!\n";
+            &statement_stderr ($jconfig, $stm, \@arg_values);
             $row_result{'success'} = 0;
             $row_result{'modified'} = 0;
-            $row_result{'message'} = $sth->errstr;
+            $row_result{'message'} = $stm->{'sth'}->errstr;
             $success = 0;
-            $message || ($message = $sth->errstr);
+            $message || ($message = $stm->{'sth'}->errstr);
 
             if ($jconfig->{'stop_on_error'}) {
                 &Jarvis::Error::debug ($jconfig, "Error detected and 'stop_on_error' configured.");
@@ -554,8 +612,8 @@ sub store {
         } else {
             $row_result{'success'} = 1;
 
-            if ($returning) {
-                my $returning_aref = $sth->fetchall_arrayref({}) || undef;
+            if ($stm->{'returning'}) {
+                my $returning_aref = $stm->{'sth'}->fetchall_arrayref({}) || undef;
                 if ($returning_aref) {
                     $row_result{'returning'} = $returning_aref;
                 }
@@ -568,7 +626,7 @@ sub store {
     }
 
     # Using placeholders, free statement only at the end.
-    $sth->finish;
+    $stm->{'sth'}->finish;
 
     my $state = undef;
     if ((! $success) && $jconfig->{'rollback_on_error'}) {
