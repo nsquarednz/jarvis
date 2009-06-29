@@ -668,7 +668,6 @@ sub store {
     }
 
     # Determine if we're going to rollback.
-    my $state = $success ? 'commit' : 'rollback';
     if (! $success) {
         &Jarvis::Error::debug ($jconfig, "Error detected.  Rolling back.");
         $dbh->rollback ();
@@ -688,12 +687,11 @@ sub store {
     if ($jconfig->{'format'} eq "json") {
         my %return_data = ();
         $return_data {'success'} = $success;
-        $return_data {'state'} = $state;
-        $return_data {'modified'} = $modified;
+        $success && ($return_data {'modified'} = $modified);
         $success || ($return_data {'message'} = &trim($message));
 
-        # Always return the array data.
-        if ($return_array) {
+        # Return the array data if we succeded.
+        if ($success && $return_array) {
             $return_data {'row'} = \@results;
         }
 
@@ -707,12 +705,11 @@ sub store {
     } elsif ($jconfig->{'format'} eq "xml") {
         my $xml = XML::Smart->new ();
         $xml->{'response'}{'success'} = $success;
-        $xml->{'response'}{'state'} = $state;
-        $xml->{'response'}{'modified'} = $modified;
+        $success && ($xml->{'response'}{'modified'} = $modified);
         $success || ($xml->{'response'}{'message'} = &trim($message));
 
-        # Always return the array data.
-        if ($return_array) {
+        # Return the array data if we succeeded.
+        if ($success && $return_array) {
             $xml->{'response'}{'results'}->{'row'} = \@results;
         }
 
