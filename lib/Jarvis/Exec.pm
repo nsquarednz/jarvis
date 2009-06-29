@@ -65,6 +65,13 @@ sub do {
     my $add_headers = undef;            # Should we add headers.
     my $default_filename = undef;       # A default return filename to use.
     my $filename_parameter = undef;     # Which CGI parameter contains our filename.
+    my $tmpDirectory = undef;           # Under some systems (e.g. windows) we need
+                                        # to stream the file from a binary file on disk
+                                        # This parameter indicates the directory
+                                        # to use.
+    my $output_filename_parameter = undef;
+                                        # The name of the parameter to pass the
+                                        # output filename through as, if necessary
 
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
     if ($axml->{'exec'}) {
@@ -72,11 +79,13 @@ sub do {
             next if ($dataset ne $exec->{'dataset'}->content);
             &Jarvis::Error::debug ($jconfig, "Found matching custom <exec> dataset '$dataset'.");
 
+            $tmpDirectory = $exec->{'tmp'}->content;
             $allowed_groups = $exec->{'access'}->content || die "No 'access' defined for exec dataset '$dataset'";
             $command = $exec->{'command'}->content || die "No 'command' defined for exec dataset '$dataset'";
             $add_headers = defined ($Jarvis::Config::yes_value {lc ($exec->{'add_headers'}->content || "no")});
             $default_filename = $exec->{'default_filename'}->content;
             $filename_parameter = $exec->{'filename_parameter'}->content;
+            $output_filename_parameter = $exec->{'output_filename_parameter'}->content || "outputfile";
         }
     }
 
@@ -100,6 +109,13 @@ sub do {
     # we will return anonymous content in text/plain format.
     #
     my $filename = $param_values {$filename_parameter} || $default_filename;
+
+    # If we're under windows, or the $tmpDirectory exists, get the output file
+    # Note that this is necessary under windows.
+    if ($^O eq "MSWin32" or $tmpDirectory) {
+        die "When using MicroSoft Windows. The temporary directory must be defined." if !$tmpDirectory;
+        $param_values{$output_filename_parameter} = $tmpDirectory . "/" . $$ . "_" . $filename;
+    }
 
     # Now pull out only the safe variables.  Add our rest args too.
     my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%param_values, $rest_args_aref, 'p');
@@ -164,7 +180,21 @@ sub do {
 
     # Now print the output.  If the report didn't add headers like it was supposed
     # to, then this will all turn to custard.
-    print $output;
+
+    # Print via the output file, if we created one. This works under Windows/apache2
+    # but is not necessary under linux/apache2.
+    if ($param_values{$output_filename_parameter}) {
+        open(F, $param_values{$output_filename_parameter}) || die "Unable to open $param_values{$output_filename_parameter} to return output to the client.";
+        binmode(F);
+        my $buff;
+        while (read(F, $buff, 8 * 2**10)) {
+            print STDOUT $buff;
+        }
+        close(F);
+        unlink($param_values{$output_filename_parameter});
+    } else {
+        print $output;
+    }
 
     return 1;
 }

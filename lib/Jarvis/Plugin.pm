@@ -79,6 +79,7 @@ sub do {
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
     if ($axml->{'plugin'}) {
         foreach my $plugin (@{ $axml->{'plugin'} }) {
+            &Jarvis::Error::debug ($jconfig, "Comparing '" . $plugin->{'dataset'}->content . "' to '$dataset'.");
             next if ($dataset ne $plugin->{'dataset'}->content);
             &Jarvis::Error::debug ($jconfig, "Found matching custom <plugin> dataset '$dataset'.");
 
