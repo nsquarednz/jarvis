@@ -55,6 +55,7 @@ use Jarvis::Error;
 #               group_list          Comma-separated group list.
 #               sname               Name of the session cookie.  Typically "CGISESSID".
 #               sid                 Session ID.  A big long number.
+#               cookie              CGI::Cookie object to send back with session info
 ################################################################################
 #
 sub check {
@@ -159,12 +160,16 @@ sub check {
         }
     }
 
-    # Set/extend session expiry on successful sessions.  Flush new/modified session data.
-    if ($logged_in) {
-        my $session_expiry = $axml->{'sessiondb'}->{'expiry'}->content || '+1h';
-        $session->expire ($session_expiry);
-        $session->flush ();
-    }
+    # Set/extend session expiry.  Flush new/modified session data.
+    my $session_expiry = $axml->{'sessiondb'}->{'expiry'}->content || '+1h';
+    $session->expire ($session_expiry);
+    $session->flush ();
+
+    # Store the new cookie in the context, whoever returns the result should return this.
+    $jconfig->{'cookie'} = CGI::Cookie->new (
+        -name => $jconfig->{'sname'},
+        -value => $jconfig->{'sid'},
+        -expires => $session_expiry);
 
     # Add to our $args_href since e.g. fetch queries might use them.
     $jconfig->{'logged_in'} = $logged_in;

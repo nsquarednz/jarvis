@@ -219,8 +219,7 @@ MAIN: {
             die "Unknown special dataset '$dataset_name'!\n";
         }
 
-        my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
-        print $cgi->header(-type => "text/plain", -cookie => $cookie);
+        print $cgi->header(-type => "text/plain", -cookie => $jconfig->{'cookie'});
         print $return_text;
 
     # A custom exec for this application?  We hand off entirely for this case,
@@ -241,19 +240,17 @@ MAIN: {
     # Fetch a regular dataset.
     } elsif ($action eq "select") {
 
-        my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
         my $return_text = &Jarvis::Dataset::fetch ($jconfig, \@rest_args);
 
-        print $cgi->header(-type => "text/plain", -cookie => $cookie);
+        print $cgi->header(-type => "text/plain", -cookie => $jconfig->{'cookie'});
         print $return_text;
 
     # Modify a regular dataset.
     } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete")) {
 
-        my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
         my $return_text = &Jarvis::Dataset::store ($jconfig, \@rest_args);
 
-        print $cgi->header(-type => "text/plain", -cookie => $cookie);
+        print $cgi->header(-type => "text/plain", -cookie => $jconfig->{'cookie'});
         print $return_text;
 
     # It's the end of the world as we know it.
