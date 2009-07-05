@@ -164,7 +164,7 @@ sub safe_variables {
     # is permitted, but never TWO leading underscores.  No special characters.
     foreach my $name (keys %$raw_params_href) {
         if ($name =~ m/^_?[a-z][a-z0-9_\-]*$/i) {
-            &Jarvis::Error::debug ($jconfig, "User Parameter: $name -> " . $$raw_params_href {$name});
+            &Jarvis::Error::debug ($jconfig, "User Parameter: $name -> " . ($$raw_params_href {$name} || ''));
             $safe_params{$name} = $$raw_params_href {$name};
         }
     }
