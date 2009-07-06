@@ -61,6 +61,7 @@ use Jarvis::Error;
 #               cgi                Handle to a CGI object for this request.
 #               format             Format xml or json?
 #               debug              Debug enabled for this app?
+#               debug_format       Format for debug output.
 ################################################################################
 #
 sub new {
@@ -107,6 +108,7 @@ sub new {
 
     # This is used by all sorts of debug methods.  Very important.
     $self->{'debug'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'debug'}->content || "no")});
+    $self->{'debug_format'} = $axml->{'debug_format'}->content || '[%P/%A/%U/%D] %M';
 
     # This is used by several things, so let's store it in our config.
     $self->{'format'} = lc ($self->{'cgi'}->param ('format') || $axml->{'format'}->content || "json");
