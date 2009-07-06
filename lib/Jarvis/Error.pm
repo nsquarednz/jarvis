@@ -65,7 +65,7 @@ sub dump_string {
     my $timestamp = sprintf "%s %s %d %02d:%02d:%02d %04d", $days[$wday], $months[$mon], $mday, $hour, $min, $sec, $year + 1900;
     $msg =~ s/\s*$/\n/;
 
-    my @bits = split ( /\%([TLUDAPM])/i, $jconfig->{'debug_format'});
+    my @bits = split ( /\%([TLUDAPM])/i, $jconfig->{'log_format'});
     my $output = '';
 
     foreach my $idx (0 .. $#bits) {

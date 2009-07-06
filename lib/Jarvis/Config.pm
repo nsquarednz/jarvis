@@ -61,7 +61,7 @@ use Jarvis::Error;
 #               cgi                Handle to a CGI object for this request.
 #               format             Format xml or json?
 #               debug              Debug enabled for this app?
-#               debug_format       Format for debug output.
+#               log_format         Format for log and debug output.
 ################################################################################
 #
 sub new {
@@ -106,9 +106,11 @@ sub new {
     my $axml = $xml->{jarvis}{app};
     (defined $axml) || die "Cannot find <jarvis><app> in '" . $self->{'app_name'} . ".xml'!\n";
 
-    # This is used by all sorts of debug methods.  Very important.
+    # Defines if we should produce debug output.
     $self->{'debug'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'debug'}->content || "no")});
-    $self->{'debug_format'} = $axml->{'debug_format'}->content || '[%P/%A/%U/%D] %M';
+
+    # This is used by both debug and log output.
+    $self->{'log_format'} = $axml->{'log_format'}->content || '[%P/%A/%U/%D] %M';
 
     # This is used by several things, so let's store it in our config.
     $self->{'format'} = lc ($self->{'cgi'}->param ('format') || $axml->{'format'}->content || "json");
