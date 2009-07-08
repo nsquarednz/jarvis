@@ -53,6 +53,7 @@ use Jarvis::Error;
 #               username            Which user logged in?
 #               error_string        What error if not logged in?
 #               group_list          Comma-separated group list.
+#               session             The session object.
 #               sname               Name of the session cookie.  Typically "CGISESSID".
 #               sid                 Session ID.  A big long number.
 #               cookie              CGI::Cookie object to send back with session info
@@ -86,6 +87,7 @@ sub check {
 
     # Get an existing/new session.
     my $session = new CGI::Session ($sid_store, $jconfig->{'cgi'}, \%sid_params);
+    $jconfig->{'session'} = $session;
     $jconfig->{'sname'} = $session->name();
     $jconfig->{'sid'} = $session->id();
 
@@ -176,6 +178,53 @@ sub check {
     $jconfig->{'username'} = $username;
     $jconfig->{'error_string'} = $error_string;
     $jconfig->{'group_list'} = $group_list;
+
+    return 1;
+}
+
+################################################################################
+# Logout by deleting the session.
+#
+# Params:
+#       jconfig   - Jasper::Config object
+#           READ
+#               session
+#
+#           WRITE
+#               session
+#               sid
+#               sname
+#               logged_in
+#               username
+#               group_list
+#               error_string
+#
+# Returns:
+#       "" on success.
+#       "<Failure description message>" on failure.
+################################################################################
+#
+sub logout {
+    my ($jconfig) = @_;
+
+    my $username = $jconfig->{'username'} || '';
+    my $sid = $jconfig->{'sid'} || '';
+
+    &Jarvis::Error::log ($jconfig, "Logout for '$username' on '$sid'.");
+    $jconfig->{'session'} || die "Not logged in!  Logic error!";
+
+    $jconfig->{'sname'} = '';
+    $jconfig->{'sid'} = '';
+    if ($jconfig->{'logged_in'}) {
+        $jconfig->{'logged_in'} = 0;
+        $jconfig->{'error_string'} = "Logged out at client request.";
+        $jconfig->{'username'} = '';
+        $jconfig->{'group_list'} = '';
+    }
+
+    # Delete the session.  Maybe 
+    $jconfig->{'session'}->delete();
+    $jconfig->{'session'}->flush();
 
     return 1;
 }

@@ -205,15 +205,9 @@ MAIN: {
         # Logout.  Clear session ID cookie, clean login parameters, then return "logged out" status.
         } elsif ($dataset_name eq "__logout") {
             &Jarvis::Error::debug ($jconfig, "Returning logout special dataset.");
-            $jconfig->{'sid'} = '';
-            if ($jconfig->{'logged_in'}) {
-                $jconfig->{'logged_in'} = 0;
-                $jconfig->{'error_string'} = "Logged out at client request.";
-                $jconfig->{'username'} = '';
-                $jconfig->{'group_list'} = '';
-            }
+            &Jarvis::Login::logout ($jconfig);
             $return_text = &Jarvis::Status::report ($jconfig, \@rest_args);
-
+            
         # Starts with __ so must be special, but we don't know it.
         } else {
             die "Unknown special dataset '$dataset_name'!\n";
