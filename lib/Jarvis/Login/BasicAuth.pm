@@ -85,6 +85,7 @@ package Jarvis::Login::BasicAuth;
 #  	     <parameter name="require_https" value="yes"/>
 #
 #	     # Default is '', no remote IP checking.
+#            # Comma separated list of exact match IP addresses.
 #  	     <parameter name="remote_ip" value="192.168.1.1"/>
 #
 #	     # Default is '', no remote user checking.
@@ -118,7 +119,7 @@ sub Jarvis::Login::BasicAuth::check {
 
     # Our user name login parameters are here...
     my $require_https = defined ($Jarvis::Config::yes_value {lc ($login_parameters{'require_https'} || "no")});
-    my $remote_ip = $login_parameters{'remote_ip'} || '';
+    my $remote_ip_list = $login_parameters{'remote_ip'} || '';
     my $remote_user = $login_parameters{'remote_user'} || '';
     $username = $login_parameters{'username'};
     my $group_list = $login_parameters{'group_list'} || $username;
@@ -130,11 +131,21 @@ sub Jarvis::Login::BasicAuth::check {
     }
 
     # Check the IP address first.
-    if ($remote_ip ne '') {
+    if ($remote_ip_list) {
         my $actual_ip = $ENV{"HTTP_X_FORWARDED_FOR"} || $ENV{"HTTP_CLIENT_IP"} || $ENV{"REMOTE_ADDR"} || '';
-	if ($actual_ip ne $remote_ip) {
-            return ("Access not authorized from actual remote IP address.");
-	}
+        &Jarvis::Error::debug ($jconfig, "Actual Remote IP: '$actual_ip'.");
+        my $matched = 0;
+        foreach my $remote_ip (split (',', $remote_ip_list)) {
+            $remote_ip =~ s/^\s+//;
+            $remote_ip =~ s/\s+$//;
+            &Jarvis::Error::debug ($jconfig, "Check Against Permitted Remote IP: '$remote_ip'.");
+            $matched = ($actual_ip eq $remote_ip);
+            last if $matched;
+        }
+        &Jarvis::Error::debug ($jconfig, "IP address " . ($matched ? "matched" : "not matched") . ".");
+        if (! $matched) {
+            return ("Access not authorized from actual remote IP address '$actual_ip'.");
+        }
     }
 
     # Specific remote user?
