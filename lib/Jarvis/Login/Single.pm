@@ -108,6 +108,7 @@ sub Jarvis::Login::Single::check {
             $matched = ($actual_ip eq $remote_ip);
             last if $matched;
         }
+        &Jarvis::Error::debug ($jconfig, "IP address " . ($matched ? "matched" : "not matched") . ".");
         if (! $matched) {
             return ("Access not authorized from actual remote IP address '$actual_ip'.");
         }
