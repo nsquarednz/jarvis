@@ -44,9 +44,12 @@ package Jarvis::Login::Single;
 #
 #    <app format="json" debug="no">
 #        ...
-#        <login module="Jarvis::Login::Database">
-# 	     <parameter name="username" value="admin"/>
-#            <parameter name="group_list" value="admin"/>
+#        <login module="Jarvis::Login::Single">
+#            <parameter name="require_https" value="no"/>
+#            <parameter name="remote_ip" value="127.0.0.1,192.168.2.2"/>
+#            <parameter name="username" value="bob"/>
+#            <parameter name="password" value="test"/>
+#            <parameter name="group_list" value="default"/>
 #        </login>
 #        ...
 #   </app>
@@ -71,7 +74,7 @@ sub Jarvis::Login::Single::check {
     my ($jconfig, $username, $password, %login_parameters) = @_;
 
     my $require_https = defined ($Jarvis::Config::yes_value {lc ($login_parameters{'require_https'} || "no")});
-    my $remote_ip = $login_parameters{'remote_ip'} || '';
+    my $remote_ip_list = $login_parameters{'remote_ip'} || '';
     my $expected_username = $login_parameters{'username'};
     my $expected_password = $login_parameters{'password'};
     my $group_list = $login_parameters{'group_list'} || $expected_username;
@@ -79,7 +82,7 @@ sub Jarvis::Login::Single::check {
 
     # Check basic configuration.  We must have EITHER remote_ip OR a password
     # You can have both, that would be evern better.
-    if (! $remote_ip && ! $expected_password) {
+    if (! $remote_ip_list && ! $expected_password) {
         return ("Login module Single is not properly configured.  Specify remote_ip and/or password.");
     }
 
@@ -94,9 +97,16 @@ sub Jarvis::Login::Single::check {
     }
 
     # Check the IP address first.
-    if ($remote_ip ne '') {
+    if ($remote_ip_list) {
         my $actual_ip = $ENV{"HTTP_X_FORWARDED_FOR"} || $ENV{"HTTP_CLIENT_IP"} || $ENV{"REMOTE_ADDR"} || '';
-        if ($actual_ip ne $remote_ip) {
+        &Jarvis::Error::debug ($jconfig, "Actual Remote IP: '$actual_ip'.");
+        my $matched = 0;
+        foreach my $remote_ip (split (',', $remote_ip_list)) {
+            &Jarvis::Error::debug ($jconfig, "Check Against Permitted Remote IP: '$remote_ip'.");
+            $matched = ($actual_ip eq $remote_ip);
+            last if $matched;
+        }
+        if (! $matched) {
             return ("Access not authorized from actual remote IP address '$actual_ip'.");
         }
     }
