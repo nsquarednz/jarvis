@@ -102,6 +102,8 @@ sub Jarvis::Login::Single::check {
         &Jarvis::Error::debug ($jconfig, "Actual Remote IP: '$actual_ip'.");
         my $matched = 0;
         foreach my $remote_ip (split (',', $remote_ip_list)) {
+            $remote_ip =~ s/^\s+//;
+            $remote_ip =~ s/\s+$//;
             &Jarvis::Error::debug ($jconfig, "Check Against Permitted Remote IP: '$remote_ip'.");
             $matched = ($actual_ip eq $remote_ip);
             last if $matched;
