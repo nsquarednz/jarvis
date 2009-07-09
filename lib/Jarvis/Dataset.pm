@@ -215,6 +215,8 @@ sub names_to_values {
 #               {'returning'}
 #               {'sth'}
 #               {'vnames_aref'}
+#               {'error'}      (Set later, to error message from latest action)
+#               {'modified'}   (Set later, to number of rows modified in latest action)
 #
 #       Or undef if no SQL.
 ################################################################################
@@ -247,27 +249,52 @@ sub parse_statement {
 }
 
 ################################################################################
-# Prints some warning text if one of our STM executes fails.
+# Executes a statement.  On failure:
+#       - Determine error string.
+#       - Print to STDERR
+#       - Finish the Statement Handle
+#       - Update 'error' and 'modified' in $stm object.
+#       - Return error string.
+#
+# You might ask why we have a separate 'error' string and don't use the one
+# on the "sth" statement handle?  Well, that's because in some rare cases
+# we can actually get a Perl failure in the "eval" without an underlying DBD
+# exception.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
 #       $stm - A STM object created by &parse_statement.
 #
 # Returns:
-#       <nothing>
+#       1
 ################################################################################
-sub statement_stderr {
+sub statement_execute {
     my ($jconfig, $stm, $arg_values_aref) = @_;
 
-    print STDERR "ERROR: Couldn't execute '" .
-        $stm->{'transaction_type'} .
-        "', SQL '" .
-        $stm->{'sql_with_placeholders'} .
-        "' with args " .
-        join (",", map { (defined $_) ? "'$_'" : 'NULL' } @$arg_values_aref) .
-        "\n";
+    my $err_handler = $SIG{__DIE__};
+    $stm->{'modified'} = 0;
+    $stm->{'error'} = undef;
+    eval {
+        no warnings 'uninitialized';
+        $SIG{__DIE__} = sub {};
+        $stm->{'modified'} = $stm->{'sth'}->execute (@$arg_values_aref);
+    };
+    $SIG{__DIE__} = $err_handler;
 
-    print STDERR $stm->{'sth'}->errstr . "!\n";
+    if ($@) {
+        my $error_message = $stm->{'sth'}->errstr || $@ || 'Unknown error SQL execution error.';
+        $error_message =~ s/\s+$//;
+
+        &Jarvis::Error::log ($jconfig, "Failure executing SQL for '" . $stm->{'transaction_type'} . "'.  Details follow.");
+        &Jarvis::Error::log ($jconfig, $stm->{'sql_with_placeholders'});
+        &Jarvis::Error::log ($jconfig, $error_message);
+        &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @$arg_values_aref) || 'NONE'));
+
+        $stm->{'sth'}->finish;
+        $stm->{'error'} = $error_message;
+    }
+
+    return $stm;
 }
 
 ################################################################################
@@ -316,22 +343,11 @@ sub fetch {
 
     my @arg_values = &names_to_values ($jconfig, $stm->{'vnames_aref'}, \%safe_params);
 
-    # Execute
-    my $status = 0;
-    my $err_handler = $SIG{__DIE__};
-    eval {
-        $SIG{__DIE__} = sub {};
-        $status = $stm->{'sth'}->execute (@arg_values);
-    };
-    $SIG{__DIE__} = $err_handler;
+    # Execute Select, return on error
+    &statement_execute($jconfig, $stm, \@arg_values);
+    $stm->{'error'} && return $stm->{'error'} ;
 
-    if ($@) {
-        &statement_stderr ($jconfig, $stm, \@arg_values);
-        my $message = $stm->{'sth'}->errstr;
-        $stm->{'sth'}->finish;
-        return $message;
-    }
-
+    # Fetch the data.
     my $rows_aref = $stm->{'sth'}->fetchall_arrayref({});
     my $num_rows = scalar @$rows_aref;
     $stm->{'sth'}->finish;
@@ -569,17 +585,10 @@ sub store {
             my %bsafe_params = &Jarvis::Config::safe_variables ($jconfig, {}, $rest_args_aref);
             my @barg_values = &names_to_values ($jconfig, $bstm->{'vnames_aref'}, \%bsafe_params);
 
-            my $err_handler = $SIG{__DIE__};
-            eval {
-                $SIG{__DIE__} = sub {};
-                $bstm->{'sth'}->execute (@barg_values);
-            };
-            $SIG{__DIE__} = $err_handler;
-
-            if ($@) {
-                &statement_stderr ($jconfig, $bstm, \@barg_values);
+            &statement_execute($jconfig, $bstm, \@barg_values);
+            if ($bstm->{'error'}) {
                 $success = 0;
-                $message || ($message = $bstm->{'sth'}->errstr);
+                $message || ($message = $bstm->{'error'});
             }
         }
     }
@@ -608,21 +617,17 @@ sub store {
         my %row_result = ();
         my $stop = 0;
         my $num_rows = 0;
-        my $err_handler = $SIG{__DIE__};
-        eval {
-            $SIG{__DIE__} = sub {};
-            $row_result{'modified'} = $stm->{'sth'}->execute (@arg_values);
-            $modified = $modified + $row_result{'modified'};
-        };
-        $SIG{__DIE__} = $err_handler;
 
-        if ($@) {
-            &statement_stderr ($jconfig, $stm, \@arg_values);
+        &statement_execute ($jconfig, $stm, \@arg_values);
+        $row_result{'modified'} = $stm->{'modified'};
+        $modified = $modified + $row_result{'modified'};
+
+        if ($stm->{'error'}) {
             $row_result{'success'} = 0;
             $row_result{'modified'} = 0;
-            $row_result{'message'} = $stm->{'sth'}->errstr;
+            $row_result{'message'} = $stm->{'error'};
             $success = 0;
-            $message || ($message = $stm->{'sth'}->errstr);
+            $message || ($message = $stm->{'error'});
 
         # Suceeded.  Set per-row status, and fetch the returned results, if this
         # operation indicates that it returns values.
@@ -652,17 +657,10 @@ sub store {
             my %asafe_params = &Jarvis::Config::safe_variables ($jconfig, {}, $rest_args_aref);
             my @aarg_values = &names_to_values ($jconfig, $astm->{'vnames_aref'}, \%asafe_params);
 
-            my $err_handler = $SIG{__DIE__};
-            eval {
-                $SIG{__DIE__} = sub {};
-                $astm->{'sth'}->execute (@aarg_values);
-            };
-            $SIG{__DIE__} = $err_handler;
-
-            if ($@) {
-                &statement_stderr ($jconfig, $astm, \@aarg_values);
+            &statement_execute($jconfig, $astm, \@aarg_values);
+            if ($stm->{'error'}) {
                 $success = 0;
-                $message || ($message = $astm->{'sth'}->errstr);
+                $message || ($message = $stm->{'error'});
             }
         }
     }
