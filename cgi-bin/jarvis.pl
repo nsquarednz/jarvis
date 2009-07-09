@@ -207,13 +207,13 @@ MAIN: {
             &Jarvis::Error::debug ($jconfig, "Returning logout special dataset.");
             &Jarvis::Login::logout ($jconfig);
             $return_text = &Jarvis::Status::report ($jconfig, \@rest_args);
-            
+
         # Starts with __ so must be special, but we don't know it.
         } else {
             die "Unknown special dataset '$dataset_name'!\n";
         }
 
-        print $cgi->header(-type => "text/plain", -cookie => $jconfig->{'cookie'});
+        print $cgi->header(-type => "text/plain", -cookie => $jconfig->{'cookie'}, 'Cache-Control' => 'no-cache');
         print $return_text;
 
     # A custom exec for this application?  We hand off entirely for this case,
@@ -236,7 +236,7 @@ MAIN: {
 
         my $return_text = &Jarvis::Dataset::fetch ($jconfig, \@rest_args);
 
-        print $cgi->header(-type => "text/plain", -cookie => $jconfig->{'cookie'});
+        print $cgi->header(-type => "text/plain", -cookie => $jconfig->{'cookie'}, 'Cache-Control' => 'no-cache');
         print $return_text;
 
     # Modify a regular dataset.
