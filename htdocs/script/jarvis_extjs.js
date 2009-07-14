@@ -214,7 +214,7 @@ function jarvisSendChange (transaction_type, store, dataset_name, records) {
 
             var result = new Object ();
             result.success = 0;
-            result.message = 'Server responded with error.  Updates lost.';
+            result.message = "'Server responded with error.  Updates lost.  '" + response.responseText + "'";
             var listener = (typeof records.length === 'number') ? 'writebackarray' : 'writeback';
             store.fireEvent (listener, store, result, transaction_type, records, num_pending);
         },
