@@ -292,6 +292,9 @@ sub statement_execute {
 
         $stm->{'sth'}->finish;
         $stm->{'error'} = $error_message;
+
+    } else {
+        &Jarvis::Error::debug ($jconfig, 'Successful statement execution.');
     }
 
     return $stm;
@@ -658,9 +661,9 @@ sub store {
             my @aarg_values = &names_to_values ($jconfig, $astm->{'vnames_aref'}, \%asafe_params);
 
             &statement_execute($jconfig, $astm, \@aarg_values);
-            if ($stm->{'error'}) {
+            if ($astm->{'error'}) {
                 $success = 0;
-                $message || ($message = $stm->{'error'});
+                $message || ($message = $astm->{'error'});
             }
         }
     }
