@@ -222,7 +222,7 @@ sub logout {
         $jconfig->{'group_list'} = '';
     }
 
-    # Delete the session.  Maybe 
+    # Delete the session.  Maybe
     $jconfig->{'session'}->delete();
     $jconfig->{'session'}->flush();
 
@@ -271,6 +271,10 @@ sub check_access {
 
     # Allow access to a specific comma-separated group list.
     } else {
+        # If we're not logged in, then we can't access this either.
+        $jconfig->{'logged_in'} || return "Login required.";
+
+        # Let's see if we belong to any of the groups.
         my $allowed = 0;
         foreach my $allowed_group (split (',', $allowed_groups)) {
             foreach my $member_group (split (',', $jconfig->{'group_list'})) {
