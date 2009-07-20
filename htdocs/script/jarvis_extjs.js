@@ -172,6 +172,9 @@ function jarvisSendChange (transaction_type, store, dataset_name, records) {
     } else if (transaction_type == 'delete') {
         request_method = 'DELETE';
 
+    } else if (transaction_type == 'mixed') {
+        request_method = 'MIXED';
+
     } else {
         request_method = transaction_type;
     }

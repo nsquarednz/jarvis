@@ -205,11 +205,11 @@ sub names_to_values {
 #       $jconfig - Jarvis::Config object
 #       $dsxml - Dataset XML object
 #       $dbh - Database handle
-#       $transaction_type - Type of SQL to get.
+#       $ttype - Type of SQL to get.
 #
 # Returns:
 #       STM hash with keys
-#               {'transaction_type'}
+#               {'ttype'}
 #               {'raw_sql'}
 #               {'sql_with_placeholders'}
 #               {'returning'}
@@ -222,17 +222,22 @@ sub names_to_values {
 ################################################################################
 #
 sub parse_statement {
-    my ($jconfig, $dsxml, $dbh, $transaction_type) = @_;
+    my ($jconfig, $dsxml, $dbh, $ttype) = @_;
 
     my $obj = {};
 
     # Get and check the raw SQL, before parameter -> ? substitution.
-    $obj->{'transaction_type'} = $transaction_type;
-    $obj->{'raw_sql'} = &get_sql ($jconfig, $transaction_type, $dsxml) || return undef;
-    &Jarvis::Error::debug ($jconfig, "SQL for '$transaction_type' = " . $obj->{'raw_sql'});
+    &Jarvis::Error::debug ($jconfig, "Parsing statement for transaction type '$ttype'");
+    $obj->{'ttype'} = $ttype;
+    $obj->{'raw_sql'} = &get_sql ($jconfig, $ttype, $dsxml);
+    if (! $obj->{'raw_sql'}) {
+        &Jarvis::Error::debug ($jconfig, "No SQL found for type '$ttype'");
+        return undef;
+    }
+    &Jarvis::Error::debug ($jconfig, "SQL for '$ttype' = " . $obj->{'raw_sql'});
 
     # Does this insert return rows?
-    $obj->{'returning'} = defined ($yes_value {lc ($dsxml->{dataset}{$transaction_type}{'returning'} || "no")});
+    $obj->{'returning'} = defined ($yes_value {lc ($dsxml->{dataset}{$ttype}{'returning'} || "no")});
     &Jarvis::Error::debug ($jconfig, "Returning? = " . $obj->{'returning'});
 
     # Get our SQL with placeholders and prepare it.
@@ -285,7 +290,7 @@ sub statement_execute {
         my $error_message = $stm->{'sth'}->errstr || $@ || 'Unknown error SQL execution error.';
         $error_message =~ s/\s+$//;
 
-        &Jarvis::Error::log ($jconfig, "Failure executing SQL for '" . $stm->{'transaction_type'} . "'.  Details follow.");
+        &Jarvis::Error::log ($jconfig, "Failure executing SQL for '" . $stm->{'ttype'} . "'.  Details follow.");
         &Jarvis::Error::log ($jconfig, $stm->{'sql_with_placeholders'});
         &Jarvis::Error::log ($jconfig, $error_message);
         &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @$arg_values_aref) || 'NONE'));
@@ -565,10 +570,10 @@ sub store {
     }
 
     # Choose our statement and find the SQL and variable names.
-    my $transaction_type = $jconfig->{'action'};
-    &Jarvis::Error::debug ($jconfig, "Transaction Type = '$transaction_type'");
-    ($transaction_type eq "delete") || ($transaction_type eq "update")|| ($transaction_type eq "insert") ||
-        die "Unsupported transaction type '$transaction_type'.";
+    my $ttype = $jconfig->{'action'};
+    &Jarvis::Error::debug ($jconfig, "Transaction Type = '$ttype'");
+    ($ttype eq "delete") || ($ttype eq "update") || ($ttype eq "insert") || ($ttype eq "mixed") ||
+        die "Unsupported transaction type '$ttype'.";
 
     # Shared database handle.
     my $dbh = &Jarvis::DB::Handle ($jconfig);
@@ -596,9 +601,15 @@ sub store {
         }
     }
 
-    # Get our main STM.  This has everything attached.
-    my $stm = &parse_statement ($jconfig, $dsxml, $dbh, $transaction_type) ||
-        die "Dataset '" . ($jconfig->{'dataset_name'} || '') . "' has no SQL of type '$transaction_type'.";
+    # Get the STM object(s) we will need.  This has everything attached.  Note that in
+    # a mixed update, it is possible that not all statement types are defined.  We will
+    # not error now on missing statement types, we will error later.
+    #
+    my %stm = ();
+    my @stm_types = ($ttype eq "mixed") ? ('insert', 'update', 'delete') : ($ttype);
+    foreach my $stm_type (@stm_types) {
+        $stm{$stm_type} = &parse_statement ($jconfig, $dsxml, $dbh, $stm_type);
+    }
 
     foreach my $fields_href (@$fields_aref) {
 
@@ -614,6 +625,15 @@ sub store {
         my %raw_params = %{ $fields_href };
         my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%raw_params, $rest_args_aref);
 
+        # Figure out which statement type we will use for this row.
+        my $row_ttype = $safe_params{'_ttype'} || $ttype;
+        ($row_ttype eq 'mixed') && die "Transaction Type 'mixed', but no '_ttype' field present in row.";
+
+        # Check we have an stm for this row.
+        my $stm = $stm{$row_ttype} ||
+            die "Dataset '" . ($jconfig->{'dataset_name'} || '') . "' has no SQL of type '$row_ttype'.";
+
+        # Determine our argument values.
         my @arg_values = &names_to_values ($jconfig, $stm->{'vnames_aref'}, \%safe_params);
 
         # Execute
@@ -651,7 +671,9 @@ sub store {
     }
 
     # Using placeholders, free statement only at the end.
-    $stm->{'sth'}->finish;
+    foreach my $stm_type (@stm_types) {
+        $stm{$stm_type} && $stm{$stm_type}->{'sth'}->finish;
+    }
 
     # Execute our "after" statement.
     if ($success) {

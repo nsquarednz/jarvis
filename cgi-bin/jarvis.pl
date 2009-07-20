@@ -162,7 +162,7 @@ MAIN: {
     my $action = lc ($method) || die "Missing request method!\n";
     ($action =~ m/^\w+$/) || die "Invalid characters in parameter 'action'\n";
 
-    # These aren't REST standard, but we accept 'em anyhow.
+    # Now canonicalise our action.
     if ($action eq 'get') { $action = 'select' };
     if ($action eq 'fetch') { $action = 'select' };
     if ($action eq 'post') { $action = 'insert' };
@@ -240,7 +240,7 @@ MAIN: {
         print $return_text;
 
     # Modify a regular dataset.
-    } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete")) {
+    } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete") || ($action eq "mixed")) {
 
         my $return_text = &Jarvis::Dataset::store ($jconfig, \@rest_args);
 
