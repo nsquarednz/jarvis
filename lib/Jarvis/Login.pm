@@ -53,15 +53,14 @@ use Jarvis::Error;
 #               username            Which user logged in?
 #               error_string        What error if not logged in?
 #               group_list          Comma-separated group list.
+#               session             The session object.
 #               sname               Name of the session cookie.  Typically "CGISESSID".
 #               sid                 Session ID.  A big long number.
-#
-#       $allow_new_login - Are we allowed to actually perform the login process?
-#           If not, then we are restricted to only validating existing logins.
+#               cookie              CGI::Cookie object to send back with session info
 ################################################################################
 #
 sub check {
-    my ($jconfig, $allow_new_login) = @_;
+    my ($jconfig) = @_;
 
     ###############################################################################
     # Login Process.  Happens after DB, 'cos login info can be in DB.
@@ -88,6 +87,7 @@ sub check {
 
     # Get an existing/new session.
     my $session = new CGI::Session ($sid_store, $jconfig->{'cgi'}, \%sid_params);
+    $jconfig->{'session'} = $session;
     $jconfig->{'sname'} = $session->name();
     $jconfig->{'sid'} = $session->id();
 
@@ -98,7 +98,7 @@ sub check {
     # By default these values are all empty.  Note that we never allow username
     # and group_list to be undef, too many things depend on it having some value,
     # even if that is just ''.
-    # 
+    #
     my ($error_string, $username, $group_list, $logged_in) = ('', '', '', 0);
     my $already_logged_in = 0;
 
@@ -111,13 +111,13 @@ sub check {
         $already_logged_in = 1;
 
     # No successful session?  Login.  Note that we store failed sessions too.
-    # 
+    #
     # Note that not all actions allow you to provide a username and password for
     # login purposes.  "status" does, and so does "fetch".  But the others don't.
-    # For exec scripts that's good, since it means that a report parameter named 
+    # For exec scripts that's good, since it means that a report parameter named
     # "username" won't get misinterpreted as an attempt to login.
-    # 
-    } elsif ($allow_new_login) {
+    #
+    } else {
 
         # Get our login parameter values.  We were using $axml->{login}{parameter}('[@]', 'name');
         # but that seemed to cause all sorts of DataDumper and cleanup problems.  This seems to
@@ -150,10 +150,6 @@ sub check {
         $session->param('logged_in', $logged_in);
         $session->param('username', $username);
         $session->param('group_list', $group_list);
-
-    # Fail because login not allowed.
-    } else {
-        $error_string = "Not logged and login disallowed for this request";
     }
 
     # Log the results if we actually tried to login, with a user and all.
@@ -166,18 +162,69 @@ sub check {
         }
     }
 
-    # Set/extend session expiry on successful sessions.  Flush new/modified session data.
-    if ($logged_in) {
-        my $session_expiry = $axml->{'sessiondb'}->{'expiry'}->content || '+1h';
-        $session->expire ($session_expiry);
-        $session->flush ();
-    }
+    # Set/extend session expiry.  Flush new/modified session data.
+    my $session_expiry = $axml->{'sessiondb'}->{'expiry'}->content || '+1h';
+    $session->expire ($session_expiry);
+    $session->flush ();
+
+    # Store the new cookie in the context, whoever returns the result should return this.
+    $jconfig->{'cookie'} = CGI::Cookie->new (
+        -name => $jconfig->{'sname'},
+        -value => $jconfig->{'sid'},
+        -expires => $session_expiry);
 
     # Add to our $args_href since e.g. fetch queries might use them.
     $jconfig->{'logged_in'} = $logged_in;
     $jconfig->{'username'} = $username;
     $jconfig->{'error_string'} = $error_string;
     $jconfig->{'group_list'} = $group_list;
+
+    return 1;
+}
+
+################################################################################
+# Logout by deleting the session.
+#
+# Params:
+#       jconfig   - Jasper::Config object
+#           READ
+#               session
+#
+#           WRITE
+#               session
+#               sid
+#               sname
+#               logged_in
+#               username
+#               group_list
+#               error_string
+#
+# Returns:
+#       "" on success.
+#       "<Failure description message>" on failure.
+################################################################################
+#
+sub logout {
+    my ($jconfig) = @_;
+
+    my $username = $jconfig->{'username'} || '';
+    my $sid = $jconfig->{'sid'} || '';
+
+    &Jarvis::Error::log ($jconfig, "Logout for '$username' on '$sid'.");
+    $jconfig->{'session'} || die "Not logged in!  Logic error!";
+
+    $jconfig->{'sname'} = '';
+    $jconfig->{'sid'} = '';
+    if ($jconfig->{'logged_in'}) {
+        $jconfig->{'logged_in'} = 0;
+        $jconfig->{'error_string'} = "Logged out at client request.";
+        $jconfig->{'username'} = '';
+        $jconfig->{'group_list'} = '';
+    }
+
+    # Delete the session.  Maybe
+    $jconfig->{'session'}->delete();
+    $jconfig->{'session'}->flush();
 
     return 1;
 }
@@ -224,6 +271,10 @@ sub check_access {
 
     # Allow access to a specific comma-separated group list.
     } else {
+        # If we're not logged in, then we can't access this either.
+        $jconfig->{'logged_in'} || return "Login required.";
+
+        # Let's see if we belong to any of the groups.
         my $allowed = 0;
         foreach my $allowed_group (split (',', $allowed_groups)) {
             foreach my $member_group (split (',', $jconfig->{'group_list'})) {

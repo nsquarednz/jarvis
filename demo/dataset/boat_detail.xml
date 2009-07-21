@@ -1,11 +1,11 @@
 <dataset read="*" write="*">
     <select>
-SELECT id, class, name, 
+SELECT id, class, name,
         COALESCE (registration_num, 0) AS registration_num,
         COALESCE (owner, '') AS owner,
         COALESCE (description, '') AS description
 FROM boat
-WHERE ID = {{id}}
+WHERE ID = {{id|1}}
     </select>
     <update>
 UPDATE boat

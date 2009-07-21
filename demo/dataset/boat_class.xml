@@ -20,7 +20,7 @@ VALUES (BTRIM ({{class}}), {{active}}, NULLIF (BTRIM ({{description}}), ''), {{_
 RETURNING {{_record_id}}::integer as _record_id, id;
     </insert>
     <delete>
-DELETE FROM item_type
+DELETE FROM boat_class
 WHERE id = {{id}};
     </delete>
 </dataset>

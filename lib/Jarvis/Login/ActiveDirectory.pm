@@ -8,17 +8,17 @@
 #
 # Licence:
 #       This file is part of the Jarvis WebApp/LDAP gateway utility.
-# 
+#
 #       Jarvis is free software: you can redistribute it and/or modify
 #       it under the terms of the GNU General Public License as published by
 #       the Free Software Foundation, either version 3 of the License, or
 #       (at your option) any later version.
-# 
+#
 #       Jarvis is distributed in the hope that it will be useful,
 #       but WITHOUT ANY WARRANTY; without even the implied warranty of
 #       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #       GNU General Public License for more details.
-# 
+#
 #       You should have received a copy of the GNU General Public License
 #       along with Jarvis.  If not, see <http://www.gnu.org/licenses/>.
 #
@@ -42,13 +42,13 @@ package Jarvis::Login::ActiveDirectory;
 
 ################################################################################
 # Determines if we are "logged in".  In this case we look at CGI variables
-# for the existing user/pass.  We validate this by checking a table in the 
+# for the existing user/pass.  We validate this by checking a table in the
 # currently open database.  The user and pass columns are both within this same
 # table.
 #
 # To use this method, specify the following login parameters.
-#  
-#    <app use_placeholders="yes" format="json" debug="no">
+#
+#    <app format="json" debug="no">
 #        ...
 #        <login module="Jarvis::Login::ActiveDirectory">
 #  	     <parameter name="server" value="<server-address>"/>
@@ -62,7 +62,6 @@ package Jarvis::Login::ActiveDirectory;
 #
 #       server:   address of server.  Required.
 #       port:     port for server.  Default 389.
-#       suffix:   The office unit & domain component suffix to append to CN=<user>
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -91,7 +90,6 @@ sub Jarvis::Login::ActiveDirectory::check {
     my $bind_username = $login_parameters{'bind_username'} || '';
     my $bind_password = $login_parameters{'bind_password'} || '';
     my $base_object = $login_parameters{'base_object'} || '';
-    my $suffix = $login_parameters{'suffix'};
 
     $server || return ("Missing 'server' configuration for Login module ActiveDirectory.");
     $base_object || return ("Missing 'base_object' configuration for Login module ActiveDirectory.");
@@ -154,7 +152,7 @@ sub Jarvis::Login::ActiveDirectory::check {
         } else {
             &Jarvis::Error::log ($jconfig, "User '$username' is memberOf group with unsupported name syntax." );
         }
-        
+
     }
     $ldap->unbind ();
 

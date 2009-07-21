@@ -3,7 +3,7 @@ Ext.onReady (function () {
 
     // this holds our status record
     var status_store = new Ext.data.JsonStore ({
-        url: jarvisUrl ('status'),
+        url: jarvisUrl ('__status'),
         root: 'data',
         idProperty: 'username',
         fields: ['logged_in', 'username', 'error_string', 'group_list']
@@ -11,7 +11,7 @@ Ext.onReady (function () {
 
     // this holds our staff names
     var user_names_store = new Ext.data.JsonStore ({
-        url: jarvisUrl ('fetch', 'user_names'),
+        url: jarvisUrl ('user_names'),
         root: 'data',
         idProperty: 'id',
         fields: ['id', 'name'],

@@ -1,5 +1,5 @@
 ###############################################################################
-# Description:  Performs a custom <plugin> action defined in the <app_name>.xml
+# Description:  Performs a custom <plugin> dataset defined in the <app_name>.xml
 #               file for this application.  Plugin modules are Perl modules
 #               which we dynamically load.  We will load the specified module
 #               and then call:
@@ -47,25 +47,25 @@ use Jarvis::Text;
 ################################################################################
 # Shows our current connection status.
 #
-# Params: 
+# Params:
 #       $jconfig - Jarvis::Config object
 #           READ
 #               xml
 #               cgi
 #
-#       $action - Name of the action we are requested to perform.
+#       $dataset - Name of the dataset we are requested to perform.
 #
 # Returns:
-#       0 if the action is not a known "plugin"
-#       1 if the action is known and successful
-#       die on error attempting to perform the action
+#       0 if the dataset is not a known "plugin"
+#       1 if the dataset is known and successful
+#       die on error attempting to perform the dataset
 ################################################################################
 #
 sub do {
-    my ($jconfig, $action) = @_;
+    my ($jconfig, $dataset) = @_;
 
     ###############################################################################
-    # See if we have any extra "plugin" actions for this application.
+    # See if we have any extra "plugin" datasets for this application.
     ###############################################################################
     #
     my $allowed_groups = undef;         # Access groups permitted, or "*" or "**"
@@ -79,12 +79,13 @@ sub do {
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
     if ($axml->{'plugin'}) {
         foreach my $plugin (@{ $axml->{'plugin'} }) {
-            next if ($action ne $plugin->{'action'}->content);
-            &Jarvis::Error::debug ($jconfig, "Found matching custom <plugin> action '$action'.");
+            &Jarvis::Error::debug ($jconfig, "Comparing '" . $plugin->{'dataset'}->content . "' to '$dataset'.");
+            next if ($dataset ne $plugin->{'dataset'}->content);
+            &Jarvis::Error::debug ($jconfig, "Found matching custom <plugin> dataset '$dataset'.");
 
-            $allowed_groups = $plugin->{'access'}->content || die "No 'access' defined for plugin action '$action'";
+            $allowed_groups = $plugin->{'access'}->content || die "No 'access' defined for plugin dataset '$dataset'";
             $lib = $plugin->{'lib'}->content;
-            $module = $plugin->{'module'}->content || die "No 'module' defined for plugin action '$action'";
+            $module = $plugin->{'module'}->content || die "No 'module' defined for plugin dataset '$dataset'";
             $add_headers = defined ($Jarvis::Config::yes_value {lc ($plugin->{'add_headers'}->content || "no")});
             $default_filename = $plugin->{'default_filename'}->content;
             $filename_parameter = $plugin->{'filename_parameter'}->content;
@@ -109,7 +110,10 @@ sub do {
 
     # Check security.
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
-    ($failure ne '') && die "Wanted plugin access: $failure";
+    if ($failure ne '') {
+        $jconfig->{'status'} = "401 Unauthorized";
+        die "Wanted plugin access: $failure";
+    }
 
     # Figure out a filename.  It's not mandatory, if we don't have a default
     # filename and we don't have a filename_parameter supplied and defined then
@@ -125,7 +129,7 @@ sub do {
     {
         eval "use lib \"$lib\" ; require $module";
         if ($@) {
-            die "Cannot load login module '$module': " . $@;
+            die "Cannot load plugin module '$module': " . $@;
         }
     }
 
@@ -139,7 +143,7 @@ sub do {
     }
 
     # Are we supposed to add headers?  Does that include a filename header?
-    # Note that if we really wanted to, we could squeeze in 
+    # Note that if we really wanted to, we could squeeze in
     if ($add_headers) {
         my $mime_types = MIME::Types->new;
         my $mime_type = $mime_types->mimeTypeOf ($filename) || MIME::Types->type('text/plain');

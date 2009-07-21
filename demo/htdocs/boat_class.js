@@ -3,7 +3,7 @@ Ext.onReady (function () {
 
     // create the main Data Store for the item types
     var boat_class_store = new Ext.data.JsonStore ({
-        url: jarvisUrl ('fetch', 'boat_class'),
+        url: jarvisUrl ('boat_class'),
         root: 'data',
         idProperty: 'id',
         fields: ['id', 'class', 'active', 'description'],
@@ -48,7 +48,7 @@ Ext.onReady (function () {
 
     // this holds our staff names
     var staff_names_store = new Ext.data.JsonStore ({
-        url: jarvisUrl ('fetch', 'staff_names'),
+        url: jarvisUrl ('staff_names'),
         root: 'data',
         idProperty: 'id',
         fields: ['id', 'name']

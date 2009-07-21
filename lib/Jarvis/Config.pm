@@ -61,6 +61,7 @@ use Jarvis::Error;
 #               cgi                Handle to a CGI object for this request.
 #               format             Format xml or json?
 #               debug              Debug enabled for this app?
+#               log_format         Format for log and debug output.
 ################################################################################
 #
 sub new {
@@ -105,13 +106,98 @@ sub new {
     my $axml = $xml->{jarvis}{app};
     (defined $axml) || die "Cannot find <jarvis><app> in '" . $self->{'app_name'} . ".xml'!\n";
 
-    # This is used by all sorts of debug methods.  Very important.
+    # Defines if we should produce debug output.
     $self->{'debug'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'debug'}->content || "no")});
+
+    # This is used by both debug and log output.
+    $self->{'log_format'} = $axml->{'log_format'}->content || '[%P/%A/%U/%D] %M';
 
     # This is used by several things, so let's store it in our config.
     $self->{'format'} = lc ($self->{'cgi'}->param ('format') || $axml->{'format'}->content || "json");
 
+    # This is an optional METHOD overide parameter, similar to Ruby on Rails.
+    # It bypasses a problem where non-proxied Flex can only send GET/POST requests.
+    $self->{'method_param'} = $self->{'cgi'}->param ('method_param') || "_method";
+
     return $self;
+}
+
+################################################################################
+# Go through the list of user-supplied variables and decide which ones are
+# safe.
+#
+# Then add some special variables.
+#
+# Any variable which starts with "__" is safe.  Specifically.
+#
+#   __username  -> <logged-in-username>
+#   __grouplist -> ('<group1>', '<group2>', ...)
+#   __group:<groupname>  ->  1 (iff belong to <groupname>) or NULL
+#
+# Params:
+#       $jconfig - Jarvis::Config object
+#           READ
+#               username
+#               group_list
+#
+#       $raw_params_href - User-supplied (unsafe) hash of variables.
+#
+#       $rest_args_aref - A ref to our REST args (slash-separated after dataset)
+#
+# Returns:
+#       1
+################################################################################
+#
+sub safe_variables {
+
+    my ($jconfig, $raw_params_href, $rest_args_aref, $rest_arg_prefix) = @_;
+
+    my %safe_params = ();
+    $rest_arg_prefix = $rest_arg_prefix || '';
+
+    # First set the default parameters configured in the config file.
+    my $pxml = $jconfig->{'xml'}{'jarvis'}{'app'}{'default_parameters'};
+    if ($pxml && $pxml->{'parameter'}) {
+        foreach my $parameter ($pxml->{'parameter'}('@')) {
+            &Jarvis::Error::debug ($jconfig, "Default Parameter: " . $parameter->{'name'}->content . " -> " . $parameter->{'value'}->content);
+            $safe_params {$parameter->{'name'}->content} = $parameter->{'value'}->content;
+        }
+    }
+
+    # Copy through the SAFE user-provided parameters.  One leading underscore
+    # is permitted, but never TWO leading underscores.  No special characters.
+    foreach my $name (keys %$raw_params_href) {
+        if ($name =~ m/^_?[a-z][a-z0-9_\-]*$/i) {
+            &Jarvis::Error::debug ($jconfig, "User Parameter: $name -> " . ($$raw_params_href {$name} || ''));
+            $safe_params{$name} = $$raw_params_href {$name};
+        }
+    }
+
+    # And our REST args go through as variable "1", "2", etc...
+    foreach my $i (0 .. $#$rest_args_aref) {
+        my $name = $rest_arg_prefix . ($i + 1);
+        my $value = $$rest_args_aref[$i];
+
+        &Jarvis::Error::debug ($jconfig, "Rest Arg: $name -> $value");
+        $safe_params{$name} = $value;
+    }
+
+    # Our secure variables.  Note that __username and __group_list are null if
+    # the user hasn't logged in
+    #
+    $safe_params{"__username"} = $jconfig->{'username'};
+    $safe_params{"__group_list"} = $jconfig->{'group_list'};
+    &Jarvis::Error::debug ($jconfig, "Username: __username = " . $safe_params{"__username"});
+    &Jarvis::Error::debug ($jconfig, "Group List: __group_list = " . $safe_params{"__group_list"});
+
+    # And our separate groups.
+    foreach my $group (split (',', $jconfig->{'group_list'})) {
+        $safe_params{"__group:$group"} = 1;
+        &Jarvis::Error::debug ($jconfig, "Group: __group:$group = 1");
+    }
+
+
+    return %safe_params;
 }
 
 1;

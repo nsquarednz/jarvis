@@ -64,9 +64,9 @@ sub Handle {
     my $dbusername = $dbxml->{'username'}->content || '';
     my $dbpassword = $dbxml->{'password'}->content || '';
 
-    &Jarvis::Error::debug ($jconfig, "DB Connect = $dbconnect");
-    &Jarvis::Error::debug ($jconfig, "DB Username = $dbusername");
-    &Jarvis::Error::debug ($jconfig, "DB Password = $dbpassword");
+    &Jarvis::Error::debug ($jconfig, "DB Connect = '$dbconnect'");
+    &Jarvis::Error::debug ($jconfig, "DB Username = '$dbusername'");
+    &Jarvis::Error::debug ($jconfig, "DB Password = '$dbpassword'");
 
     $dbh = DBI->connect ($dbconnect, $dbusername, $dbpassword) ||
         die "Cannot connect to database. " . DBI::errstr;

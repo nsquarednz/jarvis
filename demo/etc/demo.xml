@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <jarvis>
-    <app name="application1" use_placeholders="yes" format="json" debug="yes">
+    <app format="xml" debug="yes">
         <!-- This is where our <dataset>.xml are all stored -->
-	<dataset_dir>/opt/jarvis/demo/etc/dataset</dataset_dir>
+	<dataset_dir>/opt/jarvis/demo/dataset</dataset_dir>
 
         <!-- This is how you might define a JSON habitat.  100% example.
              If your requested format is non-XML (e.g. JSON, we will strip the
@@ -19,7 +19,7 @@
 
         <!-- XML Habitat. Contents are entirely free form.  This is 100% example only.
              For requests with &format=xml we will include the <habitat></habitat>.
-            
+
              BE WARNED.  Your HABITAT is PUBLIC.  Login is not required in order
              to view the habitat.
         -->
@@ -28,22 +28,45 @@
             <parameter name="pname" value="some_value"/>
             <parameter name="another" value="a_different_value"/>
         </habitat>
-        
+
         <!-- This defines how our sessions are stored.  See CGI::Session. -->
         <sessiondb store="driver:file;serializer:default;id:md5" expiry="+2h">
             <parameter name="Directory" value="/tmp/demo"/>
         </sessiondb>
 
+        <!-- Global default parameters -->
+        <default_parameters>
+            <parameter name="max_rows" value="500"/>
+        </default_parameters>
+
         <!-- This gives a sample configuration where the Login validation is performed by
              database lookup.  These values should work with the demo PostgreSQL
              database SQL included with this distribution.
-             -->            
+             -->
+        <!--
         <login module="Jarvis::Login::Database">
             <parameter name="user_table" value="users"/>
             <parameter name="user_username_column" value="name"/>
             <parameter name="user_password_column" value="password"/>
-	</login>
-        
+	</login>-->
+
+        <!-- This is a "no username or password required" login mechanism. -->
+        <login module="Jarvis::Login::None">
+            <parameter name="username" value="admin"/>
+            <parameter name="group_list" value="admin"/>
+        </login>
+
+        <!-- This defines simply one single user who may login with a fixed password,
+             AND/OR from a fixed IP address. -->
+        <!--
+        <login module="Jarvis::Login::Single">
+            <parameter name="require_https" value="no"/>
+            <parameter name="remote_ip" value="127.0.0.1"/>
+            <parameter name="username" value="bob"/>
+            <parameter name="password" value="test"/>
+            <parameter name="group_list" value="default"/>
+        </login>-->
+
         <!-- This is an example of configuring ActiveDirectory lookup.  The values here
              are totally fictitious.  You will need to supply real values.
              -->
@@ -77,7 +100,7 @@
              your Apache user (e.g. www-data).
              -->
         <database connect="dbi:Pg:dbname=jarvis_demo" username="" password=""/>
-        
+
         <!-- This is a SQL server example.  You may need additional setup.
         <database connect="dbi:Sybase:server=SERVERNAME" username="username" password="password"/>
         -->
@@ -90,7 +113,7 @@
              Login is required before you can use "exec" actions, even when using module
              None.  See the note above on using the "status" action to obtain a session cookie.
              -->
-        <exec action="echo" access="*" command="echo" add_headers="yes" filename_parameter="filename"/>
+        <exec dataset="echo" access="*" command="echo" add_headers="yes" filename_parameter="filename"/>
 
         <!-- This action ignores includes a '#' so that command line parameters are commented
              out.  It cats an image back through the socket.  Try saving the image and you will
@@ -102,13 +125,13 @@
 
              http://localhost/jarvis-bin/jarvis.pl?app=demo&action=png&filename=boat.png
              -->
-        <exec action="png" access="*" command="cat /opt/jarvis/demo/htdocs/decoration/top_background.png # "
+        <exec dataset="png" access="*" command="cat /opt/jarvis/demo/htdocs/decoration/top_background.png # "
               add_headers="yes" default_filename="bg.png" filename_parameter="filename"/>
 
-        <!-- This shows how to use a Plugin.  It executes the plugin::Test::Do ()
+        <!-- This shows how to use a Plugin.  It executes the do ()
              method.  Any returned output is put to the browser.
              -->
-        <plugin action="plug" access="*" lib="/opt/jarvis/demo" module="plugin::Demo" add_headers="yes" filename_parameter="filename">
+        <plugin dataset="Plug" access="*" lib="/opt/jarvis/demo" module="plugin::Demo" add_headers="yes" filename_parameter="filename">
             <parameter name="smtp_server" value="192.168.70.100"/>
             <parameter name="category" value="kiwisaver"/>
         </plugin>

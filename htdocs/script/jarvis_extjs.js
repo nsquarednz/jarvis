@@ -50,24 +50,12 @@ function jarvisInit (new_application, new_login_page) {
 }
 
 // URL builder.
-function jarvisUrl (action_name, dataset_name) {
-    var url = jarvis_home + '?app=' + application + '&action=' + action_name;
+function jarvisUrl (dataset_name) {
+    var url = jarvis_home + '/' + application;
     if (dataset_name) {
-        url = url + '&dataset=' + dataset_name;
+        url = url + '/' + dataset_name;
     }
     return url;
-}
-
-// Alternate POST URL without args.
-function jarvisPostUrl () {
-    return jarvis_home;
-}
-
-// Fill the standard post params.  Caller can then add their own params.
-function jarvisPostParams (action_name, dataset_name) {
-    this.app = application;
-    this.action = action_name;
-    this.dataset = dataset_name;
 }
 
 // Gets a parameter by looking at the #<name> part of a full URL specification.
@@ -110,21 +98,24 @@ function jarvisLoadException (proxy, options, response, e) {
         done_alert = 1;
     }
 
-    // Load exception.  Let's see if we need to login first, perhaps?  If that's the
-    // problem, then send them to the login page.
-    var status_store = new Ext.data.JsonStore ({
-        url: jarvisUrl ('status'),
-        root: 'data',
-        fields: ['error_string', 'logged_in', 'group_list', 'username'],
-        listeners: {
-            'load': function (store, records, options) {
-                if ((records.length > 0) && ! records[0].get ('logged_in')) {
+    // Perform the request over ajax.
+    Ext.Ajax.request({
+        url: jarvisUrl ('__status'),
+
+        // We received a response back from the server, that's a good start.
+        success: function (response, request_options) {
+            try {
+                var result = Ext.util.JSON.decode (response.responseText);
+                if (result.logged_in == 0) {
                     document.location.href = login_page + '?from=' + escape (location.pathname + location.hash);
                 }
+
+            // Well, something bad here.  Could be anything.  We tried.
+            } catch (e) {
+                // Do nothing further.
             }
         }
     });
-    status_store.load ();
 };
 
 // Common submit method (does delete/update/insert).
@@ -143,10 +134,10 @@ function jarvisLoadException (proxy, options, response, e) {
 //                          data:    (Optional) Array of returned objects.  E.g. if SQL used INSERT RETURNING.
 //
 //      transaction_type - 'update', 'insert' or 'delete' as supplied for request
-//      record           - The original record which invoked the update.
+//      records          - Record(s) to send.  May be hash (1 record) or array of hashes.
 //      num_pending      - Number of remaining changes still queued.
 //
-function jarvisSendChange (transaction_type, store, dataset_name, record) {
+function jarvisSendChange (transaction_type, store, dataset_name, records) {
 
     // Fields is a copy of "record.data" that we extend with some extra magic attributes:
     //
@@ -155,21 +146,54 @@ function jarvisSendChange (transaction_type, store, dataset_name, record) {
     //
     // Note that _record_id is the INTERNAL ExtJS ID.  Not the database "id" column.
     //
-    var fields = record.data;
-    fields._record_id = record.id;
-    fields._transaction_type = transaction_type;
+    var fields = [];
+
+    // Is it an array?
+    if (typeof records.length === 'number') {
+        for (var i = 0; i < records.length; i++) {
+            fields.push (records[i].data);
+            fields[i]._record_id = records[i].id;
+        }
+
+    // Or just a single record.
+    } else {
+        fields = records.data;
+        fields._record_id = records.id;
+    }
+
+    // Convert to standards.
+    var request_method;
+    if (transaction_type == 'insert') {
+        request_method = 'POST';
+
+    } else if (transaction_type == 'update') {
+        request_method = 'PUT';
+
+    } else if (transaction_type == 'delete') {
+        request_method = 'DELETE';
+
+    } else if (transaction_type == 'mixed') {
+        request_method = 'MIXED';
+
+    } else {
+        request_method = transaction_type;
+    }
+
+    // This is for pre-RESTful Jarvis.
+    //
+    // fields._transaction_type = transaction_type;
 
     // One more request to track in our counter.
     num_pending++;
 
     // Perform the request over ajax.
     Ext.Ajax.request({
-        url: jarvis_home,
+        url: jarvisUrl (dataset_name),
+        method: request_method,
 
         // We received a response back from the server, that's a good start.
         success: function (response, request_options) {
             num_pending--;   // One less request.
-
             // Eval the response.  It SHOULD be valid JSON.  However, bad JSON is basically
             // treated the same as good JSON with a failure flag.
             var result;
@@ -182,7 +206,8 @@ function jarvisSendChange (transaction_type, store, dataset_name, record) {
                 result.success = 0;
                 result.message = 'Bad JSON: ' + response.responseText;
             }
-            store.fireEvent ('writeback', store, result, transaction_type, record, num_pending);
+            var listener = (typeof records.length === 'number') ? 'writebackarray' : 'writeback';
+            store.fireEvent (listener, store, result, transaction_type, records, num_pending);
         },
 
         // Total failure.  Script failed.  It might have managed to update
@@ -192,16 +217,13 @@ function jarvisSendChange (transaction_type, store, dataset_name, record) {
 
             var result = new Object ();
             result.success = 0;
-            result.message = 'Server responded with error.  Updates lost.';
-            store.fireEvent ('writeback', store, result, transaction_type, record, num_pending);
+            result.message = "'Server responded with error.  Updates lost.  '" + response.responseText + "'";
+            var listener = (typeof records.length === 'number') ? 'writebackarray' : 'writeback';
+            store.fireEvent (listener, store, result, transaction_type, records, num_pending);
         },
 
-        params: {
-            action: 'store',
-            app: application,
-            dataset: dataset_name,
-            fields: Ext.util.JSON.encode (fields)
-        }
+        // Send data in the body.
+        jsonData: Ext.util.JSON.encode (fields)
     });
 }
 

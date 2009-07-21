@@ -37,9 +37,20 @@ use Jarvis::Text;
 #
 # Params:
 #       $jconfig - Jarvis::Config object
-#           READ: username, app_name, dataset_name
+#           READ: username, app_name, dataset_name, dbgfmt
 #       $msg - User message string. We will extend with extra info from $jconfig.
 #       $level - "log", "error", etc.
+#
+#       dbgmask contains specifies the headers to include:
+#           '%T' -> Timestamp
+#           '%L' -> Level
+#           '%U' -> Username
+#           '%D' -> Dataset
+#           '%A' -> Application
+#           '%P' -> Pid
+#           '%M' -> Message
+#
+#       Default dbmask is in Config.pm.
 #
 # Returns:
 #       dies
@@ -51,24 +62,42 @@ sub dump_string {
     my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime();
     my @days = ('Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat');
     my @months = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Sep', 'Oct', 'Nov', 'Dec');
-
-    my $header = sprintf "[%s %s %d %02d:%02d:%02d %04d] [$level] ",
-        $days[$wday], $months[$mon], $mday, $hour, $min, $sec, $year + 1900;
-
-    $header .= "[" . $$;
-    ($jconfig->{'app_name'}) && ($header .= "/" . $jconfig->{'app_name'});
-    ($jconfig->{'username'}) && ($header .= "/" . $jconfig->{'username'});
-    ($jconfig->{'dataset_name'}) && ($header .= "/" . $jconfig->{'dataset_name'});
-    $header .= "] ";
-
-    # This newline is tidy.  It also stops Perl from appending an "at line..."
-    # to the message if/when we die with this message.
-    #
+    my $timestamp = sprintf "%s %s %d %02d:%02d:%02d %04d", $days[$wday], $months[$mon], $mday, $hour, $min, $sec, $year + 1900;
     $msg =~ s/\s*$/\n/;
 
-    $header && (length ($msg) + length ($header) > 132) && ($header .= "\n");
+    my @bits = split ( /\%([TLUDAPM])/i, ($jconfig->{'log_format'} || '[%P/%A/%U/%D] %M'));
+    my $output = '';
 
-    return "$header$msg";
+    foreach my $idx (0 .. $#bits) {
+        if ($idx % 2) {
+            if ($bits[$idx] eq 'T') {
+                $output .= $timestamp;
+
+            } elsif ($bits[$idx] eq 'L') {
+                $output .= $level;
+
+            } elsif ($bits[$idx] eq 'U') {
+                $output .= $jconfig->{'username'} || '';
+
+            } elsif ($bits[$idx] eq 'D') {
+                $output .= $jconfig->{'dataset_name'} || '';
+
+            } elsif ($bits[$idx] eq 'A') {
+                $output .= $jconfig->{'app_name'} || '';
+
+            } elsif ($bits[$idx] eq 'P') {
+                $output .= $$;
+
+            } elsif ($bits[$idx] eq 'M') {
+                $output .= $msg;
+            }
+
+        } else {
+            $output .= $bits[$idx];
+        }
+    }
+
+    return $output;
 }
 
 ################################################################################

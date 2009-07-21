@@ -75,7 +75,8 @@ sub handler {
 
     # Return error.  Note that we do not print stack trace to user, since
     # that is a potential security weakness.
-    print $cgi->header(-type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt");
+    my $status = $jconfig->{'status'} || "500 Internal Server Error";
+    print $cgi->header(-status => $status, -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt");
     print $msg;
 
     # Print to error log.  Include stack trace if debug is enabled.
@@ -94,77 +95,125 @@ MAIN: {
     $SIG{__DIE__} = \&Main::handler;
 
     ###############################################################################
-    # AppName: (mandatory parameter)
+    # Determine app name (and possibly data-set).
     ###############################################################################
     #
-    my $app_name = $cgi->param ('app') || die "Missing mandatory parameter 'app'!\n";
-    ($app_name =~ m/^[\w\-]+$/) || die "Invalid characters in parameter 'app'\n";
+
+    my $script_name = $cgi->script_name();
+    my $path = $cgi->path_info() ||
+        die "Missing path info.  Send $script_name/<app>[/<dataset>[/<arg1>...]] in URI!\n";
+
+    # Clean up our path to remove & args, # names, and finally leading and trailing
+    # spaces and slashes.
+    #
+    $path =~ s|(?<!\\)&.*$||;
+    $path =~ s|(?<!\\)#.*$||;
+    $path =~ s|^\s*/||;
+    $path =~ s|/\s*$||;
+
+    # Parse our app-name, optional dataset-name and REST args.  Note that path is no longer
+    # URL-encoded by the time it gets to us.  Setting AllowEncodedSlashes doesn't help us
+    # get slashes through to this point.  So we do a special case and allow \/ to escape
+    # a slash through to our REST args.
+    #
+    my ($app_name, $dataset_name, @rest_args) = split ( m|(?<!\\)/|, $path);
+    @rest_args = map { s|\\/|/|g; $_ } @rest_args;
+
+    $app_name || ($app_name = '');
+    $dataset_name || ($dataset_name = '');
+
+    # Check app_name and dataset are OK format
+    $app_name || die "Missing app name.  Send $script_name/<app>[/<dataset>[/<arg1>...]] in URI!\n";
+    $app_name =~ m|^[\w\-]+$| || die "Invalid app_name '$app_name'!\n";
+    ($dataset_name eq '') || ($dataset_name =~ m|^[\w\-]+$|) || die "Invalid dataset_name '$dataset_name'!\n";
 
     $jconfig = new Jarvis::Config ($app_name, 'etc_dir' => ($ENV{'JARVIS_ETC'} || $default_jarvis_etc));
+    $dataset_name && ($jconfig->{'dataset_name'} = $dataset_name);
+
+    # Debug can now occur, since we have called Config!
+    &Jarvis::Error::debug ($jconfig, "Base Path = $path");
+    &Jarvis::Error::debug ($jconfig, "App Name = $app_name");
+    &Jarvis::Error::debug ($jconfig, "Dataset Name = $dataset_name");
+
+    foreach my $i (0 .. $#rest_args) {
+        &Jarvis::Error::debug ($jconfig, "Rest Arg " . ($i + 1) . " = " . $rest_args[$i]);
+    }
+
+    # foreach my $env (keys %ENV) {
+    #     &Jarvis::Error::debug ($jconfig, "$env = $ENV{$env}");
+    # }
 
     ###############################################################################
     # Action: "status", "habitat", "logout", "fetch", "update",  or custom
     #           action from Exec or Plugin.
     ###############################################################################
     #
-    # Must have an action.
-    my $action = $cgi->param ('action') || die "Missing mandatory parameter 'action'!\n";
+    my $method = $cgi->request_method() || '';
+
+    my $method_param = $jconfig->{'method_param'};
+    if ($method_param) {
+        my $new_method = $cgi->param($method_param);
+        if ($new_method) {
+            &Jarvis::Error::debug ($jconfig, "Using Method '$new_method' instead of '" . $method ."'");
+            $method = $new_method;
+        }
+    }
+
+    my $action = lc ($method) || die "Missing request method!\n";
     ($action =~ m/^\w+$/) || die "Invalid characters in parameter 'action'\n";
 
+    # Now canonicalise our action.
+    if ($action eq 'get') { $action = 'select' };
+    if ($action eq 'fetch') { $action = 'select' };
+    if ($action eq 'post') { $action = 'insert' };
+    if ($action eq 'create') { $action = 'insert' };
+    if ($action eq 'put') { $action = 'update' };
+
     $jconfig->{'action'} = $action;
-    my $allow_new_login = (($action eq "status") || ($action eq "fetch"));
 
-    &Jarvis::Login::check ($jconfig, $allow_new_login);
+    &Jarvis::Login::check ($jconfig);
 
-    &Jarvis::Error::debug ($jconfig, "User Name = " . $jconfig->{'username'});
-    &Jarvis::Error::debug ($jconfig, "Group List = " . $jconfig->{'group_list'});
+    &Jarvis::Error::debug ($jconfig, "User Name = '" . $jconfig->{'username'} . "'");
+    &Jarvis::Error::debug ($jconfig, "Group List = '" . $jconfig->{'group_list'} . "'");
+    &Jarvis::Error::debug ($jconfig, "Logged In = " . $jconfig->{'logged_in'});
+    &Jarvis::Error::debug ($jconfig, "Error String = '" . $jconfig->{'error_string'} . "'");
+    &Jarvis::Error::debug ($jconfig, "Method = '" . $method . "'");
+    &Jarvis::Error::debug ($jconfig, "Action = '" . $action . "'");
 
-    # Status.  I.e. are we logged in?
-    if ($action eq "status") {
+    # Check we have a dataset.
+    $dataset_name || die "All requests requires $script_name/$app_name/<dataset-or-special>[/<arg1>...] in URI!\n";
 
-        my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
-        my $return_text = &Jarvis::Status::report ($jconfig);
-        print $cgi->header(-type => "text/plain", -cookie => $cookie);
-        print $return_text;
+    # All special datasets start with "__".
+    #
+    # Note that our Plugin and Execs may expect "/appname/<something-else>" so
+    # we should be careful not to trample on them.  We only interpret these
+    # special datasets for the four main CRUD actions.
+    #
+    if ($dataset_name =~ m/^__/) {
+        my $return_text = undef;
 
-    # Habitat.  Echo the contents of the "<context>...</context>" block in our app-name.xml.
-    } elsif ($action eq "habitat") {
+        # Status.  I.e. are we logged in?
+        if ($dataset_name eq "__status") {
+            &Jarvis::Error::debug ($jconfig, "Returning status special dataset.");
+            $return_text = &Jarvis::Status::report ($jconfig, \@rest_args);
 
-        my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
-        my $return_text = &Jarvis::Habitat::print ($jconfig);
-        print $cgi->header(-type => "text/plain", -cookie => $cookie);
-        print $return_text;
+        # Habitat.  Echo the contents of the "<context>...</context>" block in our app-name.xml.
+        } elsif ($dataset_name eq "__habitat") {
+            &Jarvis::Error::debug ($jconfig, "Returning habitat special dataset.");
+            $return_text = &Jarvis::Habitat::print ($jconfig, \@rest_args);
 
-    # Logout.  Clear session ID cookie, clean login parameters, then return "logged out" status.
-    } elsif ($action eq "logout") {
+        # Logout.  Clear session ID cookie, clean login parameters, then return "logged out" status.
+        } elsif ($dataset_name eq "__logout") {
+            &Jarvis::Error::debug ($jconfig, "Returning logout special dataset.");
+            &Jarvis::Login::logout ($jconfig);
+            $return_text = &Jarvis::Status::report ($jconfig, \@rest_args);
 
-        $jconfig->{'sid'} = '';
-        my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
-        if ($jconfig->{'logged_in'}) {
-            $jconfig->{'logged_in'} = 0;
-            $jconfig->{'error_string'} = "Logged out at client request.";
-            $jconfig->{'username'} = '';
-            $jconfig->{'group_list'} = '';
+        # Starts with __ so must be special, but we don't know it.
+        } else {
+            die "Unknown special dataset '$dataset_name'!\n";
         }
 
-        my $return_text = &Jarvis::Status::report ($jconfig);
-        print $cgi->header(-type => "text/plain", -cookie => $cookie);
-        print $return_text;
-
-    # Fetch.  I.e. get some data.
-    } elsif ($action eq "fetch") {
-
-        my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
-        my $return_text = &Jarvis::Dataset::fetch ($jconfig);
-        print $cgi->header(-type => "text/plain", -cookie => $cookie);
-        print $return_text;
-
-    # Store.  I.e. alter some data.
-    } elsif ($action eq "store") {
-
-        my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
-        my $return_text = &Jarvis::Dataset::store ($jconfig);
-        print $cgi->header(-type => "text/plain", -cookie => $cookie);
+        print $cgi->header(-type => "text/plain", -cookie => $jconfig->{'cookie'}, 'Cache-Control' => 'no-cache');
         print $return_text;
 
     # A custom exec for this application?  We hand off entirely for this case,
@@ -172,19 +221,35 @@ MAIN: {
     # cases where it is doing the header.  But if the exec script itself is
     # doing all the headers, then there will be no session cookie.
     #
-    } elsif (&Jarvis::Exec::do ($jconfig, $action)) {
+    } elsif (&Jarvis::Exec::do ($jconfig, $dataset_name, \@rest_args)) {
         # All is well if this returns true.  The action is treated.
 
     # A custom plugin for this application?  This is very similar to an Exec,
     # except that where an exec is a `<command>` system call, a Plugin is a
     # dynamically loaded module method.
     #
-    } elsif (&Jarvis::Plugin::do ($jconfig, $action)) {
+    } elsif (&Jarvis::Plugin::do ($jconfig, $dataset_name, \@rest_args)) {
         # All is well if this returns true.  The action is treated.
+
+    # Fetch a regular dataset.
+    } elsif ($action eq "select") {
+
+        my $return_text = &Jarvis::Dataset::fetch ($jconfig, \@rest_args);
+
+        print $cgi->header(-type => "text/plain", -cookie => $jconfig->{'cookie'}, 'Cache-Control' => 'no-cache');
+        print $return_text;
+
+    # Modify a regular dataset.
+    } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete") || ($action eq "mixed")) {
+
+        my $return_text = &Jarvis::Dataset::store ($jconfig, \@rest_args);
+
+        print $cgi->header(-type => "text/plain", -cookie => $jconfig->{'cookie'});
+        print $return_text;
 
     # It's the end of the world as we know it.
     } else {
-        die "Unsupported action '" . $action . "'!\n";
+        die "Unsupported action '" . $action . "' ($method)!\n";
     }
 
     ###############################################################################

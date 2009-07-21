@@ -38,6 +38,7 @@ use Jarvis::Error;
 # Params:
 #       $jconfig - Jarvis::Config object
 #           READ: logged_in, username, error_string, group_list
+#       $rest_args_aref - A ref to our REST args (slash-separated after dataset)
 #
 # Returns:
 #       1.
@@ -45,7 +46,7 @@ use Jarvis::Error;
 ################################################################################
 #
 sub report {
-    my ($jconfig) = @_;
+    my ($jconfig, $rest_args_aref) = @_;
 
     my %fields = ();
     $fields{"logged_in"} = $jconfig->{'logged_in'};
@@ -53,16 +54,13 @@ sub report {
     $fields{"error_string"} = $jconfig->{'error_string'};
     $fields{"group_list"} = $jconfig->{'group_list'};
 
-    my @data = (\%fields);
-
     if ($jconfig->{'format'} eq "json") {
-        my %return_hash = ( "data" => \@data );
         my $json = JSON::XS->new->pretty(1);
-        return $json->encode ( \%return_hash );
+        return $json->encode ( \%fields );
 
     } elsif ($jconfig->{'format'} eq "xml") {
         my $xml = XML::Smart->new ();
-        $xml->{data} = \@data;
+        $xml->{'response'} = \%fields;
 
         return $xml->data ();
 

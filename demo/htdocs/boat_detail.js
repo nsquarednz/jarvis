@@ -13,7 +13,7 @@ Ext.onReady (function () {
 
     // create the main Data Store for the links
     var boat_detail_store = new Ext.data.JsonStore ({
-        url: jarvisPostUrl (),      // We need to give extra params, so will use POST.
+        proxy: new Ext.data.HttpProxy ({ url: jarvisUrl ('boat_detail'), method: 'GET' }),
         root: 'data',
         idProperty: 'id',
         fields: ['id', 'class', 'name', 'registration_num', 'owner', 'description' ],
@@ -153,7 +153,7 @@ Ext.onReady (function () {
     }
 
     // Take our standard Jarvis POST params, and add our "id" param for the load.
-    var params = new jarvisPostParams ('fetch', 'boat_detail')
+    var params = {};
     params.id = boat_id;
     boat_detail_store.load ({'params': params});
 });

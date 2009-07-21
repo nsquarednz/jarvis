@@ -1,0 +1,7 @@
+<dataset read="*" write="*">
+    <select>
+SELECT id, class, active, {{__group_list}}::text FROM boat_class
+WHERE ({{1|class_name}}::text IS NULL) OR class ~ {{1|class_name}}
+ORDER BY class
+    </select>
+</dataset>
