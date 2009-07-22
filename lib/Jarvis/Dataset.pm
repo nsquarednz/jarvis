@@ -693,7 +693,10 @@ sub store {
     # Determine if we're going to rollback.
     if (! $success) {
         &Jarvis::Error::debug ($jconfig, "Error detected.  Rolling back.");
-        $dbh->rollback ();
+
+        # Use "eval" as some drivers (e.g. SQL Server) will have already rolled-back on the
+        # original failure, and hence a second rollback will fail.
+        eval { $dbh->rollback (); }
 
     } else {
         &Jarvis::Error::debug ($jconfig, "All successful.  Committing all changes.");
