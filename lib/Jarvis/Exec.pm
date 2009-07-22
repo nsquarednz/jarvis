@@ -168,12 +168,20 @@ sub do {
 
         &Jarvis::Error::debug ($jconfig, "Exec returned mime type '" . $mime_type->type . "'");
 
-        my $cookie = CGI::Cookie->new (-name => $jconfig->{'sname'}, -value => $jconfig->{'sid'});
         if ($filename) {
-            print $jconfig->{'cgi'}->header(-type => $mime_type->type, 'Content-Disposition' => "inline; filename=$filename", -cookie => $cookie);
+            print $jconfig->{'cgi'}->header(
+                -type                   => $mime_type->type, 
+                'Content-Disposition'   => "inline; filename=$filename", 
+                -cookie                 => $jconfig->{'cookie'}, 
+                'Cache-Control'         => 'no-cache'
+            );
 
         } else {
-            print $jconfig->{'cgi'}->header(-type => $mime_type->type, -cookie => $cookie);
+            print $jconfig->{'cgi'}->header(
+                -type => $mime_type->type, 
+                -cookie => $jconfig->{'cookie'}, 
+                'Cache-Control' => 'no-cache'
+            );
         }
     }
 
