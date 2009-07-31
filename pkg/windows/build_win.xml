@@ -36,7 +36,7 @@
             <equals arg1="${env.BUILD_FOR_RELEASE}" arg2="true" />
             <then>
                 <property name="release-version" value="jarvis v${env.MAJOR_VERSION_NUMBER}.${env.MINOR_VERSION_NUMBER}.${env.MAINTENANCE_NUMBER}" />
-                <property name="cvs_tag" value="JARVIS_V${env.MAJOR_VERSION_NUMBER}_${env.MINOR_VERSION_NUMBER}_${env.MAINTENANCE_NUMBER}" />
+                <property name="cvs_tag" value="JARVIS_v${env.MAJOR_VERSION_NUMBER}_${env.MINOR_VERSION_NUMBER}_${env.MAINTENANCE_NUMBER}" />
                 <echo message="Built Release Version: ${release-version}" />
                 <echo append="false" file="../../build-version.txt">${release-version}</echo>
                 <!-- CVS tagging -->
