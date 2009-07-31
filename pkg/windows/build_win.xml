@@ -1,0 +1,55 @@
+<!--
+- Build the Jarvis installer on a Windows Platform
+
+- This ant script is called by Hudson.
+- The command used is something like:
+- cmd.exe /C '"ant.bat -file build_win.xml -DMINOR_VERSION_NUMBER=0 -DMAJOR_VERSION_NUMBER=0 -DMAINTENANCE_NUMBER=0 -DBUILD_FOR_RELEASE=false && exit %%ERRORLEVEL%%"'
+
+- If cvs branch (etc) changes in Hudson, it needs to be updated here as well.
+-->
+
+<project name="Jarvis" default="deploy">
+    <property name="repository_root" value=":pserver:build@kingpin:/home/cvsroot" />
+    <property name="cvs_branch" value="HEAD" />
+    <property environment="env" />
+    
+    <taskdef resource="net/sf/antcontrib/antlib.xml" classpath="libs/ant-contrib-1.0b3.jar" />
+    
+    <target name="clean">
+        <delete dir="output"/>
+    </target>
+    
+    <target name="init">
+        <mkdir dir="output" />
+    </target>
+
+    <target name="deploy" depends="clean,init,build-number">
+        <echo message="Building Inno Setup installer..." />
+        <exec executable="cmd" dir=".">
+            <arg value="/c"/>
+            <arg value="build.bat"/>
+        </exec>
+    </target>
+    
+    <target name="build-number">
+        <if>
+            <equals arg1="${env.BUILD_FOR_RELEASE}" arg2="true" />
+            <then>
+                <property name="release-version" value="jarvis v${env.MAJOR_VERSION_NUMBER}.${env.MINOR_VERSION_NUMBER}.${env.MAINTENANCE_NUMBER}" />
+                <property name="cvs_tag" value="JARVIS_V${env.MAJOR_VERSION_NUMBER}_${env.MINOR_VERSION_NUMBER}_${env.MAINTENANCE_NUMBER}" />
+                <echo message="Built Release Version: ${release-version}" />
+                <echo append="false" file="../../build-version.txt">${release-version}</echo>
+                <!-- CVS tagging -->
+                <echo message="Tagging CVS source: branch=${cvs_branch} tag=${cvs_tag}" />
+                <cvs cvsRoot="${repository_root}" command="rtag -F -r ${cvs_branch} ${cvs_tag} jarvis" />
+            </then>
+            <else>
+                <property name="development-build" value="Jarvis development build b${env.BUILD_NUMBER} Id:${env.BUILD_ID}" />
+                <echo message="Built Development Build: ${development-build}" />
+                <echo append="false" file="../../build-version.txt">${development-build}</echo>
+                
+            </else>
+        </if>
+    </target>
+    
+</project>
