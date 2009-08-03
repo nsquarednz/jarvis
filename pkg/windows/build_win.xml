@@ -29,6 +29,12 @@
             <arg value="/c"/>
             <arg value="build.bat"/>
         </exec>
+        <if>
+            <equals arg1="${env.BUILD_FOR_RELEASE}" arg2="true" />
+            <then>
+                <move file="output/jarvis_setup.exe" tofile="output/jarvis_v${env.MAJOR_VERSION_NUMBER}.${env.MINOR_VERSION_NUMBER}.${env.MAINTENANCE_NUMBER}_setup.exe"/>
+            </then>
+        </if>
     </target>
     
     <target name="build-number">
