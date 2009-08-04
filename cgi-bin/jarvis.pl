@@ -213,7 +213,7 @@ MAIN: {
             die "Unknown special dataset '$dataset_name'!\n";
         }
 
-        print $cgi->header(-type => "text/plain", -cookie => $jconfig->{'cookie'}, 'Cache-Control' => 'no-cache');
+        print $cgi->header(-type => "text/plain", -cookie => $jconfig->{'cookie'}, 'Cache-Control' => 'no-store, no-cache, must-revalidate');
         print $return_text;
 
     # A custom exec for this application?  We hand off entirely for this case,
@@ -236,7 +236,7 @@ MAIN: {
 
         my $return_text = &Jarvis::Dataset::fetch ($jconfig, \@rest_args);
 
-        print $cgi->header(-type => "text/plain", -cookie => $jconfig->{'cookie'}, 'Cache-Control' => 'no-cache');
+        print $cgi->header(-type => "text/plain", -cookie => $jconfig->{'cookie'}, 'Cache-Control' => 'no-store, no-cache, must-revalidate');
         print $return_text;
 
     # Modify a regular dataset.

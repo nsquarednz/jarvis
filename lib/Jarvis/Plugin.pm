@@ -155,14 +155,14 @@ sub do {
                 -type => $mime_type->type, 
                 'Content-Disposition' => $filename && "inline; filename=$filename", 
                 -cookie => $jconfig->{'cookie'}, 
-                'Cache-Control' => 'no-cache'
+                'Cache-Control' => 'no-store, no-cache, must-revalidate'
             );
 
         } else {
             print $jconfig->{'cgi'}->header(
                 -type => $mime_type->type, 
                 -cookie => $jconfig->{'cookie'}, 
-                'Cache-Control' => 'no-cache'
+                'Cache-Control' => 'no-store, no-cache, must-revalidate'
             );
         }
     }
