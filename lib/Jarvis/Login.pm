@@ -91,6 +91,13 @@ sub check {
     $jconfig->{'sname'} = $session->name();
     $jconfig->{'sid'} = $session->id();
 
+    # CGI::Session does not appear to warn us if the CGI session is file based,
+    # and the directory being written to is not writable. Put a check in here to
+    # check for a writable session directory (otherwise you end up constantly
+    # logging in).
+    die "Webserver user has no permissions to write to CGI::Session directory '$sid_params{'Directory'}'." 
+        if $sid_store =~ /driver:file/ && $sid_params{'Directory'} && ! -w $sid_params{'Directory'};
+
     # Now see what we got passed.  These are the user's provided info that we will validate.
     my $offered_username = $jconfig->{'cgi'}->param('username') || '';
     my $offered_password = $jconfig->{'cgi'}->param('password') || '';
