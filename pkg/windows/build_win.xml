@@ -9,7 +9,6 @@
 -->
 
 <project name="Jarvis" default="deploy">
-    <property name="repository_root" value=":pserver:build@kingpin:/home/cvsroot" />
     <property name="cvs_branch" value="HEAD" />
     <property environment="env" />
     
@@ -47,7 +46,7 @@
                 <echo append="false" file="../../build-version.txt">${release-version}</echo>
                 <!-- CVS tagging -->
                 <echo message="Tagging CVS source: branch=${cvs_branch} tag=${cvs_tag}" />
-                <cvs cvsRoot="${repository_root}" command="rtag -F -r ${cvs_branch} ${cvs_tag} jarvis" />
+                <cvs cvsRoot="${env.REPOSITORY_ROOT}" command="rtag -F -r ${cvs_branch} ${cvs_tag} jarvis" />
             </then>
             <else>
                 <property name="development-build" value="Jarvis development build b${env.BUILD_NUMBER} Id:${env.BUILD_ID}" />
