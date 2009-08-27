@@ -299,7 +299,7 @@ sub statement_execute {
         $stm->{'error'} = $error_message;
 
     } else {
-        &Jarvis::Error::debug ($jconfig, 'Successful statement execution.');
+        &Jarvis::Error::debug ($jconfig, 'Successful statement execution.  Modified = ' . $stm->{'modified'});
     }
 
     return $stm;
@@ -358,6 +358,7 @@ sub fetch {
     # Fetch the data.
     my $rows_aref = $stm->{'sth'}->fetchall_arrayref({});
     my $num_rows = scalar @$rows_aref;
+    &Jarvis::Error::debug ($jconfig, "Number of rows fetched = $num_rows.");
     $stm->{'sth'}->finish;
 
     # Do we want to do server side sorting?  This happens BEFORE paging.
