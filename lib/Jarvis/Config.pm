@@ -119,6 +119,11 @@ sub new {
     # It bypasses a problem where non-proxied Flex can only send GET/POST requests.
     $self->{'method_param'} = $self->{'cgi'}->param ('method_param') || "_method";
 
+    # Pull out the list of default (Perl) library paths to use for perl plugins scripts
+    # from the configuration, and store in an array in the config item.
+    $self->{'default_libs'} = [];
+    map { push @{$self->{'default_libs'}}, $_->{'lib'}->{'path'}->content; } @{$axml->{'default_libs'}} if ($axml->{'default_libs'});
+
     return $self;
 }
 

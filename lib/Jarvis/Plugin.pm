@@ -84,7 +84,7 @@ sub do {
             &Jarvis::Error::debug ($jconfig, "Found matching custom <plugin> dataset '$dataset'.");
 
             $allowed_groups = $plugin->{'access'}->content || die "No 'access' defined for plugin dataset '$dataset'";
-            $lib = $plugin->{'lib'}->content;
+            $lib = $plugin->{'lib'}->content if $plugin->{'lib'};
             $module = $plugin->{'module'}->content || die "No 'module' defined for plugin dataset '$dataset'";
             $add_headers = defined ($Jarvis::Config::yes_value {lc ($plugin->{'add_headers'}->content || "no")});
             $default_filename = $plugin->{'default_filename'}->content;
@@ -123,11 +123,13 @@ sub do {
 
     # Now load the module.
     #
-    &Jarvis::Error::debug ($jconfig, "Using plugin lib '$lib'.");
+    &Jarvis::Error::debug ($jconfig, "Using default libs: '" . (join ',', @{$jconfig->{'default_libs'}}) . "'". ($lib ? ", plugin lib '$lib'." : ", no plugin specific lib."));
     &Jarvis::Error::debug ($jconfig, "Loading plugin module '$module'.");
 
     {
-        eval "use lib \"$lib\" ; require $module";
+        map { eval "use lib \"$_\""; } @{$jconfig->{'default_libs'}};
+        eval "use lib \"$lib\"" if $lib;
+        eval "require $module";
         if ($@) {
             die "Cannot load plugin module '$module': " . $@;
         }
