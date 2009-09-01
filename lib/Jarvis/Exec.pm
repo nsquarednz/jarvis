@@ -169,12 +169,23 @@ sub do {
         &Jarvis::Error::debug ($jconfig, "Exec returned mime type '" . $mime_type->type . "'");
 
         if ($filename) {
-            print $jconfig->{'cgi'}->header(
-                -type                   => $mime_type->type, 
-                'Content-Disposition'   => "inline; filename=$filename", 
-                -cookie                 => $jconfig->{'cookie'}, 
-                'Cache-Control'         => 'no-store, no-cache, must-revalidate'
-            );
+            if ($use_tmpfile) {
+                my $length = -s $tmpFile->filename;
+                print $jconfig->{'cgi'}->header(
+                    -type                   => $mime_type->type, 
+                    'Content-Disposition'   => "inline; filename=$filename", 
+                    -cookie                 => $jconfig->{'cookie'}, 
+                    'Cache-Control'         => 'no-store, no-cache, must-revalidate',
+                    'Content-Length'        => $length
+                );
+            } else {
+                print $jconfig->{'cgi'}->header(
+                    -type                   => $mime_type->type, 
+                    'Content-Disposition'   => "inline; filename=$filename", 
+                    -cookie                 => $jconfig->{'cookie'}, 
+                    'Cache-Control'         => 'no-store, no-cache, must-revalidate'
+                );
+            }
 
         } else {
             print $jconfig->{'cgi'}->header(
