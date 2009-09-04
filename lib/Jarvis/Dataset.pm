@@ -216,7 +216,7 @@ sub names_to_values {
 #               {'sth'}
 #               {'vnames_aref'}
 #               {'error'}      (Set later, to error message from latest action)
-#               {'modified'}   (Set later, to number of rows modified in latest action)
+#               {'retval'}     (Set later, return value of latest action)
 #
 #       Or undef if no SQL.
 ################################################################################
@@ -258,13 +258,15 @@ sub parse_statement {
 #       - Determine error string.
 #       - Print to STDERR
 #       - Finish the Statement Handle
-#       - Update 'error' and 'modified' in $stm object.
+#       - Update 'error' and 'retval' in $stm object.
 #       - Return error string.
 #
 # You might ask why we have a separate 'error' string and don't use the one
 # on the "sth" statement handle?  Well, that's because in some rare cases
 # we can actually get a Perl failure in the "eval" without an underlying DBD
 # exception.
+#
+# The "retval" parameter is the number of rows modified in an update/insert/delete.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -277,12 +279,12 @@ sub statement_execute {
     my ($jconfig, $stm, $arg_values_aref) = @_;
 
     my $err_handler = $SIG{__DIE__};
-    $stm->{'modified'} = 0;
+    $stm->{'retval'} = 0;
     $stm->{'error'} = undef;
     eval {
         no warnings 'uninitialized';
         $SIG{__DIE__} = sub {};
-        $stm->{'modified'} = $stm->{'sth'}->execute (@$arg_values_aref);
+        $stm->{'retval'} = $stm->{'sth'}->execute (@$arg_values_aref);
     };
     $SIG{__DIE__} = $err_handler;
 
@@ -299,7 +301,7 @@ sub statement_execute {
         $stm->{'error'} = $error_message;
 
     } else {
-        &Jarvis::Error::debug ($jconfig, 'Successful statement execution.  Modified = ' . $stm->{'modified'});
+        &Jarvis::Error::debug ($jconfig, 'Successful statement execution.  RetVal = ' . $stm->{'retval'});
     }
 
     return $stm;
@@ -359,6 +361,11 @@ sub fetch {
     my $rows_aref = $stm->{'sth'}->fetchall_arrayref({});
     my $num_rows = scalar @$rows_aref;
     &Jarvis::Error::debug ($jconfig, "Number of rows fetched = $num_rows.");
+
+    my $rows_aref2 = $stm->{'sth'}->fetchall_arrayref({});
+    my $num_rows2 = scalar @$rows_aref;
+    &Jarvis::Error::debug ($jconfig, "Number of rows fetched2 = $num_rows2.");
+
     $stm->{'sth'}->finish;
 
     # Do we want to do server side sorting?  This happens BEFORE paging.
@@ -643,7 +650,7 @@ sub store {
         my $num_rows = 0;
 
         &statement_execute ($jconfig, $stm, \@arg_values);
-        $row_result{'modified'} = $stm->{'modified'};
+        $row_result{'modified'} = $stm->{'retval'};
         $modified = $modified + $row_result{'modified'};
 
         if ($stm->{'error'}) {
