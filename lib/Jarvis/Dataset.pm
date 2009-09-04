@@ -362,10 +362,6 @@ sub fetch {
     my $num_rows = scalar @$rows_aref;
     &Jarvis::Error::debug ($jconfig, "Number of rows fetched = $num_rows.");
 
-    my $rows_aref2 = $stm->{'sth'}->fetchall_arrayref({});
-    my $num_rows2 = scalar @$rows_aref;
-    &Jarvis::Error::debug ($jconfig, "Number of rows fetched2 = $num_rows2.");
-
     $stm->{'sth'}->finish;
 
     # Do we want to do server side sorting?  This happens BEFORE paging.
