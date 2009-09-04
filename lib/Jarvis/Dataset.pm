@@ -288,7 +288,7 @@ sub statement_execute {
     };
     $SIG{__DIE__} = $err_handler;
 
-    if ($@) {
+    if ($@ || (! defined $stm->{'retval'})) {
         my $error_message = $stm->{'sth'}->errstr || $@ || 'Unknown error SQL execution error.';
         $error_message =~ s/\s+$//;
 
