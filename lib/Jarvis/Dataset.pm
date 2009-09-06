@@ -319,7 +319,7 @@ sub statement_execute {
 #               group_list          Used for {{group_list}} in SQL
 #               format              Either "json" or "xml" or "csv".
 #
-#       $rest_args_aref - A ref to our REST args (slash-separated after dataset)
+#       $rest_args_aref - Optional ref to our REST args (slash-separated after dataset).
 #
 # Returns:
 #       Reference to Hash of returned data.  You may convert to JSON or XML.
@@ -364,7 +364,10 @@ sub fetch {
 
     $stm->{'sth'}->finish;
 
-    # Do we want to do server side sorting?  This happens BEFORE paging.
+    # Do we want to do server side sorting?  This happens BEFORE paging.  Note that this
+    # will only work when $sth->{NAME} is available.  Some (all?) stored procedures
+    # under MS-SQL Server will not provide field names, and hence this feature will not
+    # be available.
     #
     my $sort_field = $jconfig->{'cgi'}->param ($jconfig->{'sort_field_param'}) || '';
     my $sort_dir = $jconfig->{'cgi'}->param ($jconfig->{'sort_dir_param'}) || 'ASC';
@@ -436,10 +439,16 @@ sub fetch {
 
         return $xml->data ();
 
-    # CSV format is the trickiest.
+    # CSV format is the trickiest.  Note that it is dependent on the $sth->{NAME} data
+    # being available.  In some cases, e.g. some (all?) stored procedures under MS-SQL
+    # Server (definitely those using a pivot, and possibly others) the list of field
+    # names is not available by this method, and hence this CSV cannot find the data
+    # it requires.  In that case, you will need to write a "smart" plugin which can
+    # figure out the field names itself, access the data with "rows_aref" format, and
+    # put two and two together.
+    #
     } elsif ($jconfig->{'format'} eq "csv") {
 
-        # Get the list of column names from our fetch statement.
         my @field_names = @{ $stm->{'sth'}->{NAME} };
         my %field_index = ();
 
@@ -462,6 +471,13 @@ sub fetch {
         }
 
         return $output;
+
+    # This is for INTERNAL use only!  Plugins for example might like to get the raw hash
+    # and do their own formatting.  If you try this from a browser, you're going to
+    # get something nasty happening.
+    #
+    } elsif ($jconfig->{'format'} eq "rows_aref") {
+        return $rows_aref;
 
     } else {
         die "Unsupported format '" . $jconfig->{'format'} ."' for Dataset::fetch return data.\n";
