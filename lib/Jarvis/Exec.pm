@@ -69,7 +69,7 @@ sub do {
     my $use_tmpfile = undef;            # Whether or the output of the exec command
                                         # should be written to a temporary file first
                                         # or directly streamed to the client.
-                                 
+
 
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
     if ($axml->{'exec'}) {
@@ -83,6 +83,7 @@ sub do {
             $default_filename = $exec->{'default_filename'}->content;
             $filename_parameter = $exec->{'filename_parameter'}->content;
             $use_tmpfile = defined ($Jarvis::Config::yes_value {lc ($exec->{'use_tmpfile'}->content || "no")});
+            last;
         }
     }
 
@@ -114,7 +115,7 @@ sub do {
     my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%param_values, $rest_args_aref, 'p');
 
     my $tmpFile = undef;
-    if ($use_tmpfile) { 
+    if ($use_tmpfile) {
         $tmpFile = new File::Temp();
         $safe_params{'__tmpfile'} = $tmpFile->filename;
     }
@@ -172,25 +173,25 @@ sub do {
             if ($use_tmpfile) {
                 my $length = -s $tmpFile->filename;
                 print $jconfig->{'cgi'}->header(
-                    -type                   => $mime_type->type, 
-                    'Content-Disposition'   => "inline; filename=$filename", 
-                    -cookie                 => $jconfig->{'cookie'}, 
+                    -type                   => $mime_type->type,
+                    'Content-Disposition'   => "inline; filename=$filename",
+                    -cookie                 => $jconfig->{'cookie'},
                     'Cache-Control'         => 'no-store, no-cache, must-revalidate',
                     'Content-Length'        => $length
                 );
             } else {
                 print $jconfig->{'cgi'}->header(
-                    -type                   => $mime_type->type, 
-                    'Content-Disposition'   => "inline; filename=$filename", 
-                    -cookie                 => $jconfig->{'cookie'}, 
+                    -type                   => $mime_type->type,
+                    'Content-Disposition'   => "inline; filename=$filename",
+                    -cookie                 => $jconfig->{'cookie'},
                     'Cache-Control'         => 'no-store, no-cache, must-revalidate'
                 );
             }
 
         } else {
             print $jconfig->{'cgi'}->header(
-                -type => $mime_type->type, 
-                -cookie => $jconfig->{'cookie'}, 
+                -type => $mime_type->type,
+                -cookie => $jconfig->{'cookie'},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             );
         }

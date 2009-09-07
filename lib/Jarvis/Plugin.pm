@@ -79,7 +79,6 @@ sub do {
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
     if ($axml->{'plugin'}) {
         foreach my $plugin (@{ $axml->{'plugin'} }) {
-            &Jarvis::Error::debug ($jconfig, "Comparing '" . $plugin->{'dataset'}->content . "' to '$dataset'.");
             next if ($dataset ne $plugin->{'dataset'}->content);
             &Jarvis::Error::debug ($jconfig, "Found matching custom <plugin> dataset '$dataset'.");
 
@@ -102,6 +101,7 @@ sub do {
                     $plugin_parameters {$parameter->{'name'}->content} = $parameter->{'value'}->content;
                 }
             }
+            last;
         }
     }
 
@@ -154,16 +154,16 @@ sub do {
 
         if ($filename) {
             print $jconfig->{'cgi'}->header(
-                -type => $mime_type->type, 
-                'Content-Disposition' => $filename && "inline; filename=$filename", 
-                -cookie => $jconfig->{'cookie'}, 
+                -type => $mime_type->type,
+                'Content-Disposition' => $filename && "inline; filename=$filename",
+                -cookie => $jconfig->{'cookie'},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             );
 
         } else {
             print $jconfig->{'cgi'}->header(
-                -type => $mime_type->type, 
-                -cookie => $jconfig->{'cookie'}, 
+                -type => $mime_type->type,
+                -cookie => $jconfig->{'cookie'},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             );
         }
