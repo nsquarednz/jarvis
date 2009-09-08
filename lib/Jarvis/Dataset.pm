@@ -65,6 +65,13 @@ my %yes_value = ('yes' => 1, 'true' => 1, '1' => 1);
 #               sort_field_param    Name of the CGI param specifying page sort field
 #               sort_dir_param      Name of the CGI param specifying page sort direction
 #
+#   Note that a "." in a dataset name is a directory path.  Note that the
+#   caller may NOT ever specify the ".xml" suffix, since we would confuse
+#   "test.xml" for "<dataset_dir>/test/xml.xml".  And that would be bad.
+#
+#   Note that it is OUR job to check that the path is safe before opening
+#   the file.
+#
 # Returns:
 #       $dsxml - XML::Smart object holding config info read from file.
 ################################################################################
@@ -80,18 +87,23 @@ sub get_config_xml {
         die "No attribute 'dataset_dir' configured.";
     &Jarvis::Error::debug ($jconfig, "Dataset Directory '$dataset_dir'.");
 
-    # Now we require 'dataset' to also be a CGI parameter.  We store this in the
-    # $jconfig
+    # Determine the raw dataset name, before "." translation.
     my $dataset_name = $jconfig->{'dataset_name'};
-    &Jarvis::Error::debug ($jconfig, "Dataset Name '$dataset_name'.");
+    &Jarvis::Error::debug ($jconfig, "Dataset Name '$dataset_name' (as supplied).");
+
+    ($dataset_name =~ m/^\./) && die "Leading '.' not permitted on dataset name '$dataset_name'";
+    ($dataset_name =~ m/\.$/) && die "Trailing '.' not permitted on dataset name '$dataset_name'";
+
+    $dataset_name =~ s/\./\//g;
 
     # Load the dataset-specific XML file and double-check it has top-level <dataset> tag.
     my $dsxml_filename = "$dataset_dir/$dataset_name.xml";
+    &Jarvis::Error::debug ($jconfig, "Opening DSXML file '$dsxml_filename'.");
 
     # Check it exists.
     if (! -f $dsxml_filename) {
         $jconfig->{'status'} = '404 Not Found';
-        die "No such dataset '$dataset_name' in application '" . $jconfig->{'app_name'} . "'";
+        die "No such DSXML file '$dataset_name.xml' for application '" . $jconfig->{'app_name'} . "'";
     }
 
     my $dsxml = XML::Smart->new ("$dsxml_filename") || die "Cannot read '$dsxml_filename': $!\n";

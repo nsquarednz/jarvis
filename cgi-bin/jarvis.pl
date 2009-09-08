@@ -122,10 +122,17 @@ MAIN: {
     $app_name || ($app_name = '');
     $dataset_name || ($dataset_name = '');
 
-    # Check app_name and dataset are OK format
+    # Check app_name is OK.
     $app_name || die "Missing app name.  Send $script_name/<app>[/<dataset>[/<arg1>...]] in URI!\n";
     $app_name =~ m|^[\w\-]+$| || die "Invalid app_name '$app_name'!\n";
-    ($dataset_name eq '') || ($dataset_name =~ m|^[\w\-]+$|) || die "Invalid dataset_name '$dataset_name'!\n";
+
+    # Dataset name can't be empty, and can only be normal characters with "-", and "."
+    # for directory separator.  Note that we don't check yet for leading and trailing
+    # dot and other file security stuff.  We'll do that when we actually go to open
+    # the file, because maybe some execs/plugins might allow it, and we don't want
+    # to restrict them.
+    #
+    ($dataset_name eq '') || ($dataset_name =~ m|^[\w\-\.]+$|) || die "Invalid dataset_name '$dataset_name'!\n";
 
     $jconfig = new Jarvis::Config ($app_name, 'etc_dir' => ($ENV{'JARVIS_ETC'} || $default_jarvis_etc));
     $dataset_name && ($jconfig->{'dataset_name'} = $dataset_name);
