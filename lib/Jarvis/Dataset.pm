@@ -210,6 +210,51 @@ sub names_to_values {
 }
 
 ################################################################################
+# Perform some optional server-side data transforms.  These are configured
+# by e.g.
+#       <dataset>
+#           <transform store="trim,null" fetch="notnull" />
+#           <select> ...
+#
+# Options are:
+#       trim - Leading and trailing whitespace is removed.
+#       null - All whitespace/empty strings are converted to NULL/absent.
+#       notnull - All NULL strings are converted to ''.
+#
+# Params:
+#       $transforms_href - Hash of 'enabled-option' -> 1
+#       $vals_href - Hash of key -> value to transform
+#
+# Returns:
+#       1
+################################################################################
+#
+sub transform {
+    my ($transforms_href, $vals_href) = @_;
+
+    if ($$transforms_href{'trim'}) {
+        foreach my $key (keys %$vals_href) {
+            next if ! defined $$vals_href{$key};
+            $$vals_href{$key} = &trim ($$vals_href{$key});
+        }
+    }
+    if ($$transforms_href{'notnull'}) {
+        foreach my $key (keys %$vals_href) {
+            (defined $$vals_href{$key}) || ($$vals_href{$key} = '');
+        }
+
+    } elsif ($$transforms_href{'null'}) {
+        foreach my $key (keys %$vals_href) {
+            next if ! defined $$vals_href{$key};
+            if ($$vals_href{$key} =~ m/^\s*$/) {
+                delete $$vals_href{$key};
+            }
+        }
+    }
+    return 1;
+}
+
+################################################################################
 # Loads a specified SQL statement from the datasets, transforms the SQL into
 # placeholder, pulls out the variable names, and prepares a statement.
 #
@@ -350,6 +395,10 @@ sub fetch {
         die "Wanted read access: $failure";
     }
 
+    # What transformations should we use when sending out fetch data?
+    my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->{dataset}{transform}{fetch});
+    &Jarvis::Error::debug ($jconfig, "Fetch transformations = " . join (', ', keys %transforms));
+
     # Attach to the database.
     my $dbh = &Jarvis::DB::Handle ($jconfig);
 
@@ -400,7 +449,6 @@ sub fetch {
     }
 
     # Should we truncate the data to a specific page?
-    #
     my $limit = $jconfig->{'cgi'}->param ($jconfig->{'page_limit_param'}) || 0;
     my $start = $jconfig->{'cgi'}->param ($jconfig->{'page_start_param'}) || 0;
 
@@ -419,6 +467,13 @@ sub fetch {
                 $limit = 1 + ($#$rows_aref - $start);
             }
             @$rows_aref = @$rows_aref[$start .. $start + ($limit - 1)];
+        }
+    }
+
+    # Any output transformations?
+    if (scalar (keys %transforms)) {
+        foreach my $row_href (@$rows_aref) {
+            &transform (\%transforms, $row_href);
         }
     }
 
@@ -526,6 +581,10 @@ sub store {
         $jconfig->{'status'} = "401 Unauthorized";
         die "Wanted write access: $failure";
     }
+
+    # What transforms should we use when processing store data?
+    my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->{dataset}{transform}{store});
+    &Jarvis::Error::debug ($jconfig, "Store transformations = " . join (', ', keys %transforms));
 
     # Get our submitted content.  This works for POST (insert) on non-XML data.  If the
     # content_type was "application/xml" then I think we will find our content in the
@@ -656,6 +715,11 @@ sub store {
         #
         my %raw_params = %{ $fields_href };
         my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%raw_params, $rest_args_aref);
+
+        # Any input transformations?
+        if (scalar (keys %transforms)) {
+            &transform (\%transforms, \%safe_params);
+        }
 
         # Figure out which statement type we will use for this row.
         my $row_ttype = $safe_params{'_ttype'} || $ttype;
