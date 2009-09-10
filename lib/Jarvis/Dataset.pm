@@ -238,17 +238,17 @@ sub transform {
             $$vals_href{$key} = &trim ($$vals_href{$key});
         }
     }
-    if ($$transforms_href{'notnull'}) {
-        foreach my $key (keys %$vals_href) {
-            (defined $$vals_href{$key}) || ($$vals_href{$key} = '');
-        }
-
-    } elsif ($$transforms_href{'null'}) {
+    if ($$transforms_href{'null'}) {
         foreach my $key (keys %$vals_href) {
             next if ! defined $$vals_href{$key};
             if ($$vals_href{$key} =~ m/^\s*$/) {
                 delete $$vals_href{$key};
             }
+        }
+    }
+    if ($$transforms_href{'notnull'}) {
+        foreach my $key (keys %$vals_href) {
+            (defined $$vals_href{$key}) || ($$vals_href{$key} = '');
         }
     }
     return 1;
