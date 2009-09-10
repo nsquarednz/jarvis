@@ -60,7 +60,7 @@ sub Handle {
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
     my $dbxml = $axml->{'database'} || die "No 'database' config present.  Cannot connect to DB.";
 
-    my $dbconnect = $dbxml->{'connect'}->content || "dbi:Pg:" . $jconfig->{'app_name'};
+    my $dbconnect = $dbxml->{'connect'}->content || "dbi:Pg:dbname=" . $jconfig->{'app_name'};
     my $dbusername = $dbxml->{'username'}->content || '';
     my $dbpassword = $dbxml->{'password'}->content || '';
 
