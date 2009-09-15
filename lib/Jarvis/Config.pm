@@ -61,6 +61,7 @@ use Jarvis::Error;
 #               cgi                Handle to a CGI object for this request.
 #               format             Format xml or json?
 #               debug              Debug enabled for this app?
+#               dump               Dump (Detailed Debug) enabled for this app?
 #               log_format         Format for log and debug output.
 ################################################################################
 #
@@ -106,8 +107,9 @@ sub new {
     my $axml = $xml->{jarvis}{app};
     (defined $axml) || die "Cannot find <jarvis><app> in '" . $self->{'app_name'} . ".xml'!\n";
 
-    # Defines if we should produce debug output.
-    $self->{'debug'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'debug'}->content || "no")});
+    # Defines if we should produce debug and/or dump output.  Dump implies debug.
+    $self->{'dump'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'dump'}->content || "no")});
+    $self->{'debug'} = $self->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($axml->{'debug'}->content || "no")});
 
     # Set binmode on STDERR because folks could want to send us UTF-8 content, and
     # debug (or even log) could raise "Wide character in print" errors.

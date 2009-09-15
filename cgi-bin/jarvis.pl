@@ -80,7 +80,7 @@ sub handler {
     print $msg;
 
     # Print to error log.  Include stack trace if debug is enabled.
-    my $long_msg = &Jarvis::Error::dump_string ($jconfig, 'fatal', $msg);
+    my $long_msg = &Jarvis::Error::print_message ($jconfig, 'fatal', $msg);
     print STDERR ($jconfig->{'debug'} ? Carp::longmess $long_msg : Carp::shortmess $long_msg);
 
     exit 0;

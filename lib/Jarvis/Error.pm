@@ -56,7 +56,7 @@ use Jarvis::Text;
 #       dies
 ################################################################################
 #
-sub dump_string {
+sub print_message {
     my ($jconfig, $level, $msg) = @_;
 
     my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime();
@@ -101,23 +101,7 @@ sub dump_string {
 }
 
 ################################################################################
-# THIS IS COMPLETELY DEPRECATED.  PLEASE JUST CALL "die".
-#
-# Params:
-#       $jconfig - Jarvis::Config object
-#       $msg - Message to print
-#
-# Returns:
-#       dies
-################################################################################
-#
-sub my_die {
-    my ($jconfig, $msg) = @_;
-    die $msg;
-}
-
-################################################################################
-# Same but just debug.  Uses dump_string.
+# Same but just debug.  Uses print_message.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -132,11 +116,30 @@ sub debug {
 
     $jconfig->{'debug'} || return;
 
-    print STDERR &dump_string ($jconfig, 'debug', $msg);
+    print STDERR &print_message ($jconfig, 'debug', $msg);
 }
 
 ################################################################################
-# Same as debug, but always prints.  Uses dump_string.
+# Used for debug that might produce LOTS of output.  Needs to be enabled
+# separately with dump="yes".
+#
+# Params:
+#       $jconfig - Jarvis::Config object
+#       $msg - Message to print
+#
+# Returns:
+#       Prints to STDERR and returns 1.
+################################################################################
+#
+sub dump {
+    my ($jconfig, $msg) = @_;
+
+    $jconfig->{'dump'} || return;
+    print STDERR &print_message ($jconfig, 'dump', $msg);
+}
+
+################################################################################
+# Same as debug, but always prints.  Uses print_message.
 #
 # Params: Same as Debug.
 #
@@ -147,7 +150,7 @@ sub debug {
 sub log {
     my ($jconfig, $msg) = @_;
 
-    print STDERR &dump_string ($jconfig, 'log', $msg);
+    print STDERR &print_message ($jconfig, 'log', $msg);
 }
 
 1;

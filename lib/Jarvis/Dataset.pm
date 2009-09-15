@@ -291,7 +291,7 @@ sub parse_statement {
         &Jarvis::Error::debug ($jconfig, "No SQL found for type '$ttype'");
         return undef;
     }
-    &Jarvis::Error::debug ($jconfig, "SQL for '$ttype' = " . $obj->{'raw_sql'});
+    &Jarvis::Error::dump ($jconfig, "SQL as read from XML = " . $obj->{'raw_sql'});
 
     # Does this insert return rows?
     $obj->{'returning'} = defined ($yes_value {lc ($dsxml->{dataset}{$ttype}{'returning'} || "no")});
@@ -301,7 +301,7 @@ sub parse_statement {
     my ($sql_with_placeholders, @variable_names) = &sql_with_placeholders ($obj->{'raw_sql'});
     $obj->{'sql_with_placeholders'} = $sql_with_placeholders;
     $obj->{'vnames_aref'} = \@variable_names;
-    &Jarvis::Error::debug ($jconfig, "SQL with placeholders = " . $obj->{'sql_with_placeholders'});
+    &Jarvis::Error::dump ($jconfig, "SQL with placeholders = " . $obj->{'sql_with_placeholders'});
     &Jarvis::Error::debug ($jconfig, "Variable Names = '" . join (',', @{ $obj->{'vnames_aref'} }) . "'");
 
     $obj->{'sth'} = $dbh->prepare ($sql_with_placeholders)
@@ -490,7 +490,10 @@ sub fetch {
         $return_data {"data"} = $rows_aref;
 
         my $json = JSON::XS->new->pretty(1);
-        return $json->encode ( \%return_data );
+        my $json_string = $json->encode ( \%return_data );
+        &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($json_string));
+        &Jarvis::Error::dump ($jconfig, $json_string);
+        return $json_string;
 
     # XML is also simple.
     } elsif ($jconfig->{'format'} eq "xml") {
@@ -504,7 +507,10 @@ sub fetch {
         $xml->{'response'}{'fetched'} = $num_rows;
         $xml->{'response'}{'data'}{'row'} = $rows_aref;
 
-        return $xml->data ();
+        my $xml_string = $xml->data ();
+        &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($xml_string));
+        &Jarvis::Error::dump ($jconfig, $xml_string);
+        return $xml_string;
 
     # CSV format is the trickiest.  Note that it is dependent on the $sth->{NAME} data
     # being available.  In some cases, e.g. some (all?) stored procedures under MS-SQL
@@ -537,6 +543,8 @@ sub fetch {
             print $io "\n";
         }
 
+        &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($output));
+        &Jarvis::Error::dump ($jconfig, $output);
         return $output;
 
     # This is for INTERNAL use only!  Plugins for example might like to get the raw hash
@@ -604,6 +612,7 @@ sub store {
     }
     $content || die "Cannot find client-submitted change content.";
     &Jarvis::Error::debug ($jconfig, "Request Content Length = " . length ($content));
+    &Jarvis::Error::dump ($jconfig, $content);
 
     # Fields we need to store.  This is an ARRAY ref to multiple rows each a HASH REF
     my $fields_aref = undef;
@@ -822,7 +831,10 @@ sub store {
             $results[0]{'returning'} && ($return_data {'returning'} = $results[0]{'returning'});
         }
         my $json = JSON::XS->new->pretty(1);
-        return $json->encode ( \%return_data );
+        my $json_string = $json->encode ( \%return_data );
+        &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($json_string));
+        &Jarvis::Error::dump ($jconfig, $json_string);
+        return $json_string;
 
     } elsif ($jconfig->{'format'} eq "xml") {
         my $xml = XML::Smart->new ();
@@ -839,7 +851,10 @@ sub store {
         if ($success && ! $return_array) {
             $results[0]{'returning'} && ($xml->{'response'}{'returning'} = $results[0]{'returning'});
         }
-        return $xml->data ();
+        my $xml_string = $xml->data ();
+        &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($xml_string));
+        &Jarvis::Error::dump ($jconfig, $xml_string);
+        return $xml_string;
 
     } else {
         die "Unsupported format '" . $jconfig->{'format'} ."' for Dataset::store return data.\n";
