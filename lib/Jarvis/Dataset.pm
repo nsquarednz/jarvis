@@ -476,17 +476,26 @@ sub fetch {
         }
     }
 
-    # Delete null (undef) values, otherwise JSON/XML will represent them as ''.
-    foreach my $row_href (@$rows_aref) {
-        foreach my $key (keys %$row_href) {
-            (defined $$row_href{$key}) || delete $$row_href{$key};
-        }
-    }
-
     # Apply any output transformations to remaining hashes.
     if (scalar (keys %transforms)) {
         foreach my $row_href (@$rows_aref) {
             &transform (\%transforms, $row_href);
+        }
+    }
+
+    # Delete null (undef) values, otherwise JSON/XML will represent them as ''.
+    #
+    # Note that this must happen AFTER the transform step, for two reasons:
+    # (a) any preceding "notnull" transform (if specified for "fetch" on
+    #     this dataset) will have turned NULLs into "" by this stage, meaning that
+    #     we won't be deleting them here.
+    #
+    # (b) any preceding "null" transform will have set whitespace values to
+    #     undef, meaning that we will now delete them here.
+    #
+    foreach my $row_href (@$rows_aref) {
+        foreach my $key (keys %$row_href) {
+            (defined $$row_href{$key}) || delete $$row_href{$key};
         }
     }
 
