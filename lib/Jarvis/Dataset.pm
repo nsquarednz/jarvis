@@ -232,20 +232,26 @@ sub names_to_values {
 sub transform {
     my ($transforms_href, $vals_href) = @_;
 
+    # Trim leading and trailing space off any defined value.
     if ($$transforms_href{'trim'}) {
         foreach my $key (keys %$vals_href) {
             next if ! defined $$vals_href{$key};
             $$vals_href{$key} = &trim ($$vals_href{$key});
         }
     }
+
+    # Convert any whitespace values into undef.  Later, all undef values
+    # will be omitted from the final results in JSON and XML format.
     if ($$transforms_href{'null'}) {
         foreach my $key (keys %$vals_href) {
             next if ! defined $$vals_href{$key};
             if ($$vals_href{$key} =~ m/^\s*$/) {
-                delete $$vals_href{$key};
+                $$vals_href{$key} = undef;
             }
         }
     }
+
+    # Any undef values will be converted to whitespace.
     if ($$transforms_href{'notnull'}) {
         foreach my $key (keys %$vals_href) {
             (defined $$vals_href{$key}) || ($$vals_href{$key} = '');
@@ -470,7 +476,14 @@ sub fetch {
         }
     }
 
-    # Any output transformations?
+    # Delete null (undef) values, otherwise JSON/XML will represent them as ''.
+    foreach my $row_href (@$rows_aref) {
+        foreach my $key (keys %$row_href) {
+            (defined $$row_href{$key}) || delete $$row_href{$key};
+        }
+    }
+
+    # Apply any output transformations to remaining hashes.
     if (scalar (keys %transforms)) {
         foreach my $row_href (@$rows_aref) {
             &transform (\%transforms, $row_href);
