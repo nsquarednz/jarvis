@@ -356,7 +356,7 @@ sub statement_execute {
         $error_message =~ s/\s+$//;
 
         &Jarvis::Error::log ($jconfig, "Failure executing SQL for '" . $stm->{'ttype'} . "'.  Details follow.");
-        &Jarvis::Error::log ($jconfig, $stm->{'sql_with_placeholders'});
+        &Jarvis::Error::log ($jconfig, $stm->{'sql_with_placeholders'}) if $stm->{'sql_with_placeholders'};
         &Jarvis::Error::log ($jconfig, $error_message);
         &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @$arg_values_aref) || 'NONE'));
 
