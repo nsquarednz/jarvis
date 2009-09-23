@@ -723,15 +723,8 @@ sub store {
         }
     }
 
-    # Get the STM object(s) we will need.  This has everything attached.  Note that in
-    # a mixed update, it is possible that not all statement types are defined.  We will
-    # not error now on missing statement types, we will error later.
-    #
+    # Our cached statement handle(s).
     my %stm = ();
-    my @stm_types = ($ttype eq "mixed") ? ('insert', 'update', 'delete') : ($ttype);
-    foreach my $stm_type (@stm_types) {
-        $stm{$stm_type} = &parse_statement ($jconfig, $dsxml, $dbh, $stm_type);
-    }
 
     foreach my $fields_href (@$fields_aref) {
 
@@ -755,6 +748,11 @@ sub store {
         # Figure out which statement type we will use for this row.
         my $row_ttype = $safe_params{'_ttype'} || $ttype;
         ($row_ttype eq 'mixed') && die "Transaction Type 'mixed', but no '_ttype' field present in row.";
+
+        # Get the statement type for this ttype if we don't have it.  This raises debug.
+        if (! $stm{$row_ttype}) {
+            $stm{$row_ttype} = &parse_statement ($jconfig, $dsxml, $dbh, $row_ttype);
+        }
 
         # Check we have an stm for this row.
         my $stm = $stm{$row_ttype} ||
@@ -797,9 +795,10 @@ sub store {
         push (@results, \%row_result);
     }
 
-    # Using placeholders, free statement only at the end.
-    foreach my $stm_type (@stm_types) {
-        $stm{$stm_type} && $stm{$stm_type}->{'sth'}->finish;
+    # Free any remaining open statement types.
+    foreach my $stm_type (keys %stm) {
+        &Jarvis::Error::debug ($jconfig, "Finished with statement for ttype '$stm_type'.");
+        $stm{$stm_type}->{'sth'}->finish;
     }
 
     # Execute our "after" statement.
