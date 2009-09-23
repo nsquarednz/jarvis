@@ -138,6 +138,7 @@ MAIN: {
     $dataset_name && ($jconfig->{'dataset_name'} = $dataset_name);
 
     # Debug can now occur, since we have called Config!
+    &Jarvis::Error::debug ($jconfig, "URI = $ENV{REQUEST_URI}");
     &Jarvis::Error::debug ($jconfig, "Base Path = $path");
     &Jarvis::Error::debug ($jconfig, "App Name = $app_name");
     &Jarvis::Error::debug ($jconfig, "Dataset Name = $dataset_name");
