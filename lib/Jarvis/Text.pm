@@ -79,8 +79,8 @@ sub escape_shell_windows {
 # Returns: trims leading and trailing whitespace.
 sub trim {
     my $text = $_[0];
-    $text =~ s/^\s+//;
-    $text =~ s/\s+$//g;
+    $text =~ s/^\s+//o;
+    $text =~ s/\s+$//og;
     return $text;
 }
 
