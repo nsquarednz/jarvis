@@ -53,16 +53,23 @@ sub report {
     $fields{"username"} = $jconfig->{'username'};
     $fields{"error_string"} = $jconfig->{'error_string'};
     $fields{"group_list"} = $jconfig->{'group_list'};
+    $fields{"sid"} = $jconfig->{'sid'};
 
     if ($jconfig->{'format'} eq "json") {
         my $json = JSON::XS->new->pretty(1);
-        return $json->encode ( \%fields );
+        my $json_string = $json->encode ( \%fields );
+        &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($json_string));
+        &Jarvis::Error::dump ($jconfig, $json_string);
+        return $json_string;
 
     } elsif ($jconfig->{'format'} eq "xml") {
         my $xml = XML::Smart->new ();
         $xml->{'response'} = \%fields;
 
-        return $xml->data ();
+        my $xml_string = $xml->data ();
+        &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($xml_string));
+        &Jarvis::Error::dump ($jconfig, $xml_string);
+        return $xml_string;
 
     } else {
         die "Unsupported format '" . $jconfig->{'format'} ."' in Status::report\n";
