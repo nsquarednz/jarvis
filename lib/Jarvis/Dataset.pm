@@ -109,6 +109,10 @@ sub get_config_xml {
     my $dsxml = XML::Smart->new ("$dsxml_filename") || die "Cannot read '$dsxml_filename': $!\n";
     ($dsxml->{dataset}) || die "Missing <dataset> tag in '$dsxml_filename'!\n";
 
+    # Enable per dataset dump/debug
+    $jconfig->{'dump'} = $jconfig->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($dsxml->{'dataset'}{'dump'}->content || "no")});
+    $jconfig->{'debug'} = $jconfig->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($dsxml->{'dataset'}{'debug'}->content || "no")});
+
     # Load a couple of other parameters.  This is a "side-effect".  Yeah, it's a bit yucky.
     $jconfig->{'page_start_param'} = lc ($axml->{'page_start_param'}->content || 'page_start');
     $jconfig->{'page_limit_param'} = lc ($axml->{'page_limit_param'}->content || 'page_limit');
