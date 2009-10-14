@@ -209,6 +209,7 @@ sub names_to_values {
         }
         push (@arg_values, $value);
     }
+    &Jarvis::Error::debug ($jconfig, "VARS = " . join (",", @$variable_names_aref));
     &Jarvis::Error::debug ($jconfig, "ARGS = " . join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values));
     return @arg_values;
 }
@@ -312,7 +313,6 @@ sub parse_statement {
     $obj->{'sql_with_placeholders'} = $sql_with_placeholders;
     $obj->{'vnames_aref'} = \@variable_names;
     &Jarvis::Error::dump ($jconfig, "SQL with placeholders = " . $obj->{'sql_with_placeholders'});
-    &Jarvis::Error::debug ($jconfig, "Variable Names = '" . join (',', @{ $obj->{'vnames_aref'} }) . "'");
 
     $obj->{'sth'} = $dbh->prepare ($sql_with_placeholders)
         || die "Couldn't prepare statement '$sql_with_placeholders': " . $dbh->errstr;
@@ -407,7 +407,7 @@ sub fetch {
 
     # What transformations should we use when sending out fetch data?
     my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->{dataset}{transform}{fetch});
-    &Jarvis::Error::debug ($jconfig, "Fetch transformations = " . join (', ', keys %transforms));
+    &Jarvis::Error::debug ($jconfig, "Fetch transformations = " . join (', ', keys %transforms) . " (applied to returned results)");
 
     # Attach to the database.
     my $dbh = &Jarvis::DB::Handle ($jconfig);
@@ -618,7 +618,7 @@ sub store {
 
     # What transforms should we use when processing store data?
     my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->{dataset}{transform}{store});
-    &Jarvis::Error::debug ($jconfig, "Store transformations = " . join (', ', keys %transforms));
+    &Jarvis::Error::debug ($jconfig, "Store transformations = " . join (', ', keys %transforms) . " (applied to incoming row data)");
 
     # Get our submitted content.  This works for POST (insert) on non-XML data.  If the
     # content_type was "application/xml" then I think we will find our content in the

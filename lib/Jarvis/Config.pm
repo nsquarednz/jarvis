@@ -199,13 +199,13 @@ sub safe_variables {
     #
     $safe_params{"__username"} = $jconfig->{'username'};
     $safe_params{"__group_list"} = $jconfig->{'group_list'};
-    &Jarvis::Error::debug ($jconfig, "Username: __username = " . $safe_params{"__username"});
-    &Jarvis::Error::debug ($jconfig, "Group List: __group_list = " . $safe_params{"__group_list"});
+    &Jarvis::Error::debug ($jconfig, "Secure Parameter: __username = " . $safe_params{"__username"});
+    &Jarvis::Error::debug ($jconfig, "Secure Parameter: __group_list = " . $safe_params{"__group_list"});
 
     # And our separate groups.
     foreach my $group (split (',', $jconfig->{'group_list'})) {
         $safe_params{"__group:$group"} = 1;
-        &Jarvis::Error::debug ($jconfig, "Group: __group:$group = 1");
+        &Jarvis::Error::debug ($jconfig, "Secure Parameter: __group:$group = 1");
     }
 
 
