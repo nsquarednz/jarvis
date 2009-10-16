@@ -227,6 +227,11 @@ function jarvisSendChange (transaction_type, store, dataset_name, records) {
     });
 }
 
+// See how many pending requests we have outstanding
+function jarvisNumPending () {
+    return num_pending;
+}
+
 // Add a cookie.
 function jarvisCreateCookie (name, value, days) {
     if (days) {
