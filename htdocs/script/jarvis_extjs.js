@@ -148,20 +148,7 @@ function jarvisSendChange (transaction_type, store, dataset_name, records) {
     //
     var fields = [];
 
-    // Is it an array?
-    if (typeof records.length === 'number') {
-        for (var i = 0; i < records.length; i++) {
-            fields.push (records[i].data);
-            fields[i]._record_id = records[i].id;
-        }
-
-    // Or just a single record.
-    } else {
-        fields = records.data;
-        fields._record_id = records.id;
-    }
-
-    // Convert to standards.
+    // Convert request method to standard Jarvis values.
     var request_method;
     if (transaction_type == 'insert') {
         request_method = 'POST';
@@ -177,6 +164,34 @@ function jarvisSendChange (transaction_type, store, dataset_name, records) {
 
     } else {
         request_method = transaction_type;
+    }
+
+    // Set _ttype for MIXED requests.
+    if (request_method.toUpperCase() == 'MIXED') {
+        if (typeof records.length === 'number') {
+            for (var i = 0; i < records.length; i++) {
+                var rd = records[i].data;
+                if (rd._type == null) {
+                    rd._ttype = rd._deleted ? 'delete' : (((rd.id == null) || (rd.id == 0)) ? 'insert' : 'update');
+                }
+            }
+        } else {
+            var rd = records.data;
+            if (rd._type == null) {
+                rd._ttype = rd._deleted ? 'delete' : (((rd.id == null) || (rd.id == 0)) ? 'insert' : 'update');
+            }
+        }
+    }
+
+    // Is it an array or just a single?
+    if (typeof records.length === 'number') {
+        for (var i = 0; i < records.length; i++) {
+            fields.push (records[i].data);
+            fields[i]._record_id = records[i].id;
+        }
+    } else {
+        fields = records.data;
+        fields._record_id = records.id;
     }
 
     // This is for pre-RESTful Jarvis.

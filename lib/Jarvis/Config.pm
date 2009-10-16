@@ -180,7 +180,7 @@ sub safe_variables {
     foreach my $name (keys %$raw_params_href) {
         if ($name =~ m/^_?[a-z][a-z0-9_\-]*$/i) {
             my $value = $$raw_params_href {$name};
-            &Jarvis::Error::debug ($jconfig, "User Parameter: $name -> '" . ((defined $value) ? $value : 'NULL') . "'");
+            &Jarvis::Error::debug ($jconfig, "User Parameter: $name -> " . ((defined $value) ? ("'" . $value . "'") : 'NULL'));
             $safe_params{$name} = $$raw_params_href {$name};
         }
     }
