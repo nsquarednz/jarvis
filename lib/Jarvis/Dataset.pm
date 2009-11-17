@@ -312,7 +312,6 @@ sub parse_statement {
     my ($sql_with_placeholders, @variable_names) = &sql_with_placeholders ($obj->{'raw_sql'});
     $obj->{'sql_with_placeholders'} = $sql_with_placeholders;
     $obj->{'vnames_aref'} = \@variable_names;
-    &Jarvis::Error::dump ($jconfig, "SQL with placeholders = " . $obj->{'sql_with_placeholders'});
 
     $obj->{'sth'} = $dbh->prepare ($sql_with_placeholders)
         || die "Couldn't prepare statement '$sql_with_placeholders': " . $dbh->errstr;
@@ -513,7 +512,9 @@ sub fetch {
         $return_data {"group_list"} = $jconfig->{'group_list'};
 
         $return_data {"fetched"} = $num_rows;
-        $return_data {"data"} = $rows_aref;
+        if (scalar @$rows_aref) {
+            $return_data {"data"} = $rows_aref;
+        }
 
         my $json = JSON::XS->new->pretty(1);
         my $json_string = $json->encode ( \%return_data );
@@ -531,7 +532,9 @@ sub fetch {
         $xml->{'response'}{'group_list'} = $jconfig->{'group_list'};
 
         $xml->{'response'}{'fetched'} = $num_rows;
-        $xml->{'response'}{'data'}{'row'} = $rows_aref;
+        if (scalar @$rows_aref) {
+            $xml->{'response'}{'data'}{'row'} = $rows_aref;
+        }
 
         my $xml_string = $xml->data ();
         &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($xml_string));
