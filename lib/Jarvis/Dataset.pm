@@ -511,10 +511,10 @@ sub fetch {
         $return_data {"error_string"} = $jconfig->{'error_string'};
         $return_data {"group_list"} = $jconfig->{'group_list'};
 
+        # Note that we always return a "data" field, even if it is an empty array.
+        # That is because ExtJS and other libraries will flag an exception if we do not.
         $return_data {"fetched"} = $num_rows;
-        if (scalar @$rows_aref) {
-            $return_data {"data"} = $rows_aref;
-        }
+        $return_data {"data"} = $rows_aref;
 
         my $json = JSON::XS->new->pretty(1);
         my $json_string = $json->encode ( \%return_data );
