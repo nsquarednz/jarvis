@@ -152,12 +152,50 @@ MAIN: {
     # }
 
     ###############################################################################
+    # Some additional parameter parsing code, because of CGI.pm oddness.
+    ###############################################################################
+    #
+    # Explanation: In the heart of CGI.pm, there is special handling for content
+    # type "application/xml" which reads the query string args from the URI
+    # such as "_method=<transaction-type>" and parses them as CGI parameters.
+    #
+    # That code is invoked specifically only for POST "application/xml".  However
+    # we really want exactly the same done for OTHER application types.  Hence
+    # the following.
+    #
+    my $method = $cgi->request_method() || 'GET';
+    my $content_type = $ENV{'CONTENT_TYPE'} || 'text/plain';
+
+    if (($method eq "POST") && ($content_type ne 'application/xml')) {
+        my $query_string = '';
+        if (exists $ENV{MOD_PERL}) {
+            $query_string = $cgi->r->args;
+
+        } else {
+            $query_string = $ENV{'QUERY_STRING'} if defined $ENV{'QUERY_STRING'};
+            $query_string ||= $ENV{'REDIRECT_QUERY_STRING'} if defined $ENV{'REDIRECT_QUERY_STRING'};
+        }
+
+        if ($query_string) {
+            if ($query_string =~ /[&=;]/) {
+                $cgi->parse_params($query_string);
+            } else {
+                $cgi->add_parameter('keywords');
+                $cgi->{'keywords'} = [$cgi->parse_keywordlist($query_string)];
+            }
+        }
+    }
+
+    # my @names = $cgi->param;
+    # foreach my $name (@names) {
+    #     &Jarvis::Error::debug ($jconfig, "Query Param $name = " . $cgi->param ($name));
+    # }
+
+    ###############################################################################
     # Action: "status", "habitat", "logout", "fetch", "update",  or custom
     #           action from Exec or Plugin.
     ###############################################################################
     #
-    my $method = $cgi->request_method() || '';
-
     my $method_param = $jconfig->{'method_param'};
     if ($method_param) {
         my $new_method = $cgi->param($method_param);
