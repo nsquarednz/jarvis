@@ -139,35 +139,8 @@ function jarvisLoadException (proxy, options, response, e) {
 //
 function jarvisSendChange (transaction_type, store, dataset_name, records) {
 
-    // Fields is a copy of "record.data" that we extend with some extra magic attributes:
-    //
-    //     _operation_type: (Mandatory) 'update' or 'delete'
-    //     _record_id:      (Mandatory) Internal ExtJS Store ID.
-    //
-    // Note that _record_id is the INTERNAL ExtJS ID.  Not the database "id" column.
-    //
-    var fields = [];
-
-    // Convert request method to standard Jarvis values.
-    var request_method;
-    if (transaction_type == 'insert') {
-        request_method = 'POST';
-
-    } else if (transaction_type == 'update') {
-        request_method = 'PUT';
-
-    } else if (transaction_type == 'delete') {
-        request_method = 'DELETE';
-
-    } else if (transaction_type == 'mixed') {
-        request_method = 'MIXED';
-
-    } else {
-        request_method = transaction_type;
-    }
-
-    // Set _ttype for MIXED requests.
-    if (request_method.toUpperCase() == 'MIXED') {
+    // Set _ttype on a per-record basis for MIXED requests.
+    if (transaction_type.toUpperCase() == 'MIXED') {
         if (typeof records.length === 'number') {
             for (var i = 0; i < records.length; i++) {
                 var rd = records[i].data;
@@ -183,6 +156,12 @@ function jarvisSendChange (transaction_type, store, dataset_name, records) {
         }
     }
 
+    // Fields is a copy of "record.data" to which we add "_record_id".  This is the
+    // internal ExtJS ID.  Its purpose here is to ensure that if we have "returning = yes"
+    // in our dataset, we can link back the returned fields to the originating record.
+    //
+    var fields = [];
+
     // Is it an array or just a single?
     if (typeof records.length === 'number') {
         for (var i = 0; i < records.length; i++) {
@@ -194,17 +173,20 @@ function jarvisSendChange (transaction_type, store, dataset_name, records) {
         fields._record_id = records.id;
     }
 
-    // This is for pre-RESTful Jarvis.
-    //
-    // fields._transaction_type = transaction_type;
-
     // One more request to track in our counter.
     num_pending++;
 
     // Perform the request over ajax.
     Ext.Ajax.request({
         url: jarvisUrl (dataset_name),
-        method: request_method,
+
+        // Note that proper RESTful behaviour says the "method" should be the transaction type.
+        // Unfortunately, IE doesn't allow you to actually use a request_method of 'MIXED',
+        // so we're just going to use POST for everything, and use the "_method" parameter
+        // in the URL to specify the real transaction type.  Blame Microsoft.
+        //
+        method: 'POST',
+        params: {_method: transaction_type},
 
         // We received a response back from the server, that's a good start.
         success: function (response, request_options) {
