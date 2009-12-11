@@ -2,8 +2,10 @@
 # "apache2ctl restart".
 #
 
-# This provides the ExtJS "helper library" script.  It must go first.
-Alias /jarvis/script/ "/opt/jarvis/htdocs/script/"
-
 # This assumes that you have unpacked into /opt/jarvis/
-ScriptAlias /jarvis/ "/opt/jarvis/cgi-bin/"
+#
+# Note that the ScriptAlias must go first.
+#
+ScriptAlias /jarvis/jarvis.pl "/opt/jarvis/cgi-bin/jarvis.pl"
+
+Alias /jarvis/ "/opt/jarvis/htdocs/"

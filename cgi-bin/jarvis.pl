@@ -33,7 +33,22 @@ use warnings;
 use Carp;
 use CGI;
 
-use lib "/opt/jarvis/lib";
+# If "/opt/jarvis" is not your root jarvis directory, then either change
+# this script by hand, or preferably set the environment variable in your
+# webserver config.  E.g. in apache, add the following line (without the
+# leading hash).
+#
+# SetEnv JARVIS_ROOT "/path/to/jarvis"
+#
+# Note that we define jarvis_root twice here.  Once is because it is
+# used at run time (the first value).  The second is because we use it
+# in the "use lib" clause at compile time (the second value, from the
+# BEGIN block).
+#
+my $jarvis_root = $ENV{'JARVIS_ROOT'} || "/opt/jarvis";
+BEGIN { $jarvis_root = $ENV{'JARVIS_ROOT'} || "/opt/jarvis" }
+
+use lib "$jarvis_root/lib";
 
 use Jarvis::Error;
 use Jarvis::Config;
@@ -46,9 +61,6 @@ use Jarvis::Plugin;
 use Jarvis::DB;
 
 package Main;
-
-# Default jarvis etc.
-my $default_jarvis_etc = "/opt/jarvis/etc";
 
 # This is our CGI object.  We pass it into our Jasper::Config, but we also
 # use it in our "die" handler.
@@ -134,7 +146,7 @@ MAIN: {
     #
     ($dataset_name eq '') || ($dataset_name =~ m|^[\w\-\.]+$|) || die "Invalid dataset_name '$dataset_name'!\n";
 
-    $jconfig = new Jarvis::Config ($app_name, 'etc_dir' => ($ENV{'JARVIS_ETC'} || $default_jarvis_etc));
+    $jconfig = new Jarvis::Config ($app_name, 'etc_dir' => "$jarvis_root/etc");
     $dataset_name && ($jconfig->{'dataset_name'} = $dataset_name);
 
     # Debug can now occur, since we have called Config!
