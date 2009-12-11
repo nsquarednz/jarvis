@@ -40,12 +40,7 @@ use CGI;
 #
 # SetEnv JARVIS_ROOT "/path/to/jarvis"
 #
-# Note that we define jarvis_root twice here.  Once is because it is
-# used at run time (the first value).  The second is because we use it
-# in the "use lib" clause at compile time (the second value, from the
-# BEGIN block).
-#
-my $jarvis_root = $ENV{'JARVIS_ROOT'} || "/opt/jarvis";
+my $jarvis_root;
 BEGIN { $jarvis_root = $ENV{'JARVIS_ROOT'} || "/opt/jarvis" }
 
 use lib "$jarvis_root/lib";
