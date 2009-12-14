@@ -15,14 +15,3 @@ PerlRequire /opt/jarvis/etc/startup.pl
 </Location>
 
 Alias /jarvis/ "/opt/jarvis/htdocs/"
-
-# Note on mod_perl.  The following performance results were obtained
-# using a dataset with a query "SELECT 1".  2000 requests were performed
-# in 5 threads, using jMeter.
-#
-# =Type=                        Avg Time
-#
-# CGI                           523 ms          - No mod_perl
-# mod_perl                      54 ms           - Use mod_perl, but no DB connection re-use
-# mod_perl + Apache::DBI (JSON) 40 ms           - mod_perl with DB connection re-use (JSON)
-# mod_perl + Apache::DBI (XML)  40 ms           - mod_perl with DB connection re-use (XML)
