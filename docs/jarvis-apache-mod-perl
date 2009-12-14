@@ -1,0 +1,17 @@
+# Use this version if you are using Apache with mod_perl.  Using
+# mod_perl is strongly recommended if you are running a production
+# machine and if performance is important to you.
+#
+# Copy this file into /etc/apache2/conf.d and restart apache with
+# "apache2ctl restart".
+#
+# This assumes that you have unpacked into /opt/jarvis/.
+# Otherwise change the paths as appropriate.
+#
+PerlRequire /opt/jarvis/etc/startup.pl
+<Location "/jarvis-agent/*">
+    SetHandler perl-script
+    PerlResponseHandler Jarvis::Agent
+</Location>
+
+Alias /jarvis/ "/opt/jarvis/htdocs/"
