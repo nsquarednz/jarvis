@@ -1,5 +1,8 @@
+DROP TABLE request;
+
 CREATE TABLE request (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sid TEXT,
     app TEXT,
     username TEXT,
     group_list TEXT,

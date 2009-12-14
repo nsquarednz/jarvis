@@ -74,7 +74,9 @@ sub Handle {
 }
 
 ################################################################################
-# Disconnect from DB (if required).
+# Disconnect from DB (if required).  Under mod_perl we need to unassign the
+# dbh, so that we get a fresh one next time, because our next request may be
+# for a different application.
 #
 # Params:
 #       $jconfig - Jarvis::Config object (not used)
@@ -87,6 +89,7 @@ sub Disconnect {
     my ($jconfig) = @_;
 
     $dbh && $dbh->disconnect();
+    $dbh = undef;
 }
 
 1;

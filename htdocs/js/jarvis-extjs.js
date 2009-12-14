@@ -34,7 +34,7 @@ Ext.BLANK_IMAGE_URL = '/ext/resources/images/default/s.gif';
 // Global parameters
 var application = 'default';
 var login_page  = 'login.html';
-var jarvis_home = '/jarvis/jarvis.pl';
+var jarvis_home = '/jarvis-agent';
 
 // Track how many changes we still have outstanding.
 var num_pending = 0;
