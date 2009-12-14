@@ -24,7 +24,7 @@
 use strict;
 use warnings;
 
-use JSON::XS;
+use JSON::PP;           # JSON::PP was giving double-free/corruption errors.
 use XML::Smart;
 
 package Jarvis::Status;
@@ -56,7 +56,7 @@ sub report {
     $fields{"sid"} = $jconfig->{'sid'};
 
     if ($jconfig->{'format'} eq "json") {
-        my $json = JSON::XS->new->pretty(1);
+        my $json = JSON::PP->new->pretty(1);
         my $json_string = $json->encode ( \%fields );
         &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($json_string));
         &Jarvis::Error::dump ($jconfig, $json_string);

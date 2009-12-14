@@ -33,7 +33,7 @@ use strict;
 use warnings;
 
 use DBI;
-use JSON::XS;
+use JSON::PP;           # JSON::PP was giving double-free/corruption errors.
 use XML::Smart;
 use Text::CSV;
 use IO::String;
@@ -516,7 +516,7 @@ sub fetch {
         $return_data {"fetched"} = $num_rows;
         $return_data {"data"} = $rows_aref;
 
-        my $json = JSON::XS->new->pretty(1);
+        my $json = JSON::PP->new->pretty(1);
         my $json_string = $json->encode ( \%return_data );
         &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($json_string));
         &Jarvis::Error::dump ($jconfig, $json_string);
@@ -653,7 +653,7 @@ sub store {
 
     &Jarvis::Error::debug ($jconfig, "Request Content Type = '" . $content_type . "'");
     if ($content_type =~ m|^[a-z]+/json(; .*)?$|) {
-        my $ref = JSON::XS->new->utf8->decode ($content);
+        my $ref = JSON::PP->new->utf8->decode ($content);
 
         # User may pass a single hash record, OR an array of hash records.  We normalise
         # to always be an array of hashes.
@@ -858,7 +858,7 @@ sub store {
         if ($success && ! $return_array) {
             $results[0]{'returning'} && ($return_data {'returning'} = $results[0]{'returning'});
         }
-        my $json = JSON::XS->new->pretty(1);
+        my $json = JSON::PP->new->pretty(1);
         my $json_string = $json->encode ( \%return_data );
         &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($json_string));
         &Jarvis::Error::dump ($jconfig, $json_string);
