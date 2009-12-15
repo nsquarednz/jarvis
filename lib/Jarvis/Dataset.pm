@@ -46,8 +46,6 @@ use Jarvis::DB;
 
 use sort 'stable';      # Don't mix up records when server-side sorting
 
-my %yes_value = ('yes' => 1, 'true' => 1, '1' => 1);
-
 ###############################################################################
 # Internal Functions
 ###############################################################################
@@ -305,7 +303,7 @@ sub parse_statement {
     &Jarvis::Error::dump ($jconfig, "SQL as read from XML = " . $obj->{'raw_sql'});
 
     # Does this insert return rows?
-    $obj->{'returning'} = defined ($yes_value {lc ($dsxml->{dataset}{$ttype}{'returning'} || "no")});
+    $obj->{'returning'} = defined ($Jarvis::Config::yes_value {lc ($dsxml->{dataset}{$ttype}{'returning'} || "no")});
     &Jarvis::Error::debug ($jconfig, "Returning? = " . $obj->{'returning'});
 
     # Get our SQL with placeholders and prepare it.
@@ -409,7 +407,7 @@ sub fetch {
     &Jarvis::Error::debug ($jconfig, "Fetch transformations = " . join (', ', keys %transforms) . " (applied to returned results)");
 
     # Attach to the database.
-    my $dbh = &Jarvis::DB::Handle ($jconfig);
+    my $dbh = &Jarvis::DB::handle ($jconfig);
 
     # Get our STM.  This has everything attached.
     my $stm = &parse_statement ($jconfig, $dsxml, $dbh, 'select') ||
@@ -421,6 +419,10 @@ sub fetch {
     my %raw_params = $jconfig->{'cgi'}->Vars;
     my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%raw_params, $rest_args_aref);
 
+    # Store the params for logging purposes.
+    &Jarvis::Tracker::set_params (\%safe_params);
+
+    # Convert the parameter names to corresponding values.
     my @arg_values = &names_to_values ($jconfig, $stm->{'vnames_aref'}, \%safe_params);
 
     # Execute Select, return on error
@@ -478,6 +480,9 @@ sub fetch {
             @$rows_aref = @$rows_aref[$start .. $start + ($limit - 1)];
         }
     }
+
+    # Store the number of returned rows.
+    &Jarvis::Tracker::set_out_nrows (scalar @$rows_aref);
 
     # Apply any output transformations to remaining hashes.
     if (scalar (keys %transforms)) {
@@ -698,6 +703,9 @@ sub store {
         die "Unsupported content type for changes: '$content_type'\n";
     }
 
+    # Store this for tracking
+    &Jarvis::Tracker::set_in_nrows (scalar @$fields_aref);
+
     # Choose our statement and find the SQL and variable names.
     my $ttype = $jconfig->{'action'};
     &Jarvis::Error::debug ($jconfig, "Transaction Type = '$ttype'");
@@ -705,7 +713,7 @@ sub store {
         die "Unsupported transaction type '$ttype'.";
 
     # Shared database handle.
-    my $dbh = &Jarvis::DB::Handle ($jconfig);
+    my $dbh = &Jarvis::DB::handle ($jconfig);
     $dbh->begin_work() || die;
 
     # Loop for each set of updates.
@@ -714,13 +722,17 @@ sub store {
     my @results = ();
     my $message = '';
 
+    # We pre-compute the "before" statement parameters even if there is no before statement,
+    # since we may also wish to log them.  It's not
+    my %restful_params = &Jarvis::Config::safe_variables ($jconfig, {}, $rest_args_aref);
+    &Jarvis::Tracker::set_params (\%restful_params);
+
     # Execute our "before" statement.  This statement is NOT permitted to fail.  If it does,
     # then we immediately barf
     {
         my $bstm = &parse_statement ($jconfig, $dsxml, $dbh, 'before');
         if ($bstm) {
-            my %bsafe_params = &Jarvis::Config::safe_variables ($jconfig, {}, $rest_args_aref);
-            my @barg_values = &names_to_values ($jconfig, $bstm->{'vnames_aref'}, \%bsafe_params);
+            my @barg_values = &names_to_values ($jconfig, $bstm->{'vnames_aref'}, \%restful_params);
 
             &statement_execute($jconfig, $bstm, \@barg_values);
             if ($bstm->{'error'}) {
@@ -794,9 +806,9 @@ sub store {
                 my $returning_aref = $stm->{'sth'}->fetchall_arrayref({}) || undef;
                 if ($returning_aref) {
                     $row_result{'returning'} = $returning_aref;
+                    &Jarvis::Tracker::set_out_nrows (scalar @$returning_aref);
                 }
             }
-
         }
 
         push (@results, \%row_result);
@@ -812,8 +824,7 @@ sub store {
     if ($success) {
         my $astm = &parse_statement ($jconfig, $dsxml, $dbh, 'after');
         if ($astm) {
-            my %asafe_params = &Jarvis::Config::safe_variables ($jconfig, {}, $rest_args_aref);
-            my @aarg_values = &names_to_values ($jconfig, $astm->{'vnames_aref'}, \%asafe_params);
+            my @aarg_values = &names_to_values ($jconfig, $astm->{'vnames_aref'}, \%restful_params);
 
             &statement_execute($jconfig, $astm, \@aarg_values);
             if ($astm->{'error'}) {

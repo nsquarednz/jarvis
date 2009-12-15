@@ -52,7 +52,7 @@ my $dbh = undef;
 #       1
 ################################################################################
 #
-sub Handle {
+sub handle {
     my ($jconfig) = @_;
 
     $dbh && return $dbh;
@@ -68,9 +68,10 @@ sub Handle {
     &Jarvis::Error::debug ($jconfig, "DB Username = '$dbusername'");
     &Jarvis::Error::debug ($jconfig, "DB Password = '$dbpassword'");
 
-    $dbh = DBI->connect ($dbconnect, $dbusername, $dbpassword,
-                         { RaiseError => 1, PrintError => 1, AutoCommit => 1 }) ||
+    $dbh = DBI->connect ($dbconnect, $dbusername, $dbpassword, { RaiseError => 1, PrintError => 1, AutoCommit => 1 }) ||
         die "Cannot connect to database. " . DBI::errstr;
+
+    return $dbh;
 }
 
 ################################################################################
@@ -85,7 +86,7 @@ sub Handle {
 #       1
 ################################################################################
 #
-sub Disconnect {
+sub disconnect {
     my ($jconfig) = @_;
 
     $dbh && $dbh->disconnect();

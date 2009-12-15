@@ -9,7 +9,7 @@
 # Otherwise change the paths as appropriate.
 #
 PerlRequire /opt/jarvis/etc/startup.pl
-<Location ~ "/jarvis-agent/*">
+<Location ~ "/jarvis-agent/.*">
     SetHandler perl-script
     PerlResponseHandler Jarvis::Agent
 </Location>

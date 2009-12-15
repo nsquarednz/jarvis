@@ -38,7 +38,6 @@ package Jarvis::Main;
 
 use CGI;
 use DBI;
-use Time::HiRes;
 use File::Basename;
 
 use Jarvis::Error;
@@ -50,6 +49,7 @@ use Jarvis::Habitat;
 use Jarvis::Exec;
 use Jarvis::Plugin;
 use Jarvis::DB;
+use Jarvis::Tracker;
 
 # This is our CGI object.  We pass it into our Jasper::Config, but we also
 # use it in our "die" error handler.
@@ -82,8 +82,9 @@ sub error_handler {
     my $long_msg = &Jarvis::Error::print_message ($jconfig, 'fatal', $msg);
     print STDERR ($jconfig->{'debug'} ? Carp::longmess $long_msg : Carp::shortmess $long_msg);
 
-    # Let's be tidy and free the DBH.
-    &Jarvis::DB::Disconnect ($jconfig);
+    # Let's be tidy and free the database handles.
+    &Jarvis::DB::disconnect ($jconfig);
+    &Jarvis::Tracker::disconnect ($jconfig);
 
     # Under mod_perl we might actually wish to do something else here to
     # indicate that we are done.  I suspect that "exit 0" will shut down the
@@ -102,6 +103,9 @@ sub do {
     $SIG{__WARN__} = sub { die shift };
     $SIG{__DIE__} = \&Jarvis::Main::error_handler;
 
+    # Start tracking.
+    &Jarvis::Tracker::start ($jconfig);
+
     # Jarvis root.  Look through our @INC and find out where "lib" is, then
     # go up one directory from there to find JARVIS_ROOT.  We provide the
     # JARVIS_ROOT as an override.  It should never be needed.
@@ -114,9 +118,6 @@ sub do {
         }
     }
     $jarvis_root || die "Cannot determine JARVIS_ROOT.";
-
-    # Start time.
-    my ($start_seconds, $start_usec) = Time::HiRes::gettimeofday();
 
     # Get a new CGI object.
     $cgi = new CGI;
@@ -267,18 +268,18 @@ sub do {
         # Status.  I.e. are we logged in?
         if ($dataset_name eq "__status") {
             &Jarvis::Error::debug ($jconfig, "Returning status special dataset.");
-            $return_text = &Jarvis::Status::report ($jconfig, \@rest_args);
+            $return_text = &Jarvis::Status::report ($jconfig);
 
         # Habitat.  Echo the contents of the "<context>...</context>" block in our app-name.xml.
         } elsif ($dataset_name eq "__habitat") {
             &Jarvis::Error::debug ($jconfig, "Returning habitat special dataset.");
-            $return_text = &Jarvis::Habitat::print ($jconfig, \@rest_args);
+            $return_text = &Jarvis::Habitat::print ($jconfig);
 
         # Logout.  Clear session ID cookie, clean login parameters, then return "logged out" status.
         } elsif ($dataset_name eq "__logout") {
             &Jarvis::Error::debug ($jconfig, "Returning logout special dataset.");
             &Jarvis::Login::logout ($jconfig);
-            $return_text = &Jarvis::Status::report ($jconfig, \@rest_args);
+            $return_text = &Jarvis::Status::report ($jconfig);
 
         # Starts with __ so must be special, but we don't know it.
         } else {
@@ -328,7 +329,11 @@ sub do {
     # Cleanup.  Under mod_perl with Apache::DBI, this will actually do nothing.
     ###############################################################################
     #
-    &Jarvis::DB::Disconnect ($jconfig);
+    &Jarvis::DB::disconnect ($jconfig);
+
+    # Track the request end, and then disconnect from tracker DB.
+    &Jarvis::Tracker::finish ($jconfig, \@rest_args);
+    &Jarvis::Tracker::disconnect ($jconfig);
 }
 
 1;
