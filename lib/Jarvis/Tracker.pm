@@ -36,14 +36,6 @@ use Jarvis::Error;
 # Tracker DB handle.
 my $tdbh = undef;
 
-# Start time of this tracked request.
-my $tstart = undef;
-
-# Other things we track
-my $in_nrows = 0;
-my $out_nrows = 0;
-my %params = ();
-
 ################################################################################
 # Connect to tracker DB (if required) and return DBH.
 #
@@ -114,35 +106,7 @@ sub start {
     my ($jconfig) = @_;
 
     # Start time.
-    $tstart = [Time::HiRes::gettimeofday];
-
-    # Reset these.
-    $in_nrows = 0;
-    $out_nrows = 0;
-    %params = ();
-}
-
-################################################################################
-# Setters
-#
-# Params:
-#       $in_nrows - Number of rows read.
-# OR    $out_nrows - Number of rows returned.
-# OR    $params_href - Hash reference of parameters.  We copy.
-#
-# Returns:
-#       1.
-################################################################################
-#
-sub set_in_nrows {
-    $in_nrows = shift
-}
-sub set_out_nrows {
-    $out_nrows = shift
-}
-sub set_params {
-    my ($params_href) = shift;
-    %params = %{ $params_href }
+    $jconfig->{'tstart'} = [Time::HiRes::gettimeofday];
 }
 
 ################################################################################
@@ -181,11 +145,15 @@ sub finish {
     my $group_list = $jconfig->{'group_list'};
     my $dataset = $jconfig->{'dataset_name'};
     my $action =  $jconfig->{'action'};
+    my $in_nrows = $jconfig->{'in_nrows'} || 0;
+    my $out_nrows = $jconfig->{'out_nrows'} || 0;
 
     # Parameters.  Discard system special (__abc...).  Separate with colons.  Escape special chars.
+    my %params = $jconfig->{'params_href'} ? %{ $jconfig->{'params_href'} } : ();
     my $param_string = join (':', map { my $pval = ($params{$_} || ''); s/\\/\\\\/g; s/=/\\=/g; s/:/\\:/g; "$_" . "=" . $pval } grep { ! m/^__/ } sort (keys %params));
 
     # Julian time of request start.
+    my $tstart = $jconfig->{'tstart'};
     my $start_time = (($$tstart[0] + $$tstart[1] / 1000000) / 86400.0 ) + 2440587;
     my $duration_ms = int (Time::HiRes::tv_interval ($tstart) * 1000);
 
@@ -206,6 +174,79 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
 
     if (! $rv) {
         &Jarvis::Error::log ($jconfig, "Cannot execute tracker request INSERT: " . $tdbh->errstr);
+        $sth->finish ();
+        return;
+    }
+
+    # Free the tracker handle.
+    &Jarvis::Tracker::disconnect ();
+}
+
+################################################################################
+# An error has occured, record it in the "error" table.
+#
+# Params:
+#       $jconfig - Jarvis::Config object
+#           READ
+#               tracker
+#       $message - Error text that was printed to STDERR.
+#
+# Returns:
+#       1.
+################################################################################
+#
+sub error {
+    my ($jconfig, $message) = @_;
+
+    # Are we tracking statistics?
+    my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
+
+    my $tracker = $axml->{'tracker'};
+    $tracker || return;
+
+    my $errors = defined ($Jarvis::Config::yes_value {lc ($tracker->{'errors'}->content || "no")});
+    $errors || return;
+
+    # Get the handle to the tracker database.
+    my $tdbh = &Jarvis::Tracker::handle ($jconfig);
+    $tdbh || return;
+
+    # Interval in ms since start time.
+    my $sid = $jconfig->{'sid'};
+    my $app_name = $jconfig->{'app_name'};
+    my $username = $jconfig->{'username'};
+    my $group_list = $jconfig->{'group_list'};
+    my $dataset = $jconfig->{'dataset_name'};
+    my $action =  $jconfig->{'action'};
+
+    # The 'store' method made a copy of this for us, thankfully.
+    my $post_body = &Jarvis::Dataset::get_post_data ($jconfig);
+
+    # Parameters.  Discard system special (__abc...).  Separate with colons.  Escape special chars.
+    my %params = $jconfig->{'params_href'} ? %{ $jconfig->{'params_href'} } : ();
+    my $param_string = join (':', map { my $pval = ($params{$_} || ''); s/\\/\\\\/g; s/=/\\=/g; s/:/\\:/g; "$_" . "=" . $pval } grep { ! m/^__/ } sort (keys %params));
+
+    # Julian time of request start.
+    my $tstart = $jconfig->{'tstart'};
+    my $start_time = (($$tstart[0] + $$tstart[1] / 1000000) / 86400.0 ) + 2440587;
+
+    # Perform the database insert.
+    my $sth = $tdbh->prepare (
+"INSERT INTO error (
+    sid, app_name, username, group_list, dataset, action,
+    params, post_body, message, start_time)
+VALUES (?,?,?,?,?,?,?,?,?,?)");
+
+    if (! $sth) {
+        &Jarvis::Error::log ($jconfig, "Cannot prepare tracker error INSERT: " . $tdbh->errstr);
+        return;
+    }
+
+    my $rv = $sth->execute ($sid, $app_name, $username, $group_list, $dataset,
+        $action, $param_string, $post_body, $message, $start_time);
+
+    if (! $rv) {
+        &Jarvis::Error::log ($jconfig, "Cannot execute tracker error INSERT: " . $tdbh->errstr);
         $sth->finish ();
         return;
     }

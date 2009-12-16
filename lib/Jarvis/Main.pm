@@ -82,6 +82,9 @@ sub error_handler {
     my $long_msg = &Jarvis::Error::print_message ($jconfig, 'fatal', $msg);
     print STDERR ($jconfig->{'debug'} ? Carp::longmess $long_msg : Carp::shortmess $long_msg);
 
+    # Track this error, if we got far enough to have enough info.
+    $jconfig && &Jarvis::Tracker::error ($jconfig, Carp::longmess $long_msg);
+
     # Let's be tidy and free the database handles.
     &Jarvis::DB::disconnect ($jconfig);
     &Jarvis::Tracker::disconnect ($jconfig);
@@ -102,9 +105,6 @@ sub do {
 
     $SIG{__WARN__} = sub { die shift };
     $SIG{__DIE__} = \&Jarvis::Main::error_handler;
-
-    # Start tracking.
-    &Jarvis::Tracker::start ($jconfig);
 
     # Jarvis root.  Look through our @INC and find out where "lib" is, then
     # go up one directory from there to find JARVIS_ROOT.  We provide the
@@ -161,8 +161,12 @@ sub do {
     #
     ($dataset_name eq '') || ($dataset_name =~ m|^[\w\-\.]+$|) || die "Invalid dataset_name '$dataset_name'!\n";
 
+    # Now we can create our $jconfig at last!
     $jconfig = new Jarvis::Config ($app_name, 'etc_dir' => "$jarvis_root/etc");
     $dataset_name && ($jconfig->{'dataset_name'} = $dataset_name);
+
+    # Start tracking now.  Hopefully, not too much time has passed.
+    &Jarvis::Tracker::start ($jconfig);
 
     # Debug can now occur, since we have called Config!
     &Jarvis::Error::debug ($jconfig, "URI = $ENV{REQUEST_URI}");

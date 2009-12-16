@@ -337,7 +337,7 @@ sub parse_statement {
 #       $stm - A STM object created by &parse_statement.
 #
 # Returns:
-#       1
+#       1 (success) or 0 (failure)
 ################################################################################
 sub statement_execute {
     my ($jconfig, $stm, $arg_values_aref) = @_;
@@ -363,12 +363,54 @@ sub statement_execute {
 
         $stm->{'sth'}->finish;
         $stm->{'error'} = $error_message;
-
-    } else {
-        &Jarvis::Error::debug ($jconfig, 'Successful statement execution.  RetVal = ' . $stm->{'retval'});
+        return 0;
     }
 
-    return $stm;
+    &Jarvis::Error::debug ($jconfig, 'Successful statement execution.  RetVal = ' . $stm->{'retval'});
+    return 1;
+}
+
+################################################################################
+# Gets our POSTDATA from a number of potential difference sources.  Stores it
+# in $jconfig, just in case it is needed later.
+#
+# Params:
+#       $jconfig - Jarvis::Config object
+#           READ
+#               cgi                 Contains data values for {{param}} in SQL
+#               username            Used for {{username}} in SQL
+#               group_list          Used for {{group_list}} in SQL
+#               format              Either "json" or "xml" or "csv".
+#
+#       $rest_args_aref - Optional ref to our REST args (slash-separated after dataset).
+#
+# Returns:
+#       Reference to Hash of returned data.  You may convert to JSON or XML.
+#       die on error (including permissions error)
+################################################################################
+#
+sub get_post_data {
+    my ($jconfig) = @_;
+
+    $jconfig->{'post_data'} || return $jconfig->{'post_data'};
+
+    # Get our submitted content.  This works for POST (insert) on non-XML data.  If the
+    # content_type was "application/xml" then I think we will find our content in the
+    # 'XForms:Model' parameter instead.
+    $jconfig->{'post_data'} = $jconfig->{'cgi'}->param ('POSTDATA');
+
+    # This is for POST (insert) on XML data.
+    if (! $jconfig->{'post_data'}) {
+        $jconfig->{'post_data'} = $jconfig->{'cgi'}->param ('XForms:Model');
+    }
+
+    # This works for DELETE (delete) and PUT (update) on any content.
+    if (! $jconfig->{'post_data'}) {
+        while (<STDIN>) {
+            $jconfig->{'post_data'} .= $_;
+        }
+    }
+    return $jconfig->{'post_data'};
 }
 
 ################################################################################
@@ -420,14 +462,24 @@ sub fetch {
     my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%raw_params, $rest_args_aref);
 
     # Store the params for logging purposes.
-    &Jarvis::Tracker::set_params (\%safe_params);
+    my %params_copy = %safe_params;
+    $jconfig->{'params_href'} = \%params_copy;
 
     # Convert the parameter names to corresponding values.
     my @arg_values = &names_to_values ($jconfig, $stm->{'vnames_aref'}, \%safe_params);
 
     # Execute Select, return on error
     &statement_execute($jconfig, $stm, \@arg_values);
-    $stm->{'error'} && return $stm->{'error'} ;
+
+    # On error, log and track the error, then return it to be given back as plain
+    # text to the caller.  We don't wrap it in JSON or XML, since we don't want it
+    # to be interpreted as "valid" data at all.
+    #
+    if ($stm->{'error'}) {
+        $stm->{'sth'}->finish;
+        &Jarvis::Tracker::error ($jconfig, $stm->{'error'});
+        return $stm->{'error'};
+    }
 
     # Fetch the data.
     my $rows_aref = $stm->{'sth'}->fetchall_arrayref({});
@@ -482,7 +534,7 @@ sub fetch {
     }
 
     # Store the number of returned rows.
-    &Jarvis::Tracker::set_out_nrows (scalar @$rows_aref);
+    $jconfig->{'out_nrows'} = scalar @$rows_aref;
 
     # Apply any output transformations to remaining hashes.
     if (scalar (keys %transforms)) {
@@ -628,22 +680,8 @@ sub store {
     my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->{dataset}{transform}{store});
     &Jarvis::Error::debug ($jconfig, "Store transformations = " . join (', ', keys %transforms) . " (applied to incoming row data)");
 
-    # Get our submitted content.  This works for POST (insert) on non-XML data.  If the
-    # content_type was "application/xml" then I think we will find our content in the
-    # 'XForms:Model' parameter instead.
-    my $content = $jconfig->{'cgi'}->param ('POSTDATA');
-
-    # This is for POST (insert) on XML data.
-    if (! $content) {
-        $content = $jconfig->{'cgi'}->param ('XForms:Model');
-    }
-
-    # This works for DELETE (delete) and PUT (update) on any content.
-    if (! $content) {
-        while (<STDIN>) {
-            $content .= $_;
-        }
-    }
+    # Get our submitted content
+    my $content = &get_post_data ($jconfig);
     $content || die "Cannot find client-submitted change content.";
     &Jarvis::Error::debug ($jconfig, "Request Content Length = " . length ($content));
     &Jarvis::Error::dump ($jconfig, $content);
@@ -704,7 +742,7 @@ sub store {
     }
 
     # Store this for tracking
-    &Jarvis::Tracker::set_in_nrows (scalar @$fields_aref);
+    $jconfig->{'in_nrows'} = scalar @$fields_aref;
 
     # Choose our statement and find the SQL and variable names.
     my $ttype = $jconfig->{'action'};
@@ -725,7 +763,8 @@ sub store {
     # We pre-compute the "before" statement parameters even if there is no before statement,
     # since we may also wish to log them.  It's not
     my %restful_params = &Jarvis::Config::safe_variables ($jconfig, {}, $rest_args_aref);
-    &Jarvis::Tracker::set_params (\%restful_params);
+    my %params_copy = %restful_params;
+    $jconfig->{'params_href'} = \%params_copy;
 
     # Execute our "before" statement.  This statement is NOT permitted to fail.  If it does,
     # then we immediately barf
@@ -806,7 +845,7 @@ sub store {
                 my $returning_aref = $stm->{'sth'}->fetchall_arrayref({}) || undef;
                 if ($returning_aref) {
                     $row_result{'returning'} = $returning_aref;
-                    &Jarvis::Tracker::set_out_nrows (scalar @$returning_aref);
+                    $jconfig->{'out_nrows'} = scalar @$returning_aref;
                 }
             }
         }
