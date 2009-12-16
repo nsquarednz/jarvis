@@ -1,7 +1,7 @@
 ###############################################################################
 # Description:  Performs tracking functions for Jarvis.  These are written
-#               to the tracking database with SQLite.  Currently this is
-#               statistics, in future we may track errors too.
+#               to the tracking database with SQLite.  We track requests and
+#               errors.
 #
 # Licence:
 #       This file is part of the Jarvis WebApp/Database gateway utility.
@@ -124,14 +124,14 @@ sub start {
 sub finish {
     my ($jconfig) = @_;
 
-    # Are we tracking statistics?
+    # Are we tracking requests?
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
 
     my $tracker = $axml->{'tracker'};
     $tracker || return;
 
-    my $statistics = defined ($Jarvis::Config::yes_value {lc ($tracker->{'statistics'}->content || "no")});
-    $statistics || return;
+    my $requests = defined ($Jarvis::Config::yes_value {lc ($tracker->{'requests'}->content || "no")});
+    $requests || return;
 
     # Get the handle to the tracker database.
     my $tdbh = &Jarvis::Tracker::handle ($jconfig);
@@ -198,7 +198,7 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
 sub error {
     my ($jconfig, $message) = @_;
 
-    # Are we tracking statistics?
+    # Are we tracking errors?
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
 
     my $tracker = $axml->{'tracker'};
