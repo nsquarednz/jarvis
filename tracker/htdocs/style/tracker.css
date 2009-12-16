@@ -1,0 +1,29 @@
+#footer {
+    font-size: 0.8em;
+    font-weight: normal;
+    width: 100%;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    height: 15px;
+    text-align: right;
+    position: absolute;
+    bottom: 0;
+    border-top: solid 2px #aaaaff;
+    color: blue;
+    background: #efefff;
+}
+
+div.title-bar {
+    background: #efefff;
+    height: 30px;
+    padding: 5px;
+    display: block;
+    border-bottom: solid 2px #aaaaff;
+}
+
+div.title-bar h1 {
+    font-weight: bold;
+    font-size: 1.5em;
+    color: #333388;
+    font-variant: small-caps;
+}
