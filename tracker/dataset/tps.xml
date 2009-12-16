@@ -1,9 +1,0 @@
-<!--
-  Transactions per second query
-  -->
-<dataset read="*" write="">
-    <select>
-        SELECT datetime (start_time) as t, count (*) as c FROM request GROUP BY datetime (start_time);
-    </select>
-</dataset>
-
