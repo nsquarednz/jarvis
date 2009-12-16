@@ -392,7 +392,7 @@ sub statement_execute {
 sub get_post_data {
     my ($jconfig) = @_;
 
-    $jconfig->{'post_data'} || return $jconfig->{'post_data'};
+    $jconfig->{'post_data'} && return $jconfig->{'post_data'};
 
     # Get our submitted content.  This works for POST (insert) on non-XML data.  If the
     # content_type was "application/xml" then I think we will find our content in the
@@ -784,6 +784,7 @@ sub store {
     # Our cached statement handle(s).
     my %stm = ();
 
+    # Handle each insert/update/delete request row.
     foreach my $fields_href (@$fields_aref) {
 
         # Stop as soon as anything goes wrong.
@@ -797,6 +798,10 @@ sub store {
         #
         my %raw_params = %{ $fields_href };
         my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%raw_params, $rest_args_aref);
+
+        # Store these new parameters for our tracking purposes.
+        %params_copy = %safe_params;
+        $jconfig->{'params_href'} = \%params_copy;
 
         # Any input transformations?
         if (scalar (keys %transforms)) {
@@ -828,12 +833,18 @@ sub store {
         $row_result{'modified'} = $stm->{'retval'};
         $modified = $modified + $row_result{'modified'};
 
+        # On failure, we will still return valid JSON/XML to the caller, but we will indicate
+        # which request failed and will send back an overall "non-success" flag.
+        #
         if ($stm->{'error'}) {
             $row_result{'success'} = 0;
             $row_result{'modified'} = 0;
             $row_result{'message'} = $stm->{'error'};
             $success = 0;
             $message || ($message = $stm->{'error'});
+
+            # Log the error in our tracker database.
+            &Jarvis::Tracker::error ($jconfig, $stm->{'error'});
 
         # Suceeded.  Set per-row status, and fetch the returned results, if this
         # operation indicates that it returns values.
@@ -852,6 +863,10 @@ sub store {
 
         push (@results, \%row_result);
     }
+
+    # Reset our parameters, our per-row parameters are no longer valid.
+    %params_copy = %restful_params;
+    $jconfig->{'params_href'} = \%params_copy;
 
     # Free any remaining open statement types.
     foreach my $stm_type (keys %stm) {
