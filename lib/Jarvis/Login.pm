@@ -100,6 +100,11 @@ sub check {
 
     # Now see what we got passed.  These are the user's provided info that we will validate.
     my $offered_username = $jconfig->{'cgi'}->param('username') || '';
+
+    # A nice helper for user applications - strip leading/trailing whitespace of usernames.
+    $offered_username =~ s/^\s+//;
+    $offered_username =~ s/\s+$//;
+
     my $offered_password = $jconfig->{'cgi'}->param('password') || '';
 
     # By default these values are all empty.  Note that we never allow username
