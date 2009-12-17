@@ -6,6 +6,7 @@
 
 
 (function () {
+return function () {
 
     return new Ext.Panel ({
         title: "Summary",
@@ -24,5 +25,4 @@
         ]
     });
 
-
-})();
+}; })();

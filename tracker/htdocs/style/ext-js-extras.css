@@ -1,0 +1,37 @@
+/* EXTJS STYLE TWEAKS */
+/* Transparent toolbar and buttons bars */
+.x-toolbar td {
+    background-color: transparent !important;
+}
+.x-panel-btns td {
+    background-color: transparent !important;
+}
+
+/* Put a light border around our extended text fields in grids. */
+.x-grid3-row-body {
+    margin: 0 5 5 5;
+    border: 1px solid #ededed;
+}
+.x-grid3-padded-cell {
+    margin: 5 5 5 5;
+}
+
+/* This applies to all GridPanel and EditGridPanel headers */
+td.x-grid3-hd-inner, .x-grid3-hd-inner {
+    border-left:1px solid #aaccf6;
+    border-right:1px solid #aaccf6;
+    border-bottom:1px solid #aaccf6;
+    background: #ededed;
+    font-style: italic;
+}
+
+/* This one applies only to GridPanel.  EditGridPanel uses cell selection and doesn't use this style. */
+.x-grid3-row-selected div {
+    background: #ebeadb url(/ext/resources/images/default/grid/grid-hrow.gif) repeat-x 0 bottom !important;
+}
+
+/* This is for visually marking a row as deleted */
+.x-grid3-deleted-row div {
+    text-decoration: line-through;
+    color: #c00000;
+}

@@ -1,0 +1,15 @@
+<!--
+     Provides a list of users (with possible search criteria)
+  -->
+<dataset read="*" write="" debug="yes" dump="yes">
+    <select>
+        SELECT DISTINCT 
+            username
+        FROM
+            request
+        WHERE
+            ({$1} IS NULL OR app_name LIKE '%' || {$1} || '%')
+        ORDER BY
+            username ASC
+    </select>
+</dataset>

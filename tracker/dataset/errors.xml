@@ -1,0 +1,29 @@
+<!--
+     This dataset provides a list of the errors that have occurred.
+     First REST parameter can be the application, if so wanted.
+
+     Errors are returned latest error first.
+  -->
+
+<dataset read="*" write="">
+    <select>
+        SELECT
+            id,
+            sid,
+            app_name,
+            username,
+            group_list,
+            dataset,
+            action,
+            params,
+            post_body,
+            message,
+            strftime('%Y-%m-%dT%H:%M:%S', start_time)  AS start_time
+        FROM
+            error
+        WHERE
+            ({$1} IS NULL OR app_name LIKE '%' || {$1} || '%')
+        ORDER BY
+            start_time DESC
+    </select>
+</dataset>

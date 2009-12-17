@@ -16,7 +16,6 @@ jarvis.graph.Graph = function () {
 jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
 
     render: function (el, data) {
-        console.log ("in TpsGraph.render", el, data);
         var g = new pv.Panel()
             .canvas (el)
             .width (400)

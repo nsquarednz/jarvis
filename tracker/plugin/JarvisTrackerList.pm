@@ -8,9 +8,10 @@
 use strict;
 use warnings;
 
-use JSON::XS;
-
 package JarvisTrackerList;
+
+use JSON::XS;
+use Jarvis::DB;
 
 sub JarvisTrackerList::do {
     my ($jconfig, %args) = @_;
@@ -51,7 +52,7 @@ sub JarvisTrackerList::do {
                 map { 
                     if ($_ =~ /\.xml$/) {
                         $_ =~ s/\.xml$//;
-                        push(@{$list}, { id => "$id/$_", text => $_, leaf => "true" }); 
+                        push(@{$list}, { id => "$id/$_", text => $_, leaf => 1 }); 
                     } elsif (-d $datasetDirectory . "/" . $_) {
                         opendir (QUERIES, $datasetDirectory . "/" . $_);
                         my @testq = grep (/\.xml$/, readdir(QUERIES));
@@ -61,6 +62,22 @@ sub JarvisTrackerList::do {
                         }
                     }
                 } @files;
+            } elsif ($parts[1] eq "users") {
+                my $dbh = &Jarvis::DB::handle ($jconfig);
+                my $sql = "SELECT DISTINCT username FROM request WHERE app_name = ?";
+                my $sth = $dbh->prepare ($sql) || die "Couldn't prepare statement '$sql': " . $dbh->errstr;
+                my $stm = {};
+                $stm->{sth} = $sth;
+                $stm->{ttype} = 'JarvisTrackerList-users';
+                my $params = [ $parts[0] ];
+                &Jarvis::Dataset::statement_execute ($jconfig, $stm, $params);
+                $stm->{'error'} && die "Unable to execute statement '$sql': " . $dbh->errstr;
+
+                my $users = $sth->fetchall_arrayref({});
+                map {
+                    my $u = $_->{username};
+                    push(@{$list}, { id => "$id/$u", text => $u, leaf => 1 }); 
+                } @{$users};
             }
         }
     }
