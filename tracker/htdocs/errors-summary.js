@@ -11,31 +11,91 @@ return function (appName) {
         autoLoad: true,
         root: 'data',
         idProperty: 'id',
-        fields: ['start_time', 'username', 'message'],
+        fields: ['sid', 'app_name', 'group_list', 'dataset', 'action', 'start_time', 'username', 'message'],
         listeners: {
             'loadexception': jarvisLoadException
         }
     });
 
-    var expander = new Ext.grid.RowExpander({
-        lazyRender: true,
-        header: '&nbsp;',
-        dataFieldName: 'message',
-        listeners: {
-            // Needed because we have lazyRender = true.
-            'expand': function (ex, record, body, rowIndex) {
-                var content = expander.getBodyContent(record, rowIndex);
-                content = prettyPrintOne(content).replace (/\n/g, '<br>');
-                body.innerHTML = "<code class='prettyprint'>" + content + "</code>";
-            }
-        }
+    var errorDetails = new Ext.Panel({
+        layout: 'absolute',
+        autoScroll: true,
+        frame: true,
+        columnWidth: 0.5,
+        defaultType: 'label',
+        anchor: '100% 100%',
+        items: [
+            {
+                text: 'Event Time',
+                x: 5, y: 5
+            },
+            {
+                id: 'eventTime',
+                x: 100, y: 5
+            },
+            {
+                text: 'Username',
+                x: 5, y: 25
+            },
+            {
+                id: 'username',
+                x: 100, y: 25
+            },
+            {
+                text: 'User Groups',
+                x: 250, y: 5
+            },
+            {
+                id: 'groups',
+                x: 355, y: 5
+            },
+            {
+                text: 'SID',
+                x: 250, y: 25
+            },
+            {
+                id: 'sid',
+                x: 355, y: 25
+            },
+            {
+                text: 'Dataset',
+                x: 550, y: 5
+            },
+            {
+                id: 'dataset',
+                x: 595, y: 5
+            },
+            {
+                text: 'Error Message',
+                x: 5, y: 45
+            },
+            new Ext.BoxComponent ({
+                autoEl: {
+                    tag: 'div'
+                },
+                id: 'message',
+                anchor: '100% 100%',
+                x: 100, y: 45
+            })
+        ]
     });
+
+    var showErrorDetails = function(record) {
+        console.log (record);
+        console.log (errorDetails.items);
+        errorDetails.items.get('eventTime').setText(record.get('start_time'));
+        errorDetails.items.get('username').setText(record.get('username'));
+        errorDetails.items.get('sid').setText(record.get('sid'));
+        errorDetails.items.get('groups').setText(record.get('group_list'));
+        errorDetails.items.get('dataset').setText(record.get('dataset') + " (" + record.get('action') + ")");
+
+        errorDetails.items.get('message').el.insertHtml("afterBegin", "<code>" + record.get('message').replace (/\n/g, '<br>') + "</code>");
+    };
 
     var recentErrorsList = new Ext.grid.GridPanel({
         store: recentErrorsStore,
-        plugins: [ expander ],
+        region: 'center', 
         columns: [
-            expander,
             {
                 header: 'Event Time',
                 dataIndex: 'start_time',
@@ -59,16 +119,32 @@ return function (appName) {
         viewConfig: {
             forceFit: true
         },
+        listeners: {
+            cellclick: function (grid, rowIndex, columnIndex, e) {
+                var record = grid.getStore().getAt(rowIndex);  // Get the Record
+                showErrorDetails (record);
+            }
+        },
         sm: new Ext.grid.RowSelectionModel({singleSelect:true})
     });
 
-
     return new Ext.Panel ({
         title: appName + " - Errors",
-        layout: 'fit',
+        layout: 'border',
         closable: true,
         items: [
-            recentErrorsList
+            recentErrorsList,
+            new Ext.Panel ({
+                layout: 'fit',
+                region: 'south',
+                title: 'Error Details',
+                collapsible: true,
+                height: 300,
+                split: true,
+                items: [
+                    errorDetails
+                ]
+            })
         ]
     });
 
