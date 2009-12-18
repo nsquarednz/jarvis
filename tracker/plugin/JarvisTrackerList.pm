@@ -14,7 +14,7 @@ use JSON::XS;
 use Jarvis::DB;
 
 sub JarvisTrackerList::do {
-    my ($jconfig, %args) = @_;
+    my ($jconfig) = @_;
 
     my $id = $jconfig->{'cgi'}->param('node');
 

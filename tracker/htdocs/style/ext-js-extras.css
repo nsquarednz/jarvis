@@ -30,3 +30,7 @@ td.x-grid3-hd-inner, .x-grid3-hd-inner {
     text-decoration: line-through;
     color: #c00000;
 }
+
+label.abs-pos-label {
+    font-weight: bold
+}

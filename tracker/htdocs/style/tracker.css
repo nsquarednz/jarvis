@@ -27,3 +27,8 @@ div.title-bar h1 {
     color: #333388;
     font-variant: small-caps;
 }
+
+code.prettyprint {
+    font: sans-serif;
+    font-size: 11px;
+}

@@ -22,8 +22,25 @@
         FROM
             error
         WHERE
-            ({$1} IS NULL OR app_name LIKE '%' || {$1} || '%')
+            ({$1} IS NULL OR lower(app_name) = lower({$1}))
+            AND
+            (
+                {$filter} IS NULL OR {$filter} = ''
+                OR
+                id IN (SELECT id FROM error WHERE sid LIKE '%' || {$filter} || '%')
+                OR
+                id IN (SELECT id FROM error WHERE username LIKE '%' || {$filter} || '%')
+                OR
+                id IN (SELECT id FROM error WHERE dataset LIKE '%' || {$filter} || '%')
+                OR
+                id IN (SELECT id FROM error WHERE params LIKE '%' || {$filter} || '%')
+                OR
+                id IN (SELECT id FROM error WHERE message LIKE '%' || {$filter} || '%')
+                OR
+                id IN (SELECT id FROM error WHERE post_body LIKE '%' || {$filter} || '%')
+            )
         ORDER BY
             start_time DESC
+
     </select>
 </dataset>

@@ -55,6 +55,8 @@ use Jarvis::Text;
 #
 #       $dataset - Name of the dataset we are requested to perform.
 #
+#       $restArgs - the RESTful arguments, if any, provided by the caller.
+#
 # Returns:
 #       0 if the dataset is not a known "plugin"
 #       1 if the dataset is known and successful
@@ -62,7 +64,7 @@ use Jarvis::Text;
 ################################################################################
 #
 sub do {
-    my ($jconfig, $dataset) = @_;
+    my ($jconfig, $dataset, $restArgs) = @_;
 
     ###############################################################################
     # See if we have any extra "plugin" datasets for this application.
@@ -141,7 +143,7 @@ sub do {
     my $output;
     {
         no strict 'refs';
-        $output = &$method ($jconfig, %plugin_parameters);
+        $output = &$method ($jconfig, $restArgs, %plugin_parameters);
     }
 
     # Are we supposed to add headers?  Does that include a filename header?

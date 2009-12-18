@@ -8,7 +8,7 @@
 
 # This gives us transparant database connection pooling.  "Disconnected"
 # connections are put back into the pool.
-use Apache::DBI;
+#use Apache::DBI;
 
 # This enables us to find Jarvis::Agent.
 use lib qw(/opt/jarvis/lib);

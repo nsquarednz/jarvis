@@ -97,8 +97,10 @@ Ext.onReady (function () {
                 // Capture clicking on a specific item within 'queries', 'users' etc.
                 if (node.leaf == 1 && parts.length >= 3) { // TODO - node.isLeaf() does not work
                     if (parts[1] == "queries") {
-                        addTab (node.id, "query.js", parts[0], {
-                            query: parts[parts.length - 1]
+                        var app = parts[0];
+                        parts.splice(0, 2);
+                        addTab (node.id, "query.js", app, {
+                            query: parts.join ("/")
                         });
                     }
                 }

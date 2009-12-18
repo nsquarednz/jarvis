@@ -7,7 +7,7 @@ return function (appName) {
 
     // create the main Data Store for the fan list
     var recentErrorsStore = new Ext.data.JsonStore ({
-        url: jarvisUrl ('errors/' + appName),
+        proxy: new Ext.data.HttpProxy ({ url: jarvisUrl ('errors/' + appName), method: 'GET' }),
         autoLoad: true,
         root: 'data',
         idProperty: 'id',
@@ -26,6 +26,7 @@ return function (appName) {
         anchor: '100% 100%',
         items: [
             {
+                cls: 'abs-pos-label',
                 text: 'Event Time',
                 x: 5, y: 5
             },
@@ -34,6 +35,10 @@ return function (appName) {
                 x: 100, y: 5
             },
             {
+                cls: 'abs-pos-label',
+                listeners: {
+                    click: function () { console.log(arguments); alert('hiiii');}
+                },
                 text: 'Username',
                 x: 5, y: 25
             },
@@ -43,6 +48,7 @@ return function (appName) {
             },
             {
                 text: 'User Groups',
+                cls: 'abs-pos-label',
                 x: 250, y: 5
             },
             {
@@ -50,6 +56,7 @@ return function (appName) {
                 x: 355, y: 5
             },
             {
+                cls: 'abs-pos-label',
                 text: 'SID',
                 x: 250, y: 25
             },
@@ -58,6 +65,7 @@ return function (appName) {
                 x: 355, y: 25
             },
             {
+                cls: 'abs-pos-label',
                 text: 'Dataset',
                 x: 550, y: 5
             },
@@ -66,6 +74,7 @@ return function (appName) {
                 x: 595, y: 5
             },
             {
+                cls: 'abs-pos-label',
                 text: 'Error Message',
                 x: 5, y: 45
             },
@@ -89,7 +98,7 @@ return function (appName) {
         errorDetails.items.get('groups').setText(record.get('group_list'));
         errorDetails.items.get('dataset').setText(record.get('dataset') + " (" + record.get('action') + ")");
 
-        errorDetails.items.get('message').el.insertHtml("afterBegin", "<code>" + record.get('message').replace (/\n/g, '<br>') + "</code>");
+        errorDetails.items.get('message').el.update("<code>" + record.get('message').replace (/\n/g, '<br>') + "</code>");
     };
 
     var recentErrorsList = new Ext.grid.GridPanel({
@@ -119,6 +128,21 @@ return function (appName) {
         viewConfig: {
             forceFit: true
         },
+        tbar: [
+            "Filter: "
+            , new Ext.form.TextField( {
+                listeners: {
+                    specialkey: function (field, e) {
+                        if (e.getKey() == Ext.EventObject.ENTER) {
+                            recentErrorsStore.baseParams = {
+                                filter: field.getValue()
+                            };
+                            recentErrorsStore.load();
+                        }
+                    }
+                }
+            })
+        ],
         listeners: {
             cellclick: function (grid, rowIndex, columnIndex, e) {
                 var record = grid.getStore().getAt(rowIndex);  // Get the Record
