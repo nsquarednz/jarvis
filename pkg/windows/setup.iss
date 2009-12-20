@@ -104,7 +104,7 @@ begin
 	LoadStringFromFile(ExpandConstant('{app}/etc/startup.pl'), jarvisScript);
 
     // Change lib location
-    StringChange(jarvisScript,'use lib qw(opt/jarvis/lib);', ConvertBackSlashes(ExpandConstant('use lib qw({app}/lib);')));
+    StringChange(jarvisScript,'use lib qw(/opt/jarvis/lib);', ConvertBackSlashes(ExpandConstant('use lib qw({app}/lib);')));
 
 	//Replace original file
 	SaveStringToFile(ExpandConstant('{app}/etc/startup.pl'), jarvisScript, false);
