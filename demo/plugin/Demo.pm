@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 sub plugin::Demo::do {
-    my ($jconfig, %args) = @_;
+    my ($jconfig, $restArgs, %args) = @_;
 
     my $output = "";
 
@@ -16,7 +16,15 @@ sub plugin::Demo::do {
     # This demonstrates XML-configured parameters to the plugin.
     $output .= "CAT: " . $args{'category'} . "\n";
 
-    my $dbh = &Jarvis::DB::Handle ($jconfig);
+    # This demonstrates accessing RESTful arguments that are 
+    # from the URL after the dataset name
+    my $counter = 0;
+    map {
+        $output .= "RESTful argument $counter: " . $restArgs->[$counter] . "\n";
+        $counter++;
+    } @{$restArgs};
+
+    my $dbh = &Jarvis::DB::handle ($jconfig);
     $output .= "Boats: " . $dbh->do("SELECT COUNT(*) FROM boat");
 
     return $output;

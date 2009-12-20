@@ -21,7 +21,7 @@ h2 {
     padding-left: 50px;
     font-size: 160%;
     height: 48px;
-    background: #fff url('/demo/decoration/top_background.png') no-repeat;
+    background: #fff url('../decoration/top_background.png') no-repeat;
 }
 .work_area {
     width: 780;
@@ -33,16 +33,16 @@ h2 {
     color: #d00;
 }
 .add {
-    background-image:url(/edit/decoration/add.png) !important;
+    background-image:url(../decoration/add.png) !important;
 }
 .remove {
-    background-image:url(/edit/decoration/remove.png) !important;
+    background-image:url(../decoration/remove.png) !important;
 }
 .save {
-    background-image:url(/edit/decoration/save.png) !important;
+    background-image:url(../decoration/save.png) !important;
 }
 .detail {
-    background-image:url(/edit/decoration/detail.png) !important;
+    background-image:url(../decoration/detail.png) !important;
 }
 
 /* Put a light border around our extended text fields in grids. */
