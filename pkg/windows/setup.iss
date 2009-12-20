@@ -8,7 +8,7 @@
 AppId={{8B0C6409-2D65-44D7-9A37-EFF99F4BD1D0}
 AppName=Jarvis
 AppVerName={code:GetAppVersion|Jarvis}
-AppPublisher=N Squared Software
+AppPublisher=N-Squared Software
 DefaultDirName=c:\opt\jarvis
 DefaultGroupName=jarvis
 DisableProgramGroupPage=yes
@@ -23,18 +23,19 @@ Name: english; MessagesFile: compiler:Default.isl
 
 
 [Files]
-Source: ..\..\cgi-bin\jarvis.pl; DestDir: {app}\cgi-bin; Flags: ignoreversion; AfterInstall: SetJarvisLocations
+Source: ..\..\cgi-bin\agent.pl; DestDir: {app}\cgi-bin; Flags: ignoreversion; AfterInstall: SetJarvisAgentLocations
 Source: ..\..\demo\*; DestDir: {app}\demo; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: ..\..\docs\*; DestDir: {app}\docs; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: ..\..\etc\*; DestDir: {app}\etc; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: ..\..\etc\*; DestDir: {app}\etc; Flags: ignoreversion recursesubdirs createallsubdirs; AfterInstall: SetJarvisStartupLocations
 Source: ..\..\htdocs\*; DestDir: {app}\htdocs; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: ..\..\lib\*; DestDir: {app}\lib; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: ..\..\tracker\*; DestDir: {app}\lib; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: ..\..\build-version.txt; DestDir: {app}; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Code]
 const
-	defaultPerlLoc='\strawberry\perl\bin\perl';
+	defaultPerlLoc='\perl\bin\perl';
 
 var
 	wpPerlLocation: TInputQueryWizardPage;
@@ -77,24 +78,35 @@ end;
 
 //Set Jarvis locations:
 // - location of Perl installation
-// - locatin of Jarvis etc and lib directories
-procedure SetJarvisLocations();
+procedure SetJarvisAgentLocations();
 var
 	jarvisScript: String;
 begin
 	if wpPerlLocation.Values[0] = '' then
 		wpPerlLocation.Values[0] := defaultPerlLoc;
 
-	LoadStringFromFile(ExpandConstant('{app}/cgi-bin/jarvis.pl'), jarvisScript);
+	LoadStringFromFile(ExpandConstant('{app}/cgi-bin/agent.pl'), jarvisScript);
 
 	//Change Perl location
 	StringChange(jarvisScript,'#!/usr/bin/perl', '#!' + ConvertBackSlashes(wpPerlLocation.Values[0]));
 
-	//Change Jarvis lib and etc locations
-	StringChange(jarvisScript,'use lib "/opt/jarvis/lib";', ConvertBackSlashes(ExpandConstant('use lib "{app}/lib";')));
-	StringChange(jarvisScript,'my $default_jarvis_etc = "/opt/jarvis/etc";', ConvertBackSlashes(ExpandConstant('my $default_jarvis_etc = "{app}/etc";')));
+	//Replace original file
+	SaveStringToFile(ExpandConstant('{app}/cgi-bin/agent.pl'), jarvisScript, false);
 
-	//Replace original jarvis.pl
-	SaveStringToFile(ExpandConstant('{app}/cgi-bin/jarvis.pl'), jarvisScript, false);
+end;
+
+//Set Jarvis lib location for startup script.
+procedure SetJarvisStartupLocations();
+var
+	jarvisScript: String;
+begin
+
+	LoadStringFromFile(ExpandConstant('{app}/etc/startup.pl'), jarvisScript);
+
+    // Change lib location
+    StringChange(jarvisScript,'use lib qw(opt/jarvis/lib);', ConvertBackSlashes(ExpandConstant('use lib qw({app}/lib);')));
+
+	//Replace original file
+	SaveStringToFile(ExpandConstant('{app}/etc/startup.pl'), jarvisScript, false);
 
 end;
