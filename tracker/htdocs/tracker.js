@@ -67,6 +67,7 @@ Ext.onReady (function () {
         width: 400,
         loader: new Ext.tree.TreeLoader({
             url: jarvisUrl('list'),
+            preloadChildren: true,
             requestMethod: 'GET',
             listeners: {
                 loadexception: jarvisLoadException
@@ -84,7 +85,6 @@ Ext.onReady (function () {
         }],
         listeners: {
             click: function (node, event) { 
-                console.log(node, event);
                 var parts = node.id.split("/");
 
                 // Capture clicking on the level below the application.

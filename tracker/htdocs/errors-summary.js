@@ -36,9 +36,6 @@ return function (appName) {
             },
             {
                 cls: 'abs-pos-label',
-                listeners: {
-                    click: function () { console.log(arguments); alert('hiiii');}
-                },
                 text: 'Username',
                 x: 5, y: 25
             },
@@ -90,8 +87,6 @@ return function (appName) {
     });
 
     var showErrorDetails = function(record) {
-        console.log (record);
-        console.log (errorDetails.items);
         errorDetails.items.get('eventTime').setText(record.get('start_time'));
         errorDetails.items.get('username').setText(record.get('username'));
         errorDetails.items.get('sid').setText(record.get('sid'));

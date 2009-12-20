@@ -16,7 +16,6 @@ Ext.ux.Visualisation = Ext.extend(Ext.BoxComponent, {
 
     onRender: function(ct) {
         Ext.ux.Visualisation.superclass.onRender.apply(this, arguments);
-        console.log (this);
         this.renderGraph();
     },
     

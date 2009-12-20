@@ -18,7 +18,6 @@ return function (appName, extra) {
             url: jarvisUrl('source/' + appName + '/' + type + '/' + extra.query),
             success: function (xhr) {
                 var html = xhr.responseText;
-                console.log ('html received', html);
                 html = prettyPrintOne(html);
                 element.update("<code class='prettyprint'>" + html + "</code>");
             },

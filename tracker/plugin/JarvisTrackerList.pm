@@ -3,6 +3,10 @@
 # Jarvis plugin to provide a list of details about a specific application or
 # dataset, depending on the level provided.
 #
+# The 'node' - i.e. place to get in the tree is given by the 'node' URL argument
+# - a RESTful approach would have been nicer, but as we're currently using EXT
+# and the default tree loader works with this 'node' argument.
+#
 ###############################################################################
 
 use strict;
@@ -13,15 +17,16 @@ package JarvisTrackerList;
 use JSON::XS;
 use Jarvis::DB;
 
+# TODO This is not really safe in terms of directory path creation
 sub JarvisTrackerList::do {
-    my ($jconfig) = @_;
+    my ($jconfig, $restArgs) = @_;
 
     my $id = $jconfig->{'cgi'}->param('node');
 
     my $list = [];
 
     if (!$id || $id eq 'root') {
-        opendir (APPS, "/opt/jarvis/etc/");
+        opendir (APPS, $jconfig->{'etc_dir'} );
         my @files = grep (/\.xml$/, readdir (APPS));
         closedir (APPS);
         map { 
