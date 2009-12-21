@@ -86,7 +86,15 @@ sub check {
     }
 
     # Get an existing/new session.
+    # Under windows, avoid having CGI::Session throw the error:
+    # 'Your vendor has not defined Fcntl macro O_NOFOLLOW, used at C:/Perl/site/lib/CGI/Session/Driver/file.pm line 26.'
+    # by hiding the signal handler.
+    my $err_handler = $SIG{__DIE__};
+    $SIG{__DIE__} = sub {};
     my $session = new CGI::Session ($sid_store, $jconfig->{'cgi'}, \%sid_params);
+    $SIG{__DIE__} = $err_handler;
+    die "Error in creating CGI::Session: " . $! if ($!);
+
     $jconfig->{'session'} = $session;
     $jconfig->{'sname'} = $session->name();
     $jconfig->{'sid'} = $session->id();
