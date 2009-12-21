@@ -93,7 +93,9 @@ sub check {
     $SIG{__DIE__} = sub {};
     my $session = new CGI::Session ($sid_store, $jconfig->{'cgi'}, \%sid_params);
     $SIG{__DIE__} = $err_handler;
-    die "Error in creating CGI::Session: " . $! if ($!);
+    if (! $session) {
+        die "Error in creating CGI::Session: " . ($! || "Unknown Reason");
+    }
 
     $jconfig->{'session'} = $session;
     $jconfig->{'sname'} = $session->name();
@@ -103,7 +105,7 @@ sub check {
     # and the directory being written to is not writable. Put a check in here to
     # check for a writable session directory (otherwise you end up constantly
     # logging in).
-    die "Webserver user has no permissions to write to CGI::Session directory '$sid_params{'Directory'}'." 
+    die "Webserver user has no permissions to write to CGI::Session directory '$sid_params{'Directory'}'."
         if $sid_store =~ /driver:file/ && $sid_params{'Directory'} && ! -w $sid_params{'Directory'};
 
     # Now see what we got passed.  These are the user's provided info that we will validate.
