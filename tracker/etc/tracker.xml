@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<jarvis>
+    <app format="json" debug="yes" dump="yes">
+        <dataset_dir>/opt/jarvis/tracker/dataset/</dataset_dir>
+
+        <default_libs>
+            <lib path="/opt/jarvis/tracker/plugin/"/>
+        </default_libs>
+
+        <tracker requests="yes" errors="yes">
+            <dbfile>/opt/jarvis/tracker/db/tracker.db</dbfile>
+        </tracker>
+
+        <login module="Jarvis::Login::None">
+            <parameter name="username" value="x"/>
+            <parameter name="group_list" value="x"/>
+        </login>
+
+        <plugin dataset="list" access="*" module="JarvisTrackerList" add_headers="yes"/>
+        <plugin dataset="source" access="*" module="JarvisTrackerSource" add_headers="yes"/>
+
+        <sessiondb store="driver:file;serializer:default;id:md5" cookie="TRACKER_CGISESSID">
+            <parameter name="Directory" value="/tmp/"/>
+        </sessiondb>
+
+        <database connect="dbi:SQLite:dbname=/opt/jarvis/tracker/db/tracker.db" username="" password=""/>
+    </app>
+</jarvis>
+
+
