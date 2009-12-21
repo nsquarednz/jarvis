@@ -100,7 +100,7 @@ sub Jarvis::Login::Database::check {
     # Check the username from the user name table.
     my $query = "SELECT $user_password_column FROM $user_table WHERE $user_username_column = ?";
 
-    my $dbh = &Jarvis::DB::Handle ($jconfig);
+    my $dbh = &Jarvis::DB::handle ($jconfig);
     my $sth = $dbh->prepare ($query)
             || die "Couldn't prepare statement '$query': " . $dbh->errstr;
 
