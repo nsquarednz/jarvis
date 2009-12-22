@@ -49,6 +49,12 @@ CREATE TABLE boat (
     description text,
     UNIQUE (class, name));
 
+INSERT INTO boat (name, registration_num, class, owner, change_user)
+    VALUES ('MyMakk', 33, 'Makklesons', 'John Smith', 'admin');
+
+INSERT INTO boat (name, registration_num, class, owner, change_user)
+    VALUES ('Mr. Makkles IV', 104, 'Makklesons', 'John Smith, Jr.', 'admin');
+
 INSERT INTO boat (name, registration_num, class, owner, description, change_user)
     VALUES ('Flying Fox II', 13423, 'X Class', 'Graham Parker', 'Pink and blue.', 'admin');
 

@@ -1,16 +1,24 @@
 Ext.onReady (function () {
     jarvisInit ('demo');
 
-    // Do we want to pre-load a specific class?
-    var url = document.URL;
-    var args = Ext.urlDecode (url.substring(url.indexOf('?')+1, url.length));
-    var preload_class = args.class || '';
+    // Page size for paging
+    var page_size = 2;
+
+    // Do we want to pre-load a specific country?
+    var boat_class = jarvisHashArg (document.URL, 'boat_class', '');
+
+    // What to do after saving: 'detail', 'page'
+    var action_after_saving = null;
+
+    // If paging, what params?
+    var page_params = {};
 
     // create the main Data Store for the boat list
     var boat_store = new Ext.data.JsonStore ({
         proxy: new Ext.data.HttpProxy ({ url: jarvisUrl ('boat'), method: 'GET' }),
         root: 'data',
         idProperty: 'id',
+        totalProperty: 'fetched',
         fields: ['id', 'name', 'class', 'registration_num', 'owner' ],
         pruneModifiedRecords: true,
         listeners: {
@@ -22,31 +30,15 @@ Ext.onReady (function () {
                 grid.setDisabled (false);
             },
             'loadexception': jarvisLoadException,
-            'remove' : function (store, record, index) {
-                if (record.get('id') != 0) {
-                    grid.getTopToolbar().items.get (2).getEl ().innerHTML = '&nbsp;<b>DELETING...</b>';
-                    jarvisSendChange ('delete', store, 'boat', record);
-                }
+            'write' : function (store, record) {
+                grid.buttons[1].getEl().innerHTML = '&nbsp;<b>UPDATING...</b>';
+                var ttype = record.get ('_deleted') ? 'delete' : ((record.get('id') == 0) ? 'insert' : 'update');
+                jarvisSendChange (ttype, store, 'boat', record);
             },
-            'update' : function (store, record, operation) {
-                if (operation == Ext.data.Record.COMMIT) {
-                    grid.getTopToolbar().items.get (2).getEl ().innerHTML = '&nbsp;<b>UPDATING...</b>';
-                    jarvisSendChange (((record.get ('id') == 0) ? 'insert' : 'update'), store, 'boat', record);
-                }
+            'writeback' : function (store, result, ttype, record, remain) {
+                remain || (grid.buttons[1].getEl().innerHTML = '&nbsp');
+                store.handleWriteback (result, ttype, record, remain);
                 setButtons ();
-            },
-            'writeback' : function (store, result) {
-                grid.getTopToolbar().items.get (2).getEl ().innerHTML = '&nbsp';
-                if (result.success != 1) {
-                    store.reload ();
-                    alert (result.message);
-
-                } else if (result.data != null) {
-                    for (i=0; i<result.data.length; i++) {
-                        store.getById (result.data[i]._record_id).data.id = result.data[i].id; // DB ID returned on INSERT.
-                    }
-                    setButtons ();
-                }
             }
         }
     });
@@ -54,31 +46,68 @@ Ext.onReady (function () {
     // create the sub-set Data Store for the link_section pulldown
     var boat_class_store = new Ext.data.JsonStore ({
         url: jarvisUrl ('boat_class'),
+        autoLoad: true,
         root: 'data',
         idProperty: 'class',
         fields: ['class'],
         listeners: {
-            'load' : function () {
-                if (boat_class_filter.store.getCount() > 0) {
+            'load' : function (store, records, options) {
+                var r = new Ext.data.Record ({});
+                r.set ('class', '-- All Classes --');
+                store.insert (0, [r]);
 
-                    // Figure which boat to select in the combo box.  If the URL specifies
-                    // ?class=<class> then preload that one.  Otherwise just load the first one.
-                    var record_idx = boat_class_filter.store.find ('class', preload_class);
-                    if (record_idx < 0) {
-                        record_idx = 0;
-                    }
-                    preload_class = '';
-
-                    // Get the corresponding record, and load it into the ComboBox.
-                    var record = boat_class_filter.store.getAt (record_idx);
-                    var class = record.get ('class');
-                    boat_class_filter.setValue (class);
-
-                    // Fire the select event, which will load the main grid.
-                    boat_class_filter.fireEvent ('select', boat_class_filter, record, 0);
+                // Figure which boat to select in the combo box.  If the URL specifies
+                // ?class=<class> then preload that one.  Otherwise just load the first one.
+                var record_idx = boat_class_filter.store.find ('class', boat_class);
+                if (record_idx < 0) {
+                    record_idx = 0;
                 }
+                boat_class = '';
+
+                // Get the corresponding record, and load it into the ComboBox.
+                var record = boat_class_filter.store.getAt (record_idx);
+                var class = record.get ('class');
+                boat_class_filter.setValue (class);
+
+                // Fire the select event, which will load the main grid.
+                boat_class_filter.fireEvent ('select', boat_class_filter, record, 0);
             },
             'loadexception': jarvisLoadException
+        }
+    });
+
+    // Function to edit the currently selected item in the grid.
+    function editDetails () {
+        var rowcol = grid.getSelectionModel().getSelectedCell();
+        if (rowcol != null) {
+            var r = boat_store.getAt (rowcol[0]);
+            if (r.get('id') != '') {
+                location.href = 'boat_detail.html#id=' + r.get('id');
+            }
+        }
+    }
+
+    // Paging widget.
+    var pagingBar = new Ext.PagingToolbar({
+        pageSize: page_size,
+        store: boat_store,
+        displayInfo: true,
+        displayMsg: 'Displaying rows {0} - {1} of {2}',
+        emptyMsg: "No data to display",
+        listeners: {
+            'beforechange': function (pbar, params) {
+                // No changes pending, fine just load next page.
+                if (! haveChanges()) return true;
+
+                // Pages pending, these MUST be saved before we page.
+                action_after_saving = 'page';
+                page_params = params;
+
+                grid.stopEditing();
+                boat_store.writeChanges ();
+
+                return false;
+            }
         }
     });
 
@@ -120,7 +149,7 @@ Ext.onReady (function () {
                 editor: new Ext.form.TextField({ allowBlank: true })
             }
         ],
-        renderTo:'boat_grid',
+        renderTo:'extjs',
         width: 780,
         height: 400,
         viewConfig: {
@@ -140,75 +169,76 @@ Ext.onReady (function () {
                     r.set ('name', '');
                     r.set ('class', class);
                     r.set ('registration_num', 0);
+                    r.set ('owner', '');
                     boat_store.insert (0, r);
                     grid.startEditing (0, 0)
                     setButtons ();
                 }
             },
             {
-                text: 'Delete',
-                iconCls:'remove',
+                text: 'Delete', iconCls:'remove', id: 'delete',
                 handler: function () {
                     var rowcol = grid.getSelectionModel().getSelectedCell();
                     if (rowcol != null) {
                         var r = boat_store.getAt (rowcol[0]);
-                        if (r.get('id') != 0) {
-                            if (boat_store.getModifiedRecords().length > 0) {
-                                alert ('Cannot delete with uncommitted changes pending.');
-                                return;
-                            }
-                            if (! confirm ("Really delete entry: '" + r.get('name') + "'")) {
-                                return;
-                            }
+                        if (r.get('id') == 0) {
+                            boat_store.remove (r);
+
+                        } else if (! r.get ('_deleted')) {
+                            r.set ('_deleted', true);
+                            grid.getView().getRow (rowcol[0]).className += ' x-grid3-deleted-row';
                         }
-                        boat_store.remove (r);
+                        setButtons ();
                     }
-                    setButtons ();
                 }
-            },
-            {xtype: 'tbtext', text: '&nbsp;'}
+            }
         ],
+        bbar: pagingBar,
         buttons: [
+            { text: 'Help', iconCls:'help', handler: function () { helpShow (); } },
+            new Ext.Toolbar.Fill (),
             {
-                text: 'Edit Details',
+                text: 'Classes', iconCls:'prev',
+                handler: function () {
+                    if (haveChanges () && ! confirm ("Really discard unsaved changes?")) return;
+                    location.href = 'boat_class.html';
+                }
+            }, {
+                text: 'Edit Details', id: 'detail',
                 iconCls:'detail',
                 handler: function () {
-                    if (boat_store.getModifiedRecords().length > 0) {
-                        alert ('Cannot edit details with uncommitted changes pending.');
-                        return;
-                    }
-                    var rowcol = grid.getSelectionModel().getSelectedCell();
-                    if (rowcol != null) {
-                        var r = boat_store.getAt (rowcol[0]);
-                        if (r.get('name') != 0) {
-                            location.href = 'boat_detail.html?id=' + r.get('id');
-                        }
+                    if (haveChanges ()) {
+                        action_after_saving = 'detail';
+                        grid.stopEditing();
+                        boat_store.writeChanges ();
+
+                    } else {
+                        editDetails ();
                     }
                 }
-            },
-            {
-                text: 'Save Changes',
-                iconCls:'save',
+            }, {
+                text: 'Save Changes', iconCls:'save', id: 'save',
                 handler: function () {
                     grid.stopEditing();
-                    boat_store.commitChanges ();
+                    boat_store.writeChanges ();
                 }
-            },
-            {
-                text: 'Discard & Reload',
-                iconCls:'remove',
+            }, {
+                text: 'Reload', iconCls:'reload',
                 handler: function () {
                     grid.stopEditing ();
+                    if (haveChanges () && ! confirm ("Really discard unsaved changes?")) return;
                     boat_store.reload ();
                 }
             }
         ],
         listeners: {
+            'beforeedit': function (e) { return (! e.record.get ('_deleted')); },
+            'afteredit': function () { setButtons () },
             'cellclick': function () { setButtons () }
         }
     });
 
-    // A simple name filter.
+    // A simple class name filter.
     var boat_class_filter = new Ext.form.ComboBox ({
         store: boat_class_store,
         lazyInit: false,
@@ -220,9 +250,11 @@ Ext.onReady (function () {
         valueNotFoundText: '<Select Boat Class...>',
         listeners: { 'select':
             function (combo, record, index) {
-                var params = {};
-                params.class = record.get ('class');
-                boat_store.load ({'params': params});
+                boat_class = record.get ('class');
+                if (boat_class == '-- All Classes --') boat_class = '';
+                location.replace (location.pathname + '#' + (boat_class ? 'boat_class=' + boat_class : ''));
+
+                reloadList ();
             }
         }
     });
@@ -230,33 +262,57 @@ Ext.onReady (function () {
     grid.getTopToolbar().addText ('Boat Class: ');
     grid.getTopToolbar().addField (boat_class_filter);
 
+    // Reload according to current search critera.  Store params in baseParams.
+    function reloadList () {
+        var params = {};
+        params.boat_class = boat_class || null;
+        boat_store.baseParams = params;
+        boat_store.load ({params: {start: 0, limit: page_size}});
+    }
+
+    //-------------------------------------------------------------------------
+    // HAVE CHANGES FUNCTION
+    //-------------------------------------------------------------------------
+    function haveChanges () {
+        return (boat_store.getModifiedRecords().length > 0);
+    }
+
+    //-------------------------------------------------------------------------
+    // SET BUTTONS FUNCTION
+    //-------------------------------------------------------------------------
     // Button dis/enable controls.
     function setButtons () {
-        var haveModifiedRecords = (boat_store.getModifiedRecords().length > 0);
+        var haveModifiedRecords = haveChanges ();
         var selectedRowCol = grid.getSelectionModel().getSelectedCell();
-        var selectedRowIsNewborn = ((selectedRowCol != null) && (boat_store.getAt (selectedRowCol[0]).get('id') == 0));
+        var selectedRecord = selectedRowCol && boat_store.getAt (selectedRowCol[0]);
 
-        if (selectedRowCol && (selectedRowIsNewborn || ! haveModifiedRecords)) {
-            grid.getTopToolbar().items.get (1).enable ();
-        } else {
-            grid.getTopToolbar().items.get (1).disable ();
-        }
+        var exists = selectedRecord && ! selectedRecord.get('_deleted');
+        boat_class_filter.setDisabled (haveModifiedRecords);
+        Ext.ComponentMgr.get ('delete').setDisabled (! exists);
+        Ext.ComponentMgr.get ('detail').setDisabled (! exists);
+        Ext.ComponentMgr.get ('save').setDisabled (! haveModifiedRecords);
+    }
 
-        if (haveModifiedRecords) {
-            grid.buttons[1].enable ();
-            grid.buttons[2].enable ();
-        } else {
-            grid.buttons[1].disable ();
-            grid.buttons[2].disable ();
-        }
-        if (selectedRowCol && ! selectedRowIsNewborn && ! haveModifiedRecords) {
-            grid.buttons[0].enable ();
-        } else {
-            grid.buttons[0].disable ();
+    //-------------------------------------------------------------------------
+    // MAIN PROGRAM
+    //-------------------------------------------------------------------------
+    // Load our help system.
+    helpInit ('boat', 'Demo: Boats - Help');
+
+    // Check for unsaved changes on all links.
+    for (var i = 0; i < document.links.length; i++) {
+        document.links[i].onclick = function () {
+            return (! haveChanges () || confirm ("Really discard unsaved changes?"));
         }
     }
 
-    // Load the boat store.  When it loads, it will pick a value in the list
-    // and will load the matching items in the boat_store.
-    boat_class_store.load ();
+    // Load boats now if we are loading ALL classes.  Otherwise, wait for the
+    // boat class list to load, and we will change the boat loading off that.
+    //
+    if (! boat_class) {
+        var params = {};
+        params.boat_class = boat_class || null;
+        boat_store.baseParams = params;
+        boat_store.load();
+    }
 });

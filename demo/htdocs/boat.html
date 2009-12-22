@@ -1,7 +1,11 @@
-<html>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
-<title>Edit: Item</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Jarvis Demonstration - Boats</title>
+    <!-- EXT STYLE -->
+    <link rel="stylesheet" type="text/css" href="css/demo.css"/>
+
     <!-- EXT STYLE -->
     <link rel="stylesheet" type="text/css" href="/ext/resources/css/ext-all.css" />
     <link rel="stylesheet" type="text/css" href="/ext/resources/css/xtheme-gray.css" />
@@ -10,28 +14,33 @@
     <script type="text/javascript" src="/ext/adapter/ext/ext-base.js"></script>
     <script type="text/javascript" src="/ext/ext-all-debug.js"></script>
 
-    <!-- CUSTOM WIDGETS -->
-    <script type="text/javascript" src="widgets/RowExpander.js"></script>
-
-    <!-- PAGE-SPECIFIC STYLES -->
-    <link rel="stylesheet" type="text/css" href="style/default.css" />
-
     <!-- PAGE-SPECIFIC CODE -->
     <script type="text/javascript" src="/jarvis/js/jarvis-extjs.js"></script>
+    <script type="text/javascript" src="include/common.js"></script>
+    <script type="text/javascript" src="include/RowExpander.js"></script>
     <script type="text/javascript" src="boat.js"></script>
 </head>
-<body>
-    <div class="top_background">Edit: Boat</div>
-    <div class="work_area">
-        <div style="float:left">Edit details for an individual Boat.</div>
-        <div style="float:right">
-          <a href="boat_class.html">Boat Classes</a> |
-          <a href="logout.html">Logout</a> |
-          <a href="index.html">Index</a>
-        </div>
-        <br>
 
-        <div style="margin-top: 5" id="boat_grid"></div>
+<body>
+    <div id="container">
+        <div id="header">
+            Jarvis Demonstration - Boats
+        </div>
+
+        <div id="menu">
+            <a href="index.html">HOME</a> &nbsp; &nbsp; &nbsp; &nbsp;
+            <a href="logout.html">Logout</a> &nbsp; &nbsp; &nbsp; &nbsp;
+        </div>
+
+        <div id="full">
+            <p>This page shows the list of known Boats for a given class.</p>
+
+            <div style="margin-top: 5px" id="extjs"></div>
+        </div>
+
+        <div id="footer">
+        Application &copy;2009 N-Squared Software &nbsp;<span class="separator">|</span>&nbsp; Design &copy; 2007 <a href="http://www.realitysoftware.ca" title="Website Design">Reality Software</a>
+        </div>
     </div>
 </body>
 </html>

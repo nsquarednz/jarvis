@@ -6,29 +6,28 @@ SELECT id, name,
         COALESCE (owner, '') AS owner,
         COALESCE (description, '') AS description
 FROM boat
-WHERE class = {{class}
+WHERE (class = {{boat_class}) OR ({{boat_class}} IS NULL)
 ORDER BY name;
     </select>
     <update>
 UPDATE boat
-SET name = BTRIM ({{name}}),
+SET name = TRIM ({{name}}),
     registration_num = NULLIF ({{registration_num}}, 0),
-    class = BTRIM ({{class}}),
-    owner = NULLIF (BTRIM ({{owner}}), ''),
-    description = NULLIF (BTRIM ({{description}}), ''),
+    class = TRIM ({{class}}),
+    owner = NULLIF (TRIM ({{owner}}), ''),
+    description = NULLIF (TRIM ({{description}}), ''),
     change_user = {{__username}},
-    change_date = now()
+    change_date = datetime ('now')
 WHERE id = {{id}};
     </update>
     <insert returning="yes">
 INSERT INTO boat (name, registration_num, class, owner, description, change_user, change_date)
 VALUES ({{name}},
         NULLIF ({{registration_num}}, 0),
-        NULLIF (BTRIM ({{class}}), ''),
-        NULLIF (BTRIM ({{owner}}), ''),
-        NULLIF (BTRIM ({{description}}), ''),
-        {{__username}}, now())
-RETURNING {{_record_id}}::integer as _record_id, id;
+        NULLIF (TRIM ({{class}}), ''),
+        NULLIF (TRIM ({{owner}}), ''),
+        NULLIF (TRIM ({{description}}), ''),
+        {{__username}}, datetime ('now'));
     </insert>
     <delete>
 DELETE FROM boat

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <jarvis>
-    <app format="json" debug="yes">
+    <app format="json" dump="yes">
         <!-- This is where our <dataset>.xml are all stored -->
 	<dataset_dir>/opt/jarvis/demo/dataset</dataset_dir>
 
@@ -16,6 +16,11 @@
     install_type: 'production'
 }]]></habitat>
         -->
+
+        <page_limit_param>limit</page_limit_param>
+        <page_start_param>start</page_start_param>
+        <sort_field_param>sort</sort_field_param>
+        <sort_dir_param>dir</sort_dir_param>
 
         <!-- XML Habitat. Contents are entirely free form.  This is 100% example only.
              For requests with &format=xml we will include the <habitat></habitat>.

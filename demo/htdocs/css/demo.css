@@ -57,7 +57,7 @@ h2 {
 #main, #full {
     width: 620px;
     margin: 0 0 0 180px;
-    padding: 10px 40px 30px 0;
+    padding: 10px 10px 10px 0;
 }
 #full {
     margin: 0 0 0 10px;
@@ -72,18 +72,18 @@ h2 {
 }
 #footer {
     padding: 6px 40px 6px 40px;
-    background: #d6d6d6;
+    background: #3b7687;
     font-family: "Lucida Sans Unicode";
-    color: #444444;
+    color: #c5d6db;
     font-size: 11px;
     text-align: right;
 }
 #footer a {
     text-decoration: none;
-    color: #262626;
+    color: #c5d6db;
 }
 #footer a:hover {
-    color: #666666;
+    color: #c5d6db;
 }
 .separator {
     font-size:11px;

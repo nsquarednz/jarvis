@@ -47,6 +47,7 @@ Ext.onReady (function () {
 
     // main grid
     var grid = new Ext.grid.EditorGridPanel({
+        id: 'boat_class_grid',
         disabled: true,
         plugins: [ expander ],
         store: boat_class_store,
@@ -112,7 +113,14 @@ Ext.onReady (function () {
                 text: 'Boats', iconCls:'next',
                 handler: function () {
                     if (haveChanges () && ! confirm ("Really discard unsaved changes?")) return;
-                    location.href = 'boat.html#' + (country ? 'boat_class=' + country : '');
+
+                    var boat_class = null;
+                    var rowcol = grid.getSelectionModel().getSelectedCell();
+                    if (rowcol != null) {
+                        var r = boat_class_store.getAt (rowcol[0]);
+                        boat_class = r.get ('class');
+                    }
+                    location.href = 'boat.html#' + (boat_class ? 'boat_class=' + boat_class : '');
                 }
             }, {
                 text: 'Save Changes', iconCls:'save', id: 'save',
