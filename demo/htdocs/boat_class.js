@@ -45,7 +45,7 @@ Ext.onReady (function () {
         }
     });
 
-    // create the grid
+    // main grid
     var grid = new Ext.grid.EditorGridPanel({
         disabled: true,
         plugins: [ expander ],
@@ -56,13 +56,13 @@ Ext.onReady (function () {
                 header: "Class",
                 dataIndex: 'class',
                 sortable: true,
-                fixed: true,
+                width: 200,
                 editor: new Ext.form.TextField({ allowBlank: false })
             },{
                 header: "Active?",
-                fixed: true,
                 dataIndex: 'active',
                 sortable: true,
+                width: 40,
                 editor: new Ext.form.ComboBox({
                     store: ['Y', 'N'],
                     mode: 'local',
@@ -72,7 +72,7 @@ Ext.onReady (function () {
                 })
             },
         ],
-        renderTo:'extjs', width: 780, height: 400, viewConfig: { forceFit: true },
+        renderTo:'extjs', width: 780, height: 400, viewConfig: { forceFit:true },
         tbar: [
             {
                 text: 'New',
@@ -103,8 +103,7 @@ Ext.onReady (function () {
                         setButtons ();
                     }
                 }
-            },
-            {xtype: 'tbtext', text: '&nbsp;'}
+            }
         ],
         buttons: [
             { text: 'Help', iconCls:'help', handler: function () { helpShow (); } },
