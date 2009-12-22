@@ -852,11 +852,42 @@ sub store {
         } else {
             $row_result{'success'} = 1;
 
+            # Try and determine the returned values (normally the auto-increment ID)
             if ($stm->{'returning'}) {
+
+                # See if the query had a built-in fetch.  Under PostGreSQL (and very
+                # likely also under other drivers) this will fail if there is no current
+                # query.  I.e. if you have no "RETURNING" clause on your insert.
+                #
+                # However, under SQLite, this appears to be forgiving if there is no
+                # RETURNING clause.  SQLite doesn't have a RETURNING clause, but it will
+                # quietly return no data, allowing us to have a second try just below.
+                #
                 my $returning_aref = $stm->{'sth'}->fetchall_arrayref({}) || undef;
-                if ($returning_aref) {
+                if ($returning_aref && (scalar @$returning_aref)) {
                     $row_result{'returning'} = $returning_aref;
                     $jconfig->{'out_nrows'} = scalar @$returning_aref;
+                    &Jarvis::Error::debug ($jconfig, "Returning " . (scalar @$returning_aref) . " rows.");
+
+                # Hmm... we're supposed to be returning data, but the query didn't give
+                # us any.  Interesting.  Maybe it's SQLite?  In that case, we need to
+                # go digging for the return values via last_insert_rowid().
+                #
+                } elsif ($row_ttype eq 'insert') {
+                    my $rowid = $dbh->func('last_insert_rowid');
+                    if ($rowid) {
+                        my %return_values = %safe_params;
+                        $return_values {'id'} = $rowid;
+
+                        $row_result{'returning'} = [ \%return_values ];
+                        $jconfig->{'out_nrows'} = 1;
+
+                    }
+                }
+
+                # This is disappointing, but perhaps a "die" is too strong here.
+                if (! $row_result{'returning'}) {
+                    &Jarvis::Error::debug ($jconfig, "Cannot determine how to get returning values.");
                 }
             }
         }
