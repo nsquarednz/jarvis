@@ -17,47 +17,24 @@ Ext.onReady (function () {
                 grid.setDisabled (false);
             },
             'loadexception': jarvisLoadException,
-            'remove' : function (store, record, index) {
-                if (record.get('id') != 0) {
-                    grid.getTopToolbar().items.get (2).getEl ().innerHTML = '&nbsp;<b>DELETING...</b>';
-                    jarvisSendChange ('delete', store, 'boat_class', record);
-                }
+            'write' : function (store, record) {
+                grid.buttons[1].getEl().innerHTML = '&nbsp;<b>UPDATING...</b>';
+                var ttype = record.get ('_deleted') ? 'delete' : ((record.get('id') == 0) ? 'insert' : 'update');
+                jarvisSendChange (ttype, store, 'boat_class', record);
             },
-            'update' : function (store, record, operation) {
-                if (operation == Ext.data.Record.COMMIT) {
-                    grid.getTopToolbar().items.get (2).getEl ().innerHTML = '&nbsp;<b>UPDATING...</b>';
-                    jarvisSendChange (((record.get ('id') == 0) ? 'insert' : 'update'), store, 'boat_class', record);
-                }
+            'writeback' : function (store, result, ttype, record, remain) {
+                remain || (grid.buttons[1].getEl().innerHTML = '&nbsp');
+                store.handleWriteback (result, ttype, record, remain);
                 setButtons ();
-            },
-            'writeback' : function (store, result) {
-                grid.getTopToolbar().items.get (2).getEl ().innerHTML = '&nbsp';
-                if (result.success != 1) {
-                    store.reload ();
-                    alert (result.message);
-
-                } else if (result.data != null) {
-                    for (i=0; i<result.data.length; i++) {
-                        store.getById (result.data[i]._record_id).data.id = result.data[i].id; // DB ID returned on INSERT.
-                    }
-                    setButtons ();
-                }
             }
         }
-    });
-
-    // this holds our staff names
-    var staff_names_store = new Ext.data.JsonStore ({
-        url: jarvisUrl ('staff_names'),
-        root: 'data',
-        idProperty: 'id',
-        fields: ['id', 'name']
     });
 
     // expander for the grid.
     var expander = new Ext.grid.RowExpander({
 	lazyRender: true,
         dataFieldName: 'description',
+        header: '&nbsp',
         listeners: {
             // Needed because we have lazyRender = true.
             'expand': function (ex, record, body, rowIndex) {
@@ -77,14 +54,12 @@ Ext.onReady (function () {
             expander,
             {
                 header: "Class",
-                width: 600,
                 dataIndex: 'class',
                 sortable: true,
                 fixed: true,
                 editor: new Ext.form.TextField({ allowBlank: false })
             },{
                 header: "Active?",
-                width: 80,
                 fixed: true,
                 dataIndex: 'active',
                 sortable: true,
@@ -97,12 +72,7 @@ Ext.onReady (function () {
                 })
             },
         ],
-        renderTo:'boat_class_grid',
-        width: 780,
-        height: 400,
-        viewConfig: {
-            forceFit:true
-        },
+        renderTo:'extjs', width: 780, height: 400, viewConfig: { forceFit: true },
         tbar: [
             {
                 text: 'New',
@@ -117,62 +87,52 @@ Ext.onReady (function () {
                     grid.startEditing (0, 1);
                     setButtons ();
                 }
-            },
-            {
-                text: 'Delete',
-                iconCls:'remove',
+            }, {
+                text: 'Delete', iconCls:'remove', id: 'delete',
                 handler: function () {
-                    if (boat_class_store.getModifiedRecords().length > 0) {
-                        alert ('Cannot delete with uncommitted changes pending.');
-                        return;
-                    }
                     var rowcol = grid.getSelectionModel().getSelectedCell();
                     if (rowcol != null) {
                         var r = boat_class_store.getAt (rowcol[0]);
-                        if ((r.get('id') != 0) && (! confirm ("Really delete entry: '" + r.get('class') + '"'))) return;
-                        boat_class_store.remove (r);
+                        if (r.get('id') == 0) {
+                            boat_class_store.remove (r);
+
+                        } else if (! r.get ('_deleted')) {
+                            r.set ('_deleted', true);
+                            grid.getView().getRow (rowcol[0]).className += ' x-grid3-deleted-row';
+                        }
+                        setButtons ();
                     }
-                    setButtons ();
                 }
             },
             {xtype: 'tbtext', text: '&nbsp;'}
         ],
         buttons: [
+            { text: 'Help', iconCls:'help', handler: function () { helpShow (); } },
+            new Ext.Toolbar.Fill (),
             {
-                text: 'View Boats',
-                iconCls:'detail',
+                text: 'Boats', iconCls:'next',
                 handler: function () {
-                    if (boat_class_store.getModifiedRecords().length > 0) {
-                        alert ('Cannot view boats with uncommitted changes pending.');
-                        return;
-                    }
-                    var rowcol = grid.getSelectionModel().getSelectedCell();
-                    if (rowcol != null) {
-                        var r = boat_class_store.getAt (rowcol[0]);
-                        if (r.get('class') != '') {
-                            location.href = 'boat.html?class=' + r.get('class');
-                        }
-                    }
+                    if (haveChanges () && ! confirm ("Really discard unsaved changes?")) return;
+                    location.href = 'boat.html#' + (country ? 'boat_class=' + country : '');
                 }
-            },
-            {
-                text: 'Save Changes',
-                iconCls:'save',
+            }, {
+                text: 'Save Changes', iconCls:'save', id: 'save',
                 handler: function () {
                     grid.stopEditing();
-                    boat_class_store.commitChanges ();
+                    boat_class_store.writeChanges ();
                 }
-            },
-            {
-                text: 'Discard & Reload',
-                iconCls:'remove',
+            }, {
+                text: 'Reload', iconCls:'reload',
                 handler: function () {
                     grid.stopEditing ();
+                    if (haveChanges () && ! confirm ("Really discard unsaved changes?")) return;
                     boat_class_store.reload ();
                 }
             }
         ],
         listeners: {
+            'beforeedit': function (e) { return (! e.record.get ('_deleted')); },
+            'afteredit': function () { setButtons () },
             'cellclick': function () { setButtons () }
         }
     });
@@ -207,32 +167,29 @@ Ext.onReady (function () {
         grid,
         {delegate: '.x-grid3-row-body'});
 
-    // Button dis/enable controls.
-    function setButtons () {
-        var haveModifiedRecords = (boat_class_store.getModifiedRecords().length > 0);
-        var selectedRowCol = grid.getSelectionModel().getSelectedCell();
-        var selectedRowIsNewborn = ((selectedRowCol != null) && (boat_class_store.getAt (selectedRowCol[0]).get('id') == 0));
-
-        if (selectedRowCol && (selectedRowIsNewborn || ! haveModifiedRecords)) {
-            grid.getTopToolbar().items.get (1).enable ();
-        } else {
-            grid.getTopToolbar().items.get (1).disable ();
-        }
-
-        if (haveModifiedRecords) {
-            grid.buttons[1].enable ();
-            grid.buttons[2].enable ();
-        } else {
-            grid.buttons[1].disable ();
-            grid.buttons[2].disable ();
-        }
-        if (selectedRowCol && ! selectedRowIsNewborn && ! haveModifiedRecords) {
-            grid.buttons[0].enable ();
-        } else {
-            grid.buttons[0].disable ();
-        }
+    //-------------------------------------------------------------------------
+    // HAVE CHANGES FUNCTION
+    //-------------------------------------------------------------------------
+    function haveChanges () {
+        return (boat_class_store.getModifiedRecords().length > 0);
     }
 
-    staff_names_store.load();
+    //-------------------------------------------------------------------------
+    // MAIN PROGRAM
+    //-------------------------------------------------------------------------
+    // Load our help system.
+    helpInit ('boat_class', 'Demo: Boat Class - Help');
+
+    // Button dis/enable controls.
+    function setButtons () {
+        var haveModifiedRecords = haveChanges ();
+        var selectedRowCol = grid.getSelectionModel().getSelectedCell();
+        var selectedRecord = selectedRowCol && boat_class_store.getAt (selectedRowCol[0]);
+        var exists = selectedRecord && ! selectedRecord.get('_deleted');
+
+        Ext.ComponentMgr.get ('delete').setDisabled (! exists);
+        Ext.ComponentMgr.get ('save').setDisabled (! haveModifiedRecords);
+    }
+
     boat_class_store.load();
 });

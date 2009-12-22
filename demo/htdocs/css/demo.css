@@ -1,235 +1,206 @@
-/* greg01 css
-released under creative commons attribution license - please keep the 'designed by' link in the footer */
-
-html, body {
-	height: 100%;
-	margin: 0;
-	font-family: "Trebuchet MS", Helvetica, Arial, sans-serif;
+/******************************************************************************
+ * These style definitions form part of the KeepItSimple template.
+ ******************************************************************************/
+body  {
+    background: #AF9C62;
+    margin: 0;
 }
-
 #container {
-	min-height: 100%;
-	position: relative;
+    width: 800px;
+    margin: 0 auto;
+    background: #FFFFFF;
 }
-* html #container {
-	height: 100%;
-}
-
-/* header stuff */
-
 #header {
-	background: url(../assets/header-bg.gif) #4e6b8e;
-	width: 100%;
-	height: 150px;
-	margin: 0;
-	padding: 0;
-	border-bottom: 4px solid #636363;
+    padding: 45px 0 20px 40px;
+    font-size: 140%;
 }
-
-#header h1, #header h2 {
-	width: 760px;
-	margin: 0 auto;
-	font-weight: normal;
-	color: #fff;
-}
-
-#header h1 {
-	padding-top: 40px;
-	font-size:  40pt;
-}
-
-#header h2 {
-	margin-top: -10px;
-	font-size: 14pt;
-}
-
 #header a {
-	color: #fff;
-	text-decoration: none;
+    color: #121212;
+    text-decoration: none;
+    font-size: 30px;
+    font-family: "Myriad Pro", "Arial Narrow";
 }
-
-#header a:hover {
-	color: #fbe4b5;
+#menu {
+    background-color: #3b7687;
+    padding: 6px 0 6px 40px;
 }
-
-/* horizontal menu */
-
-#menu-h {
-	background: url(../assets/menu-h-bg.gif) #fff;
-	width: 100%;
-	height: 58px;
-	margin: 0;
-	padding: 0;
+#menu a {
+    color: #c5d6db;
+    text-decoration: none;
+    font-size: 14px;
+    font-family: "Arial Narrow", "Myriad Pro";
 }
-
-#menu-h ul {
-	width: 760px;
-	margin: 0 auto;
-	padding: 0;
-	list-style: none;
+#menu a:hover {
+    color: #ecf2f3;
 }
-
-#menu-h li {
-	float: left;
+#sidebar {
+    float: left;
+    width: 120px;
+    padding: 30px 0 0 40px;
+    margin: 0;
 }
-
-#menu-h a {
-	height: 27px;
-	background: transparent;
-	display: block;
-	float: left;
-	margin: 0 auto;
-	padding: 3px 20px 0 20px;
-	color: #636363;
-	font-weight: bold;
-	text-decoration: none;
+h1 {
+    margin: 0px;
+    color: #869843;
+    font-size:24px;
+    font-family: "Arial Narrow", "Myriad Pro";
+    font-weight: normal;
 }
-
-#menu-h a:hover {
-	background: transparent url(../assets/menu-h-bg-invert.gif);
+h2 {
+    color: #3b7687;
+    font-size: 15px;
+    margin: 20px 0 5px 0;
 }
-
-#menu-h .active {
-	color: #60758f;
-	text-decoration: underline;
+#main, #full {
+    margin: 0 0 0 180px;
+    padding: 35px 40px 30px 0;
+    color: #444444;
+    font-family: "Georgia";
+    font-size: 13px;
+    line-height: 18px;
+    text-align: justify;
 }
-
-/* main content container */
-
-#main {
-	width: 760px;
-	margin: 0 auto;
-	margin-bottom: 70px;
-	margin-top: 10px;
-	line-height: 1.7em;
+#full {
+    margin: 0 0 0 10px;
+    width: 780px;
 }
-
-#main h1, #main h2 {
-	border-bottom: 3px solid #43648d;
-	width: 100%;
-	color: #43648d;
+#main a, #full a {
+    color: #3b7687;
+    text-decoration: none;
 }
-
-/* main content */
-
-#content {
-	width: 560px;
-	float: left;
-	margin-right: 40px;
-	color: #5c738f;
+#main a:hover, #full a:hover {
+    color: #444444;
 }
-
-#content p {
-	font-size: 10pt;
-}
-
-#content blockquote {
-	font-size: 10pt;
-	border-left: 3px solid #f8b832;
-	padding: 0 10px 0 10px;
-	background: #eef url(../assets/quote.gif) no-repeat bottom right;
-}
-
-#content ul {
-	font-size: 10pt;
-}
-
-#content a {
-	color: #43648d;
-	border-bottom: 1px solid #f8b832;
-	text-decoration: none;
-	font-weight: bold;
-}
-
-#content a:hover {
-	border-bottom: none;
-}
-
-#content .intro {
-	font-size: 11pt;
-}
-
-#content img {
-	padding: 3px;
-	border: 1px solid #5c738f;
-}
-
-/* right menu */
-
-#menu-v {
-	width: 160px;
-	float: left;
-	color: #5c738f;
-}
-
-#menu-v ul {
-	list-style: none;
-	padding: 0;
-	margin: 0;
-}
-
-#menu-v a {
-	width: 160px;
-	border-bottom: 1px solid yellow;
-	display: block;
-	text-decoration: none;
-	color: #5c738f;
-
-}
-
-#menu-v a:hover {
-	background: #eef;
-}
-
-#menu-v p {
-	font-size: 10pt;
-}
-
-/* footer */
-
 #footer {
-	background: #4e6b8e;
-	height: 45px;
-	color: #f8b832;
-	padding-top: 10px;
-	padding-bottom: 10px;
-	width: 100%;
-	position: relative;
-	margin-top: -65px;
-	clear: both;
+    padding: 6px 40px 6px 40px;
+    background: #d6d6d6;
+    font-family: "Lucida Sans Unicode";
+    color: #444444;
+    font-size: 11px;
+    text-align: right;
 }
-
-#footer p {
-	text-align: center;
-	font-size: 9pt;
-	margin: 0;
-}
-
 #footer a {
-	color: #fac353;
-	text-decoration: underline;
+    text-decoration: none;
+    color: #262626;
 }
-
 #footer a:hover {
-	text-decoration: none;
+    color: #666666;
+}
+.separator {
+    font-size:11px;
+    color:#FFFFFF;
 }
 
-/* misc */
+/******************************************************************************
+ * These style definitions are used by ExtJS, and do not form part of the
+ * KeepItSimple template.
+ ******************************************************************************/
 
-.clear {
-	clear: both;
-	margin: 0;
-	padding: 0;
-	height: 0;
-	overflow: hidden;
+/* Transparent toolbar and buttons bars */
+.x-toolbar td {
+    background-color: transparent !important;
+}
+.x-panel-btns td {
+    background-color: transparent !important;
 }
 
-.left {
-	float: left;
-	margin-right: 10px;
+/* Put a light border around our extended text fields in grids. */
+.x-grid3-row-body {
+    margin: 0 5 5 5;
+    border: 1px solid #ededed;
+}
+.x-grid3-padded-cell {
+    margin: 5 5 5 5;
 }
 
-.right {
-	float: right;
-	margin-left: 10px;
+/* This applies to all GridPanel and EditGridPanel headers */
+td.x-grid3-hd-inner, .x-grid3-hd-inner {
+    border-left:1px solid #aaccf6;
+    border-right:1px solid #aaccf6;
+    border-bottom:1px solid #aaccf6;
+    background: #ededed;
+    font-style: italic;
+}
+
+/* This one applies only to GridPanel.  EditGridPanel uses cell selection and doesn't use this style. */
+.x-grid3-row-selected div {
+    background-color: #b8cfee;
+}
+
+/* This is for visually marking a row as deleted */
+.x-grid3-deleted-row div {
+    text-decoration: line-through;
+    color: #c00000;
+}
+
+/* ASSET STYLES */
+.add { background-image:url(../images/add.png) !important; }
+.remove { background-image:url(../images/remove.png) !important; }
+.save { background-image:url(../images/save.png) !important; }
+.detail { background-image:url(../images/detail.png) !important; }
+.help { background-image:url(../images/help.png) !important; }
+.reload { background-image:url(../images/reload.png) !important; }
+.up { background-image:url(../images/up.png) !important; }
+.down { background-image:url(../images/down.png) !important; }
+.next { background-image:url(../images/next.png) !important; }
+.prev { background-image:url(../images/prev.png) !important; }
+.copy { background-image:url(../images/copy.png) !important; }
+.paste { background-image:url(../images/paste.png) !important; }
+.edit { background-image:url(../images/edit.png) !important; }
+.cancel { background-image:url(../images/cancel.png) !important; }
+
+/* HELP STYLES */
+#extjs td, #extjs input {
+    font-size: 100%;
+}
+.x-grid3-padded-cell {
+    padding: 5px 5px 5px 5px !important;
+}
+.x-window-body {
+    padding: 5px 5px 5px 5px !important;
+    background-color: #fff !important;
+}
+.x-window-body p, .x-window-body h2 {
+    margin-bottom:10px !important;
+}
+.x-window-mc body, .x-window-mc td {
+    font-family:tahoma,arial,helvetica,sans-serif;
+    font-size:11px;
+    font-size-adjust:none;
+    font-style:normal;
+    font-variant:normal;
+    font-weight:normal;
+    line-height:normal;
+    margin-bottom:5px;
+}
+hr.topic {
+    margin-top: 20px;
+    margin-right: 20px;
+    color: #888888;
+}
+p.topic {
+    color: #0081AF;
+    font-weight: bold;
+    font-size: 110%;
+    width: 100%;
+    margin-top: 5px !important;
+    margin-bottom: 5px !important;
+}
+td.note {
+    vertical-align: top;
+    text-align: right;
+}
+table.helptable {
+    margin-left: 20px;
+    margin-right: 20px;
+    border: 1px solid #aaaaaa;
+    border-collapse: collapse;
+}
+table.helptable td {
+    border: 1px solid #aaaaaa;
+    padding: 4px 4px 4px 4px !important;
+    vertical-align: top;
+}
+.align-right {
+    text-align: right;
 }
