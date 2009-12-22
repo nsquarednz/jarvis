@@ -15,7 +15,7 @@ SET name = BTRIM ({{name}}),
     owner = NULLIF (BTRIM ({{owner}}), ''),
     description = NULLIF (BTRIM ({{description}}), ''),
     change_user = {{__username}},
-    change_date = now()
+    change_date = datetime ('now')
 WHERE ID = {{id}}
     </update>
 </dataset>

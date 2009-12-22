@@ -30,7 +30,7 @@
         </habitat>
 
         <!-- This defines how our sessions are stored.  See CGI::Session. -->
-        <sessiondb store="driver:file;serializer:default;id:md5" expiry="+2h">
+        <sessiondb store="driver:file;serializer:default;id:md5" expiry="+2h" cookie="DEMO_SESSIONID">
             <parameter name="Directory" value="/tmp/demo"/>
         </sessiondb>
 

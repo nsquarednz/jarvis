@@ -1,4 +1,4 @@
-<dataset read="*" write="*">
+<dataset read="*" write="*" dump="yes">
     <select>
 SELECT id, class, active,
     COALESCE (description, '') AS description
@@ -7,17 +7,16 @@ ORDER BY class
     </select>
     <update>
 UPDATE boat_class
-SET class = BTRIM ({{class}}),
+SET class = TRIM ({{class}}),
     active = {{active}},
-    description = NULLIF (BTRIM ({{description}}), ''),
+    description = NULLIF (TRIM ({{description}}), ''),
     change_user = {{__username}},
-    change_date = now()
+    change_date = datetime ('now')
 WHERE id = {{id}};
     </update>
     <insert returning="yes">
 INSERT INTO boat_class (class, active, description, change_user, change_date)
-VALUES (BTRIM ({{class}}), {{active}}, NULLIF (BTRIM ({{description}}), ''), {{__username}}, now())
-RETURNING {{_record_id}}::integer as _record_id, id;
+VALUES (TRIM ({{class}}), {{active}}, NULLIF (TRIM ({{description}}), ''), {{__username}}, datetime ('now'));
     </insert>
     <delete>
 DELETE FROM boat_class
