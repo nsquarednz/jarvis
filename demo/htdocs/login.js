@@ -1,16 +1,8 @@
 Ext.onReady (function () {
     jarvisInit ('demo');
 
-    // this holds our status record
-    var status_store = new Ext.data.JsonStore ({
-        url: jarvisUrl ('__status'),
-        root: 'data',
-        idProperty: 'username',
-        fields: ['logged_in', 'username', 'error_string', 'group_list']
-    });
-
     // this holds our staff names
-    var user_names_store = new Ext.data.JsonStore ({
+    var staff_names_store = new Ext.data.JsonStore ({
         url: jarvisUrl ('user_names'),
         root: 'data',
         idProperty: 'id',
@@ -20,65 +12,79 @@ Ext.onReady (function () {
 
     var username_field = new Ext.form.ComboBox ({
         renderTo: 'username',
-        store: user_names_store,
+        store: staff_names_store,
+        mode: 'local',
         emptyText: 'Select Username...',
         displayField: 'name',
         valueField: 'name',
-        mode: 'local',
         forceSelection: true
     });
     var password_field = new Ext.form.TextField ({
         renderTo: 'password'
     });
+    var login_button = new Ext.Button ({
+        renderTo: 'button',
+        text: 'Login',
+        listeners: { 'click': function () { doLogin () } }
+    });
 
     // Attempt to login.  Set our cookies, and reload the "status" store.
     function doLogin () {
-        // alert ('Login ' + username_field.getValue() + ' + ' + password_field.getValue());
-        status_store.baseParams.app = 'demo';
-        status_store.baseParams.action = 'status';
-        status_store.baseParams.username = username_field.getValue ();
-        status_store.baseParams.password = password_field.getValue ();
-        status_store.reload ();
+        var params = {
+            username: username_field.getValue (),
+            password: password_field.getValue ()
+        };
+        Ext.Ajax.request({
+            url: jarvisUrl ('__status'),
+            params: params,
+
+            // We received a response back from the server, that's a good start.
+            success: function (response, request_options) {
+                try {
+                    var result = Ext.util.JSON.decode (response.responseText);
+
+                    if (result.error_string == '') {
+                        document.getElementById ("request_text").innerHTML = 'You may now access the Demo application.';
+                        document.getElementById ("feedback_text").style.color = '#444';
+                        var outgoing = '<p>Login Accepted (User = ' + result.username;
+                        if (result.group_list != '') {
+                            outgoing = outgoing + ', Groups = ' + result.group_list;
+                        }
+                        outgoing = outgoing + ').</p>\n';
+                        var from = jarvisQueryArg (document.URL, 'from');
+                        if (from) {
+                            outgoing = outgoing + '<p>Return to <a href="' + from + '">' + from + '</a>.</p>\n';
+                        } else {
+                            outgoing = outgoing + '<p>Go to the <a href="/edit/index.html">Index</a>.</p>\n';
+                        }
+                        document.getElementById ("feedback_text").innerHTML = outgoing;
+
+                    } else {
+                        document.getElementById ("request_text").innerHTML = 'You must login before you can access the Demo application.';
+                        document.getElementById ("feedback_text").style.color = '#CC6600';
+                        document.getElementById ("feedback_text").innerHTML = result.error_string;
+                    }
+
+                // Well, something bad here.  Could be anything.  We tried.
+                } catch (e) {
+                    document.getElementById ("feedback_text").innerHTML = response.responseText;
+                }
+            },
+            failure: function (response, request_options) {
+                document.getElementById ("feedback_text").innerHTML = response.responseText;
+            }
+        });
     }
     function doLoginOnEnter (field, e) {
         if (e.getKey () == Ext.EventObject.ENTER) {
             doLogin ();
         }
     }
-    function storeLoaded () {
-        var error_string = status_store.getAt (0).data.error_string;
-        var group_list = status_store.getAt (0).data.group_list;
 
-        document.getElementById ("error_text").innerHTML = error_string;
-        if (error_string == '') {
-            var outgoing = '<p>Login Accepted.';
-            if (group_list != '') {
-                outgoing = outgoing + '  Groups = ' + group_list + '.';
-            }
-            outgoing = outgoing + '</p>\n';
-            outgoing = outgoing + '<p>Proceed to the <a href="index.html">Index</a>.</p>\n';
-            if (document.referrer != '') {
-                outgoing = outgoing + '<p>Return to <a href="' + document.referrer + '">' + document.referrer + '</a>.</p>\n';
-            }
-            document.getElementById ("outgoing_text").innerHTML = outgoing;
+    username_field.setValue ();
+    password_field.setValue ();
 
-        } else {
-            document.getElementById ("outgoing_text").innerHTML = 'Login is required.<p>\n';
-        }
-    };
-    function storeLoadException (proxy, options, response, e) {
-        document.getElementById ("error_text").innerHTML = response.responseText;
-    };
+    password_field.addListener("specialkey", doLoginOnEnter);
 
-    username_field.setValue (jarvisReadCookie ('username'));
-    password_field.setValue (jarvisReadCookie ('password'));
-
-    password_field.addListener("specialkey", doLogin);
-
-    status_store.addListener("load", storeLoaded);
-    status_store.addListener("loadexception", storeLoadException);
-    status_store.load();
-
-    user_names_store.addListener("loadexception", storeLoadException);
-    user_names_store.load();
+    staff_names_store.load();
 });
