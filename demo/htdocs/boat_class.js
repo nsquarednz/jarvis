@@ -180,6 +180,13 @@ Ext.onReady (function () {
     // Load our help system.
     helpInit ('boat_class', 'Demo: Boat Class - Help');
 
+    // Check for unsaved changes on all links.
+    for (var i = 0; i < document.links.length; i++) {
+        document.links[i].onclick = function () {
+            return (! haveChanges () || confirm ("Really discard unsaved changes?"));
+        }
+    }
+
     // Button dis/enable controls.
     function setButtons () {
         var haveModifiedRecords = haveChanges ();

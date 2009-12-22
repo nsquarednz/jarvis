@@ -1,5 +1,5 @@
-Ext.onReady (function () {       
+Ext.onReady (function () {
     jarvisInit ('demo');
- 
-    jarvisEraseCookie ('CGISESSID');
+
+    jarvisEraseCookie ('DEMO_CGISESSID');
 });
