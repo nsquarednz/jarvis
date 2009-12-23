@@ -2,7 +2,7 @@ Ext.onReady (function () {
     jarvisInit ('demo');
 
     // Page size for paging
-    var page_size = 2;
+    var page_size = 25;
 
     // Do we want to pre-load a specific country?
     var boat_class = jarvisHashArg (document.URL, 'boat_class', '');
@@ -26,21 +26,10 @@ Ext.onReady (function () {
                 r.set ('class', '');
                 store.insert (0, [r]);
 
-                // Figure which boat to select in the combo box.  If the URL specifies
-                // ?class=<class> then preload that one.  Otherwise just load the first one.
-                var record_idx = boat_class_filter.store.find ('class', boat_class);
-                if (record_idx < 0) {
-                    record_idx = 0;
+                boat_class_filter.setValue (boat_class);
+                if (boat_class) {
+                    reloadList ();
                 }
-                boat_class = '';
-
-                // Get the corresponding record, and load it into the ComboBox.
-                var record = boat_class_filter.store.getAt (record_idx);
-                var class = record.get ('class');
-                boat_class_filter.setValue (class);
-
-                // Fire the select event, which will load the main grid.
-                boat_class_filter.fireEvent ('select', boat_class_filter, record, 0);
             },
             'loadexception': jarvisLoadException
         }
