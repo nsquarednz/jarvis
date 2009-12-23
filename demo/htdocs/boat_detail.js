@@ -116,6 +116,8 @@ Ext.onReady (function () {
         height: 400,
         items: [ summary_panel, description_panel ],
         buttons: [
+            { text: 'Help', iconCls:'help', handler: function () { helpShow (); } },
+            new Ext.Toolbar.Fill (),
             {
                 text: 'Boats', iconCls:'prev',
                 handler: function () {
@@ -139,16 +141,34 @@ Ext.onReady (function () {
         ]
     });
 
-    // Do we have changes?
+    //-------------------------------------------------------------------------
+    // HAVE CHANGES FUNCTION
+    //-------------------------------------------------------------------------
     function haveChanges () {
         return (boat_detail_store.getModifiedRecords().length > 0);
     }
 
+    //-------------------------------------------------------------------------
+    // SET BUTTONS FUNCTION
+    //-------------------------------------------------------------------------
     // Button dis/enable controls.
     function setButtons () {
         var haveModifiedRecords = haveChanges ();
 
         Ext.ComponentMgr.get ('save').setDisabled (! haveModifiedRecords);
+    }
+
+    //-------------------------------------------------------------------------
+    // MAIN PROGRAM
+    //-------------------------------------------------------------------------
+    // Load our help system.
+    helpInit ('boat_detail', 'Demo: Boat Detail - Help');
+
+    // Check for unsaved changes on all links.
+    for (var i = 0; i < document.links.length; i++) {
+        document.links[i].onclick = function () {
+            return (! haveChanges () || confirm ("Really discard unsaved changes?"));
+        }
     }
 
     // Take our standard Jarvis POST params, and add our "id" param for the load.
