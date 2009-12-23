@@ -1,0 +1,55 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Jarvis Demonstration - Users</title>
+    <!-- EXT STYLE -->
+    <link rel="stylesheet" type="text/css" href="css/demo.css"/>
+
+    <!-- EXT STYLE -->
+    <link rel="stylesheet" type="text/css" href="/ext/resources/css/ext-all.css" />
+    <link rel="stylesheet" type="text/css" href="/ext/resources/css/xtheme-gray.css" />
+
+    <!-- EXT SOURCE CODE -->
+    <script type="text/javascript" src="/ext/adapter/ext/ext-base.js"></script>
+    <script type="text/javascript" src="/ext/ext-all-debug.js"></script>
+
+    <!-- PAGE-SPECIFIC CODE -->
+    <script type="text/javascript" src="/jarvis/js/jarvis-extjs.js"></script>
+    <script type="text/javascript" src="include/common.js"></script>
+    <script type="text/javascript" src="users.js"></script>
+
+    <!-- Center align the second column of the grid -->
+    <style type="text/css">
+        #user_grid .x-grid3-col-2 {
+            text-align: center;
+        }
+        #user_grid .x-grid3-hd-2 {
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="container">
+        <div id="header">
+            Demo - Users
+        </div>
+
+        <div id="menu">
+            <a href="index.html">HOME</a> &nbsp; &nbsp; &nbsp; &nbsp;
+            <a href="logout.html">Logout</a> &nbsp; &nbsp; &nbsp; &nbsp;
+        </div>
+
+        <div id="full">
+            <p>This is the user management page.  It is only visible to "admin" users.</p>
+
+            <div style="margin-top: 5px" id="extjs"></div>
+        </div>
+
+        <div id="footer">
+        Application &copy;2009 N-Squared Software &nbsp;<span class="separator">|</span>&nbsp; Design &copy; 2007 <a href="http://www.realitysoftware.ca" title="Website Design">Reality Software</a>
+        </div>
+    </div>
+</body>
+</html>

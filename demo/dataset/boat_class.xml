@@ -1,22 +1,22 @@
 <dataset read="*" write="*" dump="yes">
+    <transform fetch="notnull" store="trim,null" />
     <select>
-SELECT id, class, active,
-    COALESCE (description, '') AS description
+SELECT id, class, active, description
 FROM boat_class
 ORDER BY class
     </select>
     <update>
 UPDATE boat_class
-SET class = TRIM ({{class}}),
+SET class = {{class}},
     active = {{active}},
-    description = NULLIF (TRIM ({{description}}), ''),
+    description = {{description}},
     change_user = {{__username}},
     change_date = datetime ('now')
 WHERE id = {{id}};
     </update>
     <insert returning="yes">
 INSERT INTO boat_class (class, active, description, change_user, change_date)
-VALUES (TRIM ({{class}}), {{active}}, NULLIF (TRIM ({{description}}), ''), {{__username}}, datetime ('now'));
+VALUES ({{class}}, {{active}}, {{description}}, {{__username}}, datetime ('now'));
     </insert>
     <delete>
 DELETE FROM boat_class

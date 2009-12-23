@@ -1,19 +1,17 @@
 <dataset read="*" write="*">
+    <transform fetch="notnull" store="trim,null" />
     <select>
-SELECT id, class, name,
-        COALESCE (registration_num, 0) AS registration_num,
-        COALESCE (owner, '') AS owner,
-        COALESCE (description, '') AS description
+SELECT id, class, name, registration_num, owner, description
 FROM boat
 WHERE ID = {{id|1}}
     </select>
     <update>
 UPDATE boat
-SET name = TRIM ({{name}}),
-    class = TRIM ({{class}}),
-    registration_num = NULLIF ({{registration_num}}, 0),
-    owner = NULLIF (TRIM ({{owner}}), ''),
-    description = NULLIF (TRIM ({{description}}), ''),
+SET name = {{name}},
+    class = {{class}},
+    registration_num = {{registration_num}},
+    owner = {{owner}},
+    description = {{description}}),
     change_user = {{__username}},
     change_date = datetime ('now')
 WHERE ID = {{id}}

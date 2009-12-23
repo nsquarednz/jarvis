@@ -151,9 +151,6 @@ Ext.onReady (function () {
                 iconCls:'add',
                 handler: function () {
                     var class = boat_class_filter.getValue (class);
-                    if (class == '') {
-                        return;
-                    }
                     var r = new Ext.data.Record ({ });
                     r.set ('id', 0);
                     r.set ('name', '');
