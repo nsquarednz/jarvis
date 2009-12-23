@@ -2,7 +2,7 @@ Ext.onReady (function () {
     jarvisInit ('demo');
 
     // Page size for paging
-    var page_size = 25;
+    var page_size = 2;
 
     // Do we want to pre-load a specific country?
     var boat_class = jarvisHashArg (document.URL, 'boat_class', '');
@@ -72,6 +72,7 @@ Ext.onReady (function () {
                 remain || (grid.buttons[1].getEl().innerHTML = '&nbsp');
                 store.handleWriteback (result, ttype, record, remain);
                 setButtons ();
+                remain || (action_after_saving = null);
             }
         }
     });
@@ -284,6 +285,16 @@ Ext.onReady (function () {
         var haveModifiedRecords = haveChanges ();
         var selectedRowCol = grid.getSelectionModel().getSelectedCell();
         var selectedRecord = selectedRowCol && boat_store.getAt (selectedRowCol[0]);
+
+        // Action after saving?
+        if (! haveModifiedRecords && (action_after_saving != null)) {
+            if (action_after_saving == 'detail') {
+                editDetails ();
+
+            } else if (action_after_saving == 'page') {
+                boat_store.load ({'params': page_params});
+            }
+        }
 
         var exists = selectedRecord && ! selectedRecord.get('_deleted');
         boat_class_filter.setDisabled (haveModifiedRecords);
