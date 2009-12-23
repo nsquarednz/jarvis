@@ -138,7 +138,13 @@ Ext.onReady (function () {
                     boat_detail_store.reload ();
                 }
             }
-        ]
+        ],
+        listeners: {
+            'tabchange': function (panel, tab) {
+                var url = location.pathname + '#id=' + boat_id;
+                location.replace (url);
+            }
+        }
     });
 
     //-------------------------------------------------------------------------
