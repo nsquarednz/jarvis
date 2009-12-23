@@ -1,15 +1,13 @@
 Ext.onReady (function () {
     jarvisInit ('demo');
 
-    var url = document.URL;
-    var args = Ext.urlDecode (url.substring(url.indexOf('?')+1, url.length));
-    var boat_id = args.id || 0;
+    var boat_id = jarvisHashArg (document.URL, 'id', '');
     if (boat_id <= 0) {
         alert ('Missing/Invalid boat_detail ID in URL.');
         return;
     }
 
-    var tab_index = args.tab || 0;
+    var tab_index = jarvisHashArg (document.URL, 'tab', 0);
 
     // create the main Data Store for the links
     var boat_detail_store = new Ext.data.JsonStore ({
@@ -29,7 +27,7 @@ Ext.onReady (function () {
                     return;
                 }
                 tabs.setDisabled (false);
-                document.getElementById ("boat_name").innerHTML = 'Edit details for: "' + r.get('name') + '" (' + r.get('id') + ')';
+                document.getElementById ("boat_name").innerHTML = 'Edit details for boat: "' + r.get('name') + '" (' + r.get('id') + ')';
                 summary_panel.findById ('class').setValue (r.get('class'));
                 summary_panel.findById ('name').setValue (r.get('name'));
                 summary_panel.findById ('registration_num').setValue (r.get('registration_num'));
@@ -37,22 +35,18 @@ Ext.onReady (function () {
                 description_panel.findById ('description').setValue (r.get('description'));
 
                 setButtons ();
-                loadMugshot ();
             },
             'loadexception': jarvisLoadException,
-            'update' : function (store, record, operation) {
-                if (operation == Ext.data.Record.COMMIT) {
-                    tabs.setDisabled (true);
-                    jarvisSendChange ('update', store, 'boat_detail', record);
-                }
-                setButtons ();
+            'write' : function (store, record) {
+                tabs.setDisabled (true);
+                tabs.buttons[1].getEl().innerHTML = '&nbsp;<b>UPDATING...</b>';
+                jarvisSendChange ('update', store, 'boat_detail', record);
             },
-            'writeback' : function (store, result) {
-                tabs.setDisabled (false);
-                if (result.success != 1) {
-                    store.reload ();
-                    alert (result.message);
-                }
+            'writeback' : function (store, result, ttype, record, remain) {
+                remain || (tabs.buttons[1].getEl().innerHTML = '&nbsp');
+                remain || tabs.setDisabled (false);
+                store.handleWriteback (result, ttype, record, remain);
+                setButtons ();
             }
         }
     });
@@ -114,7 +108,7 @@ Ext.onReady (function () {
     });
 
     var tabs = new Ext.TabPanel({
-        renderTo: 'boat_detail_panel',
+        renderTo: 'extjs',
         disabled: true,
         autoHeight: false,
         deferredRender: false,          // Resolves bug which means first tab doesn't render.
@@ -123,33 +117,38 @@ Ext.onReady (function () {
         items: [ summary_panel, description_panel ],
         buttons: [
             {
-                text: 'Save Changes',
+                text: 'Boats', iconCls:'prev',
+                handler: function () {
+                    if (haveChanges () && ! confirm ("Really discard unsaved changes?")) return;
+                    location.href = 'boat.html';
+                }
+            }, {
+                text: 'Save Changes', id: 'save',
                 iconCls:'save',
                 handler: function () {
-                    boat_detail_store.commitChanges ();
+                    boat_detail_store.writeChanges ();
                 }
-            },
-            {
-                text: 'Discard & Reload',
-                iconCls:'remove',
+            }, {
+                text: 'Reload', id: 'reload',
+                iconCls:'reload',
                 handler: function () {
+                    if (haveChanges () && ! confirm ("Really discard unsaved changes?")) return;
                     boat_detail_store.reload ();
                 }
             }
         ]
     });
 
+    // Do we have changes?
+    function haveChanges () {
+        return (boat_detail_store.getModifiedRecords().length > 0);
+    }
+
     // Button dis/enable controls.
     function setButtons () {
-        var haveModifiedRecords = (boat_detail_store.getModifiedRecords().length > 0);
+        var haveModifiedRecords = haveChanges ();
 
-        if (haveModifiedRecords) {
-            tabs.buttons[0].enable ();
-            tabs.buttons[1].enable ();
-        } else {
-            tabs.buttons[0].disable ();
-            tabs.buttons[1].disable ();
-        }
+        Ext.ComponentMgr.get ('save').setDisabled (! haveModifiedRecords);
     }
 
     // Take our standard Jarvis POST params, and add our "id" param for the load.

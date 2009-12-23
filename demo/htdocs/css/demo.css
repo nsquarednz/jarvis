@@ -2,7 +2,7 @@
  * These style definitions form part of the KeepItSimple template.
  ******************************************************************************/
 body  {
-    background: #869843;
+    background: #122E2F;
     font-family: "Georgia";
     font-size: 14px;
     color: #444444;
@@ -18,23 +18,28 @@ p {
     background: #FFFFFF;
 }
 #header {
-    padding: 45px 0 20px 40px;
+    padding: 45px 20px 20px 0px;
     font-size: 32px;
+    text-align: right;
     font-family: "Tahoma";
+    color: #333;
+    background: #fff url('../images/water.jpg') no-repeat;
 }
 #menu {
-    background-color: #3b7687;
+    background-color: #7c9da2;
+    color: #fff;
+    font-size: 13px;
     padding: 6px 0 6px 40px;
 }
 #menu a {
-    color: #c5d6db;
+    color: #fff;
     text-decoration: none;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: bold;
     font-family: "Arial Narrow", "Myriad Pro";
 }
 #menu a:hover {
-    color: #ecf2f3;
+    color: #fff;
 }
 #sidebar {
     float: left;
@@ -71,19 +76,19 @@ h2 {
     color: #444444;
 }
 #footer {
-    padding: 6px 40px 6px 40px;
-    background: #3b7687;
+    padding: 6px 20px 6px 40px;
+    background: #7c9da2;
     font-family: "Lucida Sans Unicode";
-    color: #c5d6db;
+    color: #fff;
     font-size: 11px;
     text-align: right;
 }
 #footer a {
     text-decoration: none;
-    color: #c5d6db;
+    color: #fff;
 }
 #footer a:hover {
-    color: #c5d6db;
+    color: #fff;
 }
 .separator {
     font-size:11px;

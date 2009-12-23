@@ -9,11 +9,11 @@ WHERE ID = {{id|1}}
     </select>
     <update>
 UPDATE boat
-SET name = BTRIM ({{name}}),
-    class = BTRIM ({{class}}),
+SET name = TRIM ({{name}}),
+    class = TRIM ({{class}}),
     registration_num = NULLIF ({{registration_num}}, 0),
-    owner = NULLIF (BTRIM ({{owner}}), ''),
-    description = NULLIF (BTRIM ({{description}}), ''),
+    owner = NULLIF (TRIM ({{owner}}), ''),
+    description = NULLIF (TRIM ({{description}}), ''),
     change_user = {{__username}},
     change_date = datetime ('now')
 WHERE ID = {{id}}
