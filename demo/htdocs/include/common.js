@@ -196,6 +196,21 @@ Ext.override (Ext.grid.GridView, {
 });
 
 //-------------------------------------------------------------------------
+// Empty element in combo box displayed as &nbsp;
+//-------------------------------------------------------------------------
+Ext.override(Ext.form.ComboBox, {
+    initList: (function(){
+        if(!this.tpl) {
+            this.tpl = new Ext.XTemplate('<tpl for="."><div class="x-combo-list-item">{', this.displayField , ':this.blank}</div></tpl>', {
+                blank: function(value) {
+                    return value==='' ? '&nbsp' : value;
+                }
+            });
+        }
+    }).createSequence(Ext.form.ComboBox.prototype.initList)
+});
+
+//-------------------------------------------------------------------------
 // Enhance Store to have a method which will callback so that we can write each
 // modified record, without actually finalising the commit until later.
 //-------------------------------------------------------------------------

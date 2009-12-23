@@ -2,7 +2,7 @@ Ext.onReady (function () {
     jarvisInit ('demo');
 
     // Page size for paging
-    var page_size = 2;
+    var page_size = 25;
 
     // Do we want to pre-load a specific country?
     var boat_class = jarvisHashArg (document.URL, 'boat_class', '');
@@ -12,6 +12,39 @@ Ext.onReady (function () {
 
     // If paging, what params?
     var page_params = {};
+
+    // create the sub-set Data Store for the link_section pulldown
+    var boat_class_store = new Ext.data.JsonStore ({
+        url: jarvisUrl ('boat_class'),
+        autoLoad: true,
+        root: 'data',
+        idProperty: 'class',
+        fields: ['class'],
+        listeners: {
+            'load' : function (store, records, options) {
+                var r = new Ext.data.Record ({});
+                r.set ('class', '');
+                store.insert (0, [r]);
+
+                // Figure which boat to select in the combo box.  If the URL specifies
+                // ?class=<class> then preload that one.  Otherwise just load the first one.
+                var record_idx = boat_class_filter.store.find ('class', boat_class);
+                if (record_idx < 0) {
+                    record_idx = 0;
+                }
+                boat_class = '';
+
+                // Get the corresponding record, and load it into the ComboBox.
+                var record = boat_class_filter.store.getAt (record_idx);
+                var class = record.get ('class');
+                boat_class_filter.setValue (class);
+
+                // Fire the select event, which will load the main grid.
+                boat_class_filter.fireEvent ('select', boat_class_filter, record, 0);
+            },
+            'loadexception': jarvisLoadException
+        }
+    });
 
     // create the main Data Store for the boat list
     var boat_store = new Ext.data.JsonStore ({
@@ -40,39 +73,6 @@ Ext.onReady (function () {
                 store.handleWriteback (result, ttype, record, remain);
                 setButtons ();
             }
-        }
-    });
-
-    // create the sub-set Data Store for the link_section pulldown
-    var boat_class_store = new Ext.data.JsonStore ({
-        url: jarvisUrl ('boat_class'),
-        autoLoad: true,
-        root: 'data',
-        idProperty: 'class',
-        fields: ['class'],
-        listeners: {
-            'load' : function (store, records, options) {
-                var r = new Ext.data.Record ({});
-                r.set ('class', '-- All Classes --');
-                store.insert (0, [r]);
-
-                // Figure which boat to select in the combo box.  If the URL specifies
-                // ?class=<class> then preload that one.  Otherwise just load the first one.
-                var record_idx = boat_class_filter.store.find ('class', boat_class);
-                if (record_idx < 0) {
-                    record_idx = 0;
-                }
-                boat_class = '';
-
-                // Get the corresponding record, and load it into the ComboBox.
-                var record = boat_class_filter.store.getAt (record_idx);
-                var class = record.get ('class');
-                boat_class_filter.setValue (class);
-
-                // Fire the select event, which will load the main grid.
-                boat_class_filter.fireEvent ('select', boat_class_filter, record, 0);
-            },
-            'loadexception': jarvisLoadException
         }
     });
 
@@ -251,7 +251,6 @@ Ext.onReady (function () {
         listeners: { 'select':
             function (combo, record, index) {
                 boat_class = record.get ('class');
-                if (boat_class == '-- All Classes --') boat_class = '';
                 location.replace (location.pathname + '#' + (boat_class ? 'boat_class=' + boat_class : ''));
 
                 reloadList ();
@@ -306,7 +305,7 @@ Ext.onReady (function () {
         }
     }
 
-    // Load boats now if we are loading ALL classes.  Otherwise, wait for the
+    // Load boats now if we are loading Select Class.  Otherwise, wait for the
     // boat class list to load, and we will change the boat loading off that.
     //
     if (! boat_class) {
