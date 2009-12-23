@@ -71,7 +71,7 @@ Ext.onReady (function () {
                     forceSelection: true,
                     editable: false
                 })
-            },
+            }
         ],
         renderTo:'extjs', width: 780, height: 400, viewConfig: { forceFit:true },
         tbar: [

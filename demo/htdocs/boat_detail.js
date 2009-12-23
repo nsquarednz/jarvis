@@ -87,7 +87,7 @@ Ext.onReady (function () {
                 name: 'owner',
                 listeners: { 'change': function () { boat_detail_store.getAt (0).set ('owner', this.getValue ()); setButtons() } }
             }
-        ],
+        ]
     });
 
     var description_panel = new Ext.Panel({
@@ -104,7 +104,7 @@ Ext.onReady (function () {
             id: 'description',
             name: 'description',
             listeners: { 'change': function () { boat_detail_store.getAt (0).set ('description', this.getValue ()); setButtons() } }
-        }],
+        }]
     });
 
     var tabs = new Ext.TabPanel({
