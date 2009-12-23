@@ -93,7 +93,7 @@ Ext.onReady (function () {
     var description_panel = new Ext.Panel({
         labelWidth: 130,
         layout: 'form',
-        title: 'Introduction',
+        title: 'Description',
         bodyStyle:'padding:15px',
         labelPad: 10,
         defaultType: 'textarea',

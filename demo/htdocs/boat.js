@@ -155,7 +155,7 @@ Ext.onReady (function () {
                     r.set ('id', 0);
                     r.set ('name', '');
                     r.set ('class', class);
-                    r.set ('registration_num', 0);
+                    r.set ('registration_num', '');
                     r.set ('owner', '');
                     boat_store.insert (0, r);
                     grid.startEditing (0, 0)

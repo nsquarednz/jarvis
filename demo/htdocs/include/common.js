@@ -27,7 +27,7 @@ function helpShow (override_filename) {
     var filename = override_filename || help_filename;
     if (! filename) { return; }
 
-    var help_url = '/v2/admin/help/' + filename + '.html';
+    var help_url = 'help/' + filename + '.html';
     if (help_window == null) {
         help_window = new Ext.Window ({
             title: help_title,

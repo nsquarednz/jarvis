@@ -12,7 +12,7 @@ CREATE TABLE users (
     change_date timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     name text UNIQUE NOT NULL CHECK (name <> ''),
-    password text,
+    password text NOT NULL CHECK (password <> ''),
     is_admin boolean DEFAULT false);
 
 INSERT INTO users (name, password, is_admin, change_user) VALUES ('admin', 'admin', 1, 'admin');
@@ -55,7 +55,7 @@ CREATE TABLE boat (
     change_date timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     name text NOT NULL CHECK (name <> ''),
-    registration_num integer DEFAULT 0,
+    registration_num integer,
     class text NOT NULL REFERENCES boat_class (class) ON DELETE RESTRICT ON UPDATE CASCADE,
     owner text,
     description text,
@@ -73,7 +73,7 @@ INSERT INTO boat (name, registration_num, class, owner, description, change_user
 INSERT INTO boat (name, registration_num, class, owner, description, change_user)
     VALUES ('Mixed Emotions', 113, 'X Class', NULL, 'Historical, wood planked.', 'admin');
 INSERT INTO boat (name, registration_num, class, owner, description, change_user)
-    VALUES ('Epsilon', 0, 'X Class', 'J & F Wilson', 'Last of its breed.
+    VALUES ('Epsilon', NULL, 'X Class', 'J & F Wilson', 'Last of its breed.
 
 This boat was built in 1959, and is the last remaining
 example of this classic class.', 'admin');

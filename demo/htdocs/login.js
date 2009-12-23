@@ -57,7 +57,7 @@ Ext.onReady (function () {
                         if (from) {
                             outgoing = outgoing + '<p>Return to <a href="' + from + '">' + from + '</a>.</p>\n';
                         } else {
-                            outgoing = outgoing + '<p>Go to the <a href="/edit/index.html">Index</a>.</p>\n';
+                            outgoing = outgoing + '<p>Go to the <a href="index.html">Index</a>.</p>\n';
                         }
                         document.getElementById ("feedback_text").innerHTML = outgoing;
 

@@ -1,0 +1,42 @@
+<p class="topic">Introduction<p>
+
+This screen allows "admin" users to maintain the list of permitted users on
+the demo system.  Users are either "admin" or "not-admin", controlled by a
+flag in the databasem, which is represented here as a checkbox.<p>
+
+Access to this screen is controlled by the read/write flags on the dataset.
+That security is all performed on the server side, so JavaScript hackers
+will not get very far.<p>
+
+There are of course a couple of security weaknesses on the demo application.
+Firstly, the list of users is shown as a pulldown in the login screen.  This
+is done to show the use of the read="**" feature which allows some datasets
+to be accessible even to users which have not been logged in.<p>
+
+Also, note that all user passwords are visible here to any admin users.
+A more secure approach would be allowing the admin users only to re-set a
+password, not to see the existing password.<p>
+
+<hr class="topic">
+<p class="topic">Grid Columns<p>
+
+Mandatory fields are marked in <b>bold</b>.<p>
+
+<table class="helptable">
+<tr><td class="note"><b>Username</b></td><td>A text string to be the username,
+must be non-empty, but otherwise not constrained.</td></tr>
+
+<tr><td class="note"><b>Prefix</b></td><td>A text string to be the password,
+must be non-empty, but otherwise not constrained.</td></tr>
+
+<tr><td class="note"><b>Admin?</b></td><td>A checkbox denoting if the user
+has administrator access.  Admin access is required to view the Users screen.</td></tr>
+</table><p>
+
+<hr class="topic">
+<p class="topic">Extra Features<p>
+
+If you mark all users as "not Admin", then when you logout, you will naturally
+no longer be able to log back in to grant Admin access.  In that case, you will
+need to use SQLite directly to reset the "is_admin" flag in the "users" table
+in the database.<p>
