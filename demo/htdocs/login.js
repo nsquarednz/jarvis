@@ -30,6 +30,8 @@ Ext.onReady (function () {
 
     // Attempt to login.  Set our cookies, and reload the "status" store.
     function doLogin () {
+        jarvisEraseCookie ('DEMO_CGISESSID');
+
         var params = {
             username: username_field.getValue (),
             password: password_field.getValue ()

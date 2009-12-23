@@ -4,6 +4,7 @@
 DROP TABLE boat;
 DROP TABLE boat_class;
 DROP TABLE users;
+DROP VIEW groups;
 
 CREATE TABLE users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -11,10 +12,16 @@ CREATE TABLE users (
     change_date timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     name text UNIQUE NOT NULL CHECK (name <> ''),
-    password text);
+    password text,
+    is_admin boolean DEFAULT false);
 
-INSERT INTO users (name, password, change_user) VALUES ('admin', 'admin', 'admin');
-INSERT INTO users (name, password, change_user) VALUES ('guest', 'guest', 'admin');
+INSERT INTO users (name, password, is_admin, change_user) VALUES ('admin', 'admin', 1, 'admin');
+INSERT INTO users (name, password, is_admin, change_user) VALUES ('guest', 'guest', 0, 'admin');
+
+CREATE VIEW groups AS
+    SELECT name, 'default' AS group_name FROM users
+    UNION
+    SELECT name, 'admin' AS group_name FROM users WHERE is_admin = 1;
 
 -- This is for a class of boat.
 CREATE TABLE boat_class (

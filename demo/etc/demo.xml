@@ -52,6 +52,9 @@
             <parameter name="user_table" value="users"/>
             <parameter name="user_username_column" value="name"/>
             <parameter name="user_password_column" value="password"/>
+            <parameter name="group_table" value="groups"/>
+            <parameter name="group_username_column" value="name"/>
+            <parameter name="group_group_column" value="group_name"/>
 	</login>
 
         <!-- This is a "no username or password required" login mechanism. -->
