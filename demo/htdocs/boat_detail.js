@@ -138,13 +138,7 @@ Ext.onReady (function () {
                     boat_detail_store.reload ();
                 }
             }
-        ],
-        listeners: {
-            'tabchange': function (panel, tab) {
-                var url = location.pathname + '#id=' + boat_id;
-                location.replace (url);
-            }
-        }
+        ]
     });
 
     //-------------------------------------------------------------------------
@@ -172,6 +166,7 @@ Ext.onReady (function () {
 
     // Check for unsaved changes on all links.
     for (var i = 0; i < document.links.length; i++) {
+        if (document.links[i].href.match (/#$/)) continue;
         document.links[i].onclick = function () {
             return (! haveChanges () || confirm ("Really discard unsaved changes?"));
         }
