@@ -881,7 +881,6 @@ sub store {
 
                         $row_result{'returning'} = [ \%return_values ];
                         $jconfig->{'out_nrows'} = 1;
-
                     }
                 }
 
