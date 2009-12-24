@@ -29,7 +29,7 @@ Source: ..\..\docs\*; DestDir: {app}\docs; Flags: ignoreversion recursesubdirs c
 Source: ..\..\etc\*; DestDir: {app}\etc; Flags: ignoreversion recursesubdirs createallsubdirs; AfterInstall: SetJarvisStartupLocations
 Source: ..\..\htdocs\*; DestDir: {app}\htdocs; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: ..\..\lib\*; DestDir: {app}\lib; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: ..\..\tracker\*; DestDir: {app}\lib; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: ..\..\tracker\*; DestDir: {app}\tracker; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: ..\..\build-version.txt; DestDir: {app}; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
