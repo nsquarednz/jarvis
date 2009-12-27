@@ -91,6 +91,9 @@ sub do {
             $default_filename = $plugin->{'default_filename'}->content;
             $filename_parameter = $plugin->{'filename_parameter'}->content;
 
+            $jconfig->{'dump'} = $jconfig->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($plugin->{'dump'}->content || "no")});
+            $jconfig->{'debug'} = $jconfig->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($plugin->{'debug'}->content || "no")});
+
             # Get our parameters.  These are the configured parameters from the XML file,
             # which we handily load up for you, to avoid duplicating this code in every
             # module.  If you want CGI parameters from within your module, then you can access
