@@ -64,7 +64,7 @@ Ext.onReady (function () {
                     } else {
                         document.getElementById ("request_text").innerHTML = 'You must login before you can access the Demo application.';
                         document.getElementById ("feedback_text").style.color = '#CC6600';
-                        document.getElementById ("feedback_text").innerHTML = result.error_string;
+                        document.getElementById ("feedback_text").innerHTML = '<p>' + result.error_string + '</p>';
                     }
 
                 // Well, something bad here.  Could be anything.  We tried.
