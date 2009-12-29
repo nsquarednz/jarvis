@@ -18,8 +18,10 @@ return function (appName, extra) {
             url: jarvisUrl('source/' + appName + '/' + type + '/' + extra.query),
             success: function (xhr) {
                 var html = xhr.responseText;
-                html = prettyPrintOne(html);
-                element.update("<code class='prettyprint'>" + html + "</code>");
+                //html = prettyPrintOne(html);
+                element.update("<pre class='sh_sql'>" + html + "</pre>");
+                console.log ('element is', element);
+                sh_highlightElement(element.first().dom, sh_languages['sql']);
             },
             failure: function () {
                 Ext.Msg.alert ("Cannot load: " + appName + '/' + type + '/' + extra.query);
@@ -32,7 +34,7 @@ return function (appName, extra) {
         layout: 'accordion',
         split: true,
         collapsible: true,
-        width: 400,
+        width: 600,
         title: "Dataset Code",
         items: new Array()
     });
@@ -45,7 +47,8 @@ return function (appName, extra) {
                 items: [
                     new Ext.BoxComponent ({
                         autoEl: {
-                            tag: 'div'
+                            tag: 'div',
+                            id: Ext.id()
                         },
                         anchor: '100% 100%',
                         x: 100, y: 45,

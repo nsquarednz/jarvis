@@ -3,6 +3,18 @@
  * The main page for looking at queries made via Jarvis.
  */
 
+// TODO MOVE this function
+
+/**
+ * Function Description:   Returns the julian date value
+ *                         for the given date object.
+ */
+Date.prototype.getJulian = function () {
+    // 2440587.5 is the julian date offset for unix epoch
+    // time.
+    return (this.getTime() + this.getTimezoneOffset() * 60 * 1000) / (1000 * 60 * 60 * 24) + 2440587.5; 
+}
+
 // Adds a tab to the page
 
 var informationTabPanel = null;
@@ -49,7 +61,7 @@ function addTab (id, page, appName, extraParameters) {
 
 // Main code to build the screen
 Ext.onReady (function () {
-    prettyPrint();
+    //prettyPrint(); TODO REMOVE
     jarvisInit ('tracker');
     
     var titleBar = {

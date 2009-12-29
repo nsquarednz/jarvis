@@ -46,11 +46,14 @@ CREATE TABLE calendar (
 
 DROP TABLE day_interval;
 CREATE TABLE day_interval (
-    interval NOT NULL PRIMARY KEY,
+    interval FLOAT NOT NULL PRIMARY KEY,
     hour INTEGER,
     hour_minute INTEGER,
     is_minute INTEGER,
     is_five_minute INTEGER,
     is_fifteen_minute INTEGER
 );    
+
+CREATE INDEX day_interval_15_idx day_interval (is_fifteen_minute);
+CREATE INDEX day_interval_5_idx day_interval (is_five_minute);
 

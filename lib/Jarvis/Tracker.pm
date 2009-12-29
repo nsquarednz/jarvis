@@ -228,7 +228,7 @@ sub error {
 
     # Julian time of request start.
     my $tstart = $jconfig->{'tstart'};
-    my $start_time = (($$tstart[0] + $$tstart[1] / 1000000) / 86400.0 ) + 2440587;
+    my $start_time = (($$tstart[0] + $$tstart[1] / 1000000) / 86400.0 ) + 2440587; # 2440587 is the Julian day of the 1st Jan 1970 - Unix Epoch
 
     # Perform the database insert.
     my $sth = $tdbh->prepare (

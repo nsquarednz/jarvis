@@ -28,7 +28,7 @@ div.title-bar h1 {
     font-variant: small-caps;
 }
 
-code.prettyprint {
-    font: sans-serif;
-    font-size: 11px;
+pre.sh_sql {
+    font-size: 10px;
+    font-style: courier;
 }

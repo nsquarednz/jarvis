@@ -9,7 +9,7 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
 
     renderGraph: function (target) {
         if (target.rendered && this.data) {
-            this.graph.render(target.id, this.data);
+            this.graph.render(target, this.data);
             this.setTitle (this.graph.title());
             console.log(this);
         } else if (this.data && !target.rendered) {
@@ -21,14 +21,18 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
 
     initComponent: function () {
         var me = this;
+        this.dataVisualisationElementId = Ext.id();
 
         Ext.apply (this, {
             header: true,
+            layout: 'fit',
             items: [
                 new Ext.BoxComponent ({
                     autoEl: { tag: 'div', cls: 'data-visualisation' }
-                    , id: 'dv'
+                    , id: this.dataVisualisationElementId
+                    , layout: 'fit'
                     , anchor: '100% 100%'
+                    , autoScroll: true
                     , listeners: {
                         render: function () { me.renderGraph(this); }
                     }
@@ -49,7 +53,7 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
             // We received a response back from the server, that's a good start.
             success: function (response, request_options) {
                 me.data = Ext.util.JSON.decode (response.responseText).data;
-                me.renderGraph(me.items.get('dv'));
+                me.renderGraph(me.items.get(me.dataVisualisationElementId));
             }
         });
     }

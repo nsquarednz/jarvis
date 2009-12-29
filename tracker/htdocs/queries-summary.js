@@ -15,13 +15,11 @@ return function (appName, extra) {
         items: [
             {
                 xtype: 'Visualisation',
-                width: 600,
-                height: 300,
                 dataSource: {
                     dataset: "tps/" + appName,
                     params: {
-                        from: new Date().add (Date.DAY, -7).format('Y-m-d'),
-                        to: new Date().format('Y-m-d')
+                        from: new Date().add (Date.MINUTE, -1 * trackerConfiguration.defaultDateRange).getJulian(),
+                        to: new Date().getJulian()
                     }
                 },
                 graph: new jarvis.graph.TpsGraph()

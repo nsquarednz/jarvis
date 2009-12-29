@@ -105,7 +105,7 @@ return function (appName) {
                 dataIndex: 'start_time',
                 sortable: true,
                 width: 20,
-                renderer: Ext.util.Format.dateRenderer ('D jS M Y H:i:s')
+                renderer: function(x) { console.log('parsing: ' + x); return Date.parseDate(x, 'c').format ('D jS M Y H:i:s'); }
             },
             {
                 header: 'User',

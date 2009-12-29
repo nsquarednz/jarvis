@@ -5,33 +5,28 @@
     <select>
     <![CDATA[
         SELECT 
-            cal.the_date AS d,
-            cal.hour AS h,
-            cal.hour_minute AS m,
-            SUM (CASE WHEN r.start_time IS NOT NULL THEN 1 ELSE 0 END) / 15 AS c 
+            datetime(cal.time) as t
+            , SUM (CASE WHEN r.start_time IS NOT NULL THEN 1 ELSE 0 END) / 15.0 AS c 
         FROM 
-            (SELECT * FROM
+            (SELECT the_date + i.interval as time FROM
                 (
-                SELECT the_date FROM calendar WHERE date(the_date) >= {$from} AND date(the_date) <= {$to}
+                -- I'm using 'cast' here as a poor man's truncate(). The cast/round ensure I get all days partially
+                -- covered by from and to.
+                SELECT the_date FROM calendar WHERE the_date >= CAST({$from} AS INTEGER) AND the_date <= round({$to})
                 ) c,
                 (
-                SELECT hour, hour_minute FROM day_interval WHERE is_fifteen_minute = 1
+                SELECT interval FROM day_interval WHERE is_fifteen_minute = 1
                 ) i
             ) cal
             LEFT JOIN request r ON 
-                date(start_time, 'localtime') = cal.the_date
-                AND strftime('%H', start_time, 'localtime') = cal.hour 
-                AND ROUND(strftime('%M', start_time, 'localtime') / 15) * 15 = cal.hour_minute
+                cal.time <= start_time AND cal.time + (15.0 / (60 * 24)) > start_time
         WHERE
-            (app_name IS NULL OR {$1} IS NULL OR {$1} = app_name)
+            time >= CAST({$from} AS FLOAT) AND time <= CAST({$to} AS FLOAT) 
+            AND (app_name IS NULL OR {$1} IS NULL OR {$1} = app_name)
         GROUP BY 
-            cal.the_date,
-            cal.hour,
-            cal.hour_minute
+            cal.time
         ORDER BY
-            cal.the_date,
-            cal.hour,
-            cal.hour_minute
+            cal.time
     ]]>
     </select>
 </dataset>

@@ -56,7 +56,7 @@ while ($c <= $daysToInclude) {
     $c++;
 
     my @bindVars = (
-        time2str("%Y-%m-%d", Date_to_Time (@day, 0, 0, 0))
+        Date_to_Time (@day, 0, 0, 0) / 86400.0 + 2440587.5
         , (Day_of_Week (@day) < 6 ? 1 : 0)
         , $day[0]
         , ($day[1] < 4 ? 1 : ($day[1] < 7 ? 2 : ($day[1] < 10 ? 3 : 4)))
@@ -90,7 +90,7 @@ my $totalIntervals = 60 * 24 - 1;
 $c = 0;
 while ($c <= $totalIntervals) {
     my @bindVars = (
-        $c,
+        $c * 1.0 / (24 * 60.0),
         , int($c / 60)
         , $c % 60
         , 1

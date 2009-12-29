@@ -18,8 +18,8 @@ return function () {
                 dataSource: {
                     dataset: "tps",
                     params: {
-                        from: new Date().add (Date.MINUTE, -1 * trackerConfiguration.defaultDateRange).format('Y-m-d'),
-                        to: new Date().format('Y-m-d')
+                        from: new Date().add (Date.MINUTE, -1 * trackerConfiguration.defaultDateRange).getJulian(),
+                        to: new Date().getJulian()
                     }
                 },
                 graph: new jarvis.graph.TpsGraph()
