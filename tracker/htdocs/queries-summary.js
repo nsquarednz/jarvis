@@ -1,24 +1,26 @@
 /**
  * This ExtJS code is designed to be evaluated and embedded within another page.
  *
- * It provides a summary page, summarising all of this jarvis's install.
+ * It provides a summary page for queries for an application.
  */
 
 
 (function () {
-return function () {
+return function (appName, extra) {
 
     return new Ext.Panel ({
-        title: "Summary",
+        title: appName + "- Queries",
         layout: 'fit',
         closable: true,
         items: [
             {
                 xtype: 'Visualisation',
+                width: 600,
+                height: 300,
                 dataSource: {
-                    dataset: "tps",
+                    dataset: "tps/" + appName,
                     params: {
-                        from: new Date().add (Date.MINUTE, -1 * trackerConfiguration.defaultDateRange).format('Y-m-d'),
+                        from: new Date().add (Date.DAY, -7).format('Y-m-d'),
                         to: new Date().format('Y-m-d')
                     }
                 },
@@ -28,3 +30,4 @@ return function () {
     });
 
 }; })();
+

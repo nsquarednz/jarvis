@@ -10,6 +10,10 @@ var informationTabPanel = null;
 var trackerSubpages = {};
 var trackerTabs = {};
 
+var trackerConfiguration = {
+    defaultDateRange: 60 * 24
+};
+
 function loadExternalPage (page, callback) {
     Ext.Ajax.request ({
         url: page,
@@ -91,6 +95,8 @@ Ext.onReady (function () {
                 if (parts.length == 2) {
                     if (parts[1] == "errors") {
                         addTab (node.id, "errors-summary.js", parts[0]);
+                    } else if (parts[1] == "queries") {
+                        addTab (node.id, "queries-summary.js", parts[0]);
                     }
                 }
 

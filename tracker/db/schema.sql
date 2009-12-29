@@ -31,3 +31,26 @@ CREATE TABLE error (
 );
 
 CREATE INDEX request_start_time_idx on request (start_time);
+
+DROP TABLE calendar;
+CREATE TABLE calendar (  
+    the_date JULIAN NOT NULL PRIMARY KEY,
+    is_weekday INTEGER, 
+    year INTEGER,  
+    quarter INTEGER,  
+    month INTEGER,  
+    day INTEGER,  
+    day_of_week INTEGER, 
+    week INTEGER 
+);
+
+DROP TABLE day_interval;
+CREATE TABLE day_interval (
+    interval NOT NULL PRIMARY KEY,
+    hour INTEGER,
+    hour_minute INTEGER,
+    is_minute INTEGER,
+    is_five_minute INTEGER,
+    is_fifteen_minute INTEGER
+);    
+

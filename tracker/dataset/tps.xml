@@ -3,7 +3,36 @@
   -->
 <dataset read="*" write="">
     <select>
-        SELECT datetime (start_time) as t, count (*) as c FROM request GROUP BY datetime (start_time);
+    <![CDATA[
+        SELECT 
+            cal.the_date AS d,
+            cal.hour AS h,
+            cal.hour_minute AS m,
+            SUM (CASE WHEN r.start_time IS NOT NULL THEN 1 ELSE 0 END) / 15 AS c 
+        FROM 
+            (SELECT * FROM
+                (
+                SELECT the_date FROM calendar WHERE date(the_date) >= {$from} AND date(the_date) <= {$to}
+                ) c,
+                (
+                SELECT hour, hour_minute FROM day_interval WHERE is_fifteen_minute = 1
+                ) i
+            ) cal
+            LEFT JOIN request r ON 
+                date(start_time, 'localtime') = cal.the_date
+                AND strftime('%H', start_time, 'localtime') = cal.hour 
+                AND ROUND(strftime('%M', start_time, 'localtime') / 15) * 15 = cal.hour_minute
+        WHERE
+            (app_name IS NULL OR {$1} IS NULL OR {$1} = app_name)
+        GROUP BY 
+            cal.the_date,
+            cal.hour,
+            cal.hour_minute
+        ORDER BY
+            cal.the_date,
+            cal.hour,
+            cal.hour_minute
+    ]]>
     </select>
 </dataset>
 
