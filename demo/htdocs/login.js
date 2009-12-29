@@ -46,7 +46,7 @@ Ext.onReady (function () {
                     var result = Ext.util.JSON.decode (response.responseText);
 
                     if (result.error_string == '') {
-                        document.getElementById ("request_text").innerHTML = 'You may now access the Demo application.';
+                        document.getElementById ("request_text").innerHTML = '<p>You may now access the Demo application.</p>';
                         document.getElementById ("feedback_text").style.color = '#444';
                         var outgoing = '<p>Login Accepted (User = ' + result.username;
                         if (result.group_list != '') {
@@ -62,18 +62,20 @@ Ext.onReady (function () {
                         document.getElementById ("feedback_text").innerHTML = outgoing;
 
                     } else {
-                        document.getElementById ("request_text").innerHTML = 'You must login before you can access the Demo application.';
+                        document.getElementById ("request_text").innerHTML = '<p>You must login before you can access the Demo application.</p>';
                         document.getElementById ("feedback_text").style.color = '#CC6600';
                         document.getElementById ("feedback_text").innerHTML = '<p>' + result.error_string + '</p>';
                     }
 
                 // Well, something bad here.  Could be anything.  We tried.
                 } catch (e) {
-                    document.getElementById ("feedback_text").innerHTML = response.responseText;
+                    document.getElementById ("feedback_text").style.color = '#CC6600';
+                    document.getElementById ("feedback_text").innerHTML = '<p>' + response.responseText + '</p>';
                 }
             },
             failure: function (response, request_options) {
-                document.getElementById ("feedback_text").innerHTML = response.responseText;
+                document.getElementById ("feedback_text").style.color = '#CC6600';
+                document.getElementById ("feedback_text").innerHTML = '<p>' + response.responseText + '</p>';
             }
         });
     }

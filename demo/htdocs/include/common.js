@@ -137,9 +137,15 @@ renderRequirePositiveInt = function (val, md, rec, rowIndex, colIndex, ds) {
     return val;
 }
 
+renderRequirePositiveZeroInt = function (val, md, rec, rowIndex, colIndex, ds) {
+    val = val || 0;
+    (val >= 0) || (md.attr = style_bad);
+    return val;
+}
+
 renderCheckbox = function (value, md, rec, rowIndex, colIndex, ds) {
     return '<img class="x-grid-checkbox" src="/ext/resources/images/default/menu/'
-        + (value? 'checked.gif' : 'unchecked.gif') + '"/>';
+        + ((value && (value != 0)) ? 'checked.gif' : 'unchecked.gif') + '"/>';
 };
 
 renderZeroAsBlank = function (val, md, rec, rowIndex, colIndex, ds) {
