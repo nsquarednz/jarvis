@@ -93,7 +93,8 @@ return function (appName) {
         errorDetails.items.get('groups').setText(record.get('group_list'));
         errorDetails.items.get('dataset').setText(record.get('dataset') + " (" + record.get('action') + ")");
 
-        errorDetails.items.get('message').el.update("<code>" + record.get('message').replace (/\n/g, '<br>') + "</code>");
+        var msgEl = errorDetails.items.get('message').el; 
+        msgEl.update("<pre>" + record.get('message') + "</pre>");
     };
 
     var recentErrorsList = new Ext.grid.GridPanel({
@@ -105,7 +106,7 @@ return function (appName) {
                 dataIndex: 'start_time',
                 sortable: true,
                 width: 20,
-                renderer: function(x) { console.log('parsing: ' + x); return Date.parseDate(x, 'c').format ('D jS M Y H:i:s'); }
+                renderer: function(x) { return Date.parseDate(x, 'c').format ('D jS M Y H:i:s'); }
             },
             {
                 header: 'User',

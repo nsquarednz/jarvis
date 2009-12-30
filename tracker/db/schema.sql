@@ -54,6 +54,6 @@ CREATE TABLE day_interval (
     is_fifteen_minute INTEGER
 );    
 
-CREATE INDEX day_interval_15_idx day_interval (is_fifteen_minute);
-CREATE INDEX day_interval_5_idx day_interval (is_five_minute);
+CREATE INDEX day_interval_15_idx ON day_interval (is_fifteen_minute);
+CREATE INDEX day_interval_5_idx ON day_interval (is_five_minute);
 

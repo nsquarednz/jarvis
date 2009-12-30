@@ -17,34 +17,44 @@ jarvis.graph.Graph = function () {
 jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
 
     title: function () {
-        return "15 Minute Averages of Transactions per Minute";
+        return "Average Transactions per Minute";
     },
 
     /*
      * Rendering function. Renders to 'el' with the given data
-     * el is a Ext.Element object. Data is an array of data points,
-     * graph specific.
+     * 
+     * Parameters:
+     *      el      - is a Ext.Element object. 
+     *      data    - is an array of data points, graph specific.
+     *      config  - configuration for rendering the graph, graph
+     *                specific.
      */
-    render: function (el, data) {
+    render: function (el, data, config) {
 
         var elBox = el.getBox();
 
-        width = 800; // TODO - it shouldn't be hard coded, but getting the extjs layout stuff to work's a PITA.
+        width = elBox.width;
         height = width * (1 / 1.61803399);
+
+        if (height > elBox.height) {
+            height = elBox.height;
+        }
 
         buffer = 15;
         leftBuffer = 30;
         bottomBuffer = 30;
 
         var maxTransactions = pv.max(data, function (x) { return x.c; });
+        maxTransactions = maxTransactions > 0 ? maxTransactions : 1;
 
         xscale = pv.Scale.linear (0, data.length).range (0, width - leftBuffer - buffer);
         yscale = pv.Scale.linear (0, maxTransactions).range (0, height - buffer - bottomBuffer).nice();
 
+
         var g = new pv.Panel()
             .canvas (el.id)
-            .width (width)
-            .height (height)
+            .width (width - leftBuffer - buffer)
+            .height (height - buffer - bottomBuffer)
             .left(leftBuffer)
             .top(buffer)
             .right(buffer)
@@ -55,7 +65,11 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
             .left (function (d) { return xscale(this.index); })
             .height (function (d) { return yscale(d.c); })
             .width (1)
-            .bottom (0);
+            .bottom (0)
+            .title (function (d) {
+                var date = Date.fromJulian(d.t);
+                return date.format ('c') + ": average: " + Math.round(d.c * 100) / 100;
+            });
 
         var yticks = yscale.ticks();
         if (yscale (yticks [yticks.length - 1]) - yscale(maxTransactions) < -10 ) {
@@ -71,18 +85,50 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
             .bottom (function (d) { return yscale (d); })
             .anchor ("left")
             .add (pv.Label)
-            .text (function (d) { return Math.round(d * 100, 2) / 100 });
+            .text (function (d) { return Math.round(d * 100) / 100 });
 
-        // TODO - make pretty date/time - just like in V2
+/*
+        var xa = new jarvis.graph.DateAxis()
+                    .timeframe (config.timeframe)
+                    .size (width - leftBuffer - buffer, bottomBuffer)
+                    .valign ("bottom")
+                    .offset (-1 * bottomBuffer)
+                    .textStyle('black')
+                    .addTo (g);
+                    */
+
+        // Find change of days 
+        var dateChangeIndexes = [];
+        var currentDate = 0;
+        var index = 0;
+        data.map (function (d) {
+            if (Math.floor(d.t) != currentDate) {
+                dateChangeIndexes.push (index);
+                currentDate = Math.floor(d.t);
+            }
+            ++index;
+        });
+
+        var lastDate = new Date(0);
         g.add (pv.Rule)
-            .data (xscale.ticks())
+            .data (dateChangeIndexes)
+            .left (function (d) { return xscale (d); })
             .bottom (-5)
             .height (5)
-            .left (function (d) { return xscale (d); })
             .anchor ("bottom")
             .add (pv.Label)
-   //         .text (function (d) { console.log("looking at", d); return data [Math.floor(d)].d; });
-            .text (function (d) { return data [Math.floor(d)].t.substring (11, 16); });
+            .textAlign ('left')
+            .text (function (d) { 
+                var date = Date.fromJulian(data[d].t);
+                var format = 'D dS';
+                if (date.format('y') != lastDate.format('y')) {
+                    format = 'D dS M y';
+                } else if (date.format('M') != lastDate.format('M')) {
+                    format = 'D dS M';
+                }
+                lastDate = date;
+                return date.format(format); 
+            });
 
         g.root.render();
     }

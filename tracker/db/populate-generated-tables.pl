@@ -1,9 +1,9 @@
 #!/usr/bin/perl
 ###############################################################################
-# Descript: This script populates the 'calendar' and other similar tables in 
-#           the tracker database. These tables can be regenerated at any time
-#           as their content is used for reporting and analysis purposes, and
-#           is not depedant on specific system behaviour.
+# Description: This script populates the 'calendar' and other similar tables in 
+#              the tracker database. These tables can be regenerated at any time
+#              as their content is used for reporting and analysis purposes, and
+#              is not depedant on specific system behaviour.
 #
 # Licence:
 #       This file is part of the Jarvis Tracker application.

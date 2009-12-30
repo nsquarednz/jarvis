@@ -1,16 +1,44 @@
 /**
- * This ExtJS code is designed to be evaluated and embedded within another page.
+ * Description: This ExtJS code is designed to be evaluated and embedded within another page.
+ *              It provides a page describing a dataset.
  *
- * It provides a page describing a dataset query.
+ * Licence:
+ *       This file is part of the Jarvis Tracker application.
+ *
+ *       Jarvis is free software: you can redistribute it and/or modify
+ *       it under the terms of the GNU General Public License as published by
+ *       the Free Software Foundation, either version 3 of the License, or
+ *       (at your option) any later version.
+ *
+ *       Jarvis is distributed in the hope that it will be useful,
+ *       but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *       GNU General Public License for more details.
+ *
+ *       You should have received a copy of the GNU General Public License
+ *       along with Jarvis.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *       This software is Copyright 2008 by Jamie Love.
  */
 
 (function () {
 return function (appName, extra) {
+
     var center = new Ext.Panel({
         region: 'center',
-        items: [{
-            html: "blabla"
-        }]
+        layout: 'fit',
+        items: [
+            {
+                xtype: 'Visualisation',
+                dataSource: {
+                    dataset: "tps/" + appName + "/" + extra.query,
+                },
+                graph: new jarvis.graph.TpsGraph(),
+                graphConfig: {
+                    timeframe: trackerConfiguration.defaultDateRange.clone()
+                }
+            }
+        ]
     });
 
     var queryLoader = function (type, element) {
@@ -18,9 +46,7 @@ return function (appName, extra) {
             url: jarvisUrl('source/' + appName + '/' + type + '/' + extra.query),
             success: function (xhr) {
                 var html = xhr.responseText;
-                //html = prettyPrintOne(html);
                 element.update("<pre class='sh_sql'>" + html + "</pre>");
-                console.log ('element is', element);
                 sh_highlightElement(element.first().dom, sh_languages['sql']);
             },
             failure: function () {
@@ -61,20 +87,16 @@ return function (appName, extra) {
         codeView.add(p);
     });
 
-    return new Ext.Panel ({
-        layout: 'fit',
+    return new Ext.Panel({
         title: appName + " - " + extra.query,
-        items: [ 
-            new Ext.Panel({
-                layout: 'border',
-                closable: true,
-                items: [
-                    codeView,
-                    center
-                ]
-            })
+        layout: 'border',
+        closable: true,
+        hideMode: 'offsets',
+        items: [
+            codeView,
+            center
         ]
-    });
+    })
 
 }; })();
 

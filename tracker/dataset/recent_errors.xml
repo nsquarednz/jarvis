@@ -1,0 +1,28 @@
+<!--
+     This dataset provides a list of the recent errors that have occurred.
+     First REST parameter can be the application, if so wanted.
+
+     Slightly different to the errors.xml file in that it limits to the most
+     recent 15, and there is no filtering bar the application name.
+
+     Errors are returned latest error first.
+  -->
+
+<dataset read="*" write="">
+    <select>
+        SELECT
+            id,
+            app_name,
+            username,
+            message,
+            strftime('%Y-%m-%dT%H:%M:%S', start_time, 'localtime')  AS start_time
+        FROM
+            error
+        WHERE
+            (app_name IS NULL OR {$1} IS NULL OR lower(app_name) = lower({$1}))
+        ORDER BY
+            start_time DESC
+        LIMIT 15
+    </select>
+</dataset>
+

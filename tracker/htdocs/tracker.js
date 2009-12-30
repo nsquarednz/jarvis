@@ -6,13 +6,16 @@
 // TODO MOVE this function
 
 /**
- * Function Description:   Returns the julian date value
- *                         for the given date object.
+ * Function Description:   Returns the julian date value for the given date object,
+ *                         adjusting to UTC from browser local time.
  */
 Date.prototype.getJulian = function () {
     // 2440587.5 is the julian date offset for unix epoch
-    // time.
-    return (this.getTime() + this.getTimezoneOffset() * 60 * 1000) / (1000 * 60 * 60 * 24) + 2440587.5; 
+    // time. 
+    return this.getTime() / (1000 * 60 * 60 * 24) + 2440587.5; 
+}
+Date.fromJulian = function (jt) {
+    return new Date(Math.round((jt - 2440587.5) * (1000 * 60 * 60 * 24)));
 }
 
 // Adds a tab to the page
@@ -23,7 +26,7 @@ var trackerSubpages = {};
 var trackerTabs = {};
 
 var trackerConfiguration = {
-    defaultDateRange: 60 * 24
+    defaultDateRange: new jarvis.Timeframe ("..now")
 };
 
 function loadExternalPage (page, callback) {

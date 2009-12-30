@@ -10,19 +10,20 @@ return function (appName, extra) {
 
     return new Ext.Panel ({
         title: appName + "- Queries",
-        layout: 'fit',
+        layout: 'border',
+        hideMode: 'offsets',
         closable: true,
         items: [
             {
                 xtype: 'Visualisation',
+                region: 'center',
                 dataSource: {
                     dataset: "tps/" + appName,
-                    params: {
-                        from: new Date().add (Date.MINUTE, -1 * trackerConfiguration.defaultDateRange).getJulian(),
-                        to: new Date().getJulian()
-                    }
                 },
-                graph: new jarvis.graph.TpsGraph()
+                graph: new jarvis.graph.TpsGraph(),
+                graphConfig: {
+                    timeframe: trackerConfiguration.defaultDateRange.clone()
+                }
             }
         ]
     });
