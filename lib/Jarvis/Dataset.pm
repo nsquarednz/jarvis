@@ -435,13 +435,15 @@ sub get_post_data {
 sub fetch {
     my ($jconfig, $rest_args_aref) = @_;
 
-    my $dsxml = &get_config_xml ($jconfig) || die "Cannot load configuration for dataset '" . ($jconfig->{'dataset_name'} || '') . "'.\n";
+    my $dsxml = &get_config_xml ($jconfig) || die "Cannot load configuration for dataset '" . ($jconfig->{'dataset_name'} || '') . "'.";
 
     my $allowed_groups = $dsxml->{dataset}{"read"};
+
+    # Die on failure.  Note the trailing \n which blocks the stack-trace.
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
     if ($failure ne '') {
         $jconfig->{'status'} = "401 Unauthorized";
-        die "Wanted read access: $failure";
+        die "Insufficient privileges to read '" . $jconfig->{'dataset_name'} . "'. $failure\n";
     }
 
     # What transformations should we use when sending out fetch data?
@@ -667,13 +669,13 @@ sub fetch {
 sub store {
     my ($jconfig, $rest_args_aref) = @_;
 
-    my $dsxml = &get_config_xml ($jconfig) || die "Cannot load configuration for dataset.\n";
+    my $dsxml = &get_config_xml ($jconfig) || die "Cannot load configuration for dataset '" . ($jconfig->{'dataset_name'} || '') . "'.";
 
     my $allowed_groups = $dsxml->{dataset}{"write"};
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
     if ($failure ne '') {
         $jconfig->{'status'} = "401 Unauthorized";
-        die "Wanted write access: $failure";
+        die "Insufficient privileges to write '" . $jconfig->{'dataset_name'} . "'. $failure\n";
     }
 
     # What transforms should we use when processing store data?
