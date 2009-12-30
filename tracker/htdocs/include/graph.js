@@ -74,6 +74,9 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
         var yticks = yscale.ticks();
         if (yscale (yticks [yticks.length - 1]) - yscale(maxTransactions) < -10 ) {
             yticks.push (maxTransactions);
+        } else if (yscale (yticks [yticks.length - 1]) - yscale(maxTransactions) > 10 ) {
+            yticks [yticks.length - 2] = maxTransactions;
+            yticks.pop();
         } else {
             yticks [yticks.length - 1] = maxTransactions;
         }

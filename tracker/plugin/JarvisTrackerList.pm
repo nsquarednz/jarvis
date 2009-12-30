@@ -83,6 +83,14 @@ sub JarvisTrackerList::do {
                     my $u = $_->{username};
                     push(@{$list}, { id => "$id/$u", text => $u, leaf => 1 }); 
                 } @{$users};
+            } elsif ($parts[1] eq "plugins") {
+                my $xmlFilename = $jconfig->{'etc_dir'} . "/" . $parts[0] . ".xml";
+                my $xml = XML::Smart->new ($xmlFilename) || die "Cannot read '$xmlFilename': $!.";
+                my @plugins = $xml->{jarvis}{app}{plugin}('@');
+
+                map {
+                    push(@{$list}, { id => "$id/$_->{dataset}->content", text => $_->{dataset}->content, leaf => 1 }); 
+                } @plugins;
             }
         }
     }
