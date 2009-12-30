@@ -1,6 +1,6 @@
 /**
  * Description: This ExtJS code is designed to be evaluated and embedded within another page.
- *              It provides a page describing a dataset.
+ *              It provides an Ext Container describing a dataset.
  *
  * Licence:
  *       This file is part of the Jarvis Tracker application.
@@ -88,7 +88,7 @@ return function (appName, extra) {
     });
 
     return new Ext.Panel({
-        title: appName + " - " + extra.query,
+        title: appName + " - Queries - " + extra.query,
         layout: 'border',
         closable: true,
         hideMode: 'offsets',

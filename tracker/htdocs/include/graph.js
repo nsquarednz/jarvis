@@ -1,8 +1,27 @@
 /**
- * Graphs
+ * Description: This code generates various types of graphs.
+ *
+ * Licence:
+ *       This file is part of the Jarvis Tracker application.
+ *
+ *       Jarvis is free software: you can redistribute it and/or modify
+ *       it under the terms of the GNU General Public License as published by
+ *       the Free Software Foundation, either version 3 of the License, or
+ *       (at your option) any later version.
+ *
+ *       Jarvis is distributed in the hope that it will be useful,
+ *       but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *       GNU General Public License for more details.
+ *
+ *       You should have received a copy of the GNU General Public License
+ *       along with Jarvis.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *       This software is Copyright 2008 by Jamie Love.
  */
 
-// Base graph class
+//
+// Base graph class.
 //
 var jarvis = jarvis ? jarvis : {};
 jarvis.graph = jarvis.graph ? jarvis.graph : {};
@@ -40,8 +59,8 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
             height = elBox.height;
         }
 
-        buffer = 15;
-        leftBuffer = 30;
+        buffer = 5;
+        leftBuffer = 35;
         bottomBuffer = 30;
 
         var maxTransactions = pv.max(data, function (x) { return x.c; });
@@ -89,16 +108,6 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
             .anchor ("left")
             .add (pv.Label)
             .text (function (d) { return Math.round(d * 100) / 100 });
-
-/*
-        var xa = new jarvis.graph.DateAxis()
-                    .timeframe (config.timeframe)
-                    .size (width - leftBuffer - buffer, bottomBuffer)
-                    .valign ("bottom")
-                    .offset (-1 * bottomBuffer)
-                    .textStyle('black')
-                    .addTo (g);
-                    */
 
         // Find change of days 
         var dateChangeIndexes = [];

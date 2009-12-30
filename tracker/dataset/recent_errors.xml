@@ -1,11 +1,16 @@
 <!--
      This dataset provides a list of the recent errors that have occurred.
      First REST parameter can be the application, if so wanted.
+     Second REST parameter can be the user, if so wanted.
 
-     Slightly different to the errors.xml file in that it limits to the most
-     recent 15, and there is no filtering bar the application name.
+     This request is slightly different to the errors.xml file in that it 
+     limits to the most recent 15, there is no filtering bar the 
+     application name and the resulting data is limited to a few fields only.
 
      Errors are returned latest error first.
+
+     This error list is designed for showing 'recent' errors, which a user could
+     then review in more detail using the 'errors.xml' dataset.
   -->
 
 <dataset read="*" write="">
@@ -19,10 +24,11 @@
         FROM
             error
         WHERE
-            (app_name IS NULL OR {$1} IS NULL OR lower(app_name) = lower({$1}))
+            ({$1} IS NULL OR lower(app_name) = lower({$1}))
+            AND ({$2} IS NULL OR lower(username) = lower({$2}))
         ORDER BY
             start_time DESC
-        LIMIT 15
+        LIMIT 20
     </select>
 </dataset>
 

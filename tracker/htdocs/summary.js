@@ -80,7 +80,7 @@ return function () {
     };
 
     return new Ext.Panel ({
-        title: "Summary",
+        title: "Applications",
         layout: 'border',
         closable: true,
         hideMode: 'offsets',

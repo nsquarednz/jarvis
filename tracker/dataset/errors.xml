@@ -1,10 +1,17 @@
 <!--
      This dataset provides a list of the errors that have occurred.
      First REST parameter can be the application, if so wanted.
+     Second REST parameter can be the user, if so wanted.
 
      Errors are returned latest error first.
-  -->
 
+     A limit is forced on the number of returned errors. If more than that
+     occur for, say, a day, then filtering should be done using the 'filter'
+     parameter.
+
+     A 'limit_to_date' parameter can be passed in to limit the erors to a
+     specific date (in server local time).
+  -->
 <dataset read="*" write="">
     <select>
         SELECT
@@ -22,7 +29,8 @@
         FROM
             error
         WHERE
-            (app_name IS NULL OR {$1} IS NULL OR lower(app_name) = lower({$1}))
+            ({$1} IS NULL OR lower(app_name) = lower({$1}))
+            AND ({$2} IS NULL OR lower(username) = lower({$2}))
             AND
             (
                 {$filter} IS NULL OR {$filter} = ''
@@ -39,8 +47,12 @@
                 OR
                 id IN (SELECT id FROM error WHERE post_body LIKE '%' || {$filter} || '%')
             )
+            AND
+            (
+                {$limit_to_date} IS NULL OR date(start_time, 'localtime') = date({$limit_to_date}, 'localtime')
+            )
         ORDER BY
             start_time DESC
-
+        LIMIT 100
     </select>
 </dataset>

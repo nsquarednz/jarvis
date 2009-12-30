@@ -1,14 +1,61 @@
 /**
- * A ExtJS component for displaying a visualisation
+ * Description: A ExtJS component for displaying a visualisation -
+ *              a graph drawn with protovis.
  *
- * This doesn't do much of anything yet, it mostly just
- * exists for extension purposes later.
+ *              The visualisation component can be created along
+ *              the following lines:
+ *
+    var v = {
+        xtype: 'Visualisation',
+        dataSource: {
+            dataset: "tps",
+        },
+        graph: new jarvis.graph.TpsGraph(),
+        graphConfig: {
+            timeframe: trackerConfiguration.defaultDateRange.clone()
+        }
+    };
+    
+ *              The visualisation code loads the datasource information
+ *              and then using the 'graph' object renders the 
+ *              graph to an inner component (basically a div). The
+ *              graphConfig is passed through to the graph rendering
+ *              code.
+ *
+ *              The code automatically will pass some of the graph
+ *              config through to the data source as well - specifically
+ *              it:
+ *                  * converts the graph timeframe into 'from' and 'to'
+ *                    parameters (in Julian date format).
+ *
+ *              This is a specific design for this application of course,
+ *              not meant to be generic. If the dataSource is passed
+ *              through with a pre-existing params object, then this
+ *              auto-creation is not done.
+ *
+ *
+ * Licence:
+ *       This file is part of the Jarvis Tracker application.
+ *
+ *       Jarvis is free software: you can redistribute it and/or modify
+ *       it under the terms of the GNU General Public License as published by
+ *       the Free Software Foundation, either version 3 of the License, or
+ *       (at your option) any later version.
+ *
+ *       Jarvis is distributed in the hope that it will be useful,
+ *       but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *       GNU General Public License for more details.
+ *
+ *       You should have received a copy of the GNU General Public License
+ *       along with Jarvis.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *       This software is Copyright 2008 by Jamie Love.
  */
 Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
 
     renderGraph: function (target) {
         if (target.rendered && this.data) {
-            console.log ("rendering graph");
             this.graph.render(target, this.data, this.graphConfig);
             this.setTitle (this.graph.title());
         } 
@@ -60,15 +107,12 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
         } else {
             params = {};
             if (this.graphConfig) {
-                console.log (this.graphConfig, this.graphConfig.timeframe.toString());
                 if (this.graphConfig.timeframe) {
                     params.from = this.graphConfig.timeframe.from().formatForServer();
                     params.to = this.graphConfig.timeframe.to().formatForServer();
                 }
             }
         }
-
-        console.log (params);
 
         // Fetch now the data for the component.
         Ext.Ajax.request({
@@ -87,8 +131,3 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
 });
 
 Ext.reg('Visualisation', Ext.ux.Visualisation);
-
-
-
-
-

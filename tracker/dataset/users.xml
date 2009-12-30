@@ -1,5 +1,8 @@
 <!--
-     Provides a list of users (with possible search criteria)
+     Provides a list of users that have been seen by the tracker -
+     this is not necessarily the same as the current possible user list.
+
+     First REST parameter is the application name (optional).
   -->
 <dataset read="*" write="" debug="yes" dump="yes">
     <select>
