@@ -31,7 +31,7 @@ use warnings;
 
 package JarvisTrackerList;
 
-use JSON::XS;
+use JSON::PP;
 use Jarvis::DB;
 
 # TODO This is not really safe in terms of directory path creation
@@ -112,7 +112,7 @@ sub JarvisTrackerList::do {
         }
     }
 
-    my $json = JSON::XS->new->pretty(1);
+    my $json = JSON::PP->new->pretty(1);
     return $json->encode ( $list );
 }
 

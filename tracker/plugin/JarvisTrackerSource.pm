@@ -27,7 +27,7 @@ use warnings;
 
 package JarvisTrackerSource;
 
-use JSON::XS;
+use JSON::PP;
 use Jarvis::DB;
 
 # TODO This is not really safe in terms of directory path creation
