@@ -115,7 +115,7 @@ sub Jarvis::Login::Database::check {
         return ("User '$username' not unique (" . (scalar @$result_aref). ").");         # Should never happen.
     }
     my $result_href = $$result_aref[0];
-    my $stored_password = $$result_href{'password'} || '';
+    my $stored_password = $$result_href{$user_password_column} || '';
 
     if ($stored_password eq '') {
         return ("Account has no password.");
