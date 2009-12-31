@@ -79,15 +79,17 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
             .right(buffer)
             .bottom(bottomBuffer);
 
+        var barwidth = xscale(1) - xscale(0) > 4 ? Math.round((xscale(1) - xscale(0)) / 2) : 1;
+
         g.add (pv.Bar)
             .data (data) 
             .left (function (d) { return xscale(this.index); })
             .height (function (d) { return yscale(d.c); })
-            .width (1)
+            .width (barwidth)
             .bottom (0)
             .title (function (d) {
                 var date = Date.fromJulian(d.t);
-                return date.format ('c') + ": average: " + Math.round(d.c * 100) / 100;
+                return 'For ' + date.format ('g:ia') + ": avg: " + Math.round(d.c * 100) / 100;
             });
 
         var yticks = yscale.ticks();
@@ -103,7 +105,7 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
         g.add (pv.Rule)
             .data (yticks)
             .left (-5)
-            .width (5)
+            .width (function (d) { return this.index == 0 ? width - buffer - leftBuffer + 5 : 5; })
             .bottom (function (d) { return yscale (d); })
             .anchor ("left")
             .add (pv.Label)
@@ -111,25 +113,37 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
 
         // Find change of days 
         var dateChangeIndexes = [];
-        var currentDate = 0;
+        var hourPoints = [];
+        var currentDate = -1;
         var index = 0;
         data.map (function (d) {
-            if (Math.floor(d.t) != currentDate) {
+            var d = Date.fromJulian (d.t);
+            var day = d.format('j');
+            if (day != currentDate) {
                 dateChangeIndexes.push (index);
-                currentDate = Math.floor(d.t);
+                currentDate = day;
+            } else {
+                var h = d.format('G') * 1;
+                var m = d.format('i') * 1;
+
+                if (h % 2 == 0 && m == 0) {
+                    hourPoints.push (index);
+                }
             }
             ++index;
         });
 
+        // Day changes
         var lastDate = new Date(0);
         g.add (pv.Rule)
             .data (dateChangeIndexes)
             .left (function (d) { return xscale (d); })
-            .bottom (-5)
-            .height (5)
+            .bottom (-30)
+            .height (30)
             .anchor ("bottom")
             .add (pv.Label)
             .textAlign ('left')
+            .textBaseline ('bottom')
             .text (function (d) { 
                 var date = Date.fromJulian(data[d].t);
                 var format = 'D dS';
@@ -140,6 +154,19 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
                 }
                 lastDate = date;
                 return date.format(format); 
+            });
+
+        // hour changes - only main times
+        g.add (pv.Rule)
+            .data (hourPoints)
+            .left (function (d) { return xscale (d); })
+            .bottom (-5)
+            .height (5)
+            .anchor ("bottom")
+            .add (pv.Label)
+            .text (function (d) { 
+                var date = Date.fromJulian(data[d].t);
+                return date.format("ga");
             });
 
         g.root.render();
