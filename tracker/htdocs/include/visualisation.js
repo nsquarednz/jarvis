@@ -61,6 +61,8 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
         } 
     },
 
+
+
     initComponent: function () {
         var me = this;
         this.dataVisualisationElementId = Ext.id();
@@ -79,10 +81,27 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
         Ext.apply (this, {
             header: true,
             border: false,
-            autoScroll: true,
             layout: 'fit',
+            autoScroll: true,
             title: 'Loading data...',
-
+            bbar: [
+                {
+                    text: 'Show:',
+                    xtype: 'label'
+                },
+                {
+                    toggleGroup: 'visualisationDateRangeToggleGroup',
+                    text: 'Last Day',
+                    pressed: true,
+                    handler: function () { me.alterGraphTimeframe (new jarvis.Timeframe('..now')); }
+                },
+                {
+                    xtype: 'tbbutton',
+                    toggleGroup: 'visualisationDateRangeToggleGroup',
+                    text: 'Last Week',
+                    handler: function () { me.alterGraphTimeframe (new jarvis.Timeframe('...now')); }
+                }
+            ],
             items: [
                 dv
             ]
@@ -97,6 +116,26 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
         this.on ('resize', function () { setTimeout(function () { me.renderGraph(dv); }, 0); });
 
         Ext.ux.Visualisation.superclass.initComponent.apply(this, arguments);
+
+        this.loadGraphData();
+    },
+
+    /**
+     * Alters the timeframe of the graph, reloading the graph data, and then
+     * once that is done, redrawing the graph.
+     */
+    alterGraphTimeframe: function(newTimeframe) {
+        this.graphConfig.timeframe = newTimeframe;
+        this.loadGraphData();
+    },
+
+    /**
+     * Loads the graph data. It uses the dataSource's params, if they exist.
+     * If they do not exist, it builds them from the graphConfig object of this
+     * object.
+     */
+    loadGraphData: function () {
+        var me = this;
 
         // Build the parameters list for the fetching. If we have parameters,
         // then use those, otherwise build one up, from configuration - this

@@ -55,10 +55,6 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
         width = elBox.width;
         height = width * (1 / 1.61803399);
 
-        if (height > elBox.height) {
-            height = elBox.height;
-        }
-
         buffer = 5;
         leftBuffer = 35;
         bottomBuffer = 30;
@@ -135,6 +131,11 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
 
         // Day changes
         var lastDate = new Date(0);
+        if (dateChangeIndexes.length > 1 && xscale(dateChangeIndexes[1]) - xscale(dateChangeIndexes[0]) < 70) {
+            lastDate = Date.fromJulian (data[dateChangeIndexes[0]]);
+            dateChangeIndexes.shift();
+        }
+
         g.add (pv.Rule)
             .data (dateChangeIndexes)
             .left (function (d) { return xscale (d); })
@@ -157,6 +158,9 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
             });
 
         // hour changes - only main times
+        // If hours are not far apart, don't show times
+        var showHourText = !(hourPoints.length > 1 && xscale(hourPoints[1]) - xscale(hourPoints[0]) < 20);
+            
         g.add (pv.Rule)
             .data (hourPoints)
             .left (function (d) { return xscale (d); })
@@ -165,8 +169,12 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
             .anchor ("bottom")
             .add (pv.Label)
             .text (function (d) { 
-                var date = Date.fromJulian(data[d].t);
-                return date.format("ga");
+                if (showHourText) {
+                    var date = Date.fromJulian(data[d].t);
+                    return date.format("ga");
+                } else {
+                    return "";
+                }
             });
 
         g.root.render();
