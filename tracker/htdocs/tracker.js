@@ -48,6 +48,8 @@ var trackerConfiguration = {
     defaultDateRange: new jarvis.Timeframe ("..now")
 };
 
+var viewport;
+
 function loadExternalPage (page, callback) {
     Ext.Ajax.request ({
         url: page,
@@ -63,9 +65,9 @@ function loadExternalPage (page, callback) {
     });
 }
 
-function addTab (id, page, appName, extraParameters) {
+function addTab (id, page, appName, extraParameters, callback) {
     if (!trackerSubpages[page]) {
-        loadExternalPage(page, function (p) { addTab (id, page, appName, extraParameters); });
+        loadExternalPage(page, function (p) { addTab (id, page, appName, extraParameters, callback); });
     } else {
         if (trackerTabs[id]) {
             informationTabPanel.setActiveTab (trackerTabs[id]);
@@ -77,6 +79,10 @@ function addTab (id, page, appName, extraParameters) {
             informationTabPanel.add (t);
             informationTabPanel.setActiveTab (t);
             trackerTabs[id] = t;
+
+            if (callback) {
+                callback(t);
+            }
         }
     };
 }
@@ -147,20 +153,12 @@ Ext.onReady (function () {
         }
     });
     
+        
     informationTabPanel = new Ext.TabPanel ({
-        autoScroll: true,
-        deferredRender: false,
-        items: [ 
-        ]
-    });
-
-    var centerPanel = new Ext.Panel({
         region:'center',
-        layout:'fit',
-        border:false,
-        items: [
-            informationTabPanel
-        ]
+        deferredRender: false,
+        margins:'0 4 4 0',
+		activeTab:0,
     });
 
     // Main layout holder
@@ -169,7 +167,7 @@ Ext.onReady (function () {
         items: [
             titleBar,
             treePanel,
-            centerPanel
+            informationTabPanel
         ]
     });
 
@@ -182,9 +180,15 @@ Ext.onReady (function () {
 
 
     /** 
-     * Start off with summary details as a tab
+     * Start off with summary details as a tab.
+     *
+     * Note that we force a relayout after the load as the informationTabPanel
+     * does not have an initial tab, and because without an initial tab ExtJS appears
+     * to have a bug which causes the tab height to be mis-calculated
+     * by about 15 pixels, chopping off the bottom of the tab's contents
+     * (until it is resized or layout is forced to recalculate)
      */
-    addTab ("summary", "summary.js");
+    addTab ("Applications", "summary.js", null, null, function () { viewport.doLayout(false); });
 });
 
 

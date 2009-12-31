@@ -63,7 +63,11 @@ return function () {
         width: 600,
         title: "Recently",
         items: [
-            recentErrorsList    
+            recentErrorsList,
+            {
+                title: 'bla',
+                html: 'help'
+                }
         ]
     });
 
@@ -82,7 +86,6 @@ return function () {
     return new Ext.Panel ({
         title: "Applications",
         layout: 'border',
-        closable: true,
         hideMode: 'offsets',
         items: [
             eastAccordion,
