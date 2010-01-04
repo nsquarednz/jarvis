@@ -96,7 +96,6 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
                     handler: function () { me.alterGraphTimeframe (new jarvis.Timeframe('..now')); }
                 },
                 {
-                    xtype: 'tbbutton',
                     toggleGroup: 'visualisationDateRangeToggleGroup',
                     text: 'Last Week',
                     handler: function () { me.alterGraphTimeframe (new jarvis.Timeframe('...now')); }

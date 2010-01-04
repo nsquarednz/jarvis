@@ -29,8 +29,13 @@ div.title-bar h1 {
 }
 
 pre.sh_sql {
-    font-size: 10px;
-    font-style: courier;
+    font-size: 12px;
+    font-style: Courier New;
+    margin: 5px;
+}
+
+div.codeView {
+    overflow: auto;
 }
 
 div.data-visualisation {

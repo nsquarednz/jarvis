@@ -52,7 +52,7 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
 
         var elBox = el.getBox();
 
-        width = elBox.width;
+        width = elBox.width - 20; // 10 pixels gives a buffer to avoid scrollbars TODO - fix
         height = width * (1 / 1.61803399);
 
         buffer = 5;

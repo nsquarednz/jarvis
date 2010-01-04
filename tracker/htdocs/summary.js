@@ -63,11 +63,7 @@ return function () {
         width: 600,
         title: "Recently",
         items: [
-            recentErrorsList,
-            {
-                title: 'bla',
-                html: 'help'
-                }
+            recentErrorsList
         ]
     });
 

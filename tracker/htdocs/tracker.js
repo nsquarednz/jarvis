@@ -80,6 +80,8 @@ function addTab (id, page, appName, extraParameters, callback) {
             informationTabPanel.setActiveTab (t);
             trackerTabs[id] = t;
 
+            //informationTabPanel.doLayout();
+
             if (callback) {
                 callback(t);
             }
@@ -157,8 +159,27 @@ Ext.onReady (function () {
     informationTabPanel = new Ext.TabPanel ({
         region:'center',
         deferredRender: false,
+        enableTabScroll: true,
         margins:'0 4 4 0',
-		activeTab:0,
+        activeTab:0,
+
+        // This layoutOnTabChange call forces the tab contents to be drawn right down
+        // the component tree when tabs are added. Without this, I was finding that 
+        // accordions within 
+        // the tab would have their panel's drawn, but not the panel contents drawn 
+        // (for multi-item contents - if an accordion panel's layout was 'fit', it'd
+        // draw that fine for some reason).
+        //
+        // I investigated for about a day, and could only identify that while
+        // the tab's accordion's panels were rendered, the doLayout() call was never
+        // made to the panel, and so such panel's items would not be rendered.
+        // It was possible to force the render by resizing the browser height, but
+        // that's sub-optimal. Note that this affected only the initially visible 
+        // accordion panel, not the other panels which are rendered afterward.
+        //
+        // Note that calling 'doLayout()' on the tab after it is added has the same
+        // effect.
+        layoutOnTabChange:true,
     });
 
     // Main layout holder
