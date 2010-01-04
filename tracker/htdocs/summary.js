@@ -27,7 +27,7 @@ return function () {
                 header: 'Event Time',
                 dataIndex: 'start_time',
                 sortable: true,
-                width: 30,
+                width: 50,
                 renderer: function(x) { return Date.parseDate(x, 'c').format ('D jS M Y H:i:s'); }
             },
             {
@@ -46,7 +46,7 @@ return function () {
                 header: 'Error',
                 dataIndex: 'message',
                 sortable: false,
-                renderer: function (x) { Ext.util.Format.ellipsis (x, 60); }
+                renderer: function (x) { return Ext.util.Format.ellipsis (x, 60); }
             }
         ],
         viewConfig: {

@@ -30,12 +30,18 @@ package JarvisTrackerSource;
 use JSON::PP;
 use Jarvis::DB;
 
-# TODO This is not really safe in terms of directory path creation
 sub JarvisTrackerSource::do {
     my ($jconfig, $restArgs) = @_;
 
+    # Check that each part is safe. We can't have the user
+    # passing in paths that could let them access files outside
+    # the application directories.
+    map {
+        die "ERROR in arguments provided. URL must be made up of characters: A-Z, a-z, 0-9, _, - and space only." if ! /^[-A-Za-z0-9_ ]*$/;
+    } @$restArgs;
+
     my $configFilename = $jconfig->{'etc_dir'} . "/" . $restArgs->[0] . ".xml";
-    my $config = XML::Smart->new ($configFilename) || die "Cannot read '$configFilename': $!.";
+    my $config = XML::Smart->new ($configFilename) || die "Cannot read configuration for $restArgs->[0].xml: $!.";
     my $datasetDirectory = $config->{jarvis}{app}{dataset_dir}->content;
 
     my $section = $restArgs->[1];
@@ -43,7 +49,7 @@ sub JarvisTrackerSource::do {
     splice(@{$restArgs}, 0, 2);
     map { $filename .= "/" . $_; } @{$restArgs};
     $filename .= ".xml";
-    my $dsxml = XML::Smart->new ($filename) || die "Cannot read '$filename': $!\n";
+    my $dsxml = XML::Smart->new ($filename) || die "Cannot read source file: $!\n";
     return $dsxml->{dataset}->{$section}->content;
 }
 

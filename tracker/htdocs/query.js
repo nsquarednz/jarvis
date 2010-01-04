@@ -44,6 +44,12 @@
         return ret;
     };
 
+    /**
+     * This function replaces parameters with real values, if so
+     * desired, and then shows this onscreen. Could be split into
+     * two separate functions if they need to be separated at any
+     * point.
+     */
     var displaySql = function  (element) {
         var parameterise = element.showParameterised;
         var dsql = element.sql;
@@ -61,6 +67,18 @@
 
         element.getEl().update("<pre class='sh_sql'>" + dsql + "</pre>");
         sh_highlightElement(element.getEl().first().dom, sh_languages['sql']);
+    };
+
+    var executeQuery = function (i) {
+        var url = jarvis_home + '/' + i.appName + '/' + i.query;
+
+        Ext.Ajax.request ({
+            url: url,
+            success: function (xhr) { },
+            failure: function () {
+                Ext.Msg.alert ("Cannot load: " + url)
+            }
+        });
     };
 
 return function (appName, extra) {
@@ -182,8 +200,20 @@ return function (appName, extra) {
                     text: 'Parameterised',
                     handler: function () { sqlBox.showParameterised = true; displaySql (sqlBox); }
                 },
+                {
+                    text: 'Results',
+                    enabled: false
+                },
                 { 
                     xtype: 'tbfill'
+                },
+                {
+                    text: 'Execute',
+                    handler: executeQuery.createCallback ({
+                        app: appName,
+                        query: extra.query,
+                        params: paramsStore
+                    })
                 }
                 /*{ TODO one day. It isn't trivial to select text for a user to copy.
                     text: 'Select',

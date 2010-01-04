@@ -15,6 +15,7 @@
         WHERE
             ({$1} IS NULL OR {$1} = app_name)
             AND ({$2} IS NULL OR {$2} = dataset)
+        LIMIT 1000
     ]]>
     </select>
 </dataset>
