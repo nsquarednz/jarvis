@@ -6,7 +6,7 @@
  *              the following lines:
  *
     var v = {
-        xtype: 'Visualisation',
+        xtype: 'TimeBasedVisualisation',
         dataSource: {
             dataset: "tps",
         },
@@ -54,14 +54,14 @@
  */
 Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
 
+    graphConfig: {},
+
     renderGraph: function (target) {
         if (target.rendered && this.data) {
             this.graph.render(target, this.data, this.graphConfig);
             this.setTitle (this.graph.title());
         } 
     },
-
-
 
     initComponent: function () {
         var me = this;
@@ -84,23 +84,6 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
             layout: 'fit',
             autoScroll: true,
             title: 'Loading data...',
-            bbar: [
-                {
-                    text: 'Show:',
-                    xtype: 'label'
-                },
-                {
-                    toggleGroup: 'visualisationDateRangeToggleGroup',
-                    text: 'Last Day',
-                    pressed: true,
-                    handler: function () { me.alterGraphTimeframe (new jarvis.Timeframe('..now')); }
-                },
-                {
-                    toggleGroup: 'visualisationDateRangeToggleGroup',
-                    text: 'Last Week',
-                    handler: function () { me.alterGraphTimeframe (new jarvis.Timeframe('...now')); }
-                }
-            ],
             items: [
                 dv
             ]
@@ -120,42 +103,18 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
     },
 
     /**
-     * Alters the timeframe of the graph, reloading the graph data, and then
-     * once that is done, redrawing the graph.
-     */
-    alterGraphTimeframe: function(newTimeframe) {
-        this.graphConfig.timeframe = newTimeframe;
-        this.loadGraphData();
-    },
-
-    /**
-     * Loads the graph data. It uses the dataSource's params, if they exist.
-     * If they do not exist, it builds them from the graphConfig object of this
-     * object.
+     * Loads the graph data. 
+     *
+     * If graphConfig.dataSourceParams exists, it uses these for the 
+     * parameters of the datasource.
      */
     loadGraphData: function () {
         var me = this;
 
-        // Build the parameters list for the fetching. If we have parameters,
-        // then use those, otherwise build one up, from configuration - this
-        // code understands deeply the config - it's not generic.
-        var params;
-        if (this.dataSource.params) {
-            params = this.dataSource.params;
-        } else {
-            params = {};
-            if (this.graphConfig) {
-                if (this.graphConfig.timeframe) {
-                    params.from = this.graphConfig.timeframe.from().formatForServer();
-                    params.to = this.graphConfig.timeframe.to().formatForServer();
-                }
-            }
-        }
-
         // Fetch now the data for the component.
         Ext.Ajax.request({
             url: jarvisUrl (this.dataSource.dataset),
-            params: params,
+            params: this.graphConfig.dataSourceParams ? this.graphConfig.dataSourceParams : {},
             method: "GET",
 
             // We received a response back from the server, that's a good start.
@@ -169,3 +128,63 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
 });
 
 Ext.reg('Visualisation', Ext.ux.Visualisation);
+
+Ext.ux.TimeBasedVisualisation = Ext.extend(Ext.ux.Visualisation, {
+
+    initComponent: function () {
+        var me = this;
+        Ext.apply (this, {
+            bbar: [
+                {
+                    text: 'Show:',
+                    xtype: 'label'
+                },
+                {
+                    toggleGroup: 'visualisationDateRangeToggleGroup',
+                    text: 'Last Day',
+                    pressed: true,
+                    handler: function () { me.alterGraphTimeframe (new jarvis.Timeframe('..now')); }
+                },
+                {
+                    toggleGroup: 'visualisationDateRangeToggleGroup',
+                    text: 'Last Week',
+                    handler: function () { me.alterGraphTimeframe (new jarvis.Timeframe('...now')); }
+                }
+            ]
+        });
+
+        Ext.ux.TimeBasedVisualisation.superclass.initComponent.apply(this, arguments);
+    },
+
+    /**
+     * Alters the timeframe of the graph, reloading the graph data, and then
+     * once that is done, redrawing the graph.
+     */
+    alterGraphTimeframe: function(newTimeframe) {
+        this.graphConfig.timeframe = newTimeframe;
+        this.loadGraphData();
+    },
+
+    /**
+     * Loads the graph data. 
+     *
+     * The timeframe (graphConfig.timeframe) is inserted into graphConfig.params.
+     */
+    loadGraphData: function () {
+        var me = this;
+
+        // Build the parameters list for the fetching. If we have parameters,
+        // then use those, otherwise build one up, from configuration - this
+        // code understands deeply the config - it's not generic.
+        this.graphConfig.dataSourceParams = this.graphConfig.dataSourceParams ? this.graphConfig.dataSourceParams : {};
+
+        if (this.graphConfig.timeframe) {
+            this.graphConfig.dataSourceParams.from = this.graphConfig.timeframe.from().formatForServer();
+            this.graphConfig.dataSourceParams.to = this.graphConfig.timeframe.to().formatForServer();
+        }
+
+        Ext.ux.TimeBasedVisualisation.superclass.loadGraphData.apply(this, arguments);
+    }
+});
+
+Ext.reg('TimeBasedVisualisation', Ext.ux.TimeBasedVisualisation);

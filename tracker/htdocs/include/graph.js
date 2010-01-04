@@ -20,15 +20,132 @@
  *       This software is Copyright 2008 by Jamie Love.
  */
 
+/**
+ * Add comma's into a number.
+ */
+jarvis.graph.formatComma = function(amount) {
+    var delimiter = ","; 
+    var a = amount.split('.',2);
+    var d = a[1];
+    var i = parseInt(a[0]);
+    if(isNaN(i)) { return ''; }
+    var minus = '';
+    if(i < 0) { minus = '-'; }
+    i = Math.abs(i);
+    var n = new String(i);
+    var a = [];
+    while(n.length > 3)
+    {
+        var nn = n.substr(n.length-3);
+        a.unshift(nn);
+        n = n.substr(0,n.length-3);
+    }
+    if(n.length > 0) { a.unshift(n); }
+    n = a.join(delimiter);
+    if(d && d.length < 1) { amount = n; }
+    else { amount = n + (d ? '.' + d : ''); }
+    amount = minus + amount;
+    return amount;
+};
+
 //
 // Base graph class.
 //
 var jarvis = jarvis ? jarvis : {};
 jarvis.graph = jarvis.graph ? jarvis.graph : {};
 
-jarvis.graph.Graph = function () {
+jarvis.graph.Graph = function() {
+};
+
+/*
+ * Provide a title for the graph.
+ */
+jarvis.graph.Graph.prototype.title = function() {
+        throw "ERROR: base graph 'title' function called. This is an abstract function and needs to be overridden.";
+};
+
+/*
+ * Rendering function. Renders to 'el' with the given data
+ * 
+ * Parameters:
+ *      el      - is a Ext.Element object. 
+ *      data    - is an array of data points, graph specific.
+ *      config  - configuration for rendering the graph, graph
+ *                specific.
+ */
+jarvis.graph.Graph.prototype.render = function (el, data, config) {
+    throw "ERROR: base graph 'render' function called. This is an abstract function and needs to be overridden.";
+};
+
+/*
+ * Provide a message indicating there is no data to display a graph on the 
+ * given element (not the same as if there was an error reading the data!)
+ */
+jarvis.graph.Graph.prototype.noDataMesasge = function(el) {
+    el.getEl().update ("<i>No data available to display graph.</i>");
 }
 
+//
+// Graph showing performance of a dataset query
+//
+jarvis.graph.DatasetPerformanceGraph = Ext.extend(jarvis.graph.Graph, {
+    title: function () {
+        return "Dataset Performance";
+    },
+
+    render: function (el, data, config) {
+
+        if (data.length == 0) {
+            this.noDataMesasge (el);
+            return;
+        }
+        
+        var elBox = el.getBox();
+
+        width = elBox.width - 20; // 20 pixels gives a buffer to avoid scrollbars TODO - fix
+        height = 60;
+
+        leftBuffer = 20;
+        bottomBuffer = 20;
+        buffer = 10;
+
+        // Lets look at the data
+        var worstTime = pv.max (data, function(d) { return d.d; });
+        var bestTime  = pv.min (data, function(d) { return d.d; });
+        var mean  = pv.mean (data, function(d) { return d.d; });
+        var median  = pv.median (data, function(d) { return d.d; });
+
+        var xscale = pv.Scale.linear (0, worstTime).range (0, width - leftBuffer - buffer).nice();
+
+        var g = new pv.Panel()
+            .canvas (el.id)
+            .width (width - leftBuffer - buffer)
+            .height (height - buffer - bottomBuffer)
+            .left(leftBuffer)
+            .top(buffer)
+            .right(buffer)
+            .bottom(bottomBuffer);
+
+       g.add (pv.Bar)
+            .data ( pv.range(0, width - leftBuffer - buffer, 2))
+            .bottom (0)
+            .height (20)
+            .width (2)
+            .left (function (a) { return a; })
+            .fillStyle (pv.Scale.linear(0, xscale(bestTime), xscale(mean), xscale(worstTime)).range("white", "white", "green", "red"));
+
+        g.add (pv.Rule)
+            .data ( [ 0, bestTime ,  mean , worstTime  ])
+            .left (function (d) { return xscale(d); })
+            .bottom (-5)
+            .height (5)
+            .anchor ("bottom")
+            .add (pv.Label)
+            .text (function (d) { return xscale.tickFormat(d) + "ms"; });
+
+        g.root.render();
+    }
+});
 
 //
 // Line graph showing transactions per second.
@@ -52,7 +169,7 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
 
         var elBox = el.getBox();
 
-        width = elBox.width - 20; // 10 pixels gives a buffer to avoid scrollbars TODO - fix
+        width = elBox.width - 20; // 20 pixels gives a buffer to avoid scrollbars TODO - fix
         height = width * (1 / 1.61803399);
 
         buffer = 5;

@@ -67,10 +67,20 @@ return function (appName, extra) {
 
     var center = new Ext.Panel({
         region: 'center',
-        layout: 'fit',
+        layout: 'anchor',
         items: [
             {
                 xtype: 'Visualisation',
+                anchor: '100%',
+                height: 90,
+                dataSource: {
+                    dataset: "dataset_duration/" + appName + "/" + extra.query,
+                },
+                graph: new jarvis.graph.DatasetPerformanceGraph()
+            },
+            {
+                xtype: 'TimeBasedVisualisation',
+                anchor: '100% -100',
                 dataSource: {
                     dataset: "tps/" + appName + "/" + extra.query,
                 },

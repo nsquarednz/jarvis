@@ -149,7 +149,7 @@ return function (appName) {
                 header: 'Error',
                 dataIndex: 'message',
                 sortable: false,
-                renderer: function (x) { return x.substring (0, 150) + "..."; }
+                renderer: function (x) { return Ext.util.Format.ellipsis (x, 150); }
             }
         ],
         viewConfig: {

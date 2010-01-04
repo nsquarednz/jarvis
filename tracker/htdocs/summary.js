@@ -46,7 +46,7 @@ return function () {
                 header: 'Error',
                 dataIndex: 'message',
                 sortable: false,
-                renderer: function (x) { return x.substring (0, 60) + "..."; }
+                renderer: function (x) { Ext.util.Format.ellipsis (x, 60); }
             }
         ],
         viewConfig: {
@@ -68,7 +68,7 @@ return function () {
     });
 
     var tps = {
-        xtype: 'Visualisation',
+        xtype: 'TimeBasedVisualisation',
         region: 'center',
         dataSource: {
             dataset: "tps",

@@ -33,7 +33,7 @@ return function (appName, extra) {
         closable: true,
         items: [
             {
-                xtype: 'Visualisation',
+                xtype: 'TimeBasedVisualisation',
                 region: 'center',
                 dataSource: {
                     dataset: "tps/" + appName,
