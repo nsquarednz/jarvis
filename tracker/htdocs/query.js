@@ -53,7 +53,6 @@
     var displaySql = function  (element) {
         var parameterise = element.showParameterised;
         var dsql = element.queryParamsStore.sql;
-
         if (parameterise) {
             element.queryParamsStore.each (function (r) {
                 var re = new RegExp('\{[\{]?[\$]?' + r.get('param') + '[\}]?\}', 'g');
@@ -69,27 +68,49 @@
         sh_highlightElement(element.getEl().first().dom, sh_languages['sql']);
     };
 
-    var executeQuery = function (i) {
-        var url = jarvis_home + '/' + i.app + '/' + i.query;
+    var executeQuery = function (info) {
+        var url = jarvis_home + '/' + info.app + '/' + info.query;
+        var params = {};
+        var restArgs = [];
+        var maxRestArg = -1;
+        
+        info.params.each (function (r) {
+            if (r.get('nullOnEmpty') && (!r.get('value') || r.get('value') === '')) {
+                // do nothing for null's
+            } else {
+                var p = r.get('param');
+                if (p > 0) {
+                    restArgs [p] = r.get('value');
+                    maxRestArg = p > maxRestArg ? p : maxRestArg;
+                } else {
+                    params[p] = r.get('value');
+                }
+            }
+        });
+        for (var i = 1; i <= maxRestArg; ++i) {
+            url += '/' + (restArgs[i] ? restArgs[i] : '');
+        }
 
         Ext.Ajax.request ({
             url: url,
+            method: 'GET',
+            params: params,
             success: function (xhr) { 
                 var txt = xhr.responseText;
                 // TODO: Show in a table.
-                var height = i.target.getEl().getBox().height;
+                var height = info.target.getEl().getBox().height;
                 try {
                     Ext.util.JSON.decode (txt); // Throws error on failure
-                    i.target.getEl().update('<pre class="sh_javascript">' + txt + '</pre>');
-                    sh_highlightElement(i.target.getEl().first().dom, sh_languages['javascript']);
+                    info.target.getEl().update('<pre class="sh_javascript">' + txt + '</pre>');
+                    sh_highlightElement(info.target.getEl().first().dom, sh_languages['javascript']);
                 } catch (error) {
-                    i.target.getEl().update('<pre class="sh_xml">' + Ext.util.Format.htmlEncode(txt) + '</pre>');
-                    sh_highlightElement(i.target.getEl().first().dom, sh_languages['xml']);
+                    info.target.getEl().update('<pre class="sh_xml">' + Ext.util.Format.htmlEncode(txt) + '</pre>');
+                    sh_highlightElement(info.target.getEl().first().dom, sh_languages['xml']);
                 }
     
-                console.log (i.target, i.target.ownerCt);
-                if (i.target.ownerCt && i.target.ownerCt.activate) {
-                    i.target.ownerCt.activate (i.target);
+                console.log (info.target, info.target.ownerCt);
+                if (info.target.ownerCt && info.target.ownerCt.activate) {
+                    info.target.ownerCt.activate (info.target);
                 }
             },
             failure: function () {
