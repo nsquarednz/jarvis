@@ -120,11 +120,11 @@ return function (appName) {
         errorDetails.items.get('username').setText(record.get('username'));
         errorDetails.items.get('sid').setText(record.get('sid'));
         errorDetails.items.get('groups').setText(record.get('group_list'));
-        errorDetails.items.get('dataset').setText(record.get('dataset') + " (" + record.get('action') + ")");
+        errorDetails.items.get('dataset').setText(record.get('dataset') + ' (' + record.get('action') + ')');
         errorDetails.items.get('requestparameters').setText(record.get('params'));
 
         var msgEl = errorDetails.items.get('message').el; 
-        msgEl.update("<pre>" + record.get('message') + "</pre>");
+        msgEl.update('<pre>' + record.get('message') + '</pre>');
     };
 
     var recentErrorsList = new Ext.grid.GridPanel({
@@ -156,8 +156,8 @@ return function (appName) {
             forceFit: true
         },
         tbar: [
-            "Viewing: "
-            , new Ext.form.DateField({
+            'Viewing: ',
+            new Ext.form.DateField({
                 format: 'd/m/Y',
                 altFormats: 'd/m/Y|n/j/Y|n/j/y|m/j/y|n/d/y|m/j/Y|n/d/Y|m-d-y|m-d-Y|m/d|m-d|md|mdy|mdY|d|Y-m-d',
                 listeners: {
@@ -172,10 +172,10 @@ return function (appName) {
                         recentErrorsStore.load();
                     }
                 }
-            })
-            , {xtype: 'tbfill'}
-            , "Filter: "
-            , new Ext.form.TextField( {
+            }),
+            {xtype: 'tbfill'},
+            'Filter: ',
+            new Ext.form.TextField( {
                 listeners: {
                     specialkey: function (field, e) {
                         if (e.getKey() == Ext.EventObject.ENTER) {
@@ -196,7 +196,7 @@ return function (appName) {
     });
 
     return new Ext.Panel ({
-        title: appName + " - Errors",
+        title: appName + ' - Errors',
         layout: 'border',
         closable: true,
         items: [

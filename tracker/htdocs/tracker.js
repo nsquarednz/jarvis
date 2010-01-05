@@ -45,7 +45,7 @@ var trackerSubpages = {};
 var trackerTabs = {};
 
 var trackerConfiguration = {
-    defaultDateRange: new jarvis.Timeframe ("..now")
+    defaultDateRange: new jarvis.Timeframe ('..now')
 };
 
 var viewport;
@@ -60,7 +60,12 @@ function loadExternalPage (page, callback) {
                 callback();
         },
         failure: function () {
-            Ext.Msg.alert ("Cannot load: " + page);
+            Ext.Msg.show ({
+                title: 'Page Load Error',
+                msg: 'Cannot load: ' + page,
+                buttons: Ext.Msg.OK,
+                icon: Ext.Msg.ERROR
+           });
         }
     });
 }
@@ -97,17 +102,17 @@ Ext.onReady (function () {
         region: 'north',
         xtype: 'container',
         autoEl: {
-            html: "<h1>The Jarvis Tracker</h1>",
+            html: '<h1>The Jarvis Tracker</h1>',
             tag: 'div'
         },
         height: 45,
-        cls: "title-bar"
+        cls: 'title-bar'
     };
 
     // Tree - showing the list of jarvis applications and suchlike.
     var treePanel = new Ext.tree.TreePanel ({
-        title: "Application Browser",
-        region: "west",
+        title: 'Application Browser',
+        region: 'west',
         split: true,
         width: 400,
         loader: new Ext.tree.TreeLoader({
@@ -121,7 +126,7 @@ Ext.onReady (function () {
         collapsible: true,
         autoScroll: true,
         root: new Ext.tree.AsyncTreeNode ({
-            text: "Applications",
+            text: 'Applications',
             expanded: true,
             id: 'root',
         }),
@@ -130,24 +135,24 @@ Ext.onReady (function () {
         }],
         listeners: {
             click: function (node, event) { 
-                var parts = node.id.split("/");
+                var parts = node.id.split('/');
 
                 // Capture clicking on the level below the application.
                 if (parts.length == 2) {
-                    if (parts[1] == "Errors") {
-                        addTab (node.id, "errors-summary.js", parts[0]);
-                    } else if (parts[1] == "Queries") {
-                        addTab (node.id, "queries-summary.js", parts[0]);
+                    if (parts[1] == 'Errors') {
+                        addTab (node.id, 'errors-summary.js', parts[0]);
+                    } else if (parts[1] == 'Queries') {
+                        addTab (node.id, 'queries-summary.js', parts[0]);
                     }
                 }
 
                 // Capture clicking on a specific item within 'queries', 'users' etc.
                 if (node.leaf == 1 && parts.length >= 3) { // TODO - node.isLeaf() does not work
-                    if (parts[1] == "Queries") {
+                    if (parts[1] == 'Queries') {
                         var app = parts[0];
                         parts.splice(0, 2);
-                        addTab (node.id, "query.js", app, {
-                            query: parts.join ("/")
+                        addTab (node.id, 'query.js', app, {
+                            query: parts.join ('/')
                         });
                     }
                 }
@@ -209,7 +214,7 @@ Ext.onReady (function () {
      * by about 15 pixels, chopping off the bottom of the tab's contents
      * (until it is resized or layout is forced to recalculate)
      */
-    addTab ("Applications", "summary.js", null, null, function () { viewport.doLayout(false); });
+    addTab ('Applications', 'summary.js', null, null, function () { viewport.doLayout(false); });
 });
 
 

@@ -8,7 +8,7 @@
     var v = {
         xtype: 'TimeBasedVisualisation',
         dataSource: {
-            dataset: "tps",
+            dataset: 'tps',
         },
         graph: new jarvis.graph.TpsGraph(),
         graphConfig: {
@@ -115,7 +115,7 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
         Ext.Ajax.request({
             url: jarvisUrl (this.dataSource.dataset),
             params: this.graphConfig.dataSourceParams ? this.graphConfig.dataSourceParams : {},
-            method: "GET",
+            method: 'GET',
 
             // We received a response back from the server, that's a good start.
             success: function (response, request_options) {

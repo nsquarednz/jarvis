@@ -21,7 +21,7 @@ return function () {
 
     var recentErrorsList = new Ext.grid.GridPanel({
         store: recentErrorsStore,
-        title: "Recent Errors: All Applications",
+        title: 'Recent Errors: All Applications',
         columns: [
             {
                 header: 'Event Time',
@@ -61,7 +61,7 @@ return function () {
         split: true,
         collapsible: true,
         width: 600,
-        title: "Recently",
+        title: 'Recently',
         items: [
             recentErrorsList
         ]
@@ -71,7 +71,7 @@ return function () {
         xtype: 'TimeBasedVisualisation',
         region: 'center',
         dataSource: {
-            dataset: "tps",
+            dataset: 'tps',
         },
         graph: new jarvis.graph.TpsGraph(),
         graphConfig: {
@@ -80,7 +80,7 @@ return function () {
     };
 
     return new Ext.Panel ({
-        title: "Applications",
+        title: 'Applications',
         layout: 'border',
         hideMode: 'offsets',
         items: [

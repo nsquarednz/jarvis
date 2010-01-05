@@ -27,7 +27,7 @@
 return function (appName, extra) {
 
     return new Ext.Panel ({
-        title: appName + "- Queries",
+        title: appName + '- Queries',
         layout: 'border',
         hideMode: 'offsets',
         closable: true,
@@ -36,7 +36,7 @@ return function (appName, extra) {
                 xtype: 'TimeBasedVisualisation',
                 region: 'center',
                 dataSource: {
-                    dataset: "tps/" + appName,
+                    dataset: 'tps/' + appName,
                 },
                 graph: new jarvis.graph.TpsGraph(),
                 graphConfig: {

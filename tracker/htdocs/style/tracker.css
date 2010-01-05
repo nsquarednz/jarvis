@@ -38,5 +38,9 @@ div.codeView {
     overflow: auto;
 }
 
+div.sh_sourceCode {
+    overflow: auto;
+}
+
 div.data-visualisation {
 }

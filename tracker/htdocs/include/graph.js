@@ -28,7 +28,7 @@ if (!Array.prototype.filter)
   Array.prototype.filter = function(fun /*, thisp*/)
   {
     var len = this.length >>> 0;
-    if (typeof fun != "function")
+    if (typeof fun != 'function')
       throw new TypeError();
 
     var res = new Array();
@@ -52,7 +52,7 @@ if (!Array.prototype.filter)
  * Add comma's into a number.
  */
 jarvis.graph.formatComma = function(amount) {
-    var delimiter = ","; 
+    var delimiter = ','; 
     var a = amount.split('.',2);
     var d = a[1];
     var i = parseInt(a[0]);
@@ -89,7 +89,7 @@ jarvis.graph.Graph = function() {
  * Provide a title for the graph.
  */
 jarvis.graph.Graph.prototype.title = function() {
-        throw "ERROR: base graph 'title' function called. This is an abstract function and needs to be overridden.";
+        throw 'ERROR: base graph "title" function called. This is an abstract function and needs to be overridden.';
 };
 
 /*
@@ -102,7 +102,7 @@ jarvis.graph.Graph.prototype.title = function() {
  *                specific.
  */
 jarvis.graph.Graph.prototype.render = function (el, data, config) {
-    throw "ERROR: base graph 'render' function called. This is an abstract function and needs to be overridden.";
+    throw 'ERROR: base graph "render" function called. This is an abstract function and needs to be overridden.';
 };
 
 /*
@@ -110,7 +110,7 @@ jarvis.graph.Graph.prototype.render = function (el, data, config) {
  * given element (not the same as if there was an error reading the data!)
  */
 jarvis.graph.Graph.prototype.noDataMesasge = function(el) {
-    el.getEl().update ("<i>No data available to display graph.</i>");
+    el.getEl().update ('<i>No data available to display graph.</i>');
 }
 
 //
@@ -118,7 +118,7 @@ jarvis.graph.Graph.prototype.noDataMesasge = function(el) {
 //
 jarvis.graph.DatasetPerformanceGraph = Ext.extend(jarvis.graph.Graph, {
     title: function () {
-        return "Dataset Performance";
+        return 'Dataset Performance';
     },
 
     render: function (el, data, config) {
@@ -171,8 +171,8 @@ jarvis.graph.DatasetPerformanceGraph = Ext.extend(jarvis.graph.Graph, {
             .height (height / 3 * 2 )
             .left (xscale (lowerQuartile))
             .width (xscale (upperQuartile - lowerQuartile))
-            .fillStyle ("white")
-            .strokeStyle ("black");
+            .fillStyle ('white')
+            .strokeStyle ('black');
 
         // The lower -> uppoer adjacent value lines
         g.add (pv.Rule)
@@ -186,8 +186,8 @@ jarvis.graph.DatasetPerformanceGraph = Ext.extend(jarvis.graph.Graph, {
             .data (outliers)
             .top (function (d) { return height / 3 + pv.random (-2, 2); })
             .left (function (a) { return xscale(a.d); })
-            .fillStyle ("rgba(255,255,255, 0.4)")
-            .strokeStyle ("black")
+            .fillStyle ('rgba(255,255,255, 0.4)')
+            .strokeStyle ('black')
             .size (2);
 
         // Median dot
@@ -195,7 +195,7 @@ jarvis.graph.DatasetPerformanceGraph = Ext.extend(jarvis.graph.Graph, {
             .data ([ median ])
             .top (height / 3)
             .left (function (a) { return xscale(a); })
-            .fillStyle ("green")
+            .fillStyle ('green')
             .title (function (a) { return 'Median: ' + xscale.tickFormat(a) + 'ms, Mean: ' + xscale.tickFormat(mean) + 'ms'; });
 
         g.add (pv.Rule)
@@ -203,9 +203,9 @@ jarvis.graph.DatasetPerformanceGraph = Ext.extend(jarvis.graph.Graph, {
             .left (function (d) { return xscale(d); })
             .bottom (-5)
             .height (5)
-            .anchor ("bottom")
+            .anchor ('bottom')
             .add (pv.Label)
-            .text (function (d) { return xscale.tickFormat(d) + "ms"; });
+            .text (function (d) { return xscale.tickFormat(d) + 'ms'; });
 
         g.root.render();
     }
@@ -217,7 +217,7 @@ jarvis.graph.DatasetPerformanceGraph = Ext.extend(jarvis.graph.Graph, {
 jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
 
     title: function () {
-        return "Average Transactions per Minute";
+        return 'Average Transactions per Minute';
     },
 
     /*
@@ -235,6 +235,8 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
 
         width = elBox.width - 20; // 20 pixels gives a buffer to avoid scrollbars TODO - fix
         height = width * (1 / 1.61803399);
+
+        height = height > elBox.height && elBox.height > 0.25 * width ? elBox.height : height;
 
         buffer = 5;
         leftBuffer = 35;
@@ -266,7 +268,7 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
             .bottom (0)
             .title (function (d) {
                 var date = Date.fromJulian(d.t);
-                return 'For ' + date.format ('g:ia') + ": avg: " + Math.round(d.c * 100) / 100;
+                return 'For ' + date.format ('g:ia') + ': avg: ' + Math.round(d.c * 100) / 100;
             });
 
         var yticks = yscale.ticks();
@@ -284,7 +286,7 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
             .left (-5)
             .width (function (d) { return this.index == 0 ? width - buffer - leftBuffer + 5 : 5; })
             .bottom (function (d) { return yscale (d); })
-            .anchor ("left")
+            .anchor ('left')
             .add (pv.Label)
             .text (function (d) { return Math.round(d * 100) / 100 });
 
@@ -322,7 +324,7 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
             .left (function (d) { return xscale (d); })
             .bottom (-30)
             .height (30)
-            .anchor ("bottom")
+            .anchor ('bottom')
             .add (pv.Label)
             .textAlign ('left')
             .textBaseline ('bottom')
@@ -347,14 +349,14 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
             .left (function (d) { return xscale (d); })
             .bottom (-5)
             .height (5)
-            .anchor ("bottom")
+            .anchor ('bottom')
             .add (pv.Label)
             .text (function (d) { 
                 if (showHourText) {
                     var date = Date.fromJulian(data[d].t);
-                    return date.format("ga");
+                    return date.format('ga');
                 } else {
-                    return "";
+                    return '';
                 }
             });
 

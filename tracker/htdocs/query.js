@@ -52,11 +52,11 @@
      */
     var displaySql = function  (element) {
         var parameterise = element.showParameterised;
-        var dsql = element.sql;
+        var dsql = element.queryParamsStore.sql;
 
         if (parameterise) {
             element.queryParamsStore.each (function (r) {
-                var re = new RegExp("\{[\{]?[\$]?" + r.get('param') + "[\}]?\}", "g");
+                var re = new RegExp('\{[\{]?[\$]?' + r.get('param') + '[\}]?\}', 'g');
                 if (r.get('nullOnEmpty') && (!r.get('value') || r.get('value') === '')) {
                     dsql = dsql.replace (re, 'NULL');
                 } else {
@@ -65,18 +65,40 @@
             });
         }
 
-        element.getEl().update("<pre class='sh_sql'>" + dsql + "</pre>");
+        element.getEl().update('<pre class="sh_sql">' + dsql + '</pre>');
         sh_highlightElement(element.getEl().first().dom, sh_languages['sql']);
     };
 
     var executeQuery = function (i) {
-        var url = jarvis_home + '/' + i.appName + '/' + i.query;
+        var url = jarvis_home + '/' + i.app + '/' + i.query;
 
         Ext.Ajax.request ({
             url: url,
-            success: function (xhr) { },
+            success: function (xhr) { 
+                var txt = xhr.responseText;
+                // TODO: Show in a table.
+                var height = i.target.getEl().getBox().height;
+                try {
+                    Ext.util.JSON.decode (txt); // Throws error on failure
+                    i.target.getEl().update('<pre class="sh_javascript">' + txt + '</pre>');
+                    sh_highlightElement(i.target.getEl().first().dom, sh_languages['javascript']);
+                } catch (error) {
+                    i.target.getEl().update('<pre class="sh_xml">' + Ext.util.Format.htmlEncode(txt) + '</pre>');
+                    sh_highlightElement(i.target.getEl().first().dom, sh_languages['xml']);
+                }
+    
+                console.log (i.target, i.target.ownerCt);
+                if (i.target.ownerCt && i.target.ownerCt.activate) {
+                    i.target.ownerCt.activate (i.target);
+                }
+            },
             failure: function () {
-                Ext.Msg.alert ("Cannot load: " + url)
+                Ext.Msg.show ({
+                    title: 'Data Retrieval Error',
+                    msg: 'Cannot load: ' + url,
+                    buttons: Ext.Msg.OK,
+                    icon: Ext.Msg.ERROR
+                });
             }
         });
     };
@@ -92,7 +114,7 @@ return function (appName, extra) {
                 anchor: '100%',
                 height: 90,
                 dataSource: {
-                    dataset: "dataset_duration/" + appName + "/" + extra.query,
+                    dataset: 'dataset_duration/' + appName + '/' + extra.query,
                 },
                 graph: new jarvis.graph.DatasetPerformanceGraph()
             },
@@ -100,7 +122,7 @@ return function (appName, extra) {
                 xtype: 'TimeBasedVisualisation',
                 anchor: '100% -100',
                 dataSource: {
-                    dataset: "tps/" + appName + "/" + extra.query,
+                    dataset: 'tps/' + appName + '/' + extra.query,
                 },
                 graph: new jarvis.graph.TpsGraph(),
                 graphConfig: {
@@ -111,16 +133,22 @@ return function (appName, extra) {
     });
 
     var queryLoader = function (type, element) {
+        var url = jarvisUrl('source/' + appName + '/' + type + '/' + extra.query);
         Ext.Ajax.request ({
-            url: jarvisUrl('source/' + appName + '/' + type + '/' + extra.query),
+            url: url,
             success: function (xhr) {
-                element.sql = xhr.responseText;
-                var parameters = parseSqlForParameters (element.sql);
+                element.queryParamsStore.sql = xhr.responseText;
+                var parameters = parseSqlForParameters (element.queryParamsStore.sql);
                 element.queryParamsStore.loadData (parameters);
-                displaySql(element, false);
+                displaySql(element);
             },
             failure: function () {
-                Ext.Msg.alert ("Cannot load: " + appName + '/' + type + '/' + extra.query);
+                Ext.Msg.show ({
+                    title: 'Data Retrieval Error',
+                    msg: 'Cannot load: ' + url,
+                    buttons: Ext.Msg.OK,
+                    icon: Ext.Msg.ERROR
+               });
             }
         });
     };
@@ -134,7 +162,7 @@ return function (appName, extra) {
         split: true,
         collapsible: true,
         width: 600,
-        title: "Dataset Code",
+        title: 'Dataset Code',
         hideMode: 'offsets',
         items: new Array()
     });
@@ -143,9 +171,26 @@ return function (appName, extra) {
         var paramsStore = new Ext.data.SimpleStore({
             fields: ['param', 'value', 'nullOnEmpty']
         });
+
+        var parameterisedSqlBoxId = Ext.id();
+        var parameterisedSqlBox = new Ext.BoxComponent ({
+            title: 'Parameterised SQL', 
+            autoScroll: true,
+            queryParamsStore: paramsStore,
+            showParameterised: true,
+            autoEl: {
+                tag: 'div',
+                id: parameterisedSqlBoxId,
+                cls: 'codeView'
+            }
+        });
+
+        paramsStore.on('datachanged', displaySql.createCallback(parameterisedSqlBox));
+        paramsStore.on('update', displaySql.createCallback(parameterisedSqlBox));
+
         var sqlBoxId = Ext.id();
         var sqlBox = new Ext.BoxComponent ({
-            anchor: '100% -110',
+            title: 'SQL', 
             autoScroll: true,
             queryParamsStore: paramsStore,
             showParameterised: false,
@@ -155,9 +200,19 @@ return function (appName, extra) {
                 cls: 'codeView'
             },
             listeners: {
-                render: function () { queryLoader(t.toLowerCase(), this); },
+                render: function () { queryLoader(t.toLowerCase(), this); }
             }
         });
+
+        var resultsBox = new Ext.BoxComponent ({
+            title: 'Results', 
+            autoScroll: true,
+            autoEl: {
+                tag: 'div',
+                cls: 'codeView'
+            }
+        });
+
         var paramsGrid = new Ext.grid.EditorGridPanel({
             store: paramsStore,
             stripeRows: true,
@@ -185,25 +240,6 @@ return function (appName, extra) {
                 }
             ],
             bbar: [
-                {
-                    text: 'Show:',
-                    xtype: 'label'
-                },
-                {
-                    toggleGroup: 'queryShowFormat',
-                    text: 'Source',
-                    pressed: true,
-                    handler: function () { sqlBox.showParameterised = false; displaySql (sqlBox); }
-                },
-                {
-                    toggleGroup: 'queryShowFormat',
-                    text: 'Parameterised',
-                    handler: function () { sqlBox.showParameterised = true; displaySql (sqlBox); }
-                },
-                {
-                    text: 'Results',
-                    enabled: false
-                },
                 { 
                     xtype: 'tbfill'
                 },
@@ -212,7 +248,8 @@ return function (appName, extra) {
                     handler: executeQuery.createCallback ({
                         app: appName,
                         query: extra.query,
-                        params: paramsStore
+                        params: paramsStore,
+                        target: resultsBox
                     })
                 }
                 /*{ TODO one day. It isn't trivial to select text for a user to copy.
@@ -224,9 +261,6 @@ return function (appName, extra) {
                     }
                 }*/
             ],
-            listeners: {
-                afteredit: function () { displaySql(sqlBox); }
-            },
             sm: new Ext.grid.RowSelectionModel({singleSelect:true})
         });
 
@@ -240,15 +274,26 @@ return function (appName, extra) {
                     columns: 1
                 },
                 items: [
-                    paramsGrid
-                    , sqlBox
+                    paramsGrid,
+                    new Ext.TabPanel ({
+                        deferredRender: false,
+                        anchor: "100% -150",
+                        enableTabScroll: true,
+                        layoutOnTabChange: true,
+                        activeTab: 0,
+                        items: [
+                            sqlBox,
+                            parameterisedSqlBox,
+                            resultsBox
+                        ]
+                    })
                 ]
             };
         codeView.add(p);
     });
 
     return new Ext.Panel({
-        title: appName + " - Queries - " + extra.query,
+        title: appName + ' - Queries - ' + extra.query,
         layout: 'border',
         closable: true,
         hideMode: 'offsets',
