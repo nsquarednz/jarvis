@@ -21,6 +21,34 @@
  */
 
 /**
+ * Add filtering to arrays, if necessary
+ */
+if (!Array.prototype.filter)
+{
+  Array.prototype.filter = function(fun /*, thisp*/)
+  {
+    var len = this.length >>> 0;
+    if (typeof fun != "function")
+      throw new TypeError();
+
+    var res = new Array();
+    var thisp = arguments[1];
+    for (var i = 0; i < len; i++)
+    {
+      if (i in this)
+      {
+        var val = this[i]; // in case fun mutates this
+        if (fun.call(thisp, val, i, this))
+          res.push(val);
+      }
+    }
+
+    return res;
+  };
+}
+
+
+/**
  * Add comma's into a number.
  */
 jarvis.graph.formatComma = function(amount) {
@@ -95,47 +123,83 @@ jarvis.graph.DatasetPerformanceGraph = Ext.extend(jarvis.graph.Graph, {
 
     render: function (el, data, config) {
 
-        if (data.length == 0) {
+        if (data.length < 4) { // Need a few data points to make this work nicely
             this.noDataMesasge (el);
             return;
         }
         
         var elBox = el.getBox();
 
-        width = elBox.width - 20; // 20 pixels gives a buffer to avoid scrollbars TODO - fix
-        height = 60;
 
         leftBuffer = 20;
+        rightBuffer = 10;
         bottomBuffer = 20;
-        buffer = 10;
+
+        width = elBox.width - 20 - leftBuffer - rightBuffer; // 20 pixels gives a buffer to avoid scrollbars TODO - fix
+        height = 60 - bottomBuffer;
 
         // Lets look at the data
-        var worstTime = pv.max (data, function(d) { return d.d; });
-        var bestTime  = pv.min (data, function(d) { return d.d; });
-        var mean  = pv.mean (data, function(d) { return d.d; });
-        var median  = pv.median (data, function(d) { return d.d; });
+        var sortedData = data.sort (function (a, b) { return a.d - b.d });
+        var sortedDataLen = sortedData.length;
 
-        var xscale = pv.Scale.linear (0, worstTime).range (0, width - leftBuffer - buffer).nice();
+        var mean = pv.mean (sortedData, function (d) { return d.d; });
+        var median = sortedDataLen % 2 == 1 ? sortedData[Math.floor(sortedDataLen / 2)].d : (sortedData[sortedDataLen / 2].d + sortedData[sortedDataLen / 2 - 1].d) / 2;
+        var lowerQuartile = Math.floor (sortedDataLen / 2) % 2 == 1 ? sortedData[Math.floor(sortedDataLen / 4)].d : (sortedData[Math.floor(sortedDataLen / 4)].d + sortedData[Math.floor(sortedDataLen / 4) - 1].d) / 2;
+        var upperQuartile = Math.floor (sortedDataLen / 2) % 2 == 1 ? sortedData[sortedDataLen - Math.floor(sortedDataLen / 4) - 1].d : (sortedData[sortedDataLen - Math.floor(sortedDataLen / 4) - 1].d + sortedData[sortedDataLen - Math.floor(sortedDataLen / 4)].d) / 2;
+        var iqr = upperQuartile - lowerQuartile; // inter-quartile range
+
+        var lowerAdjacentValue = pv.min (data, function (d) { return d.d < (1.5 * iqr + lowerQuartile) ? d.d : 1000 * 60 * 60 * 24; });
+        var upperAdjacentValue = pv.max (data, function (d) { return d.d > (1.5 * iqr + upperQuartile) ? 0 : d.d; });
+
+        var outliers = sortedData.filter (function (d) { return d.d < lowerAdjacentValue || d.d > upperAdjacentValue });
+        
+        var xscale = pv.Scale.linear (0, sortedData[sortedDataLen - 1].d).range (0, width - 15).nice(); // -10 is to ensure any dots/txt overflowing doesn't get cut off
 
         var g = new pv.Panel()
             .canvas (el.id)
-            .width (width - leftBuffer - buffer)
-            .height (height - buffer - bottomBuffer)
+            .width (width)
+            .height (height)
             .left(leftBuffer)
             .top(buffer)
             .right(buffer)
             .bottom(bottomBuffer);
+        
+        // the lower -> upper quartile box
+        g.add (pv.Bar) 
+            .data ( [ 1 ] )
+            .top (0)
+            .height (height / 3 * 2 )
+            .left (xscale (lowerQuartile))
+            .width (xscale (upperQuartile - lowerQuartile))
+            .fillStyle ("white")
+            .strokeStyle ("black");
 
-       g.add (pv.Bar)
-            .data ( pv.range(0, width - leftBuffer - buffer, 2))
-            .bottom (0)
-            .height (20)
-            .width (2)
-            .left (function (a) { return a; })
-            .fillStyle (pv.Scale.linear(0, xscale(bestTime), xscale(mean), xscale(worstTime)).range("white", "white", "green", "red"));
+        // The lower -> uppoer adjacent value lines
+        g.add (pv.Rule)
+            .data ( [ { f: lowerAdjacentValue, t: lowerQuartile }, { f: upperQuartile, t: upperAdjacentValue } ] )
+            .top (height / 3)
+            .left (function (d) { return xscale(d.f) })
+            .width (function (d) { return xscale(d.t - d.f) });
+
+        // outlier dots
+        g.add (pv.Dot) 
+            .data (outliers)
+            .top (function (d) { return height / 3 + pv.random (-2, 2); })
+            .left (function (a) { return xscale(a.d); })
+            .fillStyle ("rgba(255,255,255, 0.4)")
+            .strokeStyle ("black")
+            .size (2);
+
+        // Median dot
+        g.add (pv.Dot) 
+            .data ([ median ])
+            .top (height / 3)
+            .left (function (a) { return xscale(a); })
+            .fillStyle ("green")
+            .title (function (a) { return 'Median: ' + xscale.tickFormat(a) + 'ms, Mean: ' + xscale.tickFormat(mean) + 'ms'; });
 
         g.add (pv.Rule)
-            .data ( [ 0, bestTime ,  mean , worstTime  ])
+            .data ( xscale.ticks() )
             .left (function (d) { return xscale(d); })
             .bottom (-5)
             .height (5)
