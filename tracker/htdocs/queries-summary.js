@@ -27,7 +27,7 @@
 return function (appName, extra) {
 
     // The timeframe to profile for.
-    var profileTimeframe = new jarvis.Timeframe ('...now');
+    var profileTimeframe = new jarvis.Timeframe ('2...now');
 
     // The profile data
     var queryProfilesStore = new Ext.data.JsonStore ({
