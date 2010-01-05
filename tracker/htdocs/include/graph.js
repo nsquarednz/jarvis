@@ -20,6 +20,9 @@
  *       This software is Copyright 2008 by Jamie Love.
  */
 
+jarvis = jarvis ? jarvis : {};
+jarvis.graph = jarvis.graph ? jarvis.graph : {};
+
 /**
  * Add filtering to arrays, if necessary
  */
@@ -79,9 +82,6 @@ jarvis.graph.formatComma = function(amount) {
 //
 // Base graph class.
 //
-var jarvis = jarvis ? jarvis : {};
-jarvis.graph = jarvis.graph ? jarvis.graph : {};
-
 jarvis.graph.Graph = function() {
 };
 

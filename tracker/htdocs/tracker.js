@@ -48,8 +48,6 @@ var trackerConfiguration = {
     defaultDateRange: new jarvis.Timeframe ('..now')
 };
 
-var viewport;
-
 function loadExternalPage (page, callback) {
     Ext.Ajax.request ({
         url: page,
@@ -197,7 +195,7 @@ Ext.onReady (function () {
         ]
     });
 
-    viewport = new Ext.Viewport({
+    var viewport = new Ext.Viewport({
         layout:'fit',        
         items:[ 
                 mainContainer
