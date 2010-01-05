@@ -1,0 +1,24 @@
+<dataset read="*" write="">
+    <select>
+        <![CDATA[
+        SELECT
+            dataset || (CASE WHEN action = 'select' THEN ' (s)' WHEN action = 'insert' THEN ' (i)' WHEN action = 'update' THEN ' (u)' ELSE ' (d)' END) AS dataset,
+            COUNT(*) AS number_of_requests,
+            SUM (duration_ms) AS total_duration_ms,
+            AVG (duration_ms) AS avg_duration_ms,
+            MAX (duration_ms) AS max_duration_ms,
+            MIN (duration_ms) AS min_duration_ms,
+            AVG (CASE WHEN action = 'select' THEN out_nrows ELSE in_nrows END) AS avg_nrows
+        FROM
+            request
+        WHERE
+            (app_name = {$1} OR {$1} IS NULL)
+            AND ({$from} IS NULL OR start_time >= CAST({$from} AS FLOAT))
+            AND ({$to} IS NULL OR start_time <= CAST({$to} AS FLOAT))
+        GROUP BY
+            dataset
+        ORDER BY
+            dataset
+        ]]>
+    </select>
+</dataset>

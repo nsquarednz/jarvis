@@ -44,3 +44,14 @@ div.sh_sourceCode {
 
 div.data-visualisation {
 }
+
+/**
+ * This removes the little red rectangle from the top left
+ * editable grid cells.
+ *
+ * It's kinda an all-or-nothing thing though!
+ */
+.x-grid3-dirty-cell {
+    background: none;
+}
+
