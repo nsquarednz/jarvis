@@ -179,8 +179,7 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
         return;
     }
 
-    # Free the tracker handle.
-    &Jarvis::Tracker::disconnect ();
+    $sth->finish ();
 }
 
 ################################################################################
@@ -252,8 +251,7 @@ VALUES (?,?,?,?,?,?,?,?,?,?)");
         return;
     }
 
-    # Free the tracker handle.
-    &Jarvis::Tracker::disconnect ();
+    $sth->finish ();
 }
 
 1;
