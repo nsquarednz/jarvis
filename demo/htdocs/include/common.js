@@ -144,7 +144,7 @@ renderRequirePositiveZeroInt = function (val, md, rec, rowIndex, colIndex, ds) {
 }
 
 renderCheckbox = function (value, md, rec, rowIndex, colIndex, ds) {
-    return '<img class="x-grid-checkbox" src="/ext/resources/images/default/menu/'
+    return '<img class="x-grid-checkbox" src="/ext-2.3/resources/images/default/menu/'
         + ((value && (value != 0)) ? 'checked.gif' : 'unchecked.gif') + '"/>';
 };
 
