@@ -135,8 +135,12 @@ Ext.onReady (function () {
             click: function (node, event) { 
                 var parts = node.id.split('/');
 
+                // Capture clicking the root node
+                if (parts.length == 1) {
+                    addTab (node.id, 'summary.js');
+                }
                 // Capture clicking on the level below the application.
-                if (parts.length == 2) {
+                else if (parts.length == 2) {
                     if (parts[1] == 'Errors') {
                         addTab (node.id, 'errors-summary.js', parts[0]);
                     } else if (parts[1] == 'Queries') {
@@ -212,7 +216,7 @@ Ext.onReady (function () {
      * by about 15 pixels, chopping off the bottom of the tab's contents
      * (until it is resized or layout is forced to recalculate)
      */
-    addTab ('Applications', 'summary.js', null, null, function () { viewport.doLayout(false); });
+    addTab ('root', 'summary.js', null, null, function () { viewport.doLayout(false); });
 });
 
 
