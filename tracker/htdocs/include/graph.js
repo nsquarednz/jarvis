@@ -20,8 +20,8 @@
  *       This software is Copyright 2008 by Jamie Love.
  */
 
-jarvis = jarvis ? jarvis : {};
-jarvis.graph = jarvis.graph ? jarvis.graph : {};
+jarvis = jarvis || {};
+jarvis.graph = jarvis.graph || {};
 
 /**
  * Add filtering to arrays, if necessary
