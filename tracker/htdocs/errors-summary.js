@@ -22,19 +22,32 @@
  *       This software is Copyright 2008 by Jamie Love.
  */
 (function () {
-return function (appName) {
+return function (appName, extra) {
+
+    var initialDate = extra && extra.params && extra.params.date ? Date.parseDate (extra.params.date, 'c').clearTime() : null;
 
     // create the main Data Store for the fan list
-    var recentErrorsStore = new Ext.data.JsonStore ({
+    var recentErrorsStore = new Ext.data.Store ({
         proxy: new Ext.data.HttpProxy ({ url: jarvisUrl ('errors/' + appName), method: 'GET' }),
         autoLoad: true,
-        root: 'data',
-        idProperty: 'id',
-        fields: ['sid', 'app_name', 'group_list', 'dataset', 'action', 'start_time', 'username', 'params', 'post_body', 'message'],
         baseParams: {},
+        reader: new Ext.data.JsonReader ({
+            root: 'data',
+            id: 'id',
+            totalProperty: 'fetched',
+            fields: ['sid', 'app_name', 'group_list', 'dataset', 'action', 'start_time', 'username', 'params', 'post_body', 'message'],
+        }),
         listeners: {
-            'loadexception': jarvisLoadException
-        }
+            'loadexception': jarvisLoadException,
+            'beforeload': function () {
+                delete this.baseParams.limit_to_date;
+                if (this.dateParamAsDate) {
+                    this.baseParams.limit_to_date = this.dateParamAsDate.formatForServer();
+                }
+            }
+        },
+        initialSelection: extra && extra.params ? extra.params.id : null, // Our own property for the initial ID to select.
+        dateParamAsDate: initialDate // Our own property as well
     });
 
     var errorDetails = new Ext.Panel({
@@ -159,16 +172,17 @@ return function (appName) {
             'Viewing: ',
             new Ext.form.DateField({
                 format: 'd/m/Y',
+                value: initialDate,
                 altFormats: 'd/m/Y|n/j/Y|n/j/y|m/j/y|n/d/y|m/j/Y|n/d/Y|m-d-y|m-d-Y|m/d|m-d|md|mdy|mdY|d|Y-m-d',
                 listeners: {
                     specialkey: function (field, e) {
                         if (e.getKey() == Ext.EventObject.ENTER) {
-                            recentErrorsStore.baseParams.limit_to_date = field.getValue() ? field.getValue().formatForServer() : null;
+                            recentErrorsStore.dateParamAsDate = field.getValue() || null;
                             recentErrorsStore.load();
                         }
                     },
                     select: function (field, e) {
-                        recentErrorsStore.baseParams.limit_to_date = e.formatForServer();
+                        recentErrorsStore.dateParamAsDate = e;
                         recentErrorsStore.load();
                     }
                 }
@@ -186,13 +200,23 @@ return function (appName) {
                 }
             })
         ],
-        listeners: {
-            cellclick: function (grid, rowIndex, columnIndex, e) {
-                var record = grid.getStore().getAt(rowIndex);  // Get the Record
-                showErrorDetails (record);
-            }
-        },
-        sm: new Ext.grid.RowSelectionModel({singleSelect:true})
+        sm: new Ext.grid.RowSelectionModel({
+                singleSelect:true,
+                listeners: {
+                    rowselect: function (sm, rowIndex, r) {
+                        showErrorDetails (r);
+                    }
+                }
+            })
+    });
+ 
+    // event handler that, after load, will see if we want to select a specific
+    // row, and if so will then do it.
+    recentErrorsStore.on ('load', function () {
+        if (this.initialSelection) {
+            var record = this.getById (this.initialSelection * 1);
+            recentErrorsList.getSelectionModel().selectRecords ([record]);
+        }
     });
 
     return new Ext.Panel ({
@@ -213,7 +237,25 @@ return function (appName) {
                     errorDetails
                 ]
             })
-        ]
+        ],
+        listeners: {
+            updateparameters: function (p) {
+                if (p.params) {
+                    recentErrorsStore.initialSelection = p.params.id
+                    var d = p.params.date ? Date.parseDate (p.params.date, 'c').clearTime() : null;
+                    if ((!recentErrorsStore.dateParamAsDate && d) || // If we have no previous date but do now
+                        (d && recentErrorsStore.dateParamAsDate && 
+                            d.getTime() != recentErrorsStore.dateParamAsDate.getTime())) { // or the dates are not the same
+                        recentErrorsStore.dateParamAsDate = d;
+                        recentErrorsStore.load();
+                    } else {
+                        // If we don't need to load, just set the correct selection.
+                        var record = recentErrorsStore.getById (p.params.id * 1);
+                        recentErrorsList.getSelectionModel().selectRecords ([record]);
+                    }
+                }
+            }
+        }
     });
 
 }; })();

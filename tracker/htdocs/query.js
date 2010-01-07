@@ -108,7 +108,6 @@
                     sh_highlightElement(info.target.getEl().first().dom, sh_languages['xml']);
                 }
     
-                console.log (info.target, info.target.ownerCt);
                 if (info.target.ownerCt && info.target.ownerCt.activate) {
                     info.target.ownerCt.activate (info.target);
                 }

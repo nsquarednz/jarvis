@@ -8,12 +8,15 @@
 (function () {
 return function () {
 
-    var recentErrorsStore = new Ext.data.JsonStore ({
+    var recentErrorsStore = new Ext.data.Store ({
         proxy: new Ext.data.HttpProxy ({ url: jarvisUrl ('recent_errors'), method: 'GET' }),
         autoLoad: true,
-        root: 'data',
-        idProperty: 'id',
-        fields: ['sid', 'app_name', 'group_list', 'dataset', 'action', 'start_time', 'username', 'message'],
+        reader: new Ext.data.JsonReader ({
+            root: 'data',
+            id: 'id',
+            totalProperty: 'fetched',
+            fields: ['sid', 'app_name', 'group_list', 'dataset', 'action', 'start_time', 'username', 'message'],
+        }),
         listeners: {
             'loadexception': jarvisLoadException
         }
@@ -51,6 +54,13 @@ return function () {
         ],
         viewConfig: {
             forceFit: true
+        },
+        listeners: {
+            rowdblclick: function (g, i) {
+                var record = g.store.getAt (i);
+                var path = record.get('app_name') + '/Errors?date=' + record.get ('start_time') + '&id=' + record.id;
+                loadAndShowTabFromPath (path);
+            }
         },
         sm: new Ext.grid.RowSelectionModel({singleSelect:true})
     });
