@@ -137,8 +137,10 @@ function loadAndShowTabFromPath (path, callback) {
     if (path == 'root') {
         loadAndShowTab (pathAndParam[0], 'summary.js', null, null, callback);
     }
-
-    // If there are two parts - the second part will be 
+    else if (parts.length == 1) {
+        loadAndShowTab (pathAndParam[0], 'application-summary.js', parts[0], null, callback);
+    }
+    // If there are two parts - the second part will be Errors/Queries etc.
     else if (parts.length == 2) {
         var extra = params ? {
             params: params
@@ -148,6 +150,8 @@ function loadAndShowTabFromPath (path, callback) {
             loadAndShowTab (pathAndParam[0], 'errors-summary.js', parts[0], extra, callback);
         } else if (parts[1] == 'Queries') {
             loadAndShowTab (pathAndParam[0], 'queries-summary.js', parts[0], extra, callback);
+        } else if (parts[1] == 'Users') {
+            loadAndShowTab (pathAndParam[0], 'users-summary.js', parts[0], extra, callback);
         }
     }
 
@@ -158,6 +162,13 @@ function loadAndShowTabFromPath (path, callback) {
         loadAndShowTab (pathAndParam[0], 'query.js', app, {
             query: parts.join ('/'),
             params: params
+        }, callback);
+    }
+
+    // If there are more than two parts, then look at what details we're after
+    else if (parts.length >= 3 && parts[1] == 'Users') {
+        loadAndShowTab (pathAndParam[0], 'user.js', parts[0], {
+            user: parts[2]
         }, callback);
     }
 }

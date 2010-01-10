@@ -1,14 +1,14 @@
 /**
  * This ExtJS code is designed to be evaluated and embedded within another page.
  *
- * It provides a summary page, summarising all of this jarvis's install.
+ * It provides a summary page, summarising a jarvis application install.
  */
 
 (function () {
-return function () {
+return function (appName, extra) {
 
     var recentErrorsStore = new Ext.data.Store ({
-        proxy: new Ext.data.HttpProxy ({ url: jarvisUrl ('recent_errors'), method: 'GET' }),
+        proxy: new Ext.data.HttpProxy ({ url: jarvisUrl ('recent_errors/' + appName), method: 'GET' }),
         autoLoad: true,
         reader: new Ext.data.JsonReader ({
             root: 'data',
@@ -23,7 +23,7 @@ return function () {
 
     var recentErrorsList = new Ext.grid.GridPanel({
         store: recentErrorsStore,
-        title: 'Recent Errors: All Applications',
+        title: 'Recent Errors: ' + appName,
         columns: [
             {
                 header: 'Event Time',
@@ -31,12 +31,6 @@ return function () {
                 sortable: true,
                 width: 50,
                 renderer: function(x) { return Date.parseDate(x, 'c').format ('D jS M Y H:i:s'); }
-            },
-            {
-                header: 'Application',
-                dataIndex: 'app_name',
-                sortable: true,
-                width: 30
             },
             {
                 header: 'User',
@@ -80,7 +74,7 @@ return function () {
         xtype: 'TimeBasedVisualisation',
         region: 'center',
         dataSource: {
-            dataset: 'tps',
+            dataset: 'tps/'+ appName,
         },
         graph: new jarvis.graph.TpsGraph(),
         graphConfig: {
@@ -89,7 +83,7 @@ return function () {
     };
 
     return new Ext.Panel ({
-        title: 'Applications',
+        title: appName,
         layout: 'border',
         hideMode: 'offsets',
         items: [
@@ -99,3 +93,4 @@ return function () {
     });
 
 }; })();
+

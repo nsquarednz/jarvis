@@ -238,7 +238,7 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
 
         height = height > elBox.height && elBox.height > 0.25 * width ? elBox.height : height;
 
-        buffer = 5;
+        buffer = 10;
         leftBuffer = 35;
         bottomBuffer = 30;
 
