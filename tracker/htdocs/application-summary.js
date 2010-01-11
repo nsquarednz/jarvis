@@ -69,7 +69,7 @@ return function (appName, extra) {
             rowdblclick: function (g, i) {
                 var record = g.store.getAt (i);
                 var path = record.get('app_name') + '/Errors?date=' + record.get ('start_time') + '&id=' + record.id;
-                loadAndShowTabFromPath (path);
+                jarvis.tracker.loadAndShowTabFromPath (path);
             }
         },
         sm: new Ext.grid.RowSelectionModel({singleSelect:true})
@@ -101,6 +101,7 @@ return function (appName, extra) {
 
     return new Ext.Panel ({
         title: appName,
+        closable: true,
         layout: 'border',
         hideMode: 'offsets',
         items: [

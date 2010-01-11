@@ -71,7 +71,8 @@ return function (appName, extra) {
             {
                 header: 'Avg. Daily Requests',
                 dataIndex: 'avg_daily_requests',
-                sortable: true
+                sortable: true,
+                renderer: function (x) { return (Math.round (x * 100) / 100); }
             },
             {
                 header: 'Avg. # of Rows',
