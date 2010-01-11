@@ -1,4 +1,4 @@
-<dataset read="admin" write="admin" dump="yes">
+<dataset read="admin" write="admin">
     <transform fetch="notnull" store="trim,null" />
     <select>
 SELECT id, name, password, is_admin
