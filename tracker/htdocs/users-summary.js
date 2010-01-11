@@ -32,7 +32,7 @@ return function (appName, extra) {
         proxy: new Ext.data.HttpProxy ({ url: jarvisUrl ('users_profile/' + appName), method: 'GET' }),
         autoLoad: true,
         root: 'data',
-        fields: ['username', 'number_of_requests', 'avg_nrows'],
+        fields: ['username', 'avg_daily_requests', 'number_of_requests', 'avg_nrows'],
         baseParams: {
             from: profileTimeframe.from().formatForServer(),
             to: profileTimeframe.to().formatForServer()
@@ -67,6 +67,11 @@ return function (appName, extra) {
                 dataIndex: 'total_requests_percentage',
                 sortable: true,
                 renderer: function (x) { return (Math.round (x * 10000) / 100) + '%'; }
+            },
+            {
+                header: 'Avg. Daily Requests',
+                dataIndex: 'avg_daily_requests',
+                sortable: true
             },
             {
                 header: 'Avg. # of Rows',

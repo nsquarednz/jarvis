@@ -4,6 +4,7 @@
         SELECT
             username,
             COUNT(*) AS number_of_requests,
+            COUNT(*) / ({$to} - {$from}) AS avg_daily_requests,
             AVG (CASE WHEN action = 'select' THEN out_nrows ELSE in_nrows END) AS avg_nrows
         FROM
             request
