@@ -311,8 +311,13 @@ sub parse_statement {
     $obj->{'sql_with_placeholders'} = $sql_with_placeholders;
     $obj->{'vnames_aref'} = \@variable_names;
 
-    $obj->{'sth'} = $dbh->prepare ($sql_with_placeholders)
-        || die "Couldn't prepare statement '$sql_with_placeholders': " . $dbh->errstr;
+    # Do the prepare, with RaiseError & PrintError disabled.
+    {
+        local $dbh->{RaiseError};
+        local $dbh->{PrintError};
+        $obj->{'sth'} = $dbh->prepare ($sql_with_placeholders) ||
+            die "Couldn't prepare statement for $ttype on '" . $jconfig->{'dataset_name'} . "'.\nSQL ERROR = '" . $dbh->errstr . "'.";
+    }
 
     return $obj;
 }

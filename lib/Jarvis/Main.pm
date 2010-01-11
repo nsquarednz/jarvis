@@ -260,14 +260,22 @@ sub do {
     # Check we have a dataset.
     $dataset_name || die "All requests require $script_name/$app_name/<dataset-or-special>[/<arg1>...] in URI!\n";
 
+    # What kind of dataset?
+    # 's' = sql, 'i' = internal, 'p' = plugin, 'e' = exec, undef for undetermined.
+    $jconfig->{'dataset_type'} = undef;
+
     # All special datasets start with "__".
     #
     # Note that our Plugin and Execs may expect "/appname/<something-else>" so
-    # we should be careful not to trample on them.  We only interpret these
-    # special datasets for the four main CRUD actions.
+    # we should be careful not to trample on them.
+    #
+    # Note that "select" is the only permissible action on special datasets.  We
+    # ignore whatever action you supplied.
     #
     if ($dataset_name =~ m/^__/) {
         my $return_text = undef;
+        $jconfig->{'dataset_type'} = 'i';
+        $jconfig->{'action'} = 'select';
 
         # Status.  I.e. are we logged in?
         if ($dataset_name eq "__status") {
@@ -310,7 +318,7 @@ sub do {
 
     # Fetch a regular dataset.
     } elsif ($action eq "select") {
-
+        $jconfig->{'dataset_type'} = 's';
         my $return_text = &Jarvis::Dataset::fetch ($jconfig, \@rest_args);
 
         print $cgi->header(-type => "text/plain; charset=UTF-8", -cookie => $jconfig->{'cookie'}, 'Cache-Control' => 'no-store, no-cache, must-revalidate');
@@ -318,7 +326,7 @@ sub do {
 
     # Modify a regular dataset.
     } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete") || ($action eq "mixed")) {
-
+        $jconfig->{'dataset_type'} = 's';
         my $return_text = &Jarvis::Dataset::store ($jconfig, \@rest_args);
 
         print $cgi->header(-type => "text/plain; charset=UTF-8", -cookie => $jconfig->{'cookie'});

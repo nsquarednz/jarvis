@@ -50,11 +50,12 @@ use Jarvis::Error;
 #
 #           WRITES
 #               logged_in           Did a user log in?
-#               username            Which user logged in?
+#               offered_username    What username did we get offered?
+#               username            Which user successfully logged in?
 #               error_string        What error if not logged in?
 #               group_list          Comma-separated group list.
 #               session             The session object.
-#               sname               Name of the session cookie.  Typically "CGISESSID".
+#               sname               Name of the session cookie.  Default "CGISESSID".
 #               sid                 Session ID.  A big long number.
 #               cookie              CGI::Cookie object to send back with session info
 ################################################################################
@@ -89,7 +90,7 @@ sub check {
     # Under windows, avoid having CGI::Session throw the error:
     # 'Your vendor has not defined Fcntl macro O_NOFOLLOW, used at C:/Perl/site/lib/CGI/Session/Driver/file.pm line 26.'
     # by hiding the signal handler.
-    
+
     my $err_handler = $SIG{__DIE__};
     $SIG{__DIE__} = sub {};
     my $session = new CGI::Session ($sid_store, $jconfig->{'cgi'}, \%sid_params);
@@ -111,6 +112,7 @@ sub check {
 
     # Now see what we got passed.  These are the user's provided info that we will validate.
     my $offered_username = $jconfig->{'cgi'}->param('username') || '';
+    $jconfig->{'offered_username'} = $offered_username;
 
     # A nice helper for user applications - strip leading/trailing whitespace of usernames.
     $offered_username =~ s/^\s+//;
@@ -175,16 +177,6 @@ sub check {
         $session->param('group_list', $group_list);
     }
 
-    # Log the results if we actually tried to login, with a user and all.
-    if (! $already_logged_in) {
-        if ($logged_in) {
-            &Jarvis::Error::log ($jconfig, "Login for '$username ($group_list)' on '" . $jconfig->{'sid'} . "'.");
-
-        } elsif ($offered_username) {
-            &Jarvis::Error::log ($jconfig, "Login fail for '$offered_username' on '" . $jconfig->{'sid'} . "': $error_string.");
-        }
-    }
-
     # Set/extend session expiry.  Flush new/modified session data.
     my $session_expiry = $axml->{'sessiondb'}->{'expiry'}->content || '+1h';
     $session->expire ($session_expiry);
@@ -201,6 +193,19 @@ sub check {
     $jconfig->{'username'} = $username;
     $jconfig->{'error_string'} = $error_string;
     $jconfig->{'group_list'} = $group_list;
+
+    # Log the results if we actually tried to login.  Write to tracker database too
+    # if we are configured to do so.
+    #
+    if (! $already_logged_in) {
+        if ($logged_in) {
+            &Jarvis::Error::log ($jconfig, "Login for '$username ($group_list)' on '" . $jconfig->{'sid'} . "'.");
+
+        } elsif ($offered_username) {
+            &Jarvis::Error::log ($jconfig, "Login fail for '$offered_username' on '" . $jconfig->{'sid'} . "': $error_string.");
+        }
+        &Jarvis::Tracker::login ($jconfig);
+    }
 
     return 1;
 }

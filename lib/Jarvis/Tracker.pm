@@ -145,6 +145,7 @@ sub finish {
     my $username = $jconfig->{'username'};
     my $group_list = $jconfig->{'group_list'};
     my $dataset = $jconfig->{'dataset_name'};
+    my $dataset_type = $jconfig->{'dataset_type'};
     my $action =  $jconfig->{'action'};
     my $in_nrows = $jconfig->{'in_nrows'} || 0;
     my $out_nrows = $jconfig->{'out_nrows'} || 0;
@@ -161,16 +162,16 @@ sub finish {
     # Perform the database insert.
     my $sth = $tdbh->prepare (
 "INSERT INTO request (
-    sid, debug_level, app_name, username, group_list, dataset, action,
+    sid, debug_level, app_name, username, group_list, dataset, dataset_type, action,
     params, in_nrows, out_nrows, start_time, duration_ms)
-VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
+VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
 
     if (! $sth) {
         &Jarvis::Error::log ($jconfig, "Cannot prepare tracker request INSERT: " . $tdbh->errstr);
         return;
     }
 
-    my $rv = $sth->execute ($sid, $debug_level, $app_name, $username, $group_list, $dataset,
+    my $rv = $sth->execute ($sid, $debug_level, $app_name, $username, $group_list, $dataset, $dataset_type,
         $action, $param_string, $in_nrows, $out_nrows, $start_time, $duration_ms);
 
     if (! $rv) {
@@ -247,6 +248,68 @@ VALUES (?,?,?,?,?,?,?,?,?,?)");
 
     if (! $rv) {
         &Jarvis::Error::log ($jconfig, "Cannot execute tracker error INSERT: " . $tdbh->errstr);
+        $sth->finish ();
+        return;
+    }
+
+    $sth->finish ();
+}
+
+################################################################################
+# We have logged in a new session, or failed to log in.
+#
+# Params:
+#       $jconfig - Jarvis::Config object
+#           READ
+#               tracker
+#
+# Returns:
+#       1.
+################################################################################
+#
+sub login {
+    my ($jconfig, $message) = @_;
+
+    # Are we tracking logins?
+    my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
+
+    my $tracker = $axml->{'tracker'};
+    $tracker || return;
+
+    my $logins = defined ($Jarvis::Config::yes_value {lc ($tracker->{'logins'}->content || "no")});
+    $logins || return;
+
+    # Get the handle to the tracker database.
+    my $tdbh = &Jarvis::Tracker::handle ($jconfig);
+    $tdbh || return;
+
+    # Interval in ms since start time.
+    my $sid = $jconfig->{'sid'};
+    my $app_name = $jconfig->{'app_name'};
+    my $username = $jconfig->{'username'} || $jconfig->{'offered_username'};
+    my $logged_in = $jconfig->{'logged_in'};
+    my $error_string = $jconfig->{'error_string'};
+    my $group_list = $jconfig->{'group_list'};
+
+    # Julian time of request start.
+    my $tstart = $jconfig->{'tstart'};
+    my $start_time = (($$tstart[0] + $$tstart[1] / 1000000) / 86400.0 ) + 2440587.5; # 2440587.5 is Unix Epoch time in Julian date format.
+
+    # Perform the database insert.
+    my $sth = $tdbh->prepare (
+"INSERT INTO login (
+    sid, app_name, username, logged_in, error_string, group_list, start_time)
+VALUES (?,?,?,?,?,?,?)");
+
+    if (! $sth) {
+        &Jarvis::Error::log ($jconfig, "Cannot prepare tracker login INSERT: " . $tdbh->errstr);
+        return;
+    }
+
+    my $rv = $sth->execute ($sid, $app_name, $username, $logged_in, $error_string, $group_list, $start_time);
+
+    if (! $rv) {
+        &Jarvis::Error::log ($jconfig, "Cannot execute tracker login INSERT: " . $tdbh->errstr);
         $sth->finish ();
         return;
     }

@@ -16,6 +16,18 @@ CREATE TABLE request (
     duration_ms INTEGER
 );
 
+DROP TABLE login;
+CREATE TABLE login (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sid TEXT,
+    app_name TEXT,
+    username TEXT,
+    logged_in INTEGER,
+    error_string TEXT,
+    group_list TEXT,
+    start_time JULIAN
+);
+
 DROP TABLE error;
 CREATE TABLE error (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
