@@ -37,7 +37,7 @@
         while (m) {
             if (!parameters[m[1]]) {
                 parameters[m[1]] = 1;
-                ret.push ([ m[1], '', true]);
+                ret.push ([ m[1], '', true]); // [ parameter name, parameter value, null on empty ]
             }
             m = re.exec(sql);
         }
@@ -68,6 +68,11 @@
         sh_highlightElement(element.getEl().first().dom, sh_languages['sql']);
     };
 
+    /**
+     * This function executes a query using the parameters provided by the user.
+     * and then shows the results of the query in the 'results' tab on the queries
+     * accordion page.
+     */
     var executeQuery = function (info) {
         var url = jarvis_home + '/' + info.app + '/' + info.query;
         var params = {};
@@ -97,17 +102,21 @@
             params: params,
             success: function (xhr) { 
                 var txt = xhr.responseText;
-                // TODO: Show in a table.
+                // TODO: Maybe show results in a table, if desirable.
                 var height = info.target.getEl().getBox().height;
                 try {
                     Ext.util.JSON.decode (txt); // Throws error on failure
                     info.target.getEl().update('<pre class="sh_javascript">' + txt + '</pre>');
                     sh_highlightElement(info.target.getEl().first().dom, sh_languages['javascript']);
                 } catch (error) {
+                    // On error, assume XML (the other format available from Jarvis).
+                    // The result could be an error string, in which case it may just
+                    // show up with a bit of color.
                     info.target.getEl().update('<pre class="sh_xml">' + Ext.util.Format.htmlEncode(txt) + '</pre>');
                     sh_highlightElement(info.target.getEl().first().dom, sh_languages['xml']);
                 }
-    
+
+                // If the results tab is not active, make it active.
                 if (info.target.ownerCt && info.target.ownerCt.activate) {
                     info.target.ownerCt.activate (info.target);
                 }
@@ -123,6 +132,7 @@
         });
     };
 
+// This is the real function for creating a query page.
 return function (appName, extra) {
 
     var center = new Ext.Panel({
@@ -132,7 +142,7 @@ return function (appName, extra) {
             {
                 xtype: 'Visualisation',
                 anchor: '100%',
-                height: 90,
+                height: 100,
                 dataSource: {
                     dataset: 'dataset_duration/' + appName + '/' + extra.query,
                 },
@@ -146,7 +156,7 @@ return function (appName, extra) {
                 },
                 graph: new jarvis.graph.TpsGraph(),
                 graphConfig: {
-                    timeframe: trackerConfiguration.defaultDateRange.clone()
+                    timeframe: jarvis.tracker.configuration.defaultDateRange.clone()
                 }
             }
         ]
@@ -187,6 +197,7 @@ return function (appName, extra) {
         items: new Array()
     });
 
+    // For each of the available query types, create an accordion panel for it.
     ['Select', 'Insert', 'Update', 'Delete'].map (function (t) {
         var paramsStore = new Ext.data.SimpleStore({
             fields: ['param', 'value', 'nullOnEmpty']

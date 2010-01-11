@@ -1,5 +1,5 @@
 /**
- * Description: A ExtJS component for displaying a visualisation -
+ * Description: ExtJS components for displaying visualisations -
  *              a graph drawn with protovis.
  *
  *              The visualisation component can be created along
@@ -9,6 +9,7 @@
         xtype: 'TimeBasedVisualisation',
         dataSource: {
             dataset: 'tps',
+            // params: { } Only set if you have actual params to pass through.
         },
         graph: new jarvis.graph.TpsGraph(),
         graphConfig: {
@@ -16,7 +17,7 @@
         }
     };
     
- *              The visualisation code loads the datasource information
+ *              The visualisation code loads the data source information
  *              and then using the 'graph' object renders the 
  *              graph to an inner component (basically a div). The
  *              graphConfig is passed through to the graph rendering
@@ -29,9 +30,11 @@
  *                    parameters (in Julian date format).
  *
  *              This is a specific design for this application of course,
- *              not meant to be generic. If the dataSource is passed
- *              through with a pre-existing params object, then this
- *              auto-creation is not done.
+ *              not meant to be generic. 
+ *
+ *              If the dataSource is passed through with a pre-existing 
+ *              params object, then this auto-creation is done in a way
+ *              to not overwrite pre-defined param values.
  *
  *
  * Licence:
@@ -52,10 +55,29 @@
  *
  *       This software is Copyright 2008 by Jamie Love.
  */
+
+
+/**
+ * Description:  The Visualisation component is the base component that
+ *               simplifies showing graphs drawn with protovis using data
+ *               from the server.
+ */
 Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
 
+    /**
+     * Default graph configuration object - empty. To be provided by
+     * the creator of the component.
+     */
     graphConfig: {},
 
+    /**
+     * Description:  This function renders the graph to the target element,
+     *               which is a ExtJS Element object.
+     *
+     * Rendering of the graph occurs after rendering of the Visualisation
+     * component, after a resize of the component, and after the data
+     * for the graph is loaded.
+     */
     renderGraph: function (target) {
         if (target.rendered && this.data) {
             this.graph.render(target, this.data, this.graphConfig);
@@ -63,12 +85,20 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
         } 
     },
 
+    /**
+     * Description:  Override the initialisation of the component to 
+     *               provide our own component elements. The creator
+     *               of the Visualisation component can still pass in
+     *               configuration, but we need to control key configuration
+     *               - such as subelements.
+     */
     initComponent: function () {
         var me = this;
         this.dataVisualisationElementId = Ext.id();
 
+        // The graph is actually rendered to a sub-div element.
         var dv = new Ext.BoxComponent ({
-            autoEl: { tag: 'div', cls: 'data-visualisation', html: '&nbsp;' },
+            autoEl: { tag: 'div', cls: 'data-visualisation' },
             id: this.dataVisualisationElementId,
             x: 0,
             y: 0,
@@ -83,7 +113,7 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
             border: false,
             layout: 'fit',
             autoScroll: true,
-            title: 'Loading data...',
+            title: 'Loading...',
             items: [
                 dv
             ]
@@ -103,24 +133,35 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
     },
 
     /**
-     * Loads the graph data. 
+     * Description:  Loads the graph data. 
      *
-     * If graphConfig.dataSourceParams exists, it uses these for the 
-     * parameters of the datasource.
+     *               If dataSource.params exists, it uses these for the 
+     *               parameters of the datasource.
      */
     loadGraphData: function () {
         var me = this;
+        var url = jarvisUrl (this.dataSource.dataset);
+
+        // TODO show a loading graphic.
 
         // Fetch now the data for the component.
         Ext.Ajax.request({
-            url: jarvisUrl (this.dataSource.dataset),
-            params: this.graphConfig.dataSourceParams ? this.graphConfig.dataSourceParams : {},
+            url: url,
+            params: this.dataSource.params ? this.dataSource.params : {},
             method: 'GET',
 
             // We received a response back from the server, that's a good start.
             success: function (response, request_options) {
                 me.data = Ext.util.JSON.decode (response.responseText).data;
                 me.renderGraph(me.items.get(me.dataVisualisationElementId));
+            },
+            failure: function () {
+                Ext.Msg.show ({
+                    title: 'Data Retrieval Error',
+                    msg: 'Cannot load: ' + url,
+                    buttons: Ext.Msg.OK,
+                    icon: Ext.Msg.ERROR
+                });
             }
         });
     }
@@ -129,10 +170,25 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
 
 Ext.reg('Visualisation', Ext.ux.Visualisation);
 
+/**
+ * Description:  The TimeBasedVisualisation component is a Visualisation component that
+ *               simplifies showing graphs based on a time span. It uses a pre-configured
+ *               timespan to retrieve only a specific set of data from the server, and
+ *               provides functions to the user in the footer of the Visualisation
+ *               component's panel for choosing different timespans.
+ *
+ *               This component expects the default timeframe for the data the 
+ *               visualisation shows to be provided in graphConfig.timeframe,
+ *               and the dataset retrieved will be provided with from/to dates using
+ *               parameters 'from' and 'to'.
+ */
 Ext.ux.TimeBasedVisualisation = Ext.extend(Ext.ux.Visualisation, {
 
     initComponent: function () {
         var me = this;
+
+        // Provide some controls to allow the user to change the timespan the graph
+        // data covers.
         Ext.apply (this, {
             bbar: [
                 {
@@ -157,8 +213,8 @@ Ext.ux.TimeBasedVisualisation = Ext.extend(Ext.ux.Visualisation, {
     },
 
     /**
-     * Alters the timeframe of the graph, reloading the graph data, and then
-     * once that is done, redrawing the graph.
+     * Description:  Alters the timeframe of the graph, reloading the graph 
+     *               data, and then once that is done, redrawing the graph.
      */
     alterGraphTimeframe: function(newTimeframe) {
         this.graphConfig.timeframe = newTimeframe;
@@ -166,7 +222,9 @@ Ext.ux.TimeBasedVisualisation = Ext.extend(Ext.ux.Visualisation, {
     },
 
     /**
-     * Loads the graph data. 
+     * Description:  Loads the graph data. This overrides the superclass method
+     *               to set up the correct timeframe to retreive data over, and
+     *               then calls the superclass loadGraphData() method.
      *
      * The timeframe (graphConfig.timeframe) is inserted into graphConfig.params.
      */
@@ -176,11 +234,11 @@ Ext.ux.TimeBasedVisualisation = Ext.extend(Ext.ux.Visualisation, {
         // Build the parameters list for the fetching. If we have parameters,
         // then use those, otherwise build one up, from configuration - this
         // code understands deeply the config - it's not generic.
-        this.graphConfig.dataSourceParams = this.graphConfig.dataSourceParams ? this.graphConfig.dataSourceParams : {};
+        this.dataSource.params = this.dataSource.params || {};
 
         if (this.graphConfig.timeframe) {
-            this.graphConfig.dataSourceParams.from = this.graphConfig.timeframe.from().formatForServer();
-            this.graphConfig.dataSourceParams.to = this.graphConfig.timeframe.to().formatForServer();
+            this.dataSource.params.from = this.graphConfig.timeframe.from().formatForServer();
+            this.dataSource.params.to = this.graphConfig.timeframe.to().formatForServer();
         }
 
         Ext.ux.TimeBasedVisualisation.superclass.loadGraphData.apply(this, arguments);

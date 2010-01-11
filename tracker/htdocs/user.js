@@ -27,7 +27,7 @@ return function (appName, extra) {
     var user = extra.user;
 
     return new Ext.Panel ({
-        title: appName + ' - ' + user,
+        title: appName + ' - Users - ' + user,
         layout: 'border',
         hideMode: 'offsets',
         closable: true,
@@ -37,13 +37,13 @@ return function (appName, extra) {
                 region: 'center',
                 dataSource: {
                     dataset: 'tps/' + appName,
+                    params: {
+                        user: user
+                    }
                 },
                 graph: new jarvis.graph.TpsGraph(),
                 graphConfig: {
-                    timeframe: trackerConfiguration.defaultDateRange.clone(),
-                    dataSourceParams: {
-                        user: user
-                    }
+                    timeframe: jarvis.tracker.configuration.defaultDateRange.clone()
                 }
             }
         ]

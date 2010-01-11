@@ -1,3 +1,40 @@
+<!--
+
+    The Jarvis Tracker GUI main entry point.
+
+    The Jarvis Tracker GUI is a web based UI (which works in recent browsers) allowing
+    users to access data stored in the Jarvis tracker database. Please refer to the
+    Jarvis documentation for how to configure Jarvis for more information on configuring
+    the tracker.
+
+    HTML help is provided in the application to provide information on the various aspects
+    of the UI.
+
+    The application itself is built on ExtJS - so the actual page rendering is handed off
+    to ExtJS and the rest of the application is written in JavaScript.
+
+    This HTML file loads the required javascript and then passes the initialisation off
+    to the code in 'tracker.js'.
+
+    Licence:
+          This file is part of the Jarvis Tracker application.
+   
+          Jarvis is free software: you can redistribute it and/or modify
+          it under the terms of the GNU General Public License as published by
+          the Free Software Foundation, either version 3 of the License, or
+          (at your option) any later version.
+   
+          Jarvis is distributed in the hope that it will be useful,
+          but WITHOUT ANY WARRANTY; without even the implied warranty of
+          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+          GNU General Public License for more details.
+   
+          You should have received a copy of the GNU General Public License
+          along with Jarvis.  If not, see <http://www.gnu.org/licenses/>.
+   
+          This software is Copyright 2008 by Jamie Love.
+
+-->
 <html>
     <head>
         <title>The Jarvis Tracker</title>
@@ -19,8 +56,9 @@
         <script type="text/javascript" src="/ext-2.3/ext-all.js"></script>
 
         <!-- COMPONENTS FOR THE APPLICATION -->
+        <script type="text/javascript" src="include/date-utils.js"></script>
+        <script type="text/javascript" src="include/array-utils.js"></script>
         <script type="text/javascript" src="include/timeframe.js"></script>
-        <script type="text/javascript" src="include/RowExpander.js"></script>
         <script type="text/javascript" src="include/visualisation.js"></script>
         <script type="text/javascript" src="include/graph.js"></script>
 

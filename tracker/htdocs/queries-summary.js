@@ -134,7 +134,7 @@ return function (appName, extra) {
                 },
                 graph: new jarvis.graph.TpsGraph(),
                 graphConfig: {
-                    timeframe: trackerConfiguration.defaultDateRange.clone()
+                    timeframe: jarvis.tracker.configuration.defaultDateRange.clone()
                 }
             }
         ]

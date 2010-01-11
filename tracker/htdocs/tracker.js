@@ -22,46 +22,67 @@
  *       This software is Copyright 2008 by Jamie Love.
  */
 
-// TODO MOVE this function
+Ext.ns('jarvis.tracker');
 
 /**
- * Description:   Returns the julian date value for the given date object,
- *                adjusting to UTC from browser local time.
- *
- * Parameters:
- *      trunc     - Truncate the returned date to midnight on 
- *                  the date the time occurs.
+ * The main UI Tab that new tabs are added to.
  */
-Date.prototype.getJulian = function (trunc) {
-    // 2440587.5 is the julian date offset for unix epoch
-    // time. 
-    if (trunc) {
-        return this.clearTime().getTime() / (1000 * 60 * 60 * 24) + 2440587.5; 
-    } else {
-        return this.getTime() / (1000 * 60 * 60 * 24) + 2440587.5; 
-    }
-}
-Date.fromJulian = function (jt) {
-    return new Date(Math.round((jt - 2440587.5) * (1000 * 60 * 60 * 24)));
-}
+jarvis.tracker.informationTabPanel = null;
 
-// Adds a tab to the page
+/**
+ * This map holds functions that are loaded from external files. These functions
+ * create the tabs of data - e.g. the 'queries' type tab that details a specific
+ * query.
+ */
+jarvis.tracker.trackerSubpages = {};
 
-var informationTabPanel = null;
+/**
+ * This is a list of all the tabs shown onscreen to the user, allowing the code
+ * to switch to a tab if the user's already got it open, rather than create a
+ * whole new one.
+ *
+ * The key is the 'id' of the tab - the path to the tab as per the application
+ * browser shown on the left of the UI in the application.
+ */
+jarvis.tracker.trackerTabs = {};
 
-var trackerSubpages = {};
-var trackerTabs = {};
-
-var trackerConfiguration = {
+/**
+ * Global default configuration for the Jarvis Tracker application.
+ */
+jarvis.tracker.configuration = {
     defaultDateRange: new jarvis.Timeframe ('..now')
 };
 
-function loadExternalPage (page, callback) {
+/**
+ * A static/global function for loading a new page type whose code will be
+ * able to create a new tab of a specific type.
+ *
+ * The JavaScript file, when loaded and evaluated is expected to return a
+ * function with the following signature:
+ *
+ *     function (appName, extra);
+ *
+ * And this function is supposed to return an ExtJS Component that can
+ * become a tab in an ExtJS TabPanel.
+ *
+ * 'extra' above is tab type specific, and is built up and passed by other
+ * code (see loadAndShowTab).
+ *
+ * The returned Panel object is also able to respond to an 'updateparameters'
+ * event, which is fired in various panel specific cases (mostly when the user
+ * does something that would trigger the reload of that specific tab).
+ *
+ * Parameters:
+ *      page - the page type, which is also the filename of JavaScript to
+ *             load.
+ *      callback - the function to call after the page is loaded, if any.
+ */
+jarvis.tracker.loadExternalPage = function(page, callback) {
     Ext.Ajax.request ({
         url: page,
         success: function (xhr) {
             var t = eval(xhr.responseText);
-            trackerSubpages[page] = t;
+            jarvis.tracker.trackerSubpages[page] = t;
             if (callback)
                 callback();
         },
@@ -74,32 +95,52 @@ function loadExternalPage (page, callback) {
            });
         }
     });
-}
+};
 
-function loadAndShowTab (id, page, appName, extraParameters, callback) {
-    if (!trackerSubpages[page]) {
-        loadExternalPage(page, function (p) { loadAndShowTab (id, page, appName, extraParameters, callback); });
+/**
+ * A static/global function for showing a new tab for a specific selection
+ * made by the user.
+ *
+ * Parameters:
+ *      id - The id (node) as per the application browser. Refer to 
+ *           loadAndShowTabFromPath for details on the form this id can take.
+ *
+ *      page - the page type, which is also the filename of JavaScript to
+ *             load.
+ *
+ *      appName - the application name. Should be the same as what is
+ *                in the 'id'.
+ *
+ *      extraParameters - any extra parameters to pass to the tab when loaded.
+ *
+ *      callback - the function to call after tab is created, if any.
+ */
+jarvis.tracker.loadAndShowTab = function(id, page, appName, extraParameters, callback) {
+    if (!jarvis.tracker.trackerSubpages[page]) {
+        jarvis.tracker.loadExternalPage(page, function (p) { 
+            jarvis.tracker.loadAndShowTab (id, page, appName, extraParameters, callback); 
+        });
     } else {
-        if (trackerTabs[id]) {
+        if (jarvis.tracker.trackerTabs[id]) {
             if (extraParameters) {
-                trackerTabs[id].fireEvent ('updateparameters', extraParameters);
+                jarvis.tracker.trackerTabs[id].fireEvent ('updateparameters', extraParameters);
             }
-            informationTabPanel.setActiveTab (trackerTabs[id]);
+            jarvis.tracker.informationTabPanel.setActiveTab (jarvis.tracker.trackerTabs[id]);
         } else {
-            var t = trackerSubpages[page](appName, extraParameters);
+            var t = jarvis.tracker.trackerSubpages[page](appName, extraParameters);
             t.on (
-                'destroy', function () { trackerTabs[id] = null }
+                'destroy', function () { jarvis.tracker.trackerTabs[id] = null }
             );
-            informationTabPanel.add (t);
-            informationTabPanel.setActiveTab (t);
-            trackerTabs[id] = t;
+            jarvis.tracker.informationTabPanel.add (t);
+            jarvis.tracker.informationTabPanel.setActiveTab (t);
+            jarvis.tracker.trackerTabs[id] = t;
 
             if (callback) {
                 callback(t);
             }
         }
     };
-}
+};
 
 /**
  * This function will parse a path and then call loadAndShowTab with the right
@@ -123,7 +164,7 @@ function loadAndShowTab (id, page, appName, extraParameters, callback) {
  *
  * Note - not all paths do anything yet
  */
-function loadAndShowTabFromPath (path, callback) {
+jarvis.tracker.loadAndShowTabFromPath = function(path, callback) {
     var pathAndParam = path.split('?');
     var parts = pathAndParam[0].split('/');
     var params = null;
@@ -132,13 +173,13 @@ function loadAndShowTabFromPath (path, callback) {
         params = Ext.urlDecode (pathAndParam[1]);
     }
 
-
     // Root node has only one part.
     if (path == 'root') {
-        loadAndShowTab (pathAndParam[0], 'summary.js', null, null, callback);
+        jarvis.tracker.loadAndShowTab (pathAndParam[0], 'summary.js', null, null, callback);
     }
+    // If the length is 1, it must be an application name.
     else if (parts.length == 1) {
-        loadAndShowTab (pathAndParam[0], 'application-summary.js', parts[0], null, callback);
+        jarvis.tracker.loadAndShowTab (pathAndParam[0], 'application-summary.js', parts[0], null, callback);
     }
     // If there are two parts - the second part will be Errors/Queries etc.
     else if (parts.length == 2) {
@@ -147,36 +188,39 @@ function loadAndShowTabFromPath (path, callback) {
         } : null;
 
         if (parts[1] == 'Errors') {
-            loadAndShowTab (pathAndParam[0], 'errors-summary.js', parts[0], extra, callback);
+            jarvis.tracker.loadAndShowTab (pathAndParam[0], 'errors-summary.js', parts[0], extra, callback);
         } else if (parts[1] == 'Queries') {
-            loadAndShowTab (pathAndParam[0], 'queries-summary.js', parts[0], extra, callback);
+            jarvis.tracker.loadAndShowTab (pathAndParam[0], 'queries-summary.js', parts[0], extra, callback);
         } else if (parts[1] == 'Users') {
-            loadAndShowTab (pathAndParam[0], 'users-summary.js', parts[0], extra, callback);
+            jarvis.tracker.loadAndShowTab (pathAndParam[0], 'users-summary.js', parts[0], extra, callback);
         }
     }
 
     // If there are more than two parts, then look at what details we're after
+    
+    // Queries.
     else if (parts.length >= 3 && parts[1] == 'Queries') {
         var app = parts[0];
         parts.splice(0, 2);
-        loadAndShowTab (pathAndParam[0], 'query.js', app, {
+        jarvis.tracker.loadAndShowTab (pathAndParam[0], 'query.js', app, {
             query: parts.join ('/'),
             params: params
         }, callback);
     }
 
-    // If there are more than two parts, then look at what details we're after
+    // User information.
     else if (parts.length >= 3 && parts[1] == 'Users') {
-        loadAndShowTab (pathAndParam[0], 'user.js', parts[0], {
+        jarvis.tracker.loadAndShowTab (pathAndParam[0], 'user.js', parts[0], {
             user: parts[2]
         }, callback);
     }
-}
+};
 
-
-// Main code to build the screen
+//
+// Main code to build the screen. 
+//
 Ext.onReady (function () {
-    jarvisInit ('tracker');
+    jarvisInit ('tracker'); // Tells the codebase what our Jarvis application name is.
     
     var titleBar = {
         region: 'north',
@@ -222,14 +266,14 @@ Ext.onReady (function () {
 
                 // avoid loading a tab for directories within 'Queries'
                 if (node.leaf == 1 || parts.length < 3) { // node.isLeaf() does not work in ExtJS v2.3
-                    loadAndShowTabFromPath (node.id);
+                    jarvis.tracker.loadAndShowTabFromPath (node.id);
                 }
             }
         }
     });
     
         
-    informationTabPanel = new Ext.TabPanel ({
+    jarvis.tracker.informationTabPanel = new Ext.TabPanel ({
         region:'center',
         deferredRender: false,
         enableTabScroll: true,
@@ -261,7 +305,7 @@ Ext.onReady (function () {
         items: [
             titleBar,
             treePanel,
-            informationTabPanel
+            jarvis.tracker.informationTabPanel
         ]
     });
 
@@ -272,7 +316,6 @@ Ext.onReady (function () {
         ]       
     });
 
-
     /** 
      * Start off with summary details as a tab.
      *
@@ -282,7 +325,7 @@ Ext.onReady (function () {
      * by about 15 pixels, chopping off the bottom of the tab's contents
      * (until it is resized or layout is forced to recalculate)
      */
-    loadAndShowTabFromPath ('root', function () { viewport.doLayout(false); });
+    jarvis.tracker.loadAndShowTabFromPath ('root', function () { viewport.doLayout(false); });
 });
 
 

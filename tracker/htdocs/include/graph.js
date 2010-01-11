@@ -1,5 +1,7 @@
 /**
- * Description: This code generates various types of graphs.
+ * Description: This code generates the various types of graphs used by 
+ *              the Jarvis Tracker system. These graphs are designed to
+ *              be shown via the Visualisation Ext component.
  *
  * Licence:
  *       This file is part of the Jarvis Tracker application.
@@ -20,68 +22,11 @@
  *       This software is Copyright 2008 by Jamie Love.
  */
 
-jarvis = jarvis || {};
-jarvis.graph = jarvis.graph || {};
+Ext.ns('jarvis.graph');
 
-/**
- * Add filtering to arrays, if necessary
- */
-if (!Array.prototype.filter)
-{
-  Array.prototype.filter = function(fun /*, thisp*/)
-  {
-    var len = this.length >>> 0;
-    if (typeof fun != 'function')
-      throw new TypeError();
-
-    var res = new Array();
-    var thisp = arguments[1];
-    for (var i = 0; i < len; i++)
-    {
-      if (i in this)
-      {
-        var val = this[i]; // in case fun mutates this
-        if (fun.call(thisp, val, i, this))
-          res.push(val);
-      }
-    }
-
-    return res;
-  };
-}
-
-
-/**
- * Add comma's into a number.
- */
-jarvis.graph.formatComma = function(amount) {
-    var delimiter = ','; 
-    var a = amount.split('.',2);
-    var d = a[1];
-    var i = parseInt(a[0]);
-    if(isNaN(i)) { return ''; }
-    var minus = '';
-    if(i < 0) { minus = '-'; }
-    i = Math.abs(i);
-    var n = new String(i);
-    var a = [];
-    while(n.length > 3)
-    {
-        var nn = n.substr(n.length-3);
-        a.unshift(nn);
-        n = n.substr(0,n.length-3);
-    }
-    if(n.length > 0) { a.unshift(n); }
-    n = a.join(delimiter);
-    if(d && d.length < 1) { amount = n; }
-    else { amount = n + (d ? '.' + d : ''); }
-    amount = minus + amount;
-    return amount;
-};
-
-//
-// Base graph class.
-//
+/******************************************************************************
+ * Base graph class.
+ *****************************************************************************/
 jarvis.graph.Graph = function() {
 };
 
@@ -109,13 +54,13 @@ jarvis.graph.Graph.prototype.render = function (el, data, config) {
  * Provide a message indicating there is no data to display a graph on the 
  * given element (not the same as if there was an error reading the data!)
  */
-jarvis.graph.Graph.prototype.noDataMesasge = function(el) {
+jarvis.graph.Graph.prototype.noDataMessage = function(el) {
     el.getEl().update ('<i>No data available to display graph.</i>');
 }
 
-//
-// Graph showing performance of a dataset query
-//
+/******************************************************************************
+ * Graph showing performance of a dataset query
+ *****************************************************************************/
 jarvis.graph.DatasetPerformanceGraph = Ext.extend(jarvis.graph.Graph, {
     title: function () {
         return 'Dataset Performance';
@@ -124,18 +69,17 @@ jarvis.graph.DatasetPerformanceGraph = Ext.extend(jarvis.graph.Graph, {
     render: function (el, data, config) {
 
         if (data.length < 4) { // Need a few data points to make this work nicely
-            this.noDataMesasge (el);
+            this.noDataMessage (el);
             return;
         }
         
         var elBox = el.getBox();
 
-
         leftBuffer = 20;
         rightBuffer = 10;
         bottomBuffer = 20;
 
-        width = elBox.width - 20 - leftBuffer - rightBuffer; // 20 pixels gives a buffer to avoid scrollbars TODO - fix
+        width = elBox.width - 20 - leftBuffer - rightBuffer; // 20 pixels gives a buffer to avoid scrollbars under Chrome TODO - fix
         height = 60 - bottomBuffer;
 
         // Lets look at the data
@@ -153,7 +97,7 @@ jarvis.graph.DatasetPerformanceGraph = Ext.extend(jarvis.graph.Graph, {
 
         var outliers = sortedData.filter (function (d) { return d.d < lowerAdjacentValue || d.d > upperAdjacentValue });
         
-        var xscale = pv.Scale.linear (0, sortedData[sortedDataLen - 1].d).range (0, width - 15).nice(); // -10 is to ensure any dots/txt overflowing doesn't get cut off
+        var xscale = pv.Scale.linear (0, sortedData[sortedDataLen - 1].d).range (0, width - 15).nice(); // -15 is to ensure any dots/txt overflowing doesn't get cut off
 
         var g = new pv.Panel()
             .canvas (el.id)
@@ -211,29 +155,20 @@ jarvis.graph.DatasetPerformanceGraph = Ext.extend(jarvis.graph.Graph, {
     }
 });
 
-//
-// Line graph showing transactions per second.
-//
+/******************************************************************************
+ * Line graph showing transactions per second.
+ *****************************************************************************/
 jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
 
     title: function () {
         return 'Average Transactions per Minute';
     },
 
-    /*
-     * Rendering function. Renders to 'el' with the given data
-     * 
-     * Parameters:
-     *      el      - is a Ext.Element object. 
-     *      data    - is an array of data points, graph specific.
-     *      config  - configuration for rendering the graph, graph
-     *                specific.
-     */
     render: function (el, data, config) {
 
         var elBox = el.getBox();
 
-        width = elBox.width - 20; // 20 pixels gives a buffer to avoid scrollbars TODO - fix
+        width = elBox.width - 20; // 20 pixels gives a buffer to avoid scrollbars under Chrome TODO - fix
         height = width * (1 / 1.61803399);
 
         height = height > elBox.height && elBox.height > 0.25 * width ? elBox.height : height;

@@ -1,18 +1,6 @@
-#footer {
-    font-size: 0.8em;
-    font-weight: normal;
-    width: 100%;
-    padding-top: 5px;
-    padding-bottom: 5px;
-    height: 15px;
-    text-align: right;
-    position: absolute;
-    bottom: 0;
-    border-top: solid 2px #aaaaff;
-    color: blue;
-    background: #efefff;
-}
-
+/**
+ * Styles for the titlebar of the application.
+ */
 div.title-bar {
     background: #efefff;
     height: 30px;
@@ -28,6 +16,9 @@ div.title-bar h1 {
     font-variant: small-caps;
 }
 
+/**
+ * Style to make the SQL text shown onscreen look good as code.
+ */
 pre.sh_sql {
     font-size: 12px;
     font-style: Courier New;
@@ -42,16 +33,8 @@ div.sh_sourceCode {
     overflow: auto;
 }
 
+/**
+ * All graphs get this class. No special styles yet for it.
+ */
 div.data-visualisation {
 }
-
-/**
- * This removes the little red rectangle from the top left
- * editable grid cells.
- *
- * It's kinda an all-or-nothing thing though!
- */
-.x-grid3-dirty-cell {
-    background: none;
-}
-

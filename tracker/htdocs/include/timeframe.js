@@ -1,6 +1,10 @@
 /**
- * Description: Provides a simple API for dealing with time ranges
- *              and time <-> pixel conversions
+ * Description: Provides a simple API for dealing with time ranges.
+ *              Date ranges are defined in a simple string format
+ *              and parsed. 
+ *
+ *              Note that further functions may be added to this API
+ *              depending on the needs of the application over time.
  * Licence:
  *       This file is part of the Jarvis Tracker application.
  *
@@ -20,11 +24,17 @@
  *       This software is Copyright 2008 by Jamie Love.
  */
 
-var jarvis = jarvis ? jarvis : {};
+Ext.ns('jarvis');
 
 /**
  * Create a timeframe, supports building a timeframe 
- * with a format  [n].{1-5}(now|tonight...)
+ * with a format:
+ *      [n].{1-5}(now|tonight|tomorrow|lastnight)
+ *
+ * E.g.
+ *      2..now     - two days, until this very moment.
+ *      2..tonight - yesterday and today.
+ *      1.now      - the last hour.
  *
  * String formats:
  *
@@ -40,20 +50,17 @@ var jarvis = jarvis ? jarvis : {};
  * Indicator of end/start period
  *      "now"   == now
  *      "tonight" == 12am tomorrow
- *      "tomorrow" == currenty time tomorrow
- *      "lastnight" == 12am today
  *
  * A Date object can be passed in as the second parameter
  * to indicate the 'now' time (instead of the code assuming
- * new Date() is now).
+ * the value of 'new Date()' is now).
  */
 jarvis.Timeframe = function (tf, now) {
-
     this._tf = tf;
     this._now = now;
 
+    var re = this.timeframeParserRe;
     var pretendNow = now ? now.clone() : new Date();
-    var re = new RegExp ("([0-9]*)([.]+)([a-z]+)"); // TODO Don't create each time.
     var s = tf.match(re);
 
     if (s == null) {
@@ -91,6 +98,15 @@ jarvis.Timeframe = function (tf, now) {
     }
 }
 
+/**
+ * The regular expression for parsing the timeframe string.
+ */
+jarvis.Timeframe.prototype.timeframeParserRe = new RegExp ("^([0-9]*)([.]+)([a-z]+)$");
+
+/**
+ * Accessor functions for accessing the start/end datetimes of the
+ * timeframe.
+ */
 jarvis.Timeframe.prototype.from = function () {
     return this._from;
 }
@@ -100,8 +116,12 @@ jarvis.Timeframe.prototype.to = function () {
 }
 
 /**
- * Clones the timeframe object, allowing callers to manipulate
- * it.
+ * Clones the timeframe object, allowing callers to manipulate the timeframe
+ * without affecting the original object.
+ * 
+ * Note that this function assumes the original timeframe and start date
+ * used to create this Timeframe object still define the timeframe
+ * correctly.
  */
 jarvis.Timeframe.prototype.clone = function () {
     return new jarvis.Timeframe(this._tf, this._now);
@@ -111,16 +131,13 @@ jarvis.Timeframe.prototype.clone = function () {
  * Provides the span of time for the timeframe in minutes.
  */
 jarvis.Timeframe.prototype.span = function () {
-    return (this._to - this._from) / (60 * 1000);
+    return (this._to - this._from) / (60 * 1000.0);
 }
 
+/**
+ * Returns a string that defines the actual timeframe (from/to datetimes)
+ */
 jarvis.Timeframe.prototype.toString = function () {
     return this._from.toString() + " - " + this._to.toString();
 }
 
-/**
- * Helper function added to the Date prototype. 
- */
-Date.prototype.formatForServer = function () {
-    return this.getJulian();
-}

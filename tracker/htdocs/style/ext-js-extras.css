@@ -1,4 +1,5 @@
 /* EXTJS STYLE TWEAKS */
+
 /* Transparent toolbar and buttons bars */
 .x-toolbar td {
     background-color: transparent !important;
@@ -33,5 +34,15 @@ td.x-grid3-hd-inner, .x-grid3-hd-inner {
 
 label.abs-pos-label {
     font-weight: bold
+}
+
+/**
+ * This removes the little red rectangle from the top left
+ * editable grid cells.
+ *
+ * It's kinda an all-or-nothing thing though!
+ */
+.x-grid3-dirty-cell {
+    background: none;
 }
 
