@@ -1,0 +1,21 @@
+<dataset read="*" write="">
+    <select>
+        <![CDATA[
+        SELECT
+            username,
+            COUNT(*) AS number_of_requests,
+            AVG (CASE WHEN action = 'select' THEN out_nrows ELSE in_nrows END) AS avg_nrows
+        FROM
+            request
+        WHERE
+            (app_name = {$1} OR {$1} IS NULL)
+            AND ({$from} IS NULL OR start_time >= CAST({$from} AS FLOAT))
+            AND ({$to} IS NULL OR start_time <= CAST({$to} AS FLOAT))
+        GROUP BY
+            username
+        ORDER BY
+            username
+        ]]>
+    </select>
+</dataset>
+

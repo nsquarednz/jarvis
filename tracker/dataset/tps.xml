@@ -30,13 +30,14 @@
                 ) i
             ) cal
             LEFT JOIN (
-                SELECT start_time FROM request 
+                SELECT start_time, username FROM request 
                 WHERE (app_name IS NULL OR {$1} IS NULL OR {$1} = app_name)
                     AND (dataset IS NULL OR {$2} IS NULL OR {$2} = dataset)
             ) r ON 
                 cal.time <= start_time AND cal.time + (15.0 / (60 * 24)) > start_time
         WHERE
             time >= CAST({$from} AS FLOAT) AND time <= CAST({$to} AS FLOAT) 
+            AND (username IS NULL OR {$user} IS NULL OR username = {$user})
         GROUP BY 
             cal.time
         ORDER BY
