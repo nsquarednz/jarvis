@@ -7,6 +7,7 @@ CREATE TABLE request (
     username TEXT,
     group_list TEXT,
     dataset TEXT,
+    dataset_type TEXT(1),
     action TEXT,
     params TEXT,
     in_nrows INTEGER,
@@ -33,15 +34,15 @@ CREATE TABLE error (
 CREATE INDEX request_start_time_idx on request (start_time);
 
 DROP TABLE calendar;
-CREATE TABLE calendar (  
+CREATE TABLE calendar (
     the_date JULIAN NOT NULL PRIMARY KEY,
-    is_weekday INTEGER, 
-    year INTEGER,  
-    quarter INTEGER,  
-    month INTEGER,  
-    day INTEGER,  
-    day_of_week INTEGER, 
-    week INTEGER 
+    is_weekday INTEGER,
+    year INTEGER,
+    quarter INTEGER,
+    month INTEGER,
+    day INTEGER,
+    day_of_week INTEGER,
+    week INTEGER
 );
 
 DROP TABLE day_interval;
@@ -52,7 +53,7 @@ CREATE TABLE day_interval (
     is_minute INTEGER,
     is_five_minute INTEGER,
     is_fifteen_minute INTEGER
-);    
+);
 
 CREATE INDEX day_interval_15_idx ON day_interval (is_fifteen_minute);
 CREATE INDEX day_interval_5_idx ON day_interval (is_five_minute);
