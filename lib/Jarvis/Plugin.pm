@@ -145,7 +145,7 @@ sub do {
 
     # The module loaded OK, now try the "do" method.
     my $method = $module . "::do";
-    &Jarvis::Error::log ($jconfig, "Executing plugin method '$method'");
+    &Jarvis::Error::debug ($jconfig, "Executing plugin method '$method'");
     my $output;
     {
         no strict 'refs';

@@ -199,7 +199,7 @@ sub check {
     #
     if (! $already_logged_in) {
         if ($logged_in) {
-            &Jarvis::Error::log ($jconfig, "Login for '$username ($group_list)' on '" . $jconfig->{'sid'} . "'.");
+            &Jarvis::Error::debug ($jconfig, "Login for '$username ($group_list)' on '" . $jconfig->{'sid'} . "'.");
 
         } elsif ($offered_username) {
             &Jarvis::Error::log ($jconfig, "Login fail for '$offered_username' on '" . $jconfig->{'sid'} . "': $error_string.");
@@ -238,7 +238,7 @@ sub logout {
     my $username = $jconfig->{'username'} || '';
     my $sid = $jconfig->{'sid'} || '';
 
-    &Jarvis::Error::log ($jconfig, "Logout for '$username' on '$sid'.");
+    &Jarvis::Error::debug ($jconfig, "Logout for '$username' on '$sid'.");
     $jconfig->{'session'} || die "Not logged in!  Logic error!";
 
     $jconfig->{'sname'} = '';

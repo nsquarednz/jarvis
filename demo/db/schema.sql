@@ -12,11 +12,12 @@ CREATE TABLE users (
     change_date timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     name text UNIQUE NOT NULL CHECK (name <> ''),
-    password text NOT NULL CHECK (password <> ''),
+    password text CHECK (password <> ''),
     is_admin boolean DEFAULT false);
 
-INSERT INTO users (name, password, is_admin, change_user) VALUES ('admin', 'admin', 1, 'admin');
-INSERT INTO users (name, password, is_admin, change_user) VALUES ('guest', 'guest', 0, 'admin');
+-- Passwords are [2 chars salt (not hex)] then 32 characters hex MD5 checksum]
+INSERT INTO users (name, password, is_admin, change_user) VALUES ('admin', '2270448f05afcfa5006cd384c52c3317b2', 1, 'admin');
+INSERT INTO users (name, password, is_admin, change_user) VALUES ('guest', 'HF0ef05afff79fb640c5b919ace82b87a9', 0, 'admin');
 
 CREATE VIEW groups AS
     SELECT name, 'default' AS group_name FROM users

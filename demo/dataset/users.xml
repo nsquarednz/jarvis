@@ -1,22 +1,23 @@
 <dataset read="admin" write="admin">
     <transform fetch="notnull" store="trim,null" />
     <select>
-SELECT id, name, password, is_admin
+SELECT id, name,
+    CASE WHEN ((password IS NULL) OR (password = '')) THEN 'NO' ELSE 'YES' END AS has_password,
+    is_admin
 FROM users
 ORDER BY name
     </select>
     <update>
 UPDATE users
 SET name = {{name}},
-    password = {{password}},
     is_admin = {{is_admin}},
     change_user = {{__username}},
     change_date = datetime ('now')
 WHERE id = {{id}};
     </update>
     <insert returning="yes">
-INSERT INTO users (name, password, is_admin, change_user, change_date)
-VALUES ({{name}}, {{password}}, COALESCE ({{is_admin}}, 0), {{__username}}, datetime ('now'));
+INSERT INTO users (name, is_admin, change_user, change_date)
+VALUES ({{name}}, COALESCE ({{is_admin}}, 0), {{__username}}, datetime ('now'));
     </insert>
     <delete>
 DELETE FROM users
