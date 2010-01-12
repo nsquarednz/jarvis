@@ -20,7 +20,7 @@
         <plugin dataset="source" access="*" module="JarvisTrackerSource" add_headers="yes"/>
 
         <sessiondb store="driver:file;serializer:default;id:md5" cookie="TRACKER_CGISESSID">
-            <parameter name="Directory" value="/tmp/"/>
+            <parameter name="Directory" value="/tmp/tracker"/>
         </sessiondb>
 
         <database connect="dbi:SQLite:dbname=/opt/jarvis/tracker/db/tracker.db" username="" password=""/>
