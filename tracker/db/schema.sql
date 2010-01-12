@@ -25,6 +25,7 @@ CREATE TABLE login (
     logged_in INTEGER,
     error_string TEXT,
     group_list TEXT,
+    address TEXT,
     start_time JULIAN
 );
 
