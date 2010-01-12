@@ -1,0 +1,21 @@
+<dataset read="*">
+    <select>
+        SELECT
+            id,
+            sid,
+            app_name,
+            username,
+            logged_in,
+            error_string,
+            group_list,
+            address,
+            start_time
+        FROM
+            login
+        WHERE
+            (app_name IS NULL OR {$1} IS NULL OR {$1} = app_name)
+                AND (username IS NULL OR {$2} IS NULL OR {$2} = username)
+        ORDER BY
+            start_time DESC
+    </select>
+</dataset>
