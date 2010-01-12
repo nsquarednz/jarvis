@@ -72,6 +72,7 @@ CREATE TABLE day_interval (
 CREATE INDEX day_interval_15_idx ON day_interval (is_fifteen_minute);
 CREATE INDEX day_interval_5_idx ON day_interval (is_five_minute);
 
+DROP TABLE tracker_user;
 CREATE TABLE tracker_user (
     username VARCHAR (50) NOT NULL PRIMARY KEY,
     password VARCHAR (50) NOT NULL,
