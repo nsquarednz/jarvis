@@ -290,6 +290,7 @@ sub login {
     my $logged_in = $jconfig->{'logged_in'};
     my $error_string = $jconfig->{'error_string'};
     my $group_list = $jconfig->{'group_list'};
+    my $actual_ip = $ENV{"HTTP_X_FORWARDED_FOR"} || $ENV{"HTTP_CLIENT_IP"} || $ENV{"REMOTE_ADDR"} || '';
 
     # Julian time of request start.
     my $tstart = $jconfig->{'tstart'};
@@ -298,15 +299,15 @@ sub login {
     # Perform the database insert.
     my $sth = $tdbh->prepare (
 "INSERT INTO login (
-    sid, app_name, username, logged_in, error_string, group_list, start_time)
-VALUES (?,?,?,?,?,?,?)");
+    sid, app_name, username, logged_in, error_string, group_list, address, start_time)
+VALUES (?,?,?,?,?,?,?,?)");
 
     if (! $sth) {
         &Jarvis::Error::log ($jconfig, "Cannot prepare tracker login INSERT: " . $tdbh->errstr);
         return;
     }
 
-    my $rv = $sth->execute ($sid, $app_name, $username, $logged_in, $error_string, $group_list, $start_time);
+    my $rv = $sth->execute ($sid, $app_name, $username, $logged_in, $error_string, $group_list, $actual_ip, $start_time);
 
     if (! $rv) {
         &Jarvis::Error::log ($jconfig, "Cannot execute tracker login INSERT: " . $tdbh->errstr);
