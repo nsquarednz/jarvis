@@ -8,19 +8,7 @@
         <!-- This is where our <dataset>.xml are all stored -->
 	<dataset_dir>/opt/jarvis/demo/dataset</dataset_dir>
 
-        <!-- This is how you might define a JSON habitat.  100% example.
-             If your requested format is non-XML (e.g. JSON, we will strip the
-             outer <habitat> tags for you.  Other than that, you're on your own.
-
-             BE WARNED.  Your HABITAT is PUBLIC.  Login is not required in order
-             to view the habitat.
-             -->
-        <!--
-        <habitat><![CDATA[hargs: {
-    install_type: 'production'
-}]]></habitat>
-        -->
-
+        <!-- For server-side paging and sorting -->
         <page_limit_param>limit</page_limit_param>
         <page_start_param>start</page_start_param>
         <sort_field_param>sort</sort_field_param>
@@ -59,95 +47,23 @@
             <parameter name="group_table" value="groups"/>
             <parameter name="group_username_column" value="name"/>
             <parameter name="group_group_column" value="group_name"/>
+            <parameter name="md5" value="yes"/>
+            <parameter name="md5_salt_prefix_len" value="2"/>
 	</login>
 
-        <!-- This is a "no username or password required" login mechanism. -->
-        <!--
-        <login module="Jarvis::Login::None">
-            <parameter name="username" value="admin"/>
-            <parameter name="group_list" value="admin"/>
-        </login>
-        -->
-
-        <!-- This defines simply one single user who may login with a fixed password,
-             AND/OR from a fixed IP address. -->
-        <!--
-        <login module="Jarvis::Login::Single">
-            <parameter name="require_https" value="no"/>
-            <parameter name="remote_ip" value="127.0.0.1"/>
-            <parameter name="username" value="bob"/>
-            <parameter name="password" value="test"/>
-            <parameter name="group_list" value="default"/>
-        </login>-->
-
-        <!-- This is an example of configuring ActiveDirectory lookup.  The values here
-             are totally fictitious.  You will need to supply real values.
-             -->
-        <!--
-        <login module="Jarvis::Login::ActiveDirectory">
-            <parameter name="server" value="pdc.company.org"/>
-            <parameter name="bind_username" value="public"/>
-            <parameter name="bind_password" value="public"/>
-            <parameter name="base_object" value="OU=STAFF,DC=COMPANY,DC=ORG"/>
-        </login>
-        -->
-
-        <!-- This is an example config for a Login module which allows anybody access.
-             Exec and Plugin actions require you to login.  The easiest way to login
-             is to use the Jarvis::Login::None module and then point your browser at:
-
-             http://localhost/jarvis-bin/jarvis.pl?app=demo&action=status
-
-             This will log you in and give you a session cookie so that you can
-             the run Exec and Plugin actions.
-             -->
-        <!--
-        <login module="Jarvis::Login::None">
-            <parameter name="username" value="nobody"/>
-            <parameter name="group_list" value="nogroup"/>
-        </login>
-        -->
-
-        <!-- Here is a database connection which works with the provided demo PostgreSQL
-             script assuming that the postgres environment PATH variables are set up for
-             your Apache user (e.g. www-data).
-             -->
+        <!-- This defines our database connection.  SQLite in our case. -->
         <database connect="dbi:SQLite:dbname=/opt/jarvis/demo/db/demo.db" username="" password=""/>
 
-        <!-- This is a SQL server example.  You may need additional setup.
-        <database connect="dbi:Sybase:server=SERVERNAME" username="username" password="password"/>
-        -->
+        <!-- This plugin is used to allow admin users to reset any user's password. -->
+        <plugin dataset="SetPassword" access="*" lib="/opt/jarvis/demo" module="plugin::SetPassword" add_headers="yes"/>
 
         <!-- This is a very simple 'exec' action.  It uses "echo" to show you the supplied
              command line parameters.  Access it via:
 
-             http://localhost/jarvis-bin/jarvis.pl?app=demo&action=echo
+             http://localhost/jarvis-agent/demo/echo
 
-             Login is required before you can use "exec" actions, even when using module
-             None.  See the note above on using the "status" action to obtain a session cookie.
+             Note that access = "**", so login is not required in order to access this particular exec.
              -->
-        <exec dataset="echo" access="*" command="echo" add_headers="yes" filename_parameter="filename"/>
-
-        <!-- This action ignores includes a '#' so that command line parameters are commented
-             out.  It cats an image back through the socket.  Try saving the image and you will
-             see the filename is "bg.png"
-
-             http://localhost/jarvis-bin/jarvis.pl?app=demo&action=png
-
-             Then try:
-
-             http://localhost/jarvis-bin/jarvis.pl?app=demo&action=png&filename=boat.png
-             -->
-        <exec dataset="png" access="*" command="cat /opt/jarvis/demo/htdocs/decoration/top_background.png # "
-              add_headers="yes" default_filename="bg.png" filename_parameter="filename"/>
-
-        <!-- This shows how to use a Plugin.  It executes the do () method.  Any returned output
-             is put to the browser.  Note that you can use the "default_libs" to specify a default
-             "lib" path if you have many plugins.
-             -->
-        <plugin dataset="Plug" access="*" lib="/opt/jarvis/demo" module="plugin::Demo" add_headers="yes" filename_parameter="filename">
-            <parameter name="smtp_server" value="192.168.70.100"/>
-            <parameter name="category" value="kiwisaver"/>
-        </plugin>
+        <exec dataset="echo" access="**" command="echo" add_headers="yes" filename_parameter="filename"/>
     </app>
 </jarvis>

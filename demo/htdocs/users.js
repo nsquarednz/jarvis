@@ -6,7 +6,7 @@ Ext.onReady (function () {
         url: jarvisUrl ('users'),
         root: 'data',
         idProperty: 'id',
-        fields: ['id', 'name', 'password', 'is_admin'],
+        fields: ['id', 'name', 'has_password', 'is_admin'],
         pruneModifiedRecords: true,
         listeners: {
             'beforeload': function () {
@@ -43,11 +43,10 @@ Ext.onReady (function () {
                 width: 200,
                 editor: new Ext.form.TextField({ allowBlank: false })
             },{
-                header: "Password",
-                dataIndex: 'password',
+                header: "Has Password",
+                dataIndex: 'has_password',
                 sortable: true,
-                width: 40,
-                editor: new Ext.form.TextField({ allowBlank: false })
+                width: 40
             },{
                 header: "Admin?",
                 dataIndex: 'is_admin',
@@ -65,13 +64,12 @@ Ext.onReady (function () {
                     var r = new Ext.data.Record ({ });
                     r.set ('id', 0);
                     r.set ('name', '');
-                    r.set ('password', '');
                     r.set ('is_admin', 0);
                     user_store.insert (0, r);
                     grid.startEditing (0, 0);
                     setButtons ();
                 }
-            }, {
+            },{
                 text: 'Delete', iconCls:'remove', id: 'delete',
                 handler: function () {
                     var rowcol = grid.getSelectionModel().getSelectedCell();
@@ -85,6 +83,17 @@ Ext.onReady (function () {
                             grid.getView().getRow (rowcol[0]).className += ' x-grid3-deleted-row';
                         }
                         setButtons ();
+                    }
+                }
+            },{
+                text: 'Set Password', iconCls:'detail', id: 'password',
+                handler: function () {
+                    var rowcol = grid.getSelectionModel().getSelectedCell();
+                    if (rowcol != null) {
+                        var r = user_store.getAt (rowcol[0]);
+                        if ((r.get('id') != 0) && ! r.get ('_deleted')) {
+                            setPassword (r.get ('name'));
+                        }
                     }
                 }
             }
@@ -134,35 +143,86 @@ Ext.onReady (function () {
         }
     });
 
-    // Create a custom editor to be used for the expander row.
-    var editor = new Ext.grid.GridEditor(
-        new Ext.form.TextArea({
-            enterIsSpecial: false
-        }),
-        {
-            completeOnEnter: false,
-            cancelOnEsc: true,
-            listeners: {
-                'complete': function (ed, value) {
-                    ed.grid.getStore().getAt(ed.row).set('description', value);
-                },
-                'show': function(ed) {
-                    ed.field.setHeight(100);
-                }
-
+    // Set password function.
+    var password_window = null;
+    function setPassword (username) {
+        function savePassword () {
+            var password1 = Ext.ComponentMgr.get ('password1').getValue ();
+            var password2 = Ext.ComponentMgr.get ('password2').getValue ();
+            if (password1 != password2) {
+                alert ('Passwords do not match.');
             }
-        });
 
-    // Assign the editor to the grid for the class of the expander row.
-    grid.getEl().on(
-        'dblclick',
-        function(e) {
-            editor.grid = this;
-            editor.row = this.getView().findRowIndex(e.target);
-            editor.startEdit(e.target, this.getStore().getAt(editor.row).get('description'));
-        },
-        grid,
-        {delegate: '.x-grid3-row-body'});
+            var params = { username: username, password: password1 };
+
+            Ext.Ajax.request({
+                url: jarvisUrl ('SetPassword'),
+                params: params,
+
+                // We received a response back from the server, that's a good start.
+                success: function (response, request_options) {
+                    if (response.responseText == 'Success') {
+                        password_window.setVisible (false);
+                        user_store.reload ();
+
+                    } else {
+                        alert ('Set password declined: ' + response.responseText);
+                    }
+                },
+                failure: function (response, request_options) {
+                    alert ('Set password error: ' + response.responseText);
+                }
+            });
+        };
+
+        if (! password_window) {
+            password_window = new Ext.Window ({
+                title: 'Password', width: 240, closeAction: 'hide',
+                items: new Ext.Panel ({
+                    bodyStyle: {'padding-top': '5px'},
+                    layout: 'form', labelWidth: 80, labelAlign: 'right',
+                    items: [{
+                        fieldLabel: 'Password',  xtype: 'textfield', id: 'password1', width: 120, inputType: 'password',
+                        listeners: {
+                            specialkey: function (field, e) {
+                                if (e.getKey () == Ext.EventObject.ENTER) {
+                                    Ext.ComponentMgr.get ('password2').focus ();
+                                }
+                            }
+                        }
+                    },{
+                        fieldLabel: 'Confirm',  xtype: 'textfield', id: 'password2', width: 120, inputType: 'password',
+                        listeners: {
+                            specialkey: function (field, e) {
+                                if (e.getKey () == Ext.EventObject.ENTER) {
+                                    savePassword ();
+                                }
+                            }
+                        }
+                    }],
+                    buttons: [
+                        {
+                            text: 'Save', iconCls:'save',
+                            listeners: {
+                                'click': function () {
+                                    savePassword ()
+                                }
+                            }
+                        },{
+                            text: 'Cancel', iconCls:'cancel',
+                            handler: function () {
+                                password_window.setVisible (false);
+                            }
+                        }
+                    ]
+                })
+            })
+        }
+        Ext.ComponentMgr.get ('password1').setValue ('');
+        Ext.ComponentMgr.get ('password2').setValue ('');
+        password_window.setTitle ('Set Password - ' + username);
+        password_window.setVisible (true);
+    };
 
     //-------------------------------------------------------------------------
     // HAVE CHANGES FUNCTION
@@ -193,6 +253,7 @@ Ext.onReady (function () {
         var exists = selectedRecord && ! selectedRecord.get('_deleted');
 
         Ext.ComponentMgr.get ('delete').setDisabled (! exists);
+        Ext.ComponentMgr.get ('password').setDisabled (! exists);
         Ext.ComponentMgr.get ('save').setDisabled (! haveModifiedRecords);
     }
 

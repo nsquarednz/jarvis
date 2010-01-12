@@ -13,10 +13,6 @@ Firstly, the list of users is shown as a pulldown in the login screen.  This
 is done to show the use of the read="**" feature which allows some datasets
 to be accessible even to users which have not been logged in.<p>
 
-Also, note that all user passwords are visible here to any admin users.
-A more secure approach would be allowing the admin users only to re-set a
-password, not to see the existing password.<p>
-
 <hr class="topic">
 <p class="topic">Grid Columns<p>
 
@@ -26,8 +22,8 @@ Mandatory fields are marked in <b>bold</b>.<p>
 <tr><td class="note"><b>Username</b></td><td>A text string to be the username,
 must be non-empty, but otherwise not constrained.</td></tr>
 
-<tr><td class="note"><b>Prefix</b></td><td>A text string to be the password,
-must be non-empty, but otherwise not constrained.</td></tr>
+<tr><td class="note"><b>Has Password?</b></td><td>A YES or NO string indicating
+if the user currently has a password field configured.</td></tr>
 
 <tr><td class="note"><b>Admin?</b></td><td>A checkbox denoting if the user
 has administrator access.  Admin access is required to view the Users screen.</td></tr>
@@ -40,3 +36,7 @@ If you mark all users as "not Admin", then when you logout, you will naturally
 no longer be able to log back in to grant Admin access.  In that case, you will
 need to use SQLite directly to reset the "is_admin" flag in the "users" table
 in the database.<p>
+
+Use the "Set Password" to set a new password for the currently selected user.
+You will not be able to view the existing password, as it is stored in encrypted
+format in the database.<p>
