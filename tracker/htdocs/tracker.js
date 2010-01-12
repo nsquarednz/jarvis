@@ -228,16 +228,25 @@ Ext.onReady (function () {
 
     jarvisInit ('tracker'); // Tells the codebase what our Jarvis application name is, and the login function.
     Ext.QuickTips.init();
+
+    var logoutButtonId = Ext.id();
     
     var titleBar = {
+        xtype: 'panel',
+        layout: 'absolute',
         region: 'north',
-        xtype: 'container',
-        autoEl: {
-            html: '<h1>The Jarvis Tracker</h1>',
-            tag: 'div'
-        },
         height: 45,
-        cls: 'title-bar'
+        items: [
+            {
+                xtype: 'container',
+                autoEl: {
+                    html: '<h1>The Jarvis Tracker</h1><div class="logout-button" id="' + logoutButtonId + '">logout</div>',
+                    tag: 'div'
+                },
+                anchor: '100% 100%',
+                cls: 'title-bar'
+            },
+        ]
     };
 
     // Tree - showing the list of jarvis applications and suchlike.
@@ -318,6 +327,17 @@ Ext.onReady (function () {
         items:[ 
                 mainContainer
         ]       
+    });
+
+    Ext.get (logoutButtonId).on ('click', function () {
+        Ext.Ajax.request ({
+            url: jarvisUrl ('__logout'),
+            method: 'GET',
+            success: function (xhr) { 
+                jarvis.tracker.login (function () {});
+            },
+            failure: jarvis.tracker.extAjaxRequestFailureHandler
+        })
     });
 
     /** 

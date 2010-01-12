@@ -14,6 +14,16 @@ div.title-bar h1 {
     font-size: 1.5em;
     color: #333388;
     font-variant: small-caps;
+    float:left;
+}
+
+div.logout-button {
+    float:right;
+    font-size: 0.8em;
+    font-weight: bold;
+    color: #333388;
+    text-decoration: underline;
+    cursor: pointer;
 }
 
 /**
@@ -38,3 +48,4 @@ div.sh_sourceCode {
  */
 div.data-visualisation {
 }
+
