@@ -20,7 +20,7 @@
             If you want to use the login system, then uncomment this code
             and add a user to the 'tracker_users' table in the tracker database.
 
-            Note that the 'group' column is not used.
+            Note that the 'group' column is not used, but must be an empty string.
         <login module="Jarvis::Login::Database">
             <parameter name="user_table" value="tracker_user"/>
             <parameter name="user_username_column" value="username"/>

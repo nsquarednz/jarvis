@@ -254,7 +254,7 @@ Ext.onReady (function () {
         title: 'Application Browser',
         region: 'west',
         split: true,
-        width: 400,
+        width: 250,
         loader: new Ext.tree.TreeLoader({
             url: jarvisUrl('list'),
             preloadChildren: true,

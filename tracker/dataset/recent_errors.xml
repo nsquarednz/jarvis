@@ -11,6 +11,9 @@
 
      This error list is designed for showing 'recent' errors, which a user could
      then review in more detail using the 'errors.xml' dataset.
+
+     This also limits the errors returned to those that don't appear to be 'normal'
+     requests before login.
   -->
 
 <dataset read="*" write="">
@@ -26,6 +29,7 @@
         WHERE
             ({$1} IS NULL OR lower(app_name) = lower({$1}))
             AND ({$2} IS NULL OR lower(username) = lower({$2}))
+            AND NOT (http_response_code = 401 AND (username = '' OR username IS NULL))
         ORDER BY
             start_time DESC
         LIMIT 20

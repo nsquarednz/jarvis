@@ -40,6 +40,10 @@ return function () {
 
     var recentErrorsList = new Ext.grid.GridPanel({
         store: recentErrorsStore,
+        region: 'east',
+        split: true,
+        collapsible: true,
+        width: '40%',
         title: 'Recent Errors: All Applications',
         columns: [
             {
@@ -81,18 +85,6 @@ return function () {
         sm: new Ext.grid.RowSelectionModel({singleSelect:true})
     });
 
-    var eastAccordion = new Ext.Panel({
-        region: 'east',
-        layout: 'accordion',
-        split: true,
-        collapsible: true,
-        width: 600,
-        title: 'Recently',
-        items: [
-            recentErrorsList
-        ]
-    });
-
     var tps = {
         xtype: 'TimeBasedVisualisation',
         region: 'center',
@@ -110,7 +102,7 @@ return function () {
         layout: 'border',
         hideMode: 'offsets',
         items: [
-            eastAccordion,
+            recentErrorsList,
             tps
         ]
     });

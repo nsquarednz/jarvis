@@ -177,7 +177,7 @@ return function (appName, extra) {
         },
         split: true,
         collapsible: true,
-        width: 600,
+        width: '50%',
         title: 'Dataset Code',
         hideMode: 'offsets',
         items: new Array()
