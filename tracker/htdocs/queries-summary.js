@@ -130,7 +130,7 @@ return function (appName, extra) {
                 xtype: 'TimeBasedVisualisation',
                 region: 'center',
                 dataSource: {
-                    dataset: 'tps/' + appName,
+                    dataset: 'tps/' + appName
                 },
                 graph: new jarvis.graph.TpsGraph(),
                 graphConfig: {

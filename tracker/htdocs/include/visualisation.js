@@ -8,7 +8,7 @@
     var v = {
         xtype: 'TimeBasedVisualisation',
         dataSource: {
-            dataset: 'tps',
+            dataset: 'tps'
             // params: { } Only set if you have actual params to pass through.
         },
         graph: new jarvis.graph.TpsGraph(),

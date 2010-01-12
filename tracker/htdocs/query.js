@@ -137,7 +137,7 @@ return function (appName, extra) {
                 anchor: '100%',
                 height: 100,
                 dataSource: {
-                    dataset: 'dataset_duration/' + appName + '/' + extra.query,
+                    dataset: 'dataset_duration/' + appName + '/' + extra.query
                 },
                 graph: new jarvis.graph.DatasetPerformanceGraph()
             },
@@ -145,7 +145,7 @@ return function (appName, extra) {
                 xtype: 'TimeBasedVisualisation',
                 anchor: '100% -100',
                 dataSource: {
-                    dataset: 'tps/' + appName + '/' + extra.query,
+                    dataset: 'tps/' + appName + '/' + extra.query
                 },
                 graph: new jarvis.graph.TpsGraph(),
                 graphConfig: {
@@ -237,7 +237,7 @@ return function (appName, extra) {
             height: 150,
             clicksToEdit: 1,
             viewConfig: {
-                forceFit: true,
+                forceFit: true
             },
             columns: [
                 {

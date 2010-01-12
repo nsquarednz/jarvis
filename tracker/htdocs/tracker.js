@@ -256,7 +256,7 @@ Ext.onReady (function () {
         root: new Ext.tree.AsyncTreeNode ({
             text: 'Applications',
             expanded: true,
-            id: 'root',
+            id: 'root'
         }),
         tools: [{
             id: 'search'
@@ -300,7 +300,7 @@ Ext.onReady (function () {
         //
         // Note that calling 'doLayout()' on the tab after it is added has the same
         // effect.
-        layoutOnTabChange:true,
+        layoutOnTabChange:true
     });
 
     // Main layout holder

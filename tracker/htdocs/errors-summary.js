@@ -35,7 +35,7 @@ return function (appName, extra) {
             root: 'data',
             id: 'id',
             totalProperty: 'fetched',
-            fields: ['sid', 'app_name', 'group_list', 'dataset', 'action', 'start_time', 'username', 'params', 'post_body', 'message'],
+            fields: ['sid', 'app_name', 'group_list', 'dataset', 'action', 'start_time', 'username', 'params', 'post_body', 'message']
         }),
         listeners: {
             'loadexception': jarvis.tracker.extStoreLoadExceptionHandler,

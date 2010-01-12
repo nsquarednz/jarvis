@@ -31,7 +31,7 @@ return function () {
             root: 'data',
             id: 'id',
             totalProperty: 'fetched',
-            fields: ['sid', 'app_name', 'group_list', 'dataset', 'action', 'start_time', 'username', 'message'],
+            fields: ['sid', 'app_name', 'group_list', 'dataset', 'action', 'start_time', 'username', 'message']
         }),
         listeners: {
             'loadexception': jarvis.tracker.extStoreLoadExceptionHandler
@@ -97,7 +97,7 @@ return function () {
         xtype: 'TimeBasedVisualisation',
         region: 'center',
         dataSource: {
-            dataset: 'tps',
+            dataset: 'tps'
         },
         graph: new jarvis.graph.TpsGraph(),
         graphConfig: {
@@ -111,7 +111,7 @@ return function () {
         hideMode: 'offsets',
         items: [
             eastAccordion,
-            tps,
+            tps
         ]
     });
 
