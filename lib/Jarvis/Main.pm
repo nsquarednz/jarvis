@@ -83,7 +83,7 @@ sub error_handler {
     print STDERR ($jconfig->{'debug'} ? Carp::longmess $long_msg : Carp::shortmess $long_msg);
 
     # Track this error, if we got far enough to have enough info.
-    $jconfig && &Jarvis::Tracker::error ($jconfig, Carp::longmess $long_msg);
+    $jconfig && &Jarvis::Tracker::error ($jconfig, $status, Carp::longmess $long_msg);
 
     # Let's be tidy and free the database handles.
     &Jarvis::DB::disconnect ($jconfig);

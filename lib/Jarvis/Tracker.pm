@@ -190,6 +190,11 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
 #       $jconfig - Jarvis::Config object
 #           READ
 #               tracker
+#       $http_response_code - the HTTP response code that will be or has been
+#                             used for the requests that caused the error (e.g.
+#                             401). Only the number is required - not the text
+#                             description of the code, though text after the 
+#                             initial number is discarded.
 #       $message - Error text that was printed to STDERR.
 #
 # Returns:
@@ -197,7 +202,7 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
 ################################################################################
 #
 sub error {
-    my ($jconfig, $message) = @_;
+    my ($jconfig, $http_response_code, $message) = @_;
 
     # Are we tracking errors?
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
@@ -231,12 +236,16 @@ sub error {
     my $tstart = $jconfig->{'tstart'};
     my $start_time = (($$tstart[0] + $$tstart[1] / 1000000) / 86400.0 ) + 2440587.5; # 2440587.5 is Unix Epoch time in Julian date format.
 
+    # Get error number
+    $http_response_code =~ s/^([0-9]+).*$/$1/;
+    $http_response_code = undef if !$http_response_code =~ /^[0-9]+$/;
+
     # Perform the database insert.
     my $sth = $tdbh->prepare (
 "INSERT INTO error (
     sid, app_name, username, group_list, dataset, action,
-    params, post_body, message, start_time)
-VALUES (?,?,?,?,?,?,?,?,?,?)");
+    params, post_body, message, start_time, http_response_code)
+VALUES (?,?,?,?,?,?,?,?,?,?,?)");
 
     if (! $sth) {
         &Jarvis::Error::log ($jconfig, "Cannot prepare tracker error INSERT: " . $tdbh->errstr);
@@ -244,7 +253,7 @@ VALUES (?,?,?,?,?,?,?,?,?,?)");
     }
 
     my $rv = $sth->execute ($sid, $app_name, $username, $group_list, $dataset,
-        $action, $param_string, $post_body, $message, $start_time);
+        $action, $param_string, $post_body, $message, $start_time, $http_response_code);
 
     if (! $rv) {
         &Jarvis::Error::log ($jconfig, "Cannot execute tracker error INSERT: " . $tdbh->errstr);

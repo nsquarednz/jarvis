@@ -19,3 +19,4 @@ CREATE TABLE tracker_user (
     user_group VARCHAR (50) NOT NULL
 );
 
+ALTER TABLE error ADD COLUMN http_response_code INTEGER;

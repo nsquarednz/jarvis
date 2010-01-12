@@ -41,7 +41,8 @@ CREATE TABLE error (
     params TEXT,
     post_body TEXT,
     message TEXT,
-    start_time JULIAN
+    start_time JULIAN,
+    http_response_code INTEGER
 );
 
 CREATE INDEX request_start_time_idx on request (start_time);

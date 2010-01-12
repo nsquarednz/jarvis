@@ -484,7 +484,7 @@ sub fetch {
     #
     if ($stm->{'error'}) {
         $stm->{'sth'}->finish;
-        &Jarvis::Tracker::error ($jconfig, $stm->{'error'});
+        &Jarvis::Tracker::error ($jconfig, '200', $stm->{'error'});
         return $stm->{'error'};
     }
 
@@ -851,7 +851,7 @@ sub store {
             $message || ($message = $stm->{'error'});
 
             # Log the error in our tracker database.
-            &Jarvis::Tracker::error ($jconfig, $stm->{'error'});
+            &Jarvis::Tracker::error ($jconfig, '200', $stm->{'error'});
 
         # Suceeded.  Set per-row status, and fetch the returned results, if this
         # operation indicates that it returns values.
