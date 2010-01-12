@@ -141,8 +141,12 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
     loadGraphData: function () {
         var me = this;
         var url = jarvisUrl (this.dataSource.dataset);
+        var myMask = null;
 
-        // TODO show a loading graphic.
+        if (this.body) {
+            myMask = new Ext.LoadMask(this.body ? this.body : Ext.getBody(), {msg:"Please wait..."});
+            myMask.show();
+        }
 
         // Fetch now the data for the component.
         Ext.Ajax.request({
@@ -152,6 +156,8 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
 
             // We received a response back from the server, that's a good start.
             success: function (response, request_options) {
+                if (myMask)
+                    myMask.hide();
                 try {
                     me.data = Ext.util.JSON.decode (response.responseText).data;
                 } catch (e) {
