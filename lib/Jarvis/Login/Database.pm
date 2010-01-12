@@ -31,6 +31,8 @@ use CGI;
 use strict;
 use warnings;
 
+use Digest::MD5 qw (md5 md5_hex);
+
 use Jarvis::Error;
 
 package Jarvis::Login::Database;
@@ -58,6 +60,10 @@ package Jarvis::Login::Database;
 #            <parameter name="group_table" value="staff_group"/>
 #            <parameter name="group_username_column" value="name"/>
 #            <parameter name="group_group_column" value="group_name"/>
+#
+#            ...
+#            <parameter name="md5" value="yes|no"/>
+#            <parameter name="md5_salt_prefix_len" value="2"/>
 #        </login>
 #        ...
 #    </app>
@@ -93,6 +99,14 @@ sub Jarvis::Login::Database::check {
     my $group_username_column = $login_parameters{'group_username_column'};
     my $group_group_column = $login_parameters{'group_group_column'};
 
+    # Does the database store an MD5 hash (in HEX format, we don't support binary).
+    my $use_md5 = defined ($Jarvis::Config::yes_value {lc ($login_parameters{'md5'} || "no")});
+
+    # Does the database MD5 hash include "N" digits of ASCII salt, which we also
+    # prefix to the password before hashing it?
+    my $md5_salt_prefix_len = $login_parameters{'md5_salt_prefix_len'} || 0;
+
+    # Sanity check our args.
     if (! ($user_table && $user_username_column && $user_password_column)) {
         return ("Missing configuration for Login module Database.");
     }
@@ -120,8 +134,23 @@ sub Jarvis::Login::Database::check {
     if ($stored_password eq '') {
         return ("Account has no password.");
     }
-    if ($stored_password ne $password) {
-        return ("Incorrect password.");
+
+    # Check the password.  Either MD5, or plain text.
+    if ($use_md5) {
+        if (length ($stored_password) != ($md5_salt_prefix_len + 32)) {
+            return ("Stored password is invalid length for MD5 + salt");
+        }
+        my $salt = substr ($stored_password, 0, $md5_salt_prefix_len);
+        my $stored_md5 = substr ($stored_password, $md5_salt_prefix_len);
+
+        if (&Digest::MD5::md5_hex ($salt . $password) ne $stored_md5) {
+            return ("Incorrect password hash.");
+        }
+
+    } else {
+        if ($stored_password ne $password) {
+            return ("Incorrect password.");
+        }
     }
 
     # Need our group configuration, otherwise just put them in group 'default'.
