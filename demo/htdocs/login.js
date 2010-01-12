@@ -20,7 +20,8 @@ Ext.onReady (function () {
         forceSelection: true
     });
     var password_field = new Ext.form.TextField ({
-        renderTo: 'password'
+        renderTo: 'password',
+        inputType: 'password'
     });
     var login_button = new Ext.Button ({
         renderTo: 'button',
