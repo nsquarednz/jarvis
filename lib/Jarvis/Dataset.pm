@@ -837,7 +837,7 @@ sub store {
         my $num_rows = 0;
 
         &statement_execute ($jconfig, $stm, \@arg_values);
-        $row_result{'modified'} = $stm->{'retval'};
+        $row_result{'modified'} = $stm->{'retval'} || 0;
         $modified = $modified + $row_result{'modified'};
 
         # On failure, we will still return valid JSON/XML to the caller, but we will indicate
