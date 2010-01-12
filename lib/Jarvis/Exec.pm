@@ -155,7 +155,7 @@ sub do {
     }
 
     # Execute the command
-    &Jarvis::Error::log ($jconfig, "Executing Command: $command");
+    &Jarvis::Error::debug ($jconfig, "Executing Command: $command");
     my $output =`$command`;
 
     # Failure?
