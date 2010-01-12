@@ -64,6 +64,7 @@ Ext.onReady (function () {
                     var r = new Ext.data.Record ({ });
                     r.set ('id', 0);
                     r.set ('name', '');
+                    r.set ('has_password', 'NO');
                     r.set ('is_admin', 0);
                     user_store.insert (0, r);
                     grid.startEditing (0, 0);
@@ -92,7 +93,7 @@ Ext.onReady (function () {
                     if (rowcol != null) {
                         var r = user_store.getAt (rowcol[0]);
                         if ((r.get('id') != 0) && ! r.get ('_deleted')) {
-                            setPassword (r.get ('name'));
+                            setPassword (r);
                         }
                     }
                 }
@@ -145,7 +146,9 @@ Ext.onReady (function () {
 
     // Set password function.
     var password_window = null;
-    function setPassword (username) {
+    function setPassword (r) {
+        username = r.get ('name');
+
         function savePassword () {
             var password1 = Ext.ComponentMgr.get ('password1').getValue ();
             var password2 = Ext.ComponentMgr.get ('password2').getValue ();
@@ -163,7 +166,8 @@ Ext.onReady (function () {
                 success: function (response, request_options) {
                     if (response.responseText == 'Success') {
                         password_window.setVisible (false);
-                        user_store.reload ();
+                        r.data.has_password = password1 ? 'YES' : 'NO';
+                        user_store.fireEvent("update", user_store, r, Ext.data.Record.EDIT);
 
                     } else {
                         alert ('Set password declined: ' + response.responseText);
@@ -251,9 +255,10 @@ Ext.onReady (function () {
         var selectedRowCol = grid.getSelectionModel().getSelectedCell();
         var selectedRecord = selectedRowCol && user_store.getAt (selectedRowCol[0]);
         var exists = selectedRecord && ! selectedRecord.get('_deleted');
+        var saved = exists && selectedRecord.get('id');
 
         Ext.ComponentMgr.get ('delete').setDisabled (! exists);
-        Ext.ComponentMgr.get ('password').setDisabled (! exists);
+        Ext.ComponentMgr.get ('password').setDisabled (! saved);
         Ext.ComponentMgr.get ('save').setDisabled (! haveModifiedRecords);
     }
 
