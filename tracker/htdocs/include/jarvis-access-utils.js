@@ -105,6 +105,7 @@ jarvis.tracker.login = function (callback) {
             basePath : 'include/third_party',
             message: 'Login to the Jarvis Tracker',
             failMessageParameter: 'error_string',
+            passwordVtype: null,
             modal: true,
             responseReader: { // A very trivial implementation of a Reader that only has a read interface 
                            // method to identify success or failure of the login.
