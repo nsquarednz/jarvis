@@ -152,17 +152,19 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
 
             // We received a response back from the server, that's a good start.
             success: function (response, request_options) {
-                me.data = Ext.util.JSON.decode (response.responseText).data;
+                try {
+                    me.data = Ext.util.JSON.decode (response.responseText).data;
+                } catch (e) {
+                    Ext.Msg.show ({
+                        title: 'Data Parsing Error',
+                        msg: 'Cannot understand data from server: ' + e,
+                        buttons: Ext.Msg.OK,
+                        icon: Ext.Msg.ERROR
+                    });
+                }
                 me.renderGraph(me.items.get(me.dataVisualisationElementId));
             },
-            failure: function () {
-                Ext.Msg.show ({
-                    title: 'Data Retrieval Error',
-                    msg: 'Cannot load: ' + url,
-                    buttons: Ext.Msg.OK,
-                    icon: Ext.Msg.ERROR
-                });
-            }
+            failure: jarvis.tracker.extAjaxRequestFailureHandler
         });
     }
 

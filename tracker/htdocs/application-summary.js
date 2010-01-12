@@ -34,7 +34,7 @@ return function (appName, extra) {
             fields: ['sid', 'app_name', 'group_list', 'dataset', 'action', 'start_time', 'username', 'message'],
         }),
         listeners: {
-            'loadexception': jarvisLoadException
+            'loadexception': jarvis.tracker.extStoreLoadExceptionHandler
         }
     });
 

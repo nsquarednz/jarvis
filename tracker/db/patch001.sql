@@ -12,3 +12,10 @@ CREATE TABLE login (
     address TEXT,
     start_time JULIAN
 );
+
+CREATE TABLE tracker_user (
+    username VARCHAR (50) NOT NULL PRIMARY KEY,
+    password VARCHAR (50) NOT NULL,
+    user_group VARCHAR (50) NOT NULL
+);
+

@@ -121,14 +121,7 @@
                     info.target.ownerCt.activate (info.target);
                 }
             },
-            failure: function () {
-                Ext.Msg.show ({
-                    title: 'Data Retrieval Error',
-                    msg: 'Cannot load: ' + url,
-                    buttons: Ext.Msg.OK,
-                    icon: Ext.Msg.ERROR
-                });
-            }
+            failure: jarvis.tracker.extAjaxRequestFailureHandler
         });
     };
 
@@ -172,14 +165,7 @@ return function (appName, extra) {
                 element.queryParamsStore.loadData (parameters);
                 displaySql(element);
             },
-            failure: function () {
-                Ext.Msg.show ({
-                    title: 'Data Retrieval Error',
-                    msg: 'Cannot load: ' + url,
-                    buttons: Ext.Msg.OK,
-                    icon: Ext.Msg.ERROR
-               });
-            }
+            failure: jarvis.tracker.extAjaxRequestFailureHandler
         });
     };
 

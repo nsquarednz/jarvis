@@ -38,7 +38,7 @@ return function (appName, extra) {
             fields: ['sid', 'app_name', 'group_list', 'dataset', 'action', 'start_time', 'username', 'params', 'post_body', 'message'],
         }),
         listeners: {
-            'loadexception': jarvisLoadException,
+            'loadexception': jarvis.tracker.extStoreLoadExceptionHandler,
             'beforeload': function () {
                 delete this.baseParams.limit_to_date;
                 if (this.dateParamAsDate) {

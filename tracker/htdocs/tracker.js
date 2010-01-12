@@ -220,7 +220,14 @@ jarvis.tracker.loadAndShowTabFromPath = function(path, callback) {
 // Main code to build the screen. 
 //
 Ext.onReady (function () {
-    jarvisInit ('tracker'); // Tells the codebase what our Jarvis application name is.
+    Ext.Ajax.on ('requestexception', function (conn, response, options) {
+        if (response.status == 401) { // 401 == unauthorized and means we should try and log in.
+            jarvis.tracker.login (options);
+        } 
+    });
+
+    jarvisInit ('tracker'); // Tells the codebase what our Jarvis application name is, and the login function.
+    Ext.QuickTips.init();
     
     var titleBar = {
         region: 'north',
@@ -242,10 +249,7 @@ Ext.onReady (function () {
         loader: new Ext.tree.TreeLoader({
             url: jarvisUrl('list'),
             preloadChildren: true,
-            requestMethod: 'GET',
-            listeners: {
-                loadexception: jarvisLoadException
-            }
+            requestMethod: 'GET'
         }),
         collapsible: true,
         autoScroll: true,

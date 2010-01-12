@@ -51,7 +51,7 @@ return function (appName, extra) {
                     d.set ('total_requests_percentage', (d.get('number_of_requests') * 1) / totalRequestsMade);
                 });
             },
-            'loadexception': jarvisLoadException
+            'loadexception': jarvis.tracker.extStoreLoadExceptionHandler
         }
     });
 
