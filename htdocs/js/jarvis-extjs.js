@@ -94,7 +94,8 @@ function jarvisArg (url, arg_name, default_value) {
 var done_alert = 0;
 function jarvisLoadException (proxy, options, response, e) {
     if (! done_alert) {
-        alert (response.responseText);
+        var dataset_name = proxy.conn.url.replace (jarvis_home + '/' + application + '/', '');
+        alert ("Database error for select on '" + dataset_name + "'.\n" + response.responseText);
         done_alert = 1;
     }
 

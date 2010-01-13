@@ -689,7 +689,7 @@ sub store {
 
     # Get our submitted content
     my $content = &get_post_data ($jconfig);
-    $content || die "Cannot find client-submitted change content.";
+    $content || die "No content body to store";
     &Jarvis::Error::debug ($jconfig, "Request Content Length = " . length ($content));
     &Jarvis::Error::dump ($jconfig, $content);
 
