@@ -67,32 +67,35 @@ return function (appName, extra) {
                     }
                 });
 
-                Ext.Ajax.request ({
-                    url: jarvisUrl ('reverse-dns-lookup'),
-                    method: 'GET',
-                    params: {
-                        ip_address: pv.keys(ipAddressesToLookup)
-                    },
-                    success: function (xhr) {
-                        try {
-                            var resp = Ext.util.JSON.decode (xhr.responseText); 
-                            pv.keys(resp.data).forEach (function (x) {
-                                globalReverseDnsCache[x] = resp.data[x];
-                            });
+                ipAddressesToLookup = pv.keys (ipAddressesToLookup);
+                if (ipAddressesToLookup.length > 0) {
+                    Ext.Ajax.request ({
+                        url: jarvisUrl ('reverse-dns-lookup'),
+                        method: 'GET',
+                        params: {
+                            ip_address: ipAddressesToLookup
+                        },
+                        success: function (xhr) {
+                            try {
+                                var resp = Ext.util.JSON.decode (xhr.responseText); 
+                                pv.keys(resp.data).forEach (function (x) {
+                                    globalReverseDnsCache[x] = resp.data[x];
+                                });
 
-                            globalReverseDnsCache.fireEvent('updated');
+                                globalReverseDnsCache.fireEvent('updated');
 
-                        } catch (error) {
-                            Ext.Msg.show ({
-                                title: 'Reverse DNS Lookup Error',
-                                msg: 'Cannot read reverse DNS information: ' + error,
-                                buttons: Ext.Msg.OK,
-                                icon: Ext.Msg.ERROR
-                           });
-                        }
-                    },
-                    failure: jarvis.tracker.extAjaxRequestFailureHandler
-                });
+                            } catch (error) {
+                                Ext.Msg.show ({
+                                    title: 'Reverse DNS Lookup Error',
+                                    msg: 'Cannot read reverse DNS information: ' + error,
+                                    buttons: Ext.Msg.OK,
+                                    icon: Ext.Msg.ERROR
+                               });
+                            }
+                        },
+                        failure: jarvis.tracker.extAjaxRequestFailureHandler
+                    });
+                }
             },
             loadexception: jarvis.tracker.extStoreLoadExceptionHandler
         }
