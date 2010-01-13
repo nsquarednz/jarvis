@@ -17,5 +17,7 @@
                 AND (username IS NULL OR {$2} IS NULL OR {$2} = username)
         ORDER BY
             start_time DESC
+        LIMIT
+            100
     </select>
 </dataset>

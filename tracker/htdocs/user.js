@@ -55,12 +55,30 @@ return function (appName, extra) {
             {
                 header: 'Address',
                 dataIndex: 'address',
-                width: 30
+                width: 20
+            },
+            {
+                header: 'SID',
+                dataIndex: 'sid',
+                width: 40
+            },
+            {
+                header: 'Success?',
+                dataIndex: 'logged_in',
+                width: 15,
+                renderer: function (x) { return x == 1 ? 'yes' : 'no' }
             },
             {
                 header: 'Error',
                 dataIndex: 'error_string',
-                width: 40
+                width: 40,
+                hidden: true
+            },
+            {
+                header: 'Groups',
+                dataIndex: 'group_list',
+                width: 40,
+                hidden: true
             }
         ],
         viewConfig: {

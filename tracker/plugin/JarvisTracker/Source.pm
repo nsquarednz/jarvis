@@ -25,12 +25,12 @@
 use strict;
 use warnings;
 
-package JarvisTrackerSource;
+package JarvisTracker::Source;
 
 use JSON::PP;
 use Jarvis::DB;
 
-sub JarvisTrackerSource::do {
+sub JarvisTracker::Source::do {
     my ($jconfig, $restArgs) = @_;
 
     # Check that each part is safe. We can't have the user

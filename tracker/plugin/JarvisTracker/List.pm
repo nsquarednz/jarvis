@@ -29,12 +29,12 @@
 use strict;
 use warnings;
 
-package JarvisTrackerList;
+package JarvisTracker::List;
 
 use JSON::PP;
 use Jarvis::DB;
 
-sub JarvisTrackerList::do {
+sub JarvisTracker::List::do {
     my ($jconfig, $restArgs) = @_;
 
     my @list;

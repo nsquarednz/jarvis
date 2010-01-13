@@ -31,8 +31,8 @@
         </login>
         -->
 
-        <plugin dataset="list" access="*" module="JarvisTrackerList" add_headers="yes"/>
-        <plugin dataset="source" access="*" module="JarvisTrackerSource" add_headers="yes"/>
+        <plugin dataset="list" access="*" module="JarvisTracker::List" add_headers="yes"/>
+        <plugin dataset="source" access="*" module="JarvisTracker::Source" add_headers="yes"/>
 
         <sessiondb store="driver:file;serializer:default;id:md5" cookie="TRACKER_CGISESSID">
             <parameter name="Directory" value="/tmp/tracker"/>
