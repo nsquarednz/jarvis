@@ -58,6 +58,12 @@ jarvis.graph.Graph.prototype.noDataMessage = function(el) {
     el.getEl().update ('<i>No data available to display graph.</i>');
 }
 
+/*
+ * The default colors to use. We assume that the general page is blue, so we choose
+ * a good contrasting color (orange in this case).
+ */
+jarvis.graph.Graph.defaultColors = pv.color('#B77A1B');
+
 /******************************************************************************
  * Graph showing performance of a dataset query
  *****************************************************************************/
@@ -139,7 +145,8 @@ jarvis.graph.DatasetPerformanceGraph = Ext.extend(jarvis.graph.Graph, {
             .data ([ median ])
             .top (height / 3)
             .left (function (a) { return xscale(a); })
-            .fillStyle ('green')
+            .fillStyle (jarvis.graph.Graph.defaultColors)
+            .strokeStyle (jarvis.graph.Graph.defaultColors)
             .title (function (a) { return 'Median: ' + xscale.tickFormat(a) + 'ms, Mean: ' + xscale.tickFormat(mean) + 'ms'; });
 
         g.add (pv.Rule)
@@ -201,6 +208,7 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
             .height (function (d) { return yscale(d.c); })
             .width (barwidth)
             .bottom (0)
+            .fillStyle (jarvis.graph.Graph.defaultColors)
             .title (function (d) {
                 var date = Date.fromJulian(d.t);
                 return 'For ' + date.format ('g:ia') + ': avg: ' + Math.round(d.c * 100) / 100;
