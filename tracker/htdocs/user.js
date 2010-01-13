@@ -22,6 +22,28 @@
  */
 
 (function () {
+
+/**
+ * The user login details includes addresses from which the user has logged in.
+ * We do a reverse DNS lookup on these addresses so it's a bit easier to see
+ * where they're based.
+ *
+ * We store a global list here of all IP addresses retrieved, so we don't constantly
+ * retrieve the same ones.
+ *
+ * Map is ipaddress -> server name.
+ */
+var ReverseDnsCache = function () {
+    this.addEvents({
+        'updated': true
+    });
+};
+ReverseDnsCache = Ext.extend (ReverseDnsCache, Ext.util.Observable);
+var globalReverseDnsCache = new ReverseDnsCache;
+
+/**
+ * The actual function that builds the tab UI.
+ */
 return function (appName, extra) {
 
     var user = extra.user;
@@ -36,7 +58,43 @@ return function (appName, extra) {
             fields: ['sid', 'logged_in', 'error_string', 'group_list', 'address', 'start_time']
         }),
         listeners: {
-            'loadexception': jarvis.tracker.extStoreLoadExceptionHandler
+            load: function (records) {
+                var ipAddressesToLookup = {};
+                records.each (function (r) {
+                    var a = r.get ('address');
+                    if (!globalReverseDnsCache[a]) {
+                        ipAddressesToLookup[a] = 1;
+                    }
+                });
+
+                Ext.Ajax.request ({
+                    url: jarvisUrl ('reverse-dns-lookup'),
+                    method: 'GET',
+                    params: {
+                        ip_address: pv.keys(ipAddressesToLookup)
+                    },
+                    success: function (xhr) {
+                        try {
+                            var resp = Ext.util.JSON.decode (xhr.responseText); 
+                            pv.keys(resp.data).forEach (function (x) {
+                                globalReverseDnsCache[x] = resp.data[x];
+                            });
+
+                            globalReverseDnsCache.fireEvent('updated');
+
+                        } catch (error) {
+                            Ext.Msg.show ({
+                                title: 'Reverse DNS Lookup Error',
+                                msg: 'Cannot read reverse DNS information: ' + error,
+                                buttons: Ext.Msg.OK,
+                                icon: Ext.Msg.ERROR
+                           });
+                        }
+                    },
+                    failure: jarvis.tracker.extAjaxRequestFailureHandler
+                });
+            },
+            loadexception: jarvis.tracker.extStoreLoadExceptionHandler
         }
     });
 
@@ -55,7 +113,14 @@ return function (appName, extra) {
             {
                 header: 'Address',
                 dataIndex: 'address',
-                width: 20
+                width: 20,
+                renderer: function (x, c) { 
+                    if (globalReverseDnsCache[x] != x) {
+                        c.attr = 'ext:qtip="' + x + '"';
+                        return globalReverseDnsCache[x];
+                    }
+                    return x;
+                }
             },
             {
                 header: 'SID',
@@ -84,6 +149,10 @@ return function (appName, extra) {
         viewConfig: {
             forceFit: true
         }
+    });
+
+    globalReverseDnsCache.on ('updated', function () {
+        loginsStore.fireEvent('datachanged'); // Force the grid to re-render to get the new address information.
     });
 
     var sidePanel = new Ext.Panel({
