@@ -16,14 +16,14 @@ Ext.onReady (function () {
                 setButtons ();
                 grid.setDisabled (false);
             },
-            'loadexception': jarvisLoadException,
+            'exception': jarvisProxyException,
             'write' : function (store, record) {
-                grid.buttons[1].getEl().innerHTML = '&nbsp;<b>UPDATING...</b>';
+                grid.buttons[1].setText ('&nbsp;<b>UPDATING...</b>');
                 var ttype = record.get ('_deleted') ? 'delete' : ((record.get('id') == 0) ? 'insert' : 'update');
                 jarvisSendChange (ttype, store, 'boat_class', record);
             },
             'writeback' : function (store, result, ttype, record, remain) {
-                remain || (grid.buttons[1].getEl().innerHTML = '&nbsp');
+                remain || (grid.buttons[1].setText ('&nbsp'));
                 store.handleWriteback (result, ttype, record, remain);
                 setButtons ();
             }
@@ -106,9 +106,11 @@ Ext.onReady (function () {
                 }
             }
         ],
+        buttonAlign: 'left',
         buttons: [
             { text: 'Help', iconCls:'help', handler: function () { helpShow (); } },
-            new Ext.Toolbar.Fill (),
+            { xtype: 'tbtext', width: 300 },
+            { xtype: 'tbfill' },
             {
                 text: 'Boats', iconCls:'next',
                 handler: function () {

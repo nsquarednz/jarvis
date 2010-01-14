@@ -36,14 +36,14 @@ Ext.onReady (function () {
 
                 setButtons ();
             },
-            'loadexception': jarvisLoadException,
+            'exception': jarvisProxyException,
             'write' : function (store, record) {
                 tabs.setDisabled (true);
-                tabs.buttons[1].getEl().innerHTML = '&nbsp;<b>UPDATING...</b>';
+                tabs.buttons[1].setText ('&nbsp;<b>UPDATING...</b>');
                 jarvisSendChange ('update', store, 'boat_detail', record);
             },
             'writeback' : function (store, result, ttype, record, remain) {
-                remain || (tabs.buttons[1].getEl().innerHTML = '&nbsp');
+                remain || (tabs.buttons[1].setText ('&nbsp'));
                 remain || tabs.setDisabled (false);
                 store.handleWriteback (result, ttype, record, remain);
                 setButtons ();
@@ -115,9 +115,11 @@ Ext.onReady (function () {
         activeTab: tab_index,
         height: 400,
         items: [ summary_panel, description_panel ],
+        buttonAlign: 'left',
         buttons: [
             { text: 'Help', iconCls:'help', handler: function () { helpShow (); } },
-            new Ext.Toolbar.Fill (),
+            { xtype: 'tbtext', width: 300 },
+            { xtype: 'tbfill' },
             {
                 text: 'Boats', iconCls:'prev',
                 handler: function () {

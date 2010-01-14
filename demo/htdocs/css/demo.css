@@ -108,6 +108,11 @@ h2 {
     background-color: transparent !important;
 }
 
+/* Bug fix.  3.1.0 has bad path in the grey theme. */
+.x-toolbar .xtb-sep {
+    background-image: url("/ext-3.1/resources/images/default/grid/grid-split.gif") !important;
+}
+
 /* Put a light border around our extended text fields in grids. */
 .x-grid3-row-body {
     margin: 0 5 5 5;

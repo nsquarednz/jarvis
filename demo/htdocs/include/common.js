@@ -144,7 +144,7 @@ renderRequirePositiveZeroInt = function (val, md, rec, rowIndex, colIndex, ds) {
 }
 
 renderCheckbox = function (value, md, rec, rowIndex, colIndex, ds) {
-    return '<img class="x-grid-checkbox" src="/ext-2.3/resources/images/default/menu/'
+    return '<img class="x-grid-checkbox" src="/ext-3.1/resources/images/default/menu/'
         + ((value && (value != 0)) ? 'checked.gif' : 'unchecked.gif') + '"/>';
 };
 
@@ -162,37 +162,37 @@ renderZeroAsBlank = function (val, md, rec, rowIndex, colIndex, ds) {
 // Override the checkbox for... some reason that I forget.  Possibly to fix
 // a bug I think.  Yeah, probably that's why.
 //-------------------------------------------------------------------------
-Ext.override(Ext.form.Checkbox, {
-    getValue : function(){
-        if(this.rendered){
-            return this.el.dom.checked;
-        }
-        return this.checked;
-    },
-
-    setValue : function(v) {
-        var checked = this.checked;
-        this.checked = (v === true || v === 'true' || v == '1' || String(v).toLowerCase() == 'on');
-
-        if(this.rendered){
-            this.el.dom.checked = this.checked;
-            this.el.dom.defaultChecked = this.checked;
-            this.wrap[this.checked? 'addClass' : 'removeClass'](this.checkedCls);
-        }
-
-        if(checked != this.checked){
-            this.fireEvent("check", this, this.checked);
-            if(this.handler){
-                this.handler.call(this.scope || this, this, this.checked);
-            }
-        }
-    }
-});
+// Ext.override(Ext.form.Checkbox, {
+//     getValue : function(){
+//         if(this.rendered){
+//             return this.el.dom.checked;
+//         }
+//         return this.checked;
+//     },
+//
+//     setValue : function(v) {
+//         var checked = this.checked;
+//         this.checked = (v === true || v === 'true' || v == '1' || String(v).toLowerCase() == 'on');
+//
+//         if(this.rendered){
+//             this.el.dom.checked = this.checked;
+//             this.el.dom.defaultChecked = this.checked;
+//             this.wrap[this.checked? 'addClass' : 'removeClass'](this.checkedCls);
+//         }
+//
+//         if(checked != this.checked){
+//             this.fireEvent("check", this, this.checked);
+//             if(this.handler){
+//                 this.handler.call(this.scope || this, this, this.checked);
+//             }
+//         }
+//     }
+// });
 
 //-------------------------------------------------------------------------
 // Change GridView focusRow to allow us to temporarily suspend autoFocus
 // of a row.  This is particularly when we are moving or modifying lots
-// of rows at once, e.g. when shuffling rows.
+// of rows at once, e.g. when shuffling rows.  Keep this in 3.1.
 //-------------------------------------------------------------------------
 Ext.override (Ext.grid.GridView, {
     focusRow : function(row){
@@ -202,7 +202,7 @@ Ext.override (Ext.grid.GridView, {
 });
 
 //-------------------------------------------------------------------------
-// Empty element in combo box displayed as &nbsp;
+// Empty element in combo box displayed as &nbsp;  Still needed in 3.1.
 //-------------------------------------------------------------------------
 Ext.override(Ext.form.ComboBox, {
     initList: (function(){

@@ -31,7 +31,7 @@ Ext.onReady (function () {
                     reloadList ();
                 }
             },
-            'loadexception': jarvisLoadException
+            'exception': jarvisProxyException
         }
     });
 
@@ -51,14 +51,14 @@ Ext.onReady (function () {
                 setButtons ();
                 grid.setDisabled (false);
             },
-            'loadexception': jarvisLoadException,
+            'exception': jarvisProxyException,
             'write' : function (store, record) {
-                grid.buttons[1].getEl().innerHTML = '&nbsp;<b>UPDATING...</b>';
+                grid.buttons[1].setText ('&nbsp;<b>UPDATING...</b>');
                 var ttype = record.get ('_deleted') ? 'delete' : ((record.get('id') == 0) ? 'insert' : 'update');
                 jarvisSendChange (ttype, store, 'boat', record);
             },
             'writeback' : function (store, result, ttype, record, remain) {
-                remain || (grid.buttons[1].getEl().innerHTML = '&nbsp');
+                remain || (grid.buttons[1].setText ('&nbsp'));
                 store.handleWriteback (result, ttype, record, remain);
                 setButtons ();
                 remain || (action_after_saving = null);
@@ -161,8 +161,7 @@ Ext.onReady (function () {
                     grid.startEditing (0, 0)
                     setButtons ();
                 }
-            },
-            {
+            },{
                 text: 'Delete', iconCls:'remove', id: 'delete',
                 handler: function () {
                     var rowcol = grid.getSelectionModel().getSelectedCell();
@@ -181,9 +180,11 @@ Ext.onReady (function () {
             }
         ],
         bbar: pagingBar,
+        buttonAlign: 'left',
         buttons: [
             { text: 'Help', iconCls:'help', handler: function () { helpShow (); } },
-            new Ext.Toolbar.Fill (),
+            { xtype: 'tbtext', width: 300 },
+            { xtype: 'tbfill' },
             {
                 text: 'Classes', iconCls:'prev',
                 handler: function () {
@@ -227,6 +228,7 @@ Ext.onReady (function () {
 
     // A simple class name filter.
     var boat_class_filter = new Ext.form.ComboBox ({
+        id: 'boat_class_filter',
         store: boat_class_store,
         lazyInit: false,
         mode: 'local',
@@ -247,6 +249,7 @@ Ext.onReady (function () {
     grid.getTopToolbar().addFill ();
     grid.getTopToolbar().addText ('Boat Class: ');
     grid.getTopToolbar().addField (boat_class_filter);
+    grid.getTopToolbar().doLayout ();
 
     // Reload according to current search critera.  Store params in baseParams.
     function reloadList () {

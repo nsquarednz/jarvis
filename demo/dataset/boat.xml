@@ -1,9 +1,9 @@
-<dataset read="*" write="*">
+<dataset read="*" write="*" dump="yes">
     <transform fetch="notnull" store="trim,null" />
     <select>
 SELECT id, name, registration_num, class, owner, description
 FROM boat
-WHERE (class = {{boat_class}) OR ({{boat_class}} IS NULL)
+WHERE (class = {{boat_class}) OR (NULLIF ({{boat_class}}, '') IS NULL)
 ORDER BY name;
     </select>
     <update>
