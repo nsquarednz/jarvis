@@ -27,10 +27,6 @@
 //      This software is Copyright 2008 by Jonathan Couper-Smartt.
 //============================================================================
 
-// Default Values for EXT
-// Default is from the extjs website.
-Ext.BLANK_IMAGE_URL = '/ext-2.3/resources/images/default/s.gif';
-
 // Global parameters
 var application = 'default';
 var login_page  = 'login.html';
@@ -39,7 +35,11 @@ var jarvis_home = '/jarvis-agent';
 // Track how many changes we still have outstanding.
 var num_pending = 0;
 
-// Init our parameters.
+//============================================================================
+// CORE FUNCTIONS
+//============================================================================
+
+// Init our parameters.  Call this once, at the top of your code.
 function jarvisInit (new_application, new_login_page) {
     if (new_application != null) {
         application = new_application;
@@ -49,7 +49,7 @@ function jarvisInit (new_application, new_login_page) {
     }
 }
 
-// URL builder.
+// URL builder.  Use this to construct your Jarvis URLs.
 function jarvisUrl (dataset_name) {
     var url = jarvis_home + '/' + application;
     if (dataset_name) {
@@ -58,39 +58,11 @@ function jarvisUrl (dataset_name) {
     return url;
 }
 
-// Gets a parameter by looking at the #<name> part of a full URL specification.
-// Note that this method does NOT take any notice of regular '?' query parameters,
-// it is totally separate.
-//
-function jarvisHashArg (url, arg_name, default_value) {
-    // This is the part after "#", we use this for our query parameters,
-    // e.g. which ID to load when editing details.
-    var args = Ext.urlDecode (url.substring(url.indexOf('#')+1, url.length));
-    if (args[arg_name]) {
-        return args[arg_name];
-    }
-    return default_value;
-}
+//============================================================================
+// EXCEPTION HANDERS FOR EXTJS STORES
+//============================================================================
 
-// This is the '?' equivalent.
-function jarvisQueryArg (url, arg_name, default_value) {
-    var args = Ext.urlDecode (url.substring(url.indexOf('?')+1, url.length));
-    if (args[arg_name]) {
-        return args[arg_name];
-    }
-    return default_value;
-}
-
-// This checks # and then ?
-function jarvisArg (url, arg_name, default_value) {
-    return jarvisHashArg (url, arg_name) || jarvisQueryArg (url, arg_name, default_value);
-}
-
-// Store load failed.  Set this as your "loadexception" handler on your Stores
-// and we will print out the exception message (probably 'need to login') and
-// then will redirect to the login page.  If you have two stores, we'll only
-// display the first error which arrives for that page.
-//
+// USE THIS VERSION FOR JARVIS 2.2 & 2.3.  Set it as your store's "loadexception" listener.
 var done_alert = 0;
 function jarvisLoadException (proxy, options, response, e) {
     if (! done_alert) {
@@ -118,6 +90,38 @@ function jarvisLoadException (proxy, options, response, e) {
         }
     });
 };
+
+// USE THIS VERSION FOR JARVIS 3.1.  Set it as your store's "exception" listener.
+function jarvisProxyException (proxy, type, action, options, response, arg) {
+    if (! done_alert) {
+        var dataset_name = proxy.url.replace (jarvis_home + '/' + application + '/', '');
+        alert ("Database error for select on '" + dataset_name + "'.\n" + response.responseText);
+        done_alert = 1;
+    }
+
+    // Perform the request over ajax.
+    Ext.Ajax.request({
+        url: jarvisUrl ('__status'),
+
+        // We received a response back from the server, that's a good start.
+        success: function (response, request_options) {
+            try {
+                var result = Ext.util.JSON.decode (response.responseText);
+                if (result.logged_in == 0) {
+                    document.location.href = login_page + '?from=' + escape (location.pathname + location.hash);
+                }
+
+            // Well, something bad here.  Could be anything.  We tried.
+            } catch (e) {
+                // Do nothing further.
+            }
+        }
+    });
+};
+
+//============================================================================
+// HELPER METHOD TO PERFORM A JARVIS "STORE" REQUEST
+//============================================================================
 
 // Common submit method (does delete/update/insert).
 //
@@ -230,6 +234,9 @@ function jarvisNumPending () {
     return num_pending;
 }
 
+//============================================================================
+// COOKIE UTILITY FUNCTIONS
+//============================================================================
 // Add a cookie.
 function jarvisCreateCookie (name, value, days) {
     if (days) {
@@ -264,6 +271,42 @@ function jarvisEraseCookie(name) {
     jarvisCreateCookie (name, "", -1);
 }
 
+//============================================================================
+// QUERY URL UTILITY METHODS
+//============================================================================
+
+// Gets a parameter by looking at the #<name> part of a full URL specification.
+// Note that this method does NOT take any notice of regular '?' query parameters,
+// it is totally separate.
+//
+function jarvisHashArg (url, arg_name, default_value) {
+    // This is the part after "#", we use this for our query parameters,
+    // e.g. which ID to load when editing details.
+    var args = Ext.urlDecode (url.substring(url.indexOf('#')+1, url.length));
+    if (args[arg_name]) {
+        return args[arg_name];
+    }
+    return default_value;
+}
+
+// This is the '?' equivalent.
+function jarvisQueryArg (url, arg_name, default_value) {
+    var args = Ext.urlDecode (url.substring(url.indexOf('?')+1, url.length));
+    if (args[arg_name]) {
+        return args[arg_name];
+    }
+    return default_value;
+}
+
+// This checks # and then ?
+function jarvisArg (url, arg_name, default_value) {
+    return jarvisHashArg (url, arg_name) || jarvisQueryArg (url, arg_name, default_value);
+}
+
+//============================================================================
+// MISC UTILITY FUNCTIONS
+//============================================================================
+//
 // Say if our comma-separated groups list contains a nominated group.
 function jarvisInGroup (wanted, group_list) {
     var group_array = group_list.split (',');
