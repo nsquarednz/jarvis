@@ -7,7 +7,7 @@ sub plugin::SetPassword::do {
     my ($jconfig, $rest_args, %args) = @_;
 
     # Check we are admin.
-    &Jarvis::Error::debug ($jconfig, "Setting password for user '" . $jconfig->{'username'} . "'.");
+    &Jarvis::Error::debug ($jconfig, "Setting password being attempted by user '" . $jconfig->{'username'} . "'.");
     my @groups = split (',', $jconfig->{'group_list'});
     grep { $_ =~ m/^admins$/ } @groups || die "Only admins may reset passwords.";
 
