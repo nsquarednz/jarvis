@@ -150,41 +150,8 @@ Ext.onReady (function () {
     // SET PASSWORD
     //-------------------------------------------------------------------------
     var password_window = null;
-    var username = null;
 
     function setPassword (r) {
-        username = r.get ('name');
-
-        function savePassword () {
-            var password1 = Ext.ComponentMgr.get ('password1').getValue ();
-            var password2 = Ext.ComponentMgr.get ('password2').getValue ();
-            if (password1 != password2) {
-                alert ('Passwords do not match.');
-            }
-
-            var params = { username: username, password: password1 };
-
-            Ext.Ajax.request({
-                url: jarvisUrl ('SetPassword'),
-                params: params,
-
-                // We received a response back from the server, that's a good start.
-                success: function (response, request_options) {
-                    if (response.responseText == 'Success') {
-                        password_window.setVisible (false);
-                        r.data.has_password = password1 ? 'YES' : 'NO';
-                        user_store.fireEvent("update", user_store, r, Ext.data.Record.EDIT);
-
-                    } else {
-                        alert ('Set password declined: ' + response.responseText);
-                    }
-                },
-                failure: function (response, request_options) {
-                    alert ('Set password error: ' + response.responseText);
-                }
-            });
-        };
-
         if (! password_window) {
             password_window = new Ext.Window ({
                 title: 'Password', width: 240, closeAction: 'hide',
@@ -205,7 +172,7 @@ Ext.onReady (function () {
                         listeners: {
                             specialkey: function (field, e) {
                                 if (e.getKey () == Ext.EventObject.ENTER) {
-                                    savePassword ();
+                                    savePassword (password_window.record);
                                 }
                             }
                         }
@@ -215,7 +182,7 @@ Ext.onReady (function () {
                             text: 'Save', iconCls:'save',
                             listeners: {
                                 'click': function () {
-                                    savePassword ()
+                                    savePassword (password_window.record)
                                 }
                             }
                         },{
@@ -230,8 +197,39 @@ Ext.onReady (function () {
         }
         Ext.ComponentMgr.get ('password1').setValue ('');
         Ext.ComponentMgr.get ('password2').setValue ('');
-        password_window.setTitle ('Set Password - ' + username);
+        password_window.record = r;
+        password_window.setTitle ('Set Password - ' + r.data.name);
         password_window.setVisible (true);
+    };
+
+    function savePassword (r) {
+        var password1 = Ext.ComponentMgr.get ('password1').getValue ();
+        var password2 = Ext.ComponentMgr.get ('password2').getValue ();
+        if (password1 != password2) {
+            alert ('Passwords do not match.');
+        }
+
+        var params = { username: r.data.name, password: password1 };
+
+        Ext.Ajax.request({
+            url: jarvisUrl ('SetPassword'),
+            params: params,
+
+            // We received a response back from the server, that's a good start.
+            success: function (response, request_options) {
+                if (response.responseText == 'Success') {
+                    password_window.setVisible (false);
+                    r.data.has_password = password1 ? 'YES' : 'NO';
+                    user_store.fireEvent("update", user_store, r, Ext.data.Record.EDIT);
+
+                } else {
+                    alert ('Set password declined: ' + response.responseText);
+                }
+            },
+            failure: function (response, request_options) {
+                alert ('Set password error: ' + response.responseText);
+            }
+        });
     };
 
     //-------------------------------------------------------------------------
