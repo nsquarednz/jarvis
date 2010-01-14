@@ -146,8 +146,12 @@ Ext.onReady (function () {
         }
     });
 
-    // Set password function.
+    //-------------------------------------------------------------------------
+    // SET PASSWORD
+    //-------------------------------------------------------------------------
     var password_window = null;
+    var username = null;
+
     function setPassword (r) {
         username = r.get ('name');
 
