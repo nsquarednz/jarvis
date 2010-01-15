@@ -154,6 +154,20 @@ return function (appName, extra) {
         }
     });
 
+    var errorList = new Ext.ux.ErrorList ({
+        region: 'east',
+        width: '40%',
+        split: true,
+        collapsible: true,
+        closable: true,
+        title: 'Recent Errors for ' + appName,
+        dataSourceParams: {
+            limit: true,
+            user: user,
+            appName: appName
+        }
+    });
+
     globalReverseDnsCache.on ('updated', function () {
         loginsStore.fireEvent('datachanged'); // Force the grid to re-render to get the new address information.
     });
@@ -166,7 +180,8 @@ return function (appName, extra) {
         region: 'east',
         collapsible: true,
         items: [
-            logins
+            logins,
+            errorList
         ]
     });
 
