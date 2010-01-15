@@ -74,7 +74,7 @@
      * accordion page.
      */
     var executeQuery = function (info) {
-        var url = jarvis_home + '/' + info.app + '/' + info.query;
+        var url = jarvis_home + '/' + info.app + '/' + info.query.replace('/', '.');
         var params = {};
         var restArgs = [];
         var maxRestArg = -1;

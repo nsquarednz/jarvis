@@ -44,7 +44,7 @@ Ext.ux.ErrorList = Ext.extend (Ext.Panel, {
                     dataIndex: 'start_time',
                     sortable: true,
                     width: 50,
-                    renderer: function(x) { return Date.parseDate(x, 'c').format ('D jS M Y H:i:s'); }
+                    renderer: function(x) { return Date.parseDate(x, 'c').format ('d/m H:i:s'); }
                 },
                 {
                     header: 'User',

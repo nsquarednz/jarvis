@@ -111,7 +111,7 @@ return function (appName, extra) {
                 dataIndex: 'start_time',
                 sortable: true,
                 width: 30,
-                renderer: function(x) { return Date.fromJulian(x).format ('D jS M Y H:i:s'); }
+                renderer: function(x) { return Date.fromJulian(x).format ('d/m H:i:s'); }
             },
             {
                 header: 'Address',
