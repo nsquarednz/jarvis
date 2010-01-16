@@ -254,7 +254,7 @@ Ext.override (Ext.data.Store, {
      */
     handleWriteback : function (result, ttype, record, remain) {
         if (result.success != 1) {
-            var dataset_name = this.url.replace (jarvis_home + '/' + application + '/', '');
+            var dataset_name = this.proxy.url.replace (jarvis_home + '/' + application + '/', '');
             alert ("Database error for " + ttype + " on '" + dataset_name + "':\n" + result.message);
             return 0;
 
@@ -285,7 +285,7 @@ Ext.override (Ext.data.Store, {
      */
     handleWritebackArray : function (result, ttype, records, remain) {
         if (result.success != 1) {
-            var dataset_name = this.url.replace (jarvis_home + '/' + application + '/', '');
+            var dataset_name = this.proxy.url.replace (jarvis_home + '/' + application + '/', '');
             alert ("Database error for " + ttype + " on '" + dataset_name + "':\n" + result.message);
             return 0;
 
