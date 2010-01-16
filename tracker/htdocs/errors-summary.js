@@ -50,94 +50,23 @@ return function (appName, extra) {
         dateParamAsDate: initialDate // Our own property as well
     });
 
-    var errorDetails = new Ext.Panel({
-        layout: 'absolute',
-        autoScroll: true,
-        frame: true,
-        columnWidth: 0.5,
-        defaultType: 'label',
-        anchor: '100% 100%',
-        items: [
-            {
-                cls: 'abs-pos-label',
-                text: 'Event Time',
-                x: 5, y: 5
-            },
-            {
-                id: 'eventTime',
-                x: 100, y: 5
-            },
-            {
-                cls: 'abs-pos-label',
-                text: 'Username',
-                x: 5, y: 25
-            },
-            {
-                id: 'username',
-                x: 100, y: 25
-            },
-            {
-                text: 'User Groups',
-                cls: 'abs-pos-label',
-                x: 250, y: 5
-            },
-            {
-                id: 'groups',
-                x: 355, y: 5
-            },
-            {
-                cls: 'abs-pos-label',
-                text: 'SID',
-                x: 250, y: 25
-            },
-            {
-                id: 'sid',
-                x: 355, y: 25
-            },
-            {
-                cls: 'abs-pos-label',
-                text: 'Dataset',
-                x: 550, y: 5
-            },
-            {
-                id: 'dataset',
-                x: 595, y: 5
-            },
-            {
-                cls: 'abs-pos-label',
-                text: 'Request Parameters',
-                x: 5, y: 45
-            },
-            {
-                id: 'requestparameters',
-                x: 130, y: 45
-            },
-            {
-                cls: 'abs-pos-label',
-                text: 'Error Message',
-                x: 5, y: 65
-            },
-            new Ext.BoxComponent ({
-                autoEl: {
-                    tag: 'div'
-                },
-                id: 'message',
-                anchor: '100% 100%',
-                x: 100, y: 65
-            })
-        ]
-    });
+    var errorDetailsTemplate = new Ext.Template (
+        '<table>',
+        '  <tr><th>Event Time</th><td>{start_time}</td></tr>',
+        '  <tr><th>Username</th><td>{username}</td>',
+        '      <th>SID</th><td>{sid}</td></tr>',
+        '  <tr><th>User Groups</th><td colspan="3">{group_list}</td></tr>',
+        '  <tr><th>Dataset</th><td colspan="3">{dataset}</td></tr>',
+        '  <tr><th>Request Parameters</th><td colspan="3">{params}</td></tr>',
+        '  <tr><th>Post Body</th><td colspan="3">{post_body}</td></tr>',
+        '  <tr><th>Error Message</th><td colspan="3"><pre>{message}</pre></td></tr>',
+        '</table>'
+    );
+
+    var recentErrorDetailsId = Ext.id();
 
     var showErrorDetails = function(record) {
-        errorDetails.items.get('eventTime').setText(record.get('start_time'));
-        errorDetails.items.get('username').setText(record.get('username'));
-        errorDetails.items.get('sid').setText(record.get('sid'));
-        errorDetails.items.get('groups').setText(record.get('group_list'));
-        errorDetails.items.get('dataset').setText(record.get('dataset') + ' (' + record.get('action') + ')');
-        errorDetails.items.get('requestparameters').setText(record.get('params'));
-
-        var msgEl = errorDetails.items.get('message').el; 
-        msgEl.update('<pre>' + record.get('message') + '</pre>');
+        errorDetailsTemplate.overwrite (recentErrorDetailsId, record.json);
     };
 
     var recentErrorsList = new Ext.grid.GridPanel({
@@ -234,7 +163,15 @@ return function (appName, extra) {
                 height: 300,
                 split: true,
                 items: [
-                    errorDetails
+                    {
+                        xtype: 'container',
+                        id: recentErrorDetailsId,
+                        autoEl: {
+                            html: '&nbsp;',
+                            tag: 'div',
+                            cls: 'error-details'
+                        }
+                    }
                 ]
             })
         ],

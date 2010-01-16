@@ -49,3 +49,19 @@ div.sh_sourceCode {
 div.data-visualisation {
 }
 
+div.error-details {
+    overflow: auto;
+}
+
+div.error-details td {
+    padding: 5px;
+    font-size: 10px;
+}
+
+div.error-details th {
+    padding: 5px;
+    font-size: 10px;
+    font-weight: bold;
+    vertical-align: top;
+}
+

@@ -267,9 +267,6 @@ Ext.onReady (function () {
             expanded: true,
             id: 'root'
         }),
-        tools: [{
-            id: 'search'
-        }],
         listeners: {
             click: function (node, event) { 
 
