@@ -97,7 +97,7 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
         this.dataVisualisationElementId = Ext.id();
 
         // The graph is actually rendered to a sub-div element.
-        var dv = new Ext.BoxComponent ({
+        this.dv = new Ext.BoxComponent ({
             autoEl: { tag: 'div', cls: 'data-visualisation' },
             id: this.dataVisualisationElementId,
             x: 0,
@@ -115,17 +115,21 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
             autoScroll: true,
             title: 'Loading...',
             items: [
-                dv
+                this.dv
             ]
         });
 
-        // When this component's resized, redraw the graph to fit
-        // the setTimeout () is used to force the call to be 'later'
-        // because otherwise the resize hasn't yet actually occurred
-        // to the DOM element yet (the new size is passed in to the
-        // resize handler, but the graph relies on the actual element
-        // size.
-        this.on ('resize', function () { setTimeout(function () { me.renderGraph(dv); }, 0); });
+        // Redraw when resized. Ensure we watch the right object
+        // when resizing.
+        var resizer = function () { 
+            if (this.dv === true)  {
+                this.renderGraph(this.dv);
+            } else {
+                this.renderGraph.defer (1, this, [this.dv]);
+            }
+        };
+
+        this.dv.on('resize', resizer, this);
 
         Ext.ux.Visualisation.superclass.initComponent.apply(this, arguments);
 
