@@ -51,17 +51,26 @@ div.data-visualisation {
 
 div.error-details {
     overflow: auto;
+    font-family: tahoma,helvetica,sans-serif;
+}
+
+div.error-details table {
+    width: 100%;
 }
 
 div.error-details td {
     padding: 5px;
     font-size: 10px;
+    font-family: tahoma,helvetica,sans-serif;
 }
 
 div.error-details th {
     padding: 5px;
-    font-size: 10px;
+    font-size: 11px;
+    text-align: right;
+    width: 150px;
     font-weight: bold;
     vertical-align: top;
+    font-family: tahoma,helvetica,sans-serif;
 }
 
