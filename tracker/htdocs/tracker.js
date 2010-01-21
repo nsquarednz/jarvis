@@ -348,6 +348,7 @@ Ext.onReady (function () {
      * by about 15 pixels, chopping off the bottom of the tab's contents
      * (until it is resized or layout is forced to recalculate)
      */
+    jarvis.tracker.loadAndShowTab ('bla', 'event-explorer.js', 'none', null, null);
     jarvis.tracker.loadAndShowTabFromPath ('root', function () { viewport.doLayout(false); });
 });
 

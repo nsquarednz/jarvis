@@ -33,6 +33,7 @@
 
         <plugin dataset="list" access="*" module="JarvisTracker::List" add_headers="yes"/>
         <plugin dataset="source" access="*" module="JarvisTracker::Source" add_headers="yes"/>
+        <plugin dataset="events" access="*" module="JarvisTracker::Events" add_headers="yes"/>
         <plugin dataset="reverse-dns-lookup" access="*" module="JarvisTracker::ReverseDnsLookup" add_headers="yes"/>
 
         <sessiondb store="driver:file;serializer:default;id:md5" cookie="TRACKER_CGISESSID">
