@@ -50,16 +50,25 @@ SELECT
     app_name, 
     username, 
     dataset 
-FROM request 
-WHERE start_time > 2455208
+FROM 
+    request 
+WHERE 
+    (? IS NULL OR sid = ?)
+    AND (? IS NULL OR username = ?)
+LIMIT 500
 EOF
     my $sth = $dbh->prepare ($sql) || die "Couldn't prepare statement for retrieving events: " . $dbh->errstr;
     my $stm = {};
     $stm->{sth} = $sth;
     $stm->{ttype} = 'JarvisTrackerEvents';
-    my $params = [ ];
+    my $params = [
+        $jconfig->{cgi}->param('sid') || undef
+        , $jconfig->{cgi}->param('sid') || undef
+        , $jconfig->{cgi}->param('user') || undef
+        , $jconfig->{cgi}->param('user') || undef
+    ];
     &Jarvis::Dataset::statement_execute ($jconfig, $stm, $params);
-    $stm->{'error'} && die "Unable to execute statement for retrieving events: " . $dbh->errstr;
+    $stm->{'error'} && die "Unable to execute statement for retrieving events: " . $stm->{'error'};
 
     my $users = $sth->fetchall_arrayref({});
     map {
@@ -68,14 +77,17 @@ EOF
             $eventData = {
                 start => $_->{start_time},
                 title => $_->{app_name} . '/' . $_->{username} . '/' . $_->{dataset},
-                durationEvent => 'false'
+                durationEvent => 'false',
+                description => ''
             };
         } else {
             $eventData = {
                 start => $_->{start_time},
                 end => $_->{end_time},
                 title => $_->{app_name} . '/' . $_->{username} . '/' . $_->{dataset},
-                durationEvent => 'true'
+                durationEvent => 'true',
+                description => ''
+
             };
         }
 

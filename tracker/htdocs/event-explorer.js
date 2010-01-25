@@ -25,10 +25,12 @@
 
 (function () {
 
-function displayTimeline(id) {
+var thisTimeline = null;
+
+function displayTimeline(id, d, params) {
+console.log ('displayTimeline', arguments);
     var eventSource = new Timeline.DefaultEventSource(0);
     var theme = Timeline.ClassicTheme.create();
-    var d = Timeline.DateTime.parseGregorianDateTime("Jan 12 2010 12:00:00")
 
     var bandInfos = [
         Timeline.createBandInfo({
@@ -64,18 +66,83 @@ function displayTimeline(id) {
     bandInfos[1].highlight = true;
     bandInfos[2].highlight = true;
                 
-    tl = Timeline.create(document.getElementById(id), bandInfos, Timeline.HORIZONTAL);
+    thisTimeline = Timeline.create(document.getElementById(id), bandInfos, Timeline.HORIZONTAL);
 
-    // Adding the date to the url stops browser caching 
-    tl.loadJSON(jarvisUrl ('events') + '?' + (new Date().getTime()), function(json, url) {
-        eventSource.loadJSON(json, url);
-    });;
+    Ext.Ajax.request ({
+        url: jarvisUrl ('events'),
+        method: 'GET',
+        params: params,
+        success: function (xhr, req) { 
+            var data = Ext.util.JSON.decode (xhr.responseText);
+            eventSource.loadJSON(data, req.url);
+        },
+        failure: jarvis.tracker.extAjaxRequestFailureHandler
+    });
 };
 
 // This is the real function for creating a query page.
 return function (appName, extra) {
 
     var timelineId = Ext.id();
+    var form = null;
+    
+    var submitForm = function() {
+        var params = { };
+        if (form.findById('sid').getValue())
+            params.sid = form.findById('sid').getValue();
+        if (form.findById('user').getValue())
+            params.user = form.findById('user').getValue();
+
+        Ext.Ajax.request ({
+            url: jarvisUrl ('get_earliest_event_time'),
+            method: 'GET',
+            params: params,
+            success: function (xhr) { 
+                var data = Ext.util.JSON.decode (xhr.responseText);
+                if (data.data[0].t) {
+                    displayTimeline (timelineId, Date.parseDate (data.data[0].t, 'Y-m-d H:i:s'), params);
+                } else {
+                    Ext.Msg.show ({
+                        title: 'No data',
+                        msg: 'Cannot find data matching search terms',
+                        buttons: Ext.Msg.OK,
+                        icon: Ext.Msg.INFO
+                    });
+                }
+            },
+            failure: jarvis.tracker.extAjaxRequestFailureHandler
+        });
+    };
+    
+    form = new Ext.form.FormPanel({
+        region: 'north',
+        autoHeight: true,
+        bodyStyle: {
+            padding: '5px'
+        },
+        items: [
+            {
+                xtype: 'textfield',
+                fieldLabel: 'SID',
+                id: 'sid'
+            },
+            {
+                xtype: 'textfield',
+                fieldLabel: 'User',
+                id: 'user'
+            },
+        ],
+        buttons: [
+            {
+                text: 'Show',
+                id: 'show',
+                default: true,
+                listeners: {
+                    click: submitForm
+                }
+            }
+        ]
+    });
 
     var center = new Ext.Panel({
         region: 'center',
@@ -87,12 +154,7 @@ return function (appName, extra) {
                 cls: 'timeline-default',
                 x: 0,
                 y: 0,
-                anchor: '100% 100%',
-                listeners: {
-                    render: function () {
-                        displayTimeline.defer(1, this, [timelineId]); // Defer to force the component height to be maxed before the timeline renders.
-                    }
-                }
+                anchor: '100% 100%'
             })
         ]
     });
@@ -103,6 +165,7 @@ return function (appName, extra) {
         closable: true,
         hideMode: 'offsets',
         items: [
+            form,
             center
         ]
     })

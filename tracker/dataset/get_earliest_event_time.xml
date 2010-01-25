@@ -1,0 +1,11 @@
+<dataset read="*" write="">
+    <select>
+        SELECT 
+            datetime(MIN(start_time)) AS t
+        FROM
+            request 
+        WHERE
+            ({$sid} IS NULL OR sid = {$sid})
+            AND ({$user} IS NULL OR username = {$user})
+    </select>
+</dataset>
