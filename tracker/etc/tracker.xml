@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <jarvis>
-    <app format="json" debug="yes" dump="yes">
+    <app format="json">
         <dataset_dir>/opt/jarvis/tracker/dataset/</dataset_dir>
 
         <default_libs>

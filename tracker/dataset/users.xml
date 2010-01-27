@@ -4,7 +4,7 @@
 
      First REST parameter is the application name (optional).
   -->
-<dataset read="*" write="" debug="yes" dump="yes">
+<dataset read="*" write="">
     <select>
         SELECT DISTINCT 
             username
