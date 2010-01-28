@@ -118,7 +118,10 @@ return function (appName, extra) {
         region: 'north',
         autoHeight: true,
         bodyStyle: {
-            padding: '5px'
+            padding: '5px',
+        },
+        defaults: {
+            width: 250
         },
         items: [
             {
@@ -136,7 +139,7 @@ return function (appName, extra) {
             {
                 text: 'Show',
                 id: 'show',
-                default: true,
+                'default': true,
                 listeners: {
                     click: submitForm
                 }

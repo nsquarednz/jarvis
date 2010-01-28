@@ -112,7 +112,6 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
             header: true,
             border: false,
             layout: 'fit',
-            autoScroll: true,
             title: 'Loading...',
             items: [
                 this.dv

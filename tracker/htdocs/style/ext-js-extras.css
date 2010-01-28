@@ -46,3 +46,11 @@ label.abs-pos-label {
     background: none;
 }
 
+
+/*
+ * Allow grid data to be selected
+ */
+.x-selectable, .x-selectable * {
+    -moz-user-select: text!important;
+    -khtml-user-select: text!important;
+}
