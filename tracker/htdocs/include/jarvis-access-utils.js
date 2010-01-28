@@ -126,7 +126,6 @@ jarvis.tracker.login = function (callback) {
                 success: function () { // After successful login, call callback to hopefully
                                        // rerun the request.
                     jarvis.tracker.login.postLoginActions.forEach (function (c) {
-                        console.log (c);
                         if (typeof c === 'function') {
                             c();
                         } else {

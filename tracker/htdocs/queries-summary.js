@@ -119,7 +119,7 @@ return function (appName, extra) {
         listeners: {
             rowdblclick: function (g, i) {
                 var record = g.store.getAt (i);
-                var path = appName + '/Queries/' + record.get ('dataset').replace(/ .*/, '');
+                var path = appName + '/Datasets/' + record.get ('dataset').replace(/ .*/, '');
                 jarvis.tracker.loadAndShowTabFromPath (path);
             }
         },
@@ -127,7 +127,7 @@ return function (appName, extra) {
 
 
     return new Ext.Panel ({
-        title: appName + '- Queries',
+        title: appName + '- Datasets',
         layout: 'border',
         hideMode: 'offsets',
         closable: true,

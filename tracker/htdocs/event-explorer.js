@@ -28,7 +28,6 @@
 var thisTimeline = null;
 
 function displayTimeline(id, d, params) {
-console.log ('displayTimeline', arguments);
     var eventSource = new Timeline.DefaultEventSource(0);
     var theme = Timeline.ClassicTheme.create();
 

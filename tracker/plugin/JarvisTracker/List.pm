@@ -67,26 +67,32 @@ sub JarvisTracker::List::do {
         # If there is only one part, it must be (or is expected to be) the application
         # name, so return a pre-defined list of types of objects under the app.
         if (@parts == 1) {
-            my @areas = ("Errors", "Plugins", "Queries", "Users");
+            my @areas = ("Errors", "Datasets", "Users");
             map {
                 push(@list, { id => "$id/$_", text => $_, leaf => $_ eq "Errors" ? 1 : 0 }); 
             } @areas;
         } else {
             #
             # If there are more than 2 parts, then we're looking at a specific 
-            # lower level item within an item - Queries, Errors, Users or Plugins
+            # lower level item within an item - Datasets, Errors, Users or Plugins
 
             #
-            # Queries
+            # Datasets of all flavours - SQL datasets, plugins, exec's and builtins
             #
-            if ($parts[1] eq "Queries") {
+            if ($parts[1] eq "Datasets") {
+
+                #
+                # Now SQL queries from dataset files.
+                #
                 my $xmlFilename = $jconfig->{'etc_dir'} . "/" . $parts[0] . ".xml";
                 my $xml = XML::Smart->new ($xmlFilename) || die "Cannot read configuration for $parts[0].xml: $!.";
                 my $datasetDirectory = $xml->{jarvis}{app}{dataset_dir}->content;
+                my $inSubdirectory = 0;
 
                 if (@parts > 2) {
+                    $inSubdirectory = 1;
                     splice(@parts, 0, 2);
-                    map {$datasetDirectory .= "/" . $_} @parts; # all parts have been previously checked for safety - no '..' or other unsafe characters are included.
+                    $datasetDirectory .= join "/", @parts; # all parts have been previously checked for safety - no '..' or other unsafe characters are included.
                 }
 
                 opendir (QUERIES, $datasetDirectory) || die "Cannot read queries for '$id'. $!.";
@@ -105,6 +111,29 @@ sub JarvisTracker::List::do {
                         }
                     }
                 } @files;
+
+                # If top level - don't do this for subdirectory SQL queries..
+                if ($inSubdirectory == 0) {
+                    #
+                    # Builtins
+                    #
+                    map {
+                        push (@list, { id => "$id/$_", text => $_, leaf => '1', datasetType => 'builtin' });
+                    } qw(__status __logout __habitat);
+
+                    #
+                    # Now plugins and 'exec' options
+                    #
+                    my @plugins = $xml->{jarvis}{app}{plugin}('@');
+                    map {
+                        push(@list, { id => "$id/" . $_->{dataset}->content, text => $_->{dataset}->content, leaf => 1 }); 
+                    } @plugins;
+
+                    my @execs = $xml->{jarvis}{app}{exec}('@');
+                    map {
+                        push(@list, { id => "$id/" . $_->{dataset}->content, text => $_->{dataset}->content, leaf => 1 }); 
+                    } @execs;
+                }
             #
             # Users
             #
@@ -128,18 +157,6 @@ sub JarvisTracker::List::do {
             # Plugins and execs
             #
             } elsif ($parts[1] eq "Plugins") {
-                my $xmlFilename = $jconfig->{'etc_dir'} . "/" . $parts[0] . ".xml";
-                my $xml = XML::Smart->new ($xmlFilename) || die "Cannot read configuration from $parts[0].xml: $!.";
-
-                my @plugins = $xml->{jarvis}{app}{plugin}('@');
-                map {
-                    push(@list, { id => "$id/$_->{dataset}->content", text => $_->{dataset}->content, leaf => 1 }); 
-                } @plugins;
-
-                my @execs = $xml->{jarvis}{app}{exec}('@');
-                map {
-                    push(@list, { id => "$id/$_->{dataset}->content", text => $_->{dataset}->content, leaf => 1 }); 
-                } @execs;
 
             }
         }

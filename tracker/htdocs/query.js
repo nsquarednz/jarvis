@@ -128,6 +128,8 @@
 // This is the real function for creating a query page.
 return function (appName, extra) {
 
+    var panelItems = [];
+
     var center = new Ext.Panel({
         region: 'center',
         layout: 'anchor',
@@ -155,6 +157,8 @@ return function (appName, extra) {
         ]
     });
 
+    panelItems.push (center);
+
     var queryLoader = function (type, element) {
         var url = jarvisUrl('source/' + appName + '/' + type + '/' + extra.query);
         Ext.Ajax.request ({
@@ -169,156 +173,156 @@ return function (appName, extra) {
         });
     };
 
-    var codeView = new Ext.Panel({
-        region: 'east',
-        layout: 'accordion',
-        layoutConfig: {
-            animate: true
-        },
-        split: true,
-        collapsible: true,
-        width: '50%',
-        title: 'Dataset Code',
-        hideMode: 'offsets',
-        items: new Array()
-    });
-
-    // For each of the available query types, create an accordion panel for it.
-    ['Select', 'Insert', 'Update', 'Delete'].map (function (t) {
-        var paramsStore = new Ext.data.SimpleStore({
-            fields: ['param', 'value', 'nullOnEmpty']
-        });
-
-        var parameterisedSqlBoxId = Ext.id();
-        var parameterisedSqlBox = new Ext.BoxComponent ({
-            title: 'Parameterised SQL', 
-            autoScroll: true,
-            queryParamsStore: paramsStore,
-            showParameterised: true,
-            autoEl: {
-                tag: 'div',
-                id: parameterisedSqlBoxId,
-                cls: 'codeView'
-            }
-        });
-
-        paramsStore.on('datachanged', displaySql.createCallback(parameterisedSqlBox));
-        paramsStore.on('update', displaySql.createCallback(parameterisedSqlBox));
-
-        var sqlBoxId = Ext.id();
-        var sqlBox = new Ext.BoxComponent ({
-            title: 'SQL', 
-            autoScroll: true,
-            queryParamsStore: paramsStore,
-            showParameterised: false,
-            autoEl: {
-                tag: 'div',
-                id: sqlBoxId,
-                cls: 'codeView'
+    if (extra.datasetInfo.type == 's') { // If the dataset query is the SQL type.
+        var codeView = new Ext.Panel({
+            region: 'east',
+            layout: 'accordion',
+            layoutConfig: {
+                animate: true
             },
-            listeners: {
-                render: function () { queryLoader(t.toLowerCase(), this); }
-            }
+            split: true,
+            collapsible: true,
+            width: '50%',
+            title: 'Dataset Code',
+            hideMode: 'offsets',
+            items: new Array()
         });
 
-        var resultsBox = new Ext.BoxComponent ({
-            title: 'Results', 
-            autoScroll: true,
-            autoEl: {
-                tag: 'div',
-                cls: 'codeView'
-            }
-        });
+        // For each of the available query types, create an accordion panel for it.
+        ['Select', 'Insert', 'Update', 'Delete'].map (function (t) {
+            var paramsStore = new Ext.data.SimpleStore({
+                fields: ['param', 'value', 'nullOnEmpty']
+            });
 
-        var paramsGrid = new Ext.grid.EditorGridPanel({
-            store: paramsStore,
-            stripeRows: true,
-            anchor: '100%',
-            height: 150,
-            clicksToEdit: 1,
-            viewConfig: {
-                forceFit: true
-            },
-            columns: [
-                {
-                    header: 'Parameter',
-                    dataIndex: 'param',
-                    sortable: true
-                },
-                {
-                    header: 'Value',
-                    dataIndex: 'value',
-                    editor: new Ext.form.TextField()
-                },
-                {
-                    header: 'Null',
-                    dataIndex: 'nullOnEmpty',
-                    editor: new Ext.form.Checkbox()
+            var parameterisedSqlBoxId = Ext.id();
+            var parameterisedSqlBox = new Ext.BoxComponent ({
+                title: 'Parameterised SQL', 
+                autoScroll: true,
+                queryParamsStore: paramsStore,
+                showParameterised: true,
+                autoEl: {
+                    tag: 'div',
+                    id: parameterisedSqlBoxId,
+                    cls: 'codeView'
                 }
-            ],
-            bbar: [
-                { 
-                    xtype: 'tbfill'
+            });
+
+            paramsStore.on('datachanged', displaySql.createCallback(parameterisedSqlBox));
+            paramsStore.on('update', displaySql.createCallback(parameterisedSqlBox));
+
+            var sqlBoxId = Ext.id();
+            var sqlBox = new Ext.BoxComponent ({
+                title: 'SQL', 
+                autoScroll: true,
+                queryParamsStore: paramsStore,
+                showParameterised: false,
+                autoEl: {
+                    tag: 'div',
+                    id: sqlBoxId,
+                    cls: 'codeView'
                 },
-                {
-                    text: 'Execute',
-                    handler: executeQuery.createCallback ({
-                        app: appName,
-                        query: extra.query,
-                        params: paramsStore,
-                        target: resultsBox
-                    })
+                listeners: {
+                    render: function () { queryLoader(t.toLowerCase(), this); }
                 }
-                /*{ TODO one day. It isn't trivial to select text for a user to copy.
-                    text: 'Select',
-                    handler: function () { 
-                        range = document.createRange();
-                        referenceNode = Ext.get(sqlBoxId).dom;
-                        range.selectNodeContents (referenceNode);
+            });
+
+            var resultsBox = new Ext.BoxComponent ({
+                title: 'Results', 
+                autoScroll: true,
+                autoEl: {
+                    tag: 'div',
+                    cls: 'codeView'
+                }
+            });
+
+            var paramsGrid = new Ext.grid.EditorGridPanel({
+                store: paramsStore,
+                stripeRows: true,
+                anchor: '100%',
+                height: 150,
+                clicksToEdit: 1,
+                viewConfig: {
+                    forceFit: true
+                },
+                columns: [
+                    {
+                        header: 'Parameter',
+                        dataIndex: 'param',
+                        sortable: true
+                    },
+                    {
+                        header: 'Value',
+                        dataIndex: 'value',
+                        editor: new Ext.form.TextField()
+                    },
+                    {
+                        header: 'Null',
+                        dataIndex: 'nullOnEmpty',
+                        editor: new Ext.form.Checkbox()
                     }
-                }*/
-            ],
-            sm: new Ext.grid.RowSelectionModel({singleSelect:true})
+                ],
+                bbar: [
+                    { 
+                        xtype: 'tbfill'
+                    },
+                    {
+                        text: 'Execute',
+                        handler: executeQuery.createCallback ({
+                            app: appName,
+                            query: extra.query,
+                            params: paramsStore,
+                            target: resultsBox
+                        })
+                    }
+                    /*{ TODO one day. It isn't trivial to select text for a user to copy.
+                        text: 'Select',
+                        handler: function () { 
+                            range = document.createRange();
+                            referenceNode = Ext.get(sqlBoxId).dom;
+                            range.selectNodeContents (referenceNode);
+                        }
+                    }*/
+                ],
+                sm: new Ext.grid.RowSelectionModel({singleSelect:true})
+            });
+
+            var p = {
+                    title: t,
+                    layout: 'anchor',
+                    border: false,
+                    hideMode: 'offsets',
+                    deferredRender: false,
+                    layoutConfig: {
+                        columns: 1
+                    },
+                    items: [
+                        paramsGrid,
+                        new Ext.TabPanel ({
+                            deferredRender: false,
+                            anchor: "100% -150",
+                            enableTabScroll: true,
+                            layoutOnTabChange: true,
+                            activeTab: 0,
+                            items: [
+                                sqlBox,
+                                parameterisedSqlBox,
+                                resultsBox
+                            ]
+                        })
+                    ]
+                };
+            codeView.add(p);
         });
 
-        var p = {
-                title: t,
-                layout: 'anchor',
-                border: false,
-                hideMode: 'offsets',
-                deferredRender: false,
-                layoutConfig: {
-                    columns: 1
-                },
-                items: [
-                    paramsGrid,
-                    new Ext.TabPanel ({
-                        deferredRender: false,
-                        anchor: "100% -150",
-                        enableTabScroll: true,
-                        layoutOnTabChange: true,
-                        activeTab: 0,
-                        items: [
-                            sqlBox,
-                            parameterisedSqlBox,
-                            resultsBox
-                        ]
-                    })
-                ]
-            };
-        codeView.add(p);
-    });
+        panelItems.push (codeView);
+    }
 
     return new Ext.Panel({
         title: appName + ' - Queries - ' + extra.query,
         layout: 'border',
         closable: true,
         hideMode: 'offsets',
-        items: [
-            codeView,
-            center
-        ]
-    })
-
+        items: panelItems
+    });
 }; })();
 

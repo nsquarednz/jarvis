@@ -129,6 +129,8 @@ jarvis.tracker.loadAndShowTab = function(id, page, appName, extraParameters, cal
             }
             jarvis.tracker.informationTabPanel.setActiveTab (jarvis.tracker.trackerTabs[id]);
         } else {
+            extraParameters = extraParameters || {};
+            extraParameters.url = id;
             var t = jarvis.tracker.trackerSubpages[page](appName, extraParameters);
             t.on (
                 'destroy', function () { jarvis.tracker.trackerTabs[id] = null }
@@ -152,16 +154,16 @@ jarvis.tracker.loadAndShowTab = function(id, page, appName, extraParameters, cal
  *
  * root         - for the root summary node
  * <app name>   - for the summary of an application
- * <app name>/[Errors|Plugins|Queries|Users]
+ * <app name>/[Errors|Datasets|Users]
  *              - for summary of an area of an application
  * <app name>/Errors?date=<julian date>&id=<error id>
  *              - for a specific error. The Errors tab will then show that error
  *                already selected.
- * <app name>/Queries/<query path>
- *              - for details on a query (<query path> may include backslashes)
- * <app name>/Queries/<query path>?<parameters>
- *              - for details on a query (<query path> may include backslashes)
- *              - <parameters> are passed through to the query detail page
+ * <app name>/Datasets/<dataset path>
+ *              - for details on a dataset (<dataset path> may include backslashes)
+ * <app name>/Datasets/<dataset path>?<parameters>
+ *              - for details on a dataset (<dataset path> may include backslashes)
+ *              - <parameters> are passed through to the relevant dataset detail page
  *                and be used for the query parameters there.
  *
  * Note - not all paths do anything yet
@@ -183,7 +185,7 @@ jarvis.tracker.loadAndShowTabFromPath = function(path, callback) {
     else if (parts.length == 1) {
         jarvis.tracker.loadAndShowTab (pathAndParam[0], 'application-summary.js', parts[0], null, callback);
     }
-    // If there are two parts - the second part will be Errors/Queries etc.
+    // If there are two parts - the second part will be Errors/Datasets etc.
     else if (parts.length == 2) {
         var extra = params ? {
             params: params
@@ -191,7 +193,7 @@ jarvis.tracker.loadAndShowTabFromPath = function(path, callback) {
 
         if (parts[1] == 'Errors') {
             jarvis.tracker.loadAndShowTab (pathAndParam[0], 'errors-summary.js', parts[0], extra, callback);
-        } else if (parts[1] == 'Queries') {
+        } else if (parts[1] == 'Datasets') {
             jarvis.tracker.loadAndShowTab (pathAndParam[0], 'queries-summary.js', parts[0], extra, callback);
         } else if (parts[1] == 'Users') {
             jarvis.tracker.loadAndShowTab (pathAndParam[0], 'users-summary.js', parts[0], extra, callback);
@@ -200,14 +202,32 @@ jarvis.tracker.loadAndShowTabFromPath = function(path, callback) {
 
     // If there are more than two parts, then look at what details we're after
     
-    // Queries.
-    else if (parts.length >= 3 && parts[1] == 'Queries') {
+    // Datasets.
+    // Before showing the dataset page, we need to know what sort of dataset
+    // we're dealing with - this will allow the query tab to better show
+    // relevant data.
+    //
+    // We could do this in the query code, but ExtJS panels require their regions
+    // to be defined pre-render, and it is easier to do this query here,
+    // and pass the information through to the query page.
+    else if (parts.length >= 3 && parts[1] == 'Datasets') {
+
         var app = parts[0];
         parts.splice(0, 2);
-        jarvis.tracker.loadAndShowTab (pathAndParam[0], 'query.js', app, {
-            query: parts.join ('/'),
-            params: params
-        }, callback);
+        
+        Ext.Ajax.request ({
+            url: jarvisUrl ('dataset-info/' + app + '/' + parts.join('/')),
+            method: 'GET',
+            success: function (xhr, req) { 
+                var datasetInfo = Ext.util.JSON.decode (xhr.responseText);
+                jarvis.tracker.loadAndShowTab (pathAndParam[0], 'query.js', app, {
+                    query: parts.join ('/'),
+                    params: params,
+                    datasetInfo: datasetInfo
+                }, callback);
+            },
+            failure: jarvis.tracker.extAjaxRequestFailureHandler
+        });
     }
 
     // User information.
@@ -274,9 +294,9 @@ Ext.onReady (function () {
 
                 // Load a path only if it's a leaf, or a special non-leaf node that
                 // we know has a summary.
-                var parts = id.split('/');
+                var parts = node.id.split('/');
 
-                // avoid loading a tab for directories within 'Queries'
+                // avoid loading a tab for directories within 'Datasets'
                 if (node.leaf == 1 || parts.length < 3) { // node.isLeaf() does not work in ExtJS v2.3
                     jarvis.tracker.loadAndShowTabFromPath (node.id);
                 }
