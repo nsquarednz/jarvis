@@ -88,10 +88,13 @@ return function (appName, extra) {
     var submitForm = function() {
         var params = { };
 
-        var lookups = ['sid', 'user', 'limit', 'app_name' ];
+        var lookups = ['sid', 'user', 'limit', 'app_name', 'from', 'to' ];
         Ext.each (lookups, function (e) {
             if (form.findById(e + '_' + timelineId).getValue())
-                params[e] = form.findById(e + '_' + timelineId).getValue();
+                var v = form.findById(e + '_' + timelineId).getValue();
+                if (v && ((typeof v === 'string' && v.length > 0) || true)) {
+                    params[e] = Ext.isDate(v) ? v.formatForServer() : v;
+                }
         });
 
         Ext.Ajax.request ({
@@ -146,14 +149,18 @@ return function (appName, extra) {
                         value: extra.params.appName || ''
                     }),
                     new Ext.ux.form.DateTime ({
+                        format: 'd/m/Y',
                         fieldLabel: 'From',
                         id: 'from_' + timelineId,
-                        value: extra.params.from || ''
+                        value: extra.params.from || '',
+                        value: extra.params.sid ? '' : Date.parseDate(new Date().format('Y-m-d\\TH:00:00'), 'c')
                     }),
                     new Ext.ux.form.DateTime({
+                        format: 'd/m/Y',
                         fieldLabel: 'To',
                         id: 'to_' + timelineId,
-                        value: extra.params.to || ''
+                        value: extra.params.to || '',
+                        value: extra.params.sid ? '' : Date.parseDate(new Date().add(Date.HOUR, 1).format('Y-m-d\\TH:00:00'), 'c')
                     })
                 ]
             },

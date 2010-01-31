@@ -10,6 +10,8 @@
                 ({$sid} IS NULL OR sid = {$sid})
                 AND ({$user} IS NULL OR username = {$user})
                 AND ({$app_name} IS NULL OR app_name = {$app_name})
+                AND ({$from} IS NULL OR start_time >= {$from})
+                AND ({$to} IS NULL OR start_time &lt;= {$to})
             UNION
             SELECT MIN(start_time) AS start_time
             FROM error 
@@ -17,6 +19,8 @@
                 ({$sid} IS NULL OR sid = {$sid})
                 AND ({$user} IS NULL OR username = {$user})
                 AND ({$app_name} IS NULL OR app_name = {$app_name})
+                AND ({$from} IS NULL OR start_time >= {$from})
+                AND ({$to} IS NULL OR start_time &lt;= {$to})
         )
     </select>
 </dataset>
