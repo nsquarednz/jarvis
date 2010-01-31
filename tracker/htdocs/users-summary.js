@@ -84,7 +84,14 @@ return function (appName, extra) {
         viewConfig: {
             forceFit: true
         },
-        sm: new Ext.grid.RowSelectionModel({singleSelect:true})
+        sm: new Ext.grid.RowSelectionModel({singleSelect:true}),
+        listeners: {
+            rowdblclick: function (g, i) {
+                var record = g.store.getAt (i);
+                var path = appName + '/Users/' + record.get('username');
+                jarvis.tracker.loadAndShowTabFromPath (path);
+            }
+        }
     });
 
 

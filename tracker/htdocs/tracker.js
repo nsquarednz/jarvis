@@ -168,6 +168,7 @@ jarvis.tracker.loadAndShowTab = function(id, page, appName, extraParameters, cal
  * <app name>/Events?<parameters>
  *              - for details on events that have occurred based on the parameters.
  *              - <parameters> are passed through to the event explorer page.
+ * <app name>/Users/<user name>
  *
  * Note - not all paths do anything yet
  */
