@@ -281,7 +281,7 @@ Ext.onReady (function () {
             fields: ['app_name']
         }),
         listeners: {
-            'loadexception': jarvis.tracker.extStoreLoadExceptionHandler,
+            'loadexception': jarvis.tracker.extStoreLoadExceptionHandler
         }
     });
 
@@ -302,7 +302,7 @@ Ext.onReady (function () {
                 },
                 anchor: '100% 100%',
                 cls: 'title-bar'
-            },
+            }
         ]
     };
 

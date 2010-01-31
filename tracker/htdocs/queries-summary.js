@@ -122,7 +122,7 @@ return function (appName, extra) {
                 var path = appName + '/Datasets/' + record.get ('dataset').replace(/ .*/, '');
                 jarvis.tracker.loadAndShowTabFromPath (path);
             }
-        },
+        }
     });
 
 

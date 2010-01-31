@@ -7,7 +7,7 @@
             <lib path="/opt/jarvis/tracker/plugin/"/>
         </default_libs>
 
-        <tracker requests="yes" errors="yes">
+        <tracker requests="yes" errors="yes" logins="yes">
             <dbfile>/opt/jarvis/tracker/db/tracker.db</dbfile>
         </tracker>
 

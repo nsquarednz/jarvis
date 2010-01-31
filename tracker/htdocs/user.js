@@ -155,7 +155,7 @@ return function (appName, extra) {
             forceFit: true
         },
         sm: new Ext.grid.RowSelectionModel({
-            singleSelect:true,
+            singleSelect:true
         }),
         listeners: {
             rowdblclick: function (g, i) {

@@ -123,7 +123,7 @@ return function (appName, extra) {
         autoHeight: true,
         layout: 'column',
         bodyStyle: {
-            padding: '5px',
+            padding: '5px'
         },
         defaults: {
             columnWidth: 0.33,
@@ -195,7 +195,7 @@ return function (appName, extra) {
                         mode: 'local'
                     })
                 ]
-            },
+            }
         ],
         buttons: [
             {
@@ -223,7 +223,7 @@ return function (appName, extra) {
                 cls: 'timeline-default',
                 x: 0,
                 y: 0,
-                anchor: '100% 100%',
+                anchor: '100% 100%'
             })
         ]
     });
