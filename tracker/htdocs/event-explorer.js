@@ -25,7 +25,6 @@
 
 (function () {
 
-var thisTimeline = null;
 
 function displayTimeline(id, d, params) {
     var eventSource = new Timeline.DefaultEventSource(0);
@@ -65,8 +64,6 @@ function displayTimeline(id, d, params) {
     bandInfos[1].highlight = true;
     bandInfos[2].highlight = true;
                 
-    thisTimeline = Timeline.create(document.getElementById(id), bandInfos, Timeline.HORIZONTAL);
-
     Ext.Ajax.request ({
         url: jarvisUrl ('events'),
         method: 'GET',
@@ -77,6 +74,8 @@ function displayTimeline(id, d, params) {
         },
         failure: jarvis.tracker.extAjaxRequestFailureHandler
     });
+
+    return Timeline.create(document.getElementById(id), bandInfos, Timeline.HORIZONTAL);
 };
 
 // This is the real function for creating a query page.
@@ -99,7 +98,8 @@ return function (appName, extra) {
             success: function (xhr) { 
                 var data = Ext.util.JSON.decode (xhr.responseText);
                 if (data.data[0].t) {
-                    displayTimeline (timelineId, Date.parseDate (data.data[0].t, 'Y-m-d H:i:s'), params);
+                    form.timelineObject = displayTimeline (timelineId, Date.parseDate (data.data[0].t, 'Y-m-d H:i:s'), params);
+                    console.log ('form is', form);
                 } else {
                     Ext.Msg.show ({
                         title: 'No data',
@@ -160,7 +160,7 @@ return function (appName, extra) {
                 cls: 'timeline-default',
                 x: 0,
                 y: 0,
-                anchor: '100% 100%'
+                anchor: '100% 100%',
             })
         ]
     });
@@ -173,7 +173,14 @@ return function (appName, extra) {
         items: [
             form,
             center
-        ]
+        ],
+        listeners: {
+            resize: function () {
+                setTimeout(function () {
+                    form.timelineObject.layout();
+                }, 0);
+            }
+        }
     })
 
 }; })();
