@@ -154,7 +154,7 @@ jarvis.tracker.loadAndShowTab = function(id, page, appName, extraParameters, cal
  *
  * root         - for the root summary node
  * <app name>   - for the summary of an application
- * <app name>/[Errors|Datasets|Users]
+ * <app name>/[Errors|Datasets|Users|Events]
  *              - for summary of an area of an application
  * <app name>/Errors?date=<julian date>&id=<error id>
  *              - for a specific error. The Errors tab will then show that error
@@ -165,6 +165,9 @@ jarvis.tracker.loadAndShowTab = function(id, page, appName, extraParameters, cal
  *              - for details on a dataset (<dataset path> may include backslashes)
  *              - <parameters> are passed through to the relevant dataset detail page
  *                and be used for the query parameters there.
+ * <app name>/Events?<parameters>
+ *              - for details on events that have occurred based on the parameters.
+ *              - <parameters> are passed through to the event explorer page.
  *
  * Note - not all paths do anything yet
  */
@@ -197,6 +200,14 @@ jarvis.tracker.loadAndShowTabFromPath = function(path, callback) {
             jarvis.tracker.loadAndShowTab (pathAndParam[0], 'queries-summary.js', parts[0], extra, callback);
         } else if (parts[1] == 'Users') {
             jarvis.tracker.loadAndShowTab (pathAndParam[0], 'users-summary.js', parts[0], extra, callback);
+        } else if (parts[1] == 'Events') {
+
+            // The event explorer is special - each time we load one, we create a unique instance
+            jarvis.tracker.loadAndShowTabFromPath.nextEventExplorerNumber = jarvis.tracker.loadAndShowTabFromPath.nextEventExplorerNumber || 0;
+            jarvis.tracker.loadAndShowTabFromPath.nextEventExplorerNumber++;
+            extra.eventExplorerNumber = jarvis.tracker.loadAndShowTabFromPath.nextEventExplorerNumber;
+
+            jarvis.tracker.loadAndShowTab (pathAndParam[0] + '/' + extra.eventExplorerNumber, 'event-explorer.js', parts[0], extra, callback);
         }
     }
 
@@ -368,7 +379,6 @@ Ext.onReady (function () {
      * by about 15 pixels, chopping off the bottom of the tab's contents
      * (until it is resized or layout is forced to recalculate)
      */
-    jarvis.tracker.loadAndShowTab ('bla', 'event-explorer.js', 'none', null, null);
     jarvis.tracker.loadAndShowTabFromPath ('root', function () { viewport.doLayout(false); });
 });
 

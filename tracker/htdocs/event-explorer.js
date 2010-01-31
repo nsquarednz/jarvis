@@ -87,10 +87,10 @@ return function (appName, extra) {
     
     var submitForm = function() {
         var params = { };
-        if (form.findById('sid').getValue())
-            params.sid = form.findById('sid').getValue();
-        if (form.findById('user').getValue())
-            params.user = form.findById('user').getValue();
+        if (form.findById('sid_' + timelineId).getValue())
+            params.sid = form.findById('sid_' + timelineId).getValue();
+        if (form.findById('user_' + timelineId).getValue())
+            params.user = form.findById('user_' + timelineId).getValue();
 
         Ext.Ajax.request ({
             url: jarvisUrl ('get_earliest_event_time'),
@@ -113,7 +113,7 @@ return function (appName, extra) {
         });
     };
     
-    form = new Ext.form.FormPanel({
+    var form = new Ext.form.FormPanel({
         region: 'north',
         autoHeight: true,
         bodyStyle: {
@@ -123,16 +123,16 @@ return function (appName, extra) {
             width: 250
         },
         items: [
-            {
-                xtype: 'textfield',
+            new Ext.form.TextField({
                 fieldLabel: 'SID',
-                id: 'sid'
-            },
-            {
-                xtype: 'textfield',
+                id: 'sid_' + timelineId,
+                value: extra.params.sid || ''
+            }),
+            new Ext.form.TextField({
                 fieldLabel: 'User',
-                id: 'user'
-            },
+                id: 'user_' + timelineId,
+                value: extra.params.user || ''
+            })
         ],
         buttons: [
             {
@@ -145,6 +145,10 @@ return function (appName, extra) {
             }
         ]
     });
+
+    if (extra.params.sid || extra.params.user) {
+        submitForm();
+    }
 
     var center = new Ext.Panel({
         region: 'center',
@@ -162,7 +166,7 @@ return function (appName, extra) {
     });
 
     return new Ext.Panel({
-        title: 'Event Explorer',
+        title: 'Event Explorer #' + extra.eventExplorerNumber,
         layout: 'border',
         closable: true,
         hideMode: 'offsets',

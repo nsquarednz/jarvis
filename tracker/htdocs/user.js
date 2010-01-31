@@ -103,7 +103,9 @@ return function (appName, extra) {
 
     var logins = new Ext.grid.GridPanel({
         width: '40%',
+        anchor: '100% 50%',
         title: 'User Logins',
+        split: true,
         store: loginsStore,
         columns: [
             {
@@ -151,6 +153,16 @@ return function (appName, extra) {
         ],
         viewConfig: {
             forceFit: true
+        },
+        sm: new Ext.grid.RowSelectionModel({
+            singleSelect:true,
+        }),
+        listeners: {
+            rowdblclick: function (g, i) {
+                var record = g.store.getAt (i);
+                var path = appName + '/Events?sid=' + record.get ('sid');
+                jarvis.tracker.loadAndShowTabFromPath (path);
+            }
         }
     });
 
@@ -158,9 +170,8 @@ return function (appName, extra) {
         region: 'east',
         width: '40%',
         split: true,
-        collapsible: true,
-        closable: true,
         title: 'Recent Errors for ' + appName,
+        anchor: '100% 50%',
         dataSourceParams: {
             limit: true,
             user: user,
@@ -173,7 +184,7 @@ return function (appName, extra) {
     });
 
     var sidePanel = new Ext.Panel({
-        layout: 'accordion',
+        layout: 'anchor',
         title: 'User Details',
         width: '40%',
         split: true,
