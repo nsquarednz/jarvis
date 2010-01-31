@@ -206,7 +206,12 @@ jarvis.tracker.loadAndShowTabFromPath = function(path, callback) {
             // The event explorer is special - each time we load one, we create a unique instance
             jarvis.tracker.loadAndShowTabFromPath.nextEventExplorerNumber = jarvis.tracker.loadAndShowTabFromPath.nextEventExplorerNumber || 0;
             jarvis.tracker.loadAndShowTabFromPath.nextEventExplorerNumber++;
+
+            extra = extra || {
+                params: {}
+            };
             extra.eventExplorerNumber = jarvis.tracker.loadAndShowTabFromPath.nextEventExplorerNumber;
+            extra.params.appName = extra.params.appName || parts[0];
 
             jarvis.tracker.loadAndShowTab (pathAndParam[0] + '/' + extra.eventExplorerNumber, 'event-explorer.js', parts[0], extra, callback);
         }
@@ -263,6 +268,24 @@ Ext.onReady (function () {
     jarvisInit ('tracker'); // Tells the codebase what our Jarvis application name is, and the login function.
     Ext.QuickTips.init();
 
+    // This global store lists all the applications
+    // available in the database - get it once as it's a
+    // thing that doesn't really rely on specific tab details.
+    jarvis.tracker.applicationsInDatabase = new Ext.data.Store ({
+        proxy: new Ext.data.HttpProxy ({ url: jarvisUrl ('applications_in_database'), method: 'GET' }),
+        autoLoad: true,
+        reader: new Ext.data.JsonReader ({
+            root: 'data',
+            id: 'app_name',
+            totalProperty: 'fetched',
+            fields: ['app_name']
+        }),
+        listeners: {
+            'loadexception': jarvis.tracker.extStoreLoadExceptionHandler,
+        }
+    });
+
+    // The UI
     var logoutButtonId = Ext.id();
     
     var titleBar = {

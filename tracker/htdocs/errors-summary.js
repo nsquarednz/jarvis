@@ -130,13 +130,20 @@ return function (appName, extra) {
             })
         ],
         sm: new Ext.grid.RowSelectionModel({
-                singleSelect:true,
-                listeners: {
-                    rowselect: function (sm, rowIndex, r) {
-                        showErrorDetails (r);
-                    }
+            singleSelect:true,
+            listeners: {
+                rowselect: function (sm, rowIndex, r) {
+                    showErrorDetails (r);
                 }
-            })
+            }
+        }),
+        listeners: {
+            rowdblclick: function (g, i) {
+                var record = g.store.getAt (i);
+                var path = appName + '/Events?sid=' + record.get ('sid');
+                jarvis.tracker.loadAndShowTabFromPath (path);
+            }
+        }
     });
  
     // event handler that, after load, will see if we want to select a specific

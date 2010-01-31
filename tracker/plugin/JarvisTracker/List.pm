@@ -67,9 +67,9 @@ sub JarvisTracker::List::do {
         # If there is only one part, it must be (or is expected to be) the application
         # name, so return a pre-defined list of types of objects under the app.
         if (@parts == 1) {
-            my @areas = ("Errors", "Datasets", "Users");
+            my @areas = ("Errors", "Datasets", "Users", "Events");
             map {
-                push(@list, { id => "$id/$_", text => $_, leaf => $_ eq "Errors" ? 1 : 0 }); 
+                push(@list, { id => "$id/$_", text => $_, leaf => $_ eq "Errors" || $_ eq "Events" ? 1 : 0 }); 
             } @areas;
         } else {
             #

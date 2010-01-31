@@ -101,3 +101,21 @@ div.error-details th {
 .testtest {
     height: 400px;
 }
+
+div.timeline-event-bubble-time {
+    font-family: Trebuchet MS, Helvetica, Arial, sans serif;
+    font-size: 8pt;
+    color: '#999';
+}
+
+div.timeline-event-bubble-body {
+    font-family: Trebuchet MS, Helvetica, Arial, sans serif;
+    font-size: 8pt;
+    color: 'black';
+}
+
+div.timeline-event-bubble-title {
+    font-family: Trebuchet MS, Helvetica, Arial, sans serif;
+    font-size: 10pt;
+    color: 'black';
+}

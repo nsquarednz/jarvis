@@ -29,6 +29,7 @@
 function displayTimeline(id, d, params) {
     var eventSource = new Timeline.DefaultEventSource(0);
     var theme = Timeline.ClassicTheme.create();
+    theme.event.bubble.width = 450;  
 
     var bandInfos = [
         Timeline.createBandInfo({
@@ -70,7 +71,7 @@ function displayTimeline(id, d, params) {
         params: params,
         success: function (xhr, req) { 
             var data = Ext.util.JSON.decode (xhr.responseText);
-            eventSource.loadJSON(data, req.url);
+            eventSource.loadJSON(data, '');
         },
         failure: jarvis.tracker.extAjaxRequestFailureHandler
     });
@@ -86,10 +87,12 @@ return function (appName, extra) {
     
     var submitForm = function() {
         var params = { };
-        if (form.findById('sid_' + timelineId).getValue())
-            params.sid = form.findById('sid_' + timelineId).getValue();
-        if (form.findById('user_' + timelineId).getValue())
-            params.user = form.findById('user_' + timelineId).getValue();
+
+        var lookups = ['sid', 'user', 'limit', 'app_name' ];
+        Ext.each (lookups, function (e) {
+            if (form.findById(e + '_' + timelineId).getValue())
+                params[e] = form.findById(e + '_' + timelineId).getValue();
+        });
 
         Ext.Ajax.request ({
             url: jarvisUrl ('get_earliest_event_time'),
@@ -99,7 +102,6 @@ return function (appName, extra) {
                 var data = Ext.util.JSON.decode (xhr.responseText);
                 if (data.data[0].t) {
                     form.timelineObject = displayTimeline (timelineId, Date.parseDate (data.data[0].t, 'Y-m-d H:i:s'), params);
-                    console.log ('form is', form);
                 } else {
                     Ext.Msg.show ({
                         title: 'No data',
@@ -113,26 +115,80 @@ return function (appName, extra) {
         });
     };
     
-    var form = new Ext.form.FormPanel({
+    var form = new Ext.Panel({
         region: 'north',
         autoHeight: true,
+        layout: 'column',
         bodyStyle: {
             padding: '5px',
         },
         defaults: {
-            width: 250
+            columnWidth: 0.33,
+            layout: 'form',
+            border: false,
+            xtype:'panel',
+            bodyStyle: 'padding:0 18px 0 0'
         },
         items: [
-            new Ext.form.TextField({
-                fieldLabel: 'SID',
-                id: 'sid_' + timelineId,
-                value: extra.params.sid || ''
-            }),
-            new Ext.form.TextField({
-                fieldLabel: 'User',
-                id: 'user_' + timelineId,
-                value: extra.params.user || ''
-            })
+            {
+                defaults: {
+                    anchor: '100%'
+                },
+                items: [
+                    new Ext.form.ComboBox({
+                        fieldLabel: 'Application',
+                        store: jarvis.tracker.applicationsInDatabase,
+                        id: 'app_name_' + timelineId,
+                        displayField: 'app_name',
+                        allowBlank: 'false',
+                        editable: false,
+                        forceSelection: true,
+                        value: extra.params.appName || ''
+                    }),
+                    new Ext.ux.form.DateTime ({
+                        fieldLabel: 'From',
+                        id: 'from_' + timelineId,
+                        value: extra.params.from || ''
+                    }),
+                    new Ext.ux.form.DateTime({
+                        fieldLabel: 'To',
+                        id: 'to_' + timelineId,
+                        value: extra.params.to || ''
+                    })
+                ]
+            },
+            {
+                defaults: {
+                    anchor: '100%'
+                },
+                items: [
+                    new Ext.form.TextField({
+                        fieldLabel: 'SID',
+                        id: 'sid_' + timelineId,
+                        value: extra.params.sid || ''
+                    }),
+                    new Ext.form.TextField({
+                        fieldLabel: 'User',
+                        id: 'user_' + timelineId,
+                        value: extra.params.user || ''
+                    })
+                ]
+            },
+            {
+                defaults: {
+                    anchor: '100%'
+                },
+                items: [
+                    new Ext.form.ComboBox({
+                        fieldLabel: 'Max. # of Events',
+                        id: 'limit_' + timelineId,
+                        value: extra.params.maxEvents || '',
+                        store: [ '100', '500', '1000', '1500' ],
+                        value: '500',
+                        mode: 'local'
+                    })
+                ]
+            },
         ],
         buttons: [
             {
@@ -176,9 +232,9 @@ return function (appName, extra) {
         ],
         listeners: {
             resize: function () {
-                setTimeout(function () {
-                    form.timelineObject.layout();
-                }, 0);
+                if (form.timelineObject) {
+                    setTimeout(function () { form.timelineObject.layout(); }, 0);
+                }
             }
         }
     })

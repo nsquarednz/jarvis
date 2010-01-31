@@ -38,63 +38,40 @@ sub JarvisTracker::Events::do {
         dateTimeFormat => 'iso8601'
     );
 
+    my $limit = $jconfig->{cgi}->param('limit') || '500';
+    $limit =~ /^[0-9]+$/ || die 'Error in parameters. Limit must be a number.';
+
     my @eventList;
 
     # Get some data.
-    my $dbh = &Jarvis::DB::handle ($jconfig);
-    my $sql = <<EOF;
-SELECT 
-    strftime('%Y-%m-%d %H:%M:%f',start_time) AS start_time, 
-    strftime('%Y-%m-%d %H:%M:%f',start_time + duration_ms * (1.0 / (1000 * 60 * 60 * 24))) AS end_time, 
-    (CASE WHEN duration_ms < 1000 THEN '1' ELSE '0' END) as instant,
-    app_name, 
-    username, 
-    dataset 
-FROM 
-    request 
-WHERE 
-    (? IS NULL OR sid = ?)
-    AND (? IS NULL OR username = ?)
-LIMIT 500
-EOF
-    my $sth = $dbh->prepare ($sql) || die "Couldn't prepare statement for retrieving events: " . $dbh->errstr;
-    my $stm = {};
-    $stm->{sth} = $sth;
-    $stm->{ttype} = 'JarvisTrackerEvents';
-    my $params = [
-        $jconfig->{cgi}->param('sid') || undef
-        , $jconfig->{cgi}->param('sid') || undef
-        , $jconfig->{cgi}->param('user') || undef
-        , $jconfig->{cgi}->param('user') || undef
-    ];
-    &Jarvis::Dataset::statement_execute ($jconfig, $stm, $params);
-    $stm->{'error'} && die "Unable to execute statement for retrieving events: " . $stm->{'error'};
+    $jconfig->{format} = 'rows_aref';
+    $jconfig->{dataset_name} = 'get_events';
+    my $events = &Jarvis::Dataset::fetch ($jconfig);
+    ref($events) ne 'ARRAY' && die $events; # If there was an error, this is an error message, not an array of data!
 
-    my $users = $sth->fetchall_arrayref({});
-    map {
-        my $eventData;
-        if ($_->{instant} eq '1') {
-            $eventData = {
-                start => $_->{start_time},
-                title => $_->{app_name} . '/' . $_->{username} . '/' . $_->{dataset},
-                durationEvent => 'false',
-                description => ''
-            };
-        } else {
-            $eventData = {
-                start => $_->{start_time},
-                end => $_->{end_time},
-                title => $_->{app_name} . '/' . $_->{username} . '/' . $_->{dataset},
-                durationEvent => 'true',
-                description => ''
+    my $counter = 0;
+    foreach (@{$events}) {
+        my $eventData = {
+            icon => 'style/instant-timeline-event-icon.png',
+            start => $_->{start_time},
+            title => $_->{app_name} . '/' . ($_->{username} || '') . '/' . $_->{dataset},
+            durationEvent => 'false',
+            description => $_->{error}
+        };
 
-            };
-        }
+        $eventData->{end} = $_->{end_time} if $_->{instant} eq '0';
+        $eventData->{durationEvent} = 'true' if $_->{instant} eq '0';
+        $eventData->{color} = '#999' if $_->{dataset} =~ /^__/;
+        $eventData->{color} = 'red' if length($_->{error}) > 0;
 
         push(@eventList, $eventData);
-    } @{$users};
+
+        $counter ++;
+        last if $counter > $limit;
+    }
 
     $events{'events'} = \@eventList;
+    $events{'fetched'} = $counter;
 
     my $json = JSON::PP->new->pretty(1);
     return $json->encode ( \%events );

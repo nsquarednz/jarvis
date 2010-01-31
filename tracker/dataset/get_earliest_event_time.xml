@@ -3,9 +3,20 @@
         SELECT 
             datetime(MIN(start_time)) AS t
         FROM
-            request 
-        WHERE
-            ({$sid} IS NULL OR sid = {$sid})
-            AND ({$user} IS NULL OR username = {$user})
+        (
+            SELECT MIN(start_time) AS start_time
+            FROM request 
+            WHERE
+                ({$sid} IS NULL OR sid = {$sid})
+                AND ({$user} IS NULL OR username = {$user})
+                AND ({$app_name} IS NULL OR app_name = {$app_name})
+            UNION
+            SELECT MIN(start_time) AS start_time
+            FROM error 
+            WHERE
+                ({$sid} IS NULL OR sid = {$sid})
+                AND ({$user} IS NULL OR username = {$user})
+                AND ({$app_name} IS NULL OR app_name = {$app_name})
+        )
     </select>
 </dataset>

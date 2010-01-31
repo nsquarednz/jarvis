@@ -1,0 +1,37 @@
+<dataset read="*">
+    <select>
+        SELECT 
+            start_time AS start_time_raw,
+            strftime('%Y-%m-%d %H:%M:%f',start_time) AS start_time, 
+            strftime('%Y-%m-%d %H:%M:%f',start_time + duration_ms * (1.0 / (1000 * 60 * 60 * 24))) AS end_time, 
+            (CASE WHEN duration_ms &lt; 1000 THEN '1' ELSE '0' END) as instant,
+            app_name, 
+            username, 
+            dataset,
+            '' AS error
+        FROM 
+            request 
+        WHERE 
+            ({$sid} IS NULL OR sid = {$sid})
+            AND ({$user} IS NULL OR username = {$user})
+            AND ({$app_name} IS NULL OR app_name = {$app_name})
+        UNION
+        SELECT 
+            start_time AS start_time_raw,
+            strftime('%Y-%m-%d %H:%M:%f',start_time) AS start_time, 
+            strftime('%Y-%m-%d %H:%M:%f',start_time) AS end_time, 
+            '1' as instant,
+            app_name, 
+            username, 
+            dataset,
+            message AS error
+        FROM 
+            error 
+        WHERE 
+            ({$sid} IS NULL OR sid = {$sid})
+            AND ({$user} IS NULL OR username = {$user})
+            AND ({$app_name} IS NULL OR app_name = {$app_name})
+        ORDER BY
+            start_time_raw
+    </select>
+</dataset>
