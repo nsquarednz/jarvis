@@ -202,7 +202,7 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
 
         var barwidth = xscale(1) - xscale(0) > 4 ? Math.round((xscale(1) - xscale(0)) / 2) : 1;
 
-        g.add (pv.Area)
+        g.add (barwidth < 2 ? pv.Area : pv.Bar)
             .data (data) 
             .left (function (d) { return xscale(this.index); })
             .height (function (d) { return yscale(d.c); })
