@@ -60,17 +60,35 @@ sub JarvisTracker::List::do {
         closedir (APPS);
         map { 
             $_ =~ s/\.xml$//;
-            push(@list, { id => $_, text => $_ }); 
+            push(@list, { id => $_, text => $_, icon => 'style/application_form.png' }); 
         } @files;
     } else {
         #
         # If there is only one part, it must be (or is expected to be) the application
         # name, so return a pre-defined list of types of objects under the app.
         if (@parts == 1) {
-            my @areas = ("Errors", "Datasets", "Users", "Events");
-            map {
-                push(@list, { id => "$id/$_", text => $_, leaf => $_ eq "Errors" || $_ eq "Events" ? 1 : 0 }); 
-            } @areas;
+            push (@list, {
+                id => "$id/Errors",
+                text => "Errors",
+                leaf => 1,
+                icon => "style/bug.png"
+            });
+            push (@list, {
+                id => "$id/Datasets",
+                text => "Datasets",
+                icon => "style/script_code.png"
+            });
+            push (@list, {
+                id => "$id/Users",
+                text => "Users",
+                icon => "style/user_gray.png"
+            });
+            push (@list, {
+                id => "$id/Events",
+                text => "Events",
+                icon => 'style/timeline_marker.png',
+                leaf => 1
+            });
         } else {
             #
             # If there are more than 2 parts, then we're looking at a specific 
@@ -92,7 +110,7 @@ sub JarvisTracker::List::do {
                 if (@parts > 2) {
                     $inSubdirectory = 1;
                     splice(@parts, 0, 2);
-                    $datasetDirectory .= join "/", @parts; # all parts have been previously checked for safety - no '..' or other unsafe characters are included.
+                    $datasetDirectory .= "/" . (join "/", @parts); # all parts have been previously checked for safety - no '..' or other unsafe characters are included.
                 }
 
                 opendir (QUERIES, $datasetDirectory) || die "Cannot read queries for '$id'. $!.";
@@ -101,7 +119,7 @@ sub JarvisTracker::List::do {
                 map { 
                     if ($_ =~ /\.xml$/) {
                         $_ =~ s/\.xml$//;
-                        push(@list, { id => "$id/$_", text => $_, leaf => 1 }); 
+                        push(@list, { id => "$id/$_", text => $_, leaf => 1, icon => 'style/bullet_blue.png' }); 
                     } elsif (-d $datasetDirectory . "/" . $_) {
                         opendir (QUERIES, $datasetDirectory . "/" . $_);
                         my @testq = grep (/\.xml$/, readdir(QUERIES));
@@ -118,7 +136,7 @@ sub JarvisTracker::List::do {
                     # Builtins
                     #
                     map {
-                        push (@list, { id => "$id/$_", text => $_, leaf => '1', datasetType => 'builtin' });
+                        push (@list, { id => "$id/$_", text => $_, leaf => '1', datasetType => 'builtin', icon => 'style/server.png' });
                     } qw(__status __logout __habitat);
 
                     #
@@ -126,12 +144,17 @@ sub JarvisTracker::List::do {
                     #
                     my @plugins = $xml->{jarvis}{app}{plugin}('@');
                     map {
-                        push(@list, { id => "$id/" . $_->{dataset}->content, text => $_->{dataset}->content, leaf => 1 }); 
+                        push(@list, { 
+                            id => "$id/" . $_->{dataset}->content, 
+                            text => $_->{dataset}->content, 
+                            leaf => 1,
+                            icon => 'style/plugin.png' 
+                        }); 
                     } @plugins;
 
                     my @execs = $xml->{jarvis}{app}{exec}('@');
                     map {
-                        push(@list, { id => "$id/" . $_->{dataset}->content, text => $_->{dataset}->content, leaf => 1 }); 
+                        push(@list, { id => "$id/" . $_->{dataset}->content, text => $_->{dataset}->content, leaf => 1, icon => 'style/application_xp_terminal.png' }); 
                     } @execs;
                 }
             #
@@ -151,7 +174,7 @@ sub JarvisTracker::List::do {
                 my $users = $sth->fetchall_arrayref({});
                 map {
                     my $u = $_->{username};
-                    push(@list, { id => "$id/$u", text => $u, leaf => 1 }); 
+                    push(@list, { id => "$id/$u", text => $u, leaf => 1, icon => 'style/bullet_yellow.png' }); 
                 } @{$users};
             #
             # Plugins and execs
