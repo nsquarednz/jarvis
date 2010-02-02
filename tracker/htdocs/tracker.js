@@ -52,7 +52,7 @@ jarvis.tracker.trackerTabs = {};
  * Global default configuration for the Jarvis Tracker application.
  */
 jarvis.tracker.configuration = {
-    defaultDateRange: new jarvis.Timeframe ('..now')
+    defaultDateRange: new jarvis.Timeframe ('..tonight')
 };
 
 /**

@@ -198,24 +198,77 @@ Ext.ux.TimeBasedVisualisation = Ext.extend(Ext.ux.Visualisation, {
     initComponent: function () {
         var me = this;
 
+        this.datePicker = new Ext.form.DateField({
+            format: 'd/m/Y',
+            value: this.graphConfig.timeframe.to().clone().clearTime().add(Date.DAY, -1), // To the user, subtract a day.
+            listeners: {
+                select: function (datePicker, newValue) { 
+                    var currentTf = me.graphConfig.timeframe;
+                    var end = newValue.add(Date.DAY, 1);
+                    me.alterGraphTimeframe (new jarvis.Timeframe(end.clone().add(Date.MILLI, -1 * (currentTf.to().getTime() - currentTf.from().getTime())), end));
+                }
+            }
+        });
+
         // Provide some controls to allow the user to change the timespan the graph
         // data covers.
         Ext.apply (this, {
             bbar: [
                 {
-                    text: 'Show:',
+                    xtype: 'tbspacer'
+                },
+                {
+                    toggleGroup: 'visualisationDateRangeToggleGroup',
+                    text: 'Show a Day',
+                    pressed: true,
+                    handler: function () { 
+                        var currentTf = me.graphConfig.timeframe;
+                        me.alterGraphTimeframe (new jarvis.Timeframe('..now', currentTf.to())); 
+                    }
+                },
+                {
+                    toggleGroup: 'visualisationDateRangeToggleGroup',
+                    text: 'Show a Week',
+                    handler: function () { 
+                        var currentTf = me.graphConfig.timeframe;
+                        me.alterGraphTimeframe (new jarvis.Timeframe('...now', currentTf.to())); 
+                    }
+                },
+                {
+                    xtype: 'tbseparator'
+                },
+                {
+                    xtype: 'tbspacer'
+                },
+                {
+                    text: 'From:',
                     xtype: 'label'
                 },
+                { xtype: 'tbspacer' },
+                { xtype: 'tbspacer' },
+                { xtype: 'tbspacer' },
+                this.datePicker,
                 {
-                    toggleGroup: 'visualisationDateRangeToggleGroup',
-                    text: 'Last Day',
-                    pressed: true,
-                    handler: function () { me.alterGraphTimeframe (new jarvis.Timeframe('..now')); }
+                    xtype: 'tbfill'
                 },
                 {
-                    toggleGroup: 'visualisationDateRangeToggleGroup',
-                    text: 'Last Week',
-                    handler: function () { me.alterGraphTimeframe (new jarvis.Timeframe('...now')); }
+                    text: "Back",
+                    cls: 'x-btn-text-icon',
+                    icon: 'style/arrow_left.png',
+                    handler: function () { 
+                        var currentTf = me.graphConfig.timeframe;
+                        me.alterGraphTimeframe (new jarvis.Timeframe(currentTf.from().clone().add(Date.MILLI, -1 * (currentTf.to().getTime() - currentTf.from().getTime())), currentTf.from().clone()));
+                    }
+                },
+                {
+                    xtype: 'tbbutton',
+                    text: "Forward",
+                    cls: 'x-btn-text-icon',
+                    icon: 'style/arrow_right.png',
+                    handler: function () { 
+                        var currentTf = me.graphConfig.timeframe;
+                        me.alterGraphTimeframe (new jarvis.Timeframe(currentTf.to().clone(), currentTf.to().clone().add(Date.MILLI, currentTf.to().getTime() - currentTf.from().getTime())));
+                    }
                 }
             ]
         });
@@ -229,6 +282,7 @@ Ext.ux.TimeBasedVisualisation = Ext.extend(Ext.ux.Visualisation, {
      */
     alterGraphTimeframe: function(newTimeframe) {
         this.graphConfig.timeframe = newTimeframe;
+        this.datePicker.setValue (newTimeframe.to().add(Date.DAY, -1));
         this.loadGraphData();
     },
 

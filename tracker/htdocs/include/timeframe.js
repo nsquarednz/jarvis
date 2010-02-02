@@ -54,47 +54,56 @@ Ext.ns('jarvis');
  * A Date object can be passed in as the second parameter
  * to indicate the 'now' time (instead of the code assuming
  * the value of 'new Date()' is now).
+ *
+ * The first parameter can also be date, in which case both
+ * parameters must be specified, and the parameters provide
+ * the date range for the timeframe.
  */
 jarvis.Timeframe = function (tf, now) {
     this._tf = tf;
     this._now = now;
 
-    var re = this.timeframeParserRe;
-    var pretendNow = now ? now.clone() : new Date();
-    var s = tf.match(re);
+    if (typeof this._tf === 'string') {
+        var re = this.timeframeParserRe;
+        var pretendNow = now ? now.clone() : new Date();
+        var s = tf.match(re);
 
-    if (s == null) {
-        throw "jarvis.Timeframe: cannot parse: " + tf;
-    }
+        if (s == null) {
+            throw "jarvis.Timeframe: cannot parse: " + tf;
+        }
 
-    switch (s[3]) {
-        case "tonight":
-            this._to = pretendNow.clearTime().add(Date.DAY, 1); break;
-        case "now":
-            this._to = pretendNow; break;
-        default:
-            throw "jarvis.Timeframe: Parse error of '" + tf + "'";
-    }
+        switch (s[3]) {
+            case "tonight":
+                this._to = pretendNow.clearTime().add(Date.DAY, 1); break;
+            case "now":
+                this._to = pretendNow; break;
+            default:
+                throw "jarvis.Timeframe: Parse error of '" + tf + "'";
+        }
 
-    var multiplier = 1;
-    if (s[1].length > 0) {
-        multiplier = parseInt(s[1]);
-    }
+        var multiplier = 1;
+        if (s[1].length > 0) {
+            multiplier = parseInt(s[1]);
+        }
 
-    switch (s[2].length) {
-        case 1:
-            this._from = this._to.clone().add(Date.HOUR, -1 * multiplier); break;
-        case 2:
-            this._from = this._to.clone().add(Date.DAY, -1 * multiplier); break;
-        case 3:
-            this._from = this._to.clone().add(Date.DAY, -7 * multiplier); break;
-        case 4:
-            this._from = this._to.clone().add(Date.MONTH, -1 * multiplier); break;
-        case 5:
-            this._from = this._to.clone().add(Date.YEAR, -1 * multiplier); break;
-            
-        default:
-            throw "jarvis.Timeframe: Parse error of '" + tf + "'";
+        switch (s[2].length) {
+            case 1:
+                this._from = this._to.clone().add(Date.HOUR, -1 * multiplier); break;
+            case 2:
+                this._from = this._to.clone().add(Date.DAY, -1 * multiplier); break;
+            case 3:
+                this._from = this._to.clone().add(Date.DAY, -7 * multiplier); break;
+            case 4:
+                this._from = this._to.clone().add(Date.MONTH, -1 * multiplier); break;
+            case 5:
+                this._from = this._to.clone().add(Date.YEAR, -1 * multiplier); break;
+                
+            default:
+                throw "jarvis.Timeframe: Parse error of '" + tf + "'";
+        }
+    } else {
+        this._from = this._tf;
+        this._to = this._now;
     }
 }
 
@@ -128,7 +137,7 @@ jarvis.Timeframe.prototype.clone = function () {
 }
 
 /**
- * Provides the span of time for the timeframe in minutes.
+ * Provides the span of time for the timeframe in minutes/days.
  */
 jarvis.Timeframe.prototype.span = function () {
     return (this._to - this._from) / (60 * 1000.0);
