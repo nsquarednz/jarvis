@@ -71,7 +71,7 @@ sub JarvisTracker::List::do {
                 id => "$id/Errors",
                 text => "Errors",
                 leaf => 1,
-                icon => "style/bug.png"
+                icon => "style/exclamation.png"
             });
             push (@list, {
                 id => "$id/Datasets",

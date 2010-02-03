@@ -149,14 +149,14 @@ return function (appName, extra) {
                         value: extra.params.appName || ''
                     }),
                     new Ext.ux.form.DateTime ({
-                        format: 'd/m/Y',
+                        dateFormat: 'd/m/Y',
                         fieldLabel: 'From',
                         id: 'from_' + timelineId,
                         value: extra.params.from || '',
                         value: extra.params.sid ? '' : Date.parseDate(new Date().format('Y-m-d\\TH:00:00'), 'c')
                     }),
                     new Ext.ux.form.DateTime({
-                        format: 'd/m/Y',
+                        dateFormat: 'd/m/Y',
                         fieldLabel: 'To',
                         id: 'to_' + timelineId,
                         value: extra.params.to || '',
