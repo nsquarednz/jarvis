@@ -55,7 +55,7 @@
             <else>
                 <property name="development_build" value="Jarvis development build b${env.BUILD_NUMBER} Id:${env.BUILD_ID}" />
                 <echo message="Built Development Build: ${development_build}" />
-                <echo append="false" file="../../build-version.txt">${development-build}</echo>
+                <echo append="false" file="../../build-version.txt">${development_build}</echo>
                 
             </else>
         </if>
