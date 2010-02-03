@@ -9,8 +9,14 @@
 -->
 
 <project name="Jarvis" default="deploy">
-    <property name="cvs_branch" value="HEAD" />
+
     <property environment="env" />
+
+    <!-- Hudson provided values -->
+    <property name="BUILD_FOR_RELEASE" value="false" />
+    <property name="MAJOR_VERSION_NUMBER" value="0" />
+    <property name="MINOR_VERSION_NUMBER" value="0" />
+    <property name="MAINTENANCE_NUMBER" value="0" />
     
     <taskdef resource="net/sf/antcontrib/antlib.xml" classpath="libs/ant-contrib-1.0b3.jar" />
     
@@ -29,28 +35,26 @@
             <arg value="build.bat"/>
         </exec>
         <if>
-            <equals arg1="${env.BUILD_FOR_RELEASE}" arg2="true" />
+            <equals arg1="${BUILD_FOR_RELEASE}" arg2="true" />
             <then>
-                <move file="output/jarvis_setup.exe" tofile="output/jarvis_v${env.MAJOR_VERSION_NUMBER}.${env.MINOR_VERSION_NUMBER}.${env.MAINTENANCE_NUMBER}_setup.exe"/>
+                <move file="output/jarvis_setup.exe" tofile="output/jarvis_v${MAJOR_VERSION_NUMBER}.${MINOR_VERSION_NUMBER}.${MAINTENANCE_NUMBER}_setup.exe"/>
             </then>
         </if>
     </target>
     
     <target name="build-number">
         <if>
-            <equals arg1="${env.BUILD_FOR_RELEASE}" arg2="true" />
+            <equals arg1="${BUILD_FOR_RELEASE}" arg2="true" />
             <then>
-                <property name="release-version" value="jarvis v${env.MAJOR_VERSION_NUMBER}.${env.MINOR_VERSION_NUMBER}.${env.MAINTENANCE_NUMBER}" />
-                <property name="cvs_tag" value="JARVIS_v${env.MAJOR_VERSION_NUMBER}_${env.MINOR_VERSION_NUMBER}_${env.MAINTENANCE_NUMBER}" />
-                <echo message="Built Release Version: ${release-version}" />
-                <echo append="false" file="../../build-version.txt">${release-version}</echo>
-                <!-- CVS tagging -->
-                <echo message="Tagging CVS source: branch=${cvs_branch} tag=${cvs_tag}" />
-                <cvs cvsRoot="${env.REPOSITORY_ROOT}" command="rtag -F -r ${cvs_branch} ${cvs_tag} jarvis" />
+                <property name="release_version" value="Jarvis v${MAJOR_VERSION_NUMBER}.${MINOR_VERSION_NUMBER}.${MAINTENANCE_NUMBER}" />
+                <property name="cvs_tag" value="JARVIS_v${MAJOR_VERSION_NUMBER}_${MINOR_VERSION_NUMBER}_${MAINTENANCE_NUMBER}" />
+                <echo message="Built Release Version: ${release_version}" />
+                <echo append="false" file="${deploy_dir}/build-version.txt">${release_version}</echo>
+                <cvs command="tag ${cvs_tag}" />
             </then>
             <else>
-                <property name="development-build" value="Jarvis development build b${env.BUILD_NUMBER} Id:${env.BUILD_ID}" />
-                <echo message="Built Development Build: ${development-build}" />
+                <property name="development_build" value="Jarvis development build b${env.BUILD_NUMBER} Id:${env.BUILD_ID}" />
+                <echo message="Built Development Build: ${development_build}" />
                 <echo append="false" file="../../build-version.txt">${development-build}</echo>
                 
             </else>
