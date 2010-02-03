@@ -49,8 +49,8 @@
                 <property name="release_version" value="Jarvis v${MAJOR_VERSION_NUMBER}.${MINOR_VERSION_NUMBER}.${MAINTENANCE_NUMBER}" />
                 <property name="cvs_tag" value="JARVIS_v${MAJOR_VERSION_NUMBER}_${MINOR_VERSION_NUMBER}_${MAINTENANCE_NUMBER}" />
                 <echo message="Built Release Version: ${release_version}" />
-                <echo append="false" file="${deploy_dir}/build-version.txt">${release_version}</echo>
-                <cvs command="tag ${cvs_tag} ../../*" /> <!-- tag from the root of the module -->
+                <echo append="false" file="../../build-version.txt">${release_version}</echo>
+                <cvs command="tag ${cvs_tag} ../../" /> <!-- tag from the root of the module -->
             </then>
             <else>
                 <property name="development_build" value="Jarvis development build b${env.BUILD_NUMBER} Id:${env.BUILD_ID}" />
