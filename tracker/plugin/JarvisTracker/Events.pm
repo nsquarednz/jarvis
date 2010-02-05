@@ -51,12 +51,28 @@ sub JarvisTracker::Events::do {
 
     my $counter = 0;
     foreach (@{$events}) {
+        my $params = '';
+        
+        my @parameters = (split /:/, $_->{params});
+        if (scalar(@parameters) > 0) {
+            $params = "Parameters:<table>";
+            map {
+                my @d = split /=/;
+                if (@d == 2) {
+                    $params .= "<tr><td class='parameter'>$d[0]</td><td>$d[1]</td></tr>";
+                } else {
+                    $params .= "<tr><td colspan='2'>$_</td></tr>";
+                }
+
+            } @parameters;
+        }
+
         my $eventData = {
             icon => 'style/instant-timeline-event-icon.png',
             start => $_->{start_time},
-            title => $_->{app_name} . '/' . ($_->{username} || '') . '/' . $_->{dataset},
+            title => ($_->{username} || '') . '/' . $_->{dataset},
             durationEvent => 'false',
-            description => $_->{error}
+            description => $_->{error} . "<p>" . $params
         };
 
         $eventData->{end} = $_->{end_time} if $_->{instant} eq '0';
