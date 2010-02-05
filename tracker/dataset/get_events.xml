@@ -2,12 +2,13 @@
     <select>
         SELECT 
             start_time AS start_time_raw,
-            strftime('%Y-%m-%d %H:%M:%f',start_time) AS start_time, 
-            strftime('%Y-%m-%d %H:%M:%f',start_time + duration_ms * (1.0 / (1000 * 60 * 60 * 24))) AS end_time, 
+            strftime('%Y-%m-%d %H:%M:%fZ',start_time) AS start_time, 
+            strftime('%Y-%m-%d %H:%M:%fZ',start_time + duration_ms * (1.0 / (1000 * 60 * 60 * 24))) AS end_time, 
             (CASE WHEN duration_ms &lt; 1000 THEN '1' ELSE '0' END) as instant,
             app_name, 
             username, 
             dataset,
+            params,
             '' AS error
         FROM 
             request 
@@ -20,12 +21,13 @@
         UNION
         SELECT 
             start_time AS start_time_raw,
-            strftime('%Y-%m-%d %H:%M:%f',start_time) AS start_time, 
-            strftime('%Y-%m-%d %H:%M:%f',start_time) AS end_time, 
+            strftime('%Y-%m-%d %H:%M:%fZ',start_time) AS start_time, 
+            strftime('%Y-%m-%d %H:%M:%fZ',start_time) AS end_time, 
             '1' as instant,
             app_name, 
             username, 
             dataset,
+            params,
             message AS error
         FROM 
             error 

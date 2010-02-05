@@ -166,8 +166,10 @@ jarvis.tracker.loadAndShowTab = function(id, page, appName, extraParameters, cal
  *              - <parameters> are passed through to the relevant dataset detail page
  *                and be used for the query parameters there.
  * <app name>/Events?<parameters>
+ * root/Events?<parameters>
  *              - for details on events that have occurred based on the parameters.
  *              - <parameters> are passed through to the event explorer page.
+ *              - root indicates no specific app has been selected.
  * <app name>/Users/<user name>
  *
  * Note - not all paths do anything yet
@@ -179,6 +181,10 @@ jarvis.tracker.loadAndShowTabFromPath = function(path, callback) {
 
     if (pathAndParam.length > 1) {
         params = Ext.urlDecode (pathAndParam[1]);
+    }
+
+    if (parts.length > 1) {
+        parts[1] = parts[1].toLowerCase();
     }
 
     // Root node has only one part.
@@ -195,13 +201,13 @@ jarvis.tracker.loadAndShowTabFromPath = function(path, callback) {
             params: params
         } : null;
 
-        if (parts[1] == 'Errors') {
+        if (parts[1] == 'errors') {
             jarvis.tracker.loadAndShowTab (pathAndParam[0], 'errors-summary.js', parts[0], extra, callback);
-        } else if (parts[1] == 'Datasets') {
+        } else if (parts[1] == 'datasets') {
             jarvis.tracker.loadAndShowTab (pathAndParam[0], 'queries-summary.js', parts[0], extra, callback);
-        } else if (parts[1] == 'Users') {
+        } else if (parts[1] == 'users') {
             jarvis.tracker.loadAndShowTab (pathAndParam[0], 'users-summary.js', parts[0], extra, callback);
-        } else if (parts[1] == 'Events') {
+        } else if (parts[1] == 'events') {
 
             // The event explorer is special - each time we load one, we create a unique instance
             jarvis.tracker.loadAndShowTabFromPath.nextEventExplorerNumber = jarvis.tracker.loadAndShowTabFromPath.nextEventExplorerNumber || 0;
@@ -211,7 +217,7 @@ jarvis.tracker.loadAndShowTabFromPath = function(path, callback) {
                 params: {}
             };
             extra.eventExplorerNumber = jarvis.tracker.loadAndShowTabFromPath.nextEventExplorerNumber;
-            extra.params.appName = extra.params.appName || parts[0];
+            extra.params.appName = extra.params.appName || (parts[0] != 'root' ? parts[0] : '');
 
             jarvis.tracker.loadAndShowTab (pathAndParam[0] + '/' + extra.eventExplorerNumber, 'event-explorer.js', parts[0], extra, callback);
         }
@@ -227,7 +233,7 @@ jarvis.tracker.loadAndShowTabFromPath = function(path, callback) {
     // We could do this in the query code, but ExtJS panels require their regions
     // to be defined pre-render, and it is easier to do this query here,
     // and pass the information through to the query page.
-    else if (parts.length >= 3 && parts[1] == 'Datasets') {
+    else if (parts.length >= 3 && parts[1] == 'datasets') {
 
         var app = parts[0];
         parts.splice(0, 2);
@@ -248,7 +254,7 @@ jarvis.tracker.loadAndShowTabFromPath = function(path, callback) {
     }
 
     // User information.
-    else if (parts.length >= 3 && parts[1] == 'Users') {
+    else if (parts.length >= 3 && parts[1] == 'users') {
         jarvis.tracker.loadAndShowTab (pathAndParam[0], 'user.js', parts[0], {
             user: parts[2]
         }, callback);

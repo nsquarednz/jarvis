@@ -84,14 +84,15 @@ return function (appName, extra) {
 
     var timelineId = Ext.id();
     var form = null;
-    
-    var submitForm = function() {
-        var params = { };
 
+    var submitForm = function() {
+
+        var params = {};
         var lookups = ['sid', 'user', 'limit', 'app_name', 'from', 'to' ];
         Ext.each (lookups, function (e) {
             if (form.findById(e + '_' + timelineId).getValue())
                 var v = form.findById(e + '_' + timelineId).getValue();
+                console.log ('got param', e, v);
                 if (v && ((typeof v === 'string' && v.length > 0) || true)) {
                     params[e] = Ext.isDate(v) ? v.formatForServer() : v;
                 }
@@ -104,7 +105,7 @@ return function (appName, extra) {
             success: function (xhr) { 
                 var data = Ext.util.JSON.decode (xhr.responseText);
                 if (data.data[0].t) {
-                    form.timelineObject = displayTimeline (timelineId, Date.parseDate (data.data[0].t, 'Y-m-d H:i:s'), params);
+                    form.timelineObject = displayTimeline (timelineId, Date.fromJulian (data.data[0].t), params);
                 } else {
                     Ext.Msg.show ({
                         title: 'No data',
@@ -152,15 +153,15 @@ return function (appName, extra) {
                         dateFormat: 'd/m/Y',
                         fieldLabel: 'From',
                         id: 'from_' + timelineId,
-                        value: extra.params.from || '',
-                        value: extra.params.sid ? '' : Date.parseDate(new Date().format('Y-m-d\\TH:00:00'), 'c')
+                        value: extra.params.from ? Date.fromJulian(extra.params.from) : 
+                            (extra.params.sid ? '' : Date.parseDate(new Date().format('Y-m-d\\TH:00:00'), 'c'))
                     }),
                     new Ext.ux.form.DateTime({
                         dateFormat: 'd/m/Y',
                         fieldLabel: 'To',
                         id: 'to_' + timelineId,
-                        value: extra.params.to || '',
-                        value: extra.params.sid ? '' : Date.parseDate(new Date().add(Date.HOUR, 1).format('Y-m-d\\TH:00:00'), 'c')
+                        value: extra.params.to ? Date.fromJulian(extra.params.to) : 
+                            (extra.params.sid ? '' : Date.parseDate(new Date().add(Date.HOUR, 1).format('Y-m-d\\TH:00:00'), 'c'))
                     })
                 ]
             },
@@ -209,9 +210,7 @@ return function (appName, extra) {
         ]
     });
 
-    if (extra.params.sid || extra.params.user) {
-        submitForm();
-    }
+    submitForm.defer(1);
 
     var center = new Ext.Panel({
         region: 'center',

@@ -1,7 +1,7 @@
 <dataset read="*" write="">
     <select>
         SELECT 
-            datetime(MIN(start_time)) AS t
+            MIN(start_time) AS t
         FROM
         (
             SELECT MIN(start_time) AS start_time

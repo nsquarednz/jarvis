@@ -37,13 +37,22 @@ return function (appName, extra) {
         }
     });
 
+    var graph = new jarvis.graph.TpsGraph({
+        listeners: {
+            click: function(data) {
+                var path = appName + '/events?from=' + (data.t - 1.0 / 48.0) + '&to=' + (data.t + 1.0 / 48.0);
+                jarvis.tracker.loadAndShowTabFromPath (path);
+            }
+        }
+    });
+
     var tps = {
         xtype: 'TimeBasedVisualisation',
         region: 'center',
         dataSource: {
             dataset: 'tps/'+ appName
         },
-        graph: new jarvis.graph.TpsGraph(),
+        graph: graph,
         graphConfig: {
             timeframe: jarvis.tracker.configuration.defaultDateRange.clone()
         }
@@ -59,6 +68,5 @@ return function (appName, extra) {
             tps
         ]
     });
-
 }; })();
 

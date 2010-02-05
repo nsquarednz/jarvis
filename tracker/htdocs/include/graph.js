@@ -27,42 +27,55 @@ Ext.ns('jarvis.graph');
 /******************************************************************************
  * Base graph class.
  *****************************************************************************/
-jarvis.graph.Graph = function() {
+jarvis.graph.Graph = function(config) {
+    Ext.apply (this, config);
+
+    this.addEvents(
+        /**
+         * An event fired before the loading of datasets is started.
+         */
+        'click'
+    );
+
+    jarvis.graph.Graph.superclass.constructor.call(this); // Observer constructor call.
 };
 
-/*
- * Provide a title for the graph.
- */
-jarvis.graph.Graph.prototype.title = function() {
-        throw 'ERROR: base graph "title" function called. This is an abstract function and needs to be overridden.';
-};
+Ext.extend (jarvis.graph.Graph, Ext.util.Observable, {
 
-/*
- * Rendering function. Renders to 'el' with the given data
- * 
- * Parameters:
- *      el      - is a Ext.Element object. 
- *      data    - is an array of data points, graph specific.
- *      config  - configuration for rendering the graph, graph
- *                specific.
- */
-jarvis.graph.Graph.prototype.render = function (el, data, config) {
-    throw 'ERROR: base graph "render" function called. This is an abstract function and needs to be overridden.';
-};
+    /*
+     * Provide a title for the graph.
+     */
+    title: function() {
+            throw 'ERROR: base graph "title" function called. This is an abstract function and needs to be overridden.';
+    },
 
-/*
- * Provide a message indicating there is no data to display a graph on the 
- * given element (not the same as if there was an error reading the data!)
- */
-jarvis.graph.Graph.prototype.noDataMessage = function(el) {
-    el.getEl().update ('<i>No data available to display graph.</i>');
-}
+    /*
+     * Rendering function. Renders to 'el' with the given data
+     * 
+     * Parameters:
+     *      el      - is a Ext.Element object. 
+     *      data    - is an array of data points, graph specific.
+     *      config  - configuration for rendering the graph, graph
+     *                specific.
+     */
+    render: function (el, data, config) {
+        throw 'ERROR: base graph "render" function called. This is an abstract function and needs to be overridden.';
+    },
 
-/*
- * The default colors to use. We assume that the general page is blue, so we choose
- * a good contrasting color (orange in this case).
- */
-jarvis.graph.Graph.defaultColors = pv.color('#B77A1B');
+    /*
+     * Provide a message indicating there is no data to display a graph on the 
+     * given element (not the same as if there was an error reading the data!)
+     */
+    noDataMessage: function(el) {
+        el.getEl().update ('<i>No data available to display graph.</i>');
+    },
+
+    /*
+     * The default colors to use. We assume that the general page is blue, so we choose
+     * a good contrasting color (orange in this case).
+     */
+    defaultColors:  pv.color('#B77A1B')
+});
 
 /******************************************************************************
  * Graph showing performance of a dataset query
@@ -145,8 +158,8 @@ jarvis.graph.DatasetPerformanceGraph = Ext.extend(jarvis.graph.Graph, {
             .data ([ median ])
             .top (height / 3)
             .left (function (a) { return xscale(a); })
-            .fillStyle (jarvis.graph.Graph.defaultColors)
-            .strokeStyle (jarvis.graph.Graph.defaultColors)
+            .fillStyle (this.defaultColors)
+            .strokeStyle (this.defaultColors)
             .title (function (a) { return 'Median: ' + xscale.tickFormat(a) + 'ms, Mean: ' + xscale.tickFormat(mean) + 'ms'; });
 
         g.add (pv.Rule)
@@ -173,6 +186,7 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
 
     render: function (el, data, config) {
 
+        var me = this;
         var elBox = el.getBox();
 
         width = elBox.width - 20; // 20 pixels gives a buffer to avoid scrollbars under Chrome TODO - fix
@@ -202,17 +216,44 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
 
         var barwidth = xscale(1) - xscale(0) > 4 ? Math.round((xscale(1) - xscale(0)) / 2) : 1;
 
-        g.add (barwidth < 2 ? pv.Area : pv.Bar)
-            .data (data) 
-            .left (function (d) { return xscale(this.index); })
-            .height (function (d) { return yscale(d.c); })
-            .width (barwidth)
-            .bottom (0)
-            .fillStyle (jarvis.graph.Graph.defaultColors)
-            .title (function (d) {
-                var date = Date.fromJulian(d.t);
-                return 'For ' + date.format ('g:ia') + ': avg: ' + Math.round(d.c * 100) / 100;
-            });
+        if (barwidth < 2) {
+            g.add (pv.Area)
+                .data (data) 
+                .left (function (d) { return xscale(this.index); })
+                .height (function (d) { return yscale(d.c); })
+                .width (barwidth)
+                .bottom (0)
+                .fillStyle (this.defaultColors)
+                .title (function (d) {
+                    var date = Date.fromJulian(d.t);
+                    return 'For ' + date.format ('g:ia') + ': avg: ' + Math.round(d.c * 100) / 100;
+                });
+        } else {
+            g.add (pv.Bar)
+                .data (data) 
+                .left (function (d) { return xscale(this.index); })
+                .height (function (d) { return yscale(d.c); })
+                .width (barwidth)
+                .bottom (0)
+                .fillStyle (this.defaultColors);
+
+            // This is an invisible clickable bar that's big enough to click, and shows the highlighted 
+            // point in time.
+            g.add (pv.Bar)
+                .data (data) 
+                .left (function (d) { return xscale(this.index); })
+                .height (height - buffer - bottomBuffer)
+                .width (xscale(1) - xscale(0))
+                .bottom (0)
+                .fillStyle (pv.color ('#fff').alpha(0.01))
+                .title (function (d) {
+                    var date = Date.fromJulian(d.t);
+                    return 'For ' + date.format ('g:ia') + ': avg: ' + Math.round(d.c * 100) / 100;
+                })
+                .event ('click', function (d) {
+                    me.fireEvent ('click', d);
+                });
+        }
 
         var yticks = yscale.ticks();
         if (yscale (yticks [yticks.length - 1]) - yscale(maxTransactions) < -10 ) {

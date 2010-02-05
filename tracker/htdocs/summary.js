@@ -42,7 +42,14 @@ return function () {
         dataSource: {
             dataset: 'tps'
         },
-        graph: new jarvis.graph.TpsGraph(),
+        graph: new jarvis.graph.TpsGraph({
+            listeners: {
+                click: function(data) {
+                    var path = 'root/events?from=' + (data.t - 1.0 / 48.0) + '&to=' + (data.t + 1.0 / 48.0);
+                    jarvis.tracker.loadAndShowTabFromPath (path);
+                }
+            }
+        }),
         graphConfig: {
             timeframe: jarvis.tracker.configuration.defaultDateRange.clone()
         }
