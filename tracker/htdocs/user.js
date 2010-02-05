@@ -120,7 +120,7 @@ return function (appName, extra) {
                 dataIndex: 'address',
                 width: 20,
                 renderer: function (x, c) { 
-                    if (globalReverseDnsCache[x] != x) {
+                    if (globalReverseDnsCache[x] && globalReverseDnsCache[x] != x) {
                         c.attr = 'ext:qtip="' + x + '"';
                         return globalReverseDnsCache[x];
                     }
