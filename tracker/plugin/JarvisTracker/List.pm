@@ -162,12 +162,16 @@ sub JarvisTracker::List::do {
             #
             } elsif ($parts[1] eq "Users") {
                 my $dbh = &Jarvis::DB::handle ($jconfig);
-                my $sql = "SELECT DISTINCT username FROM request WHERE app_name = ?";
+                my $sql = <<EOF;
+                    SELECT DISTINCT username FROM request WHERE app_name = ?
+                    UNION
+                    SELECT DISTINCT username FROM login WHERE app_name = ?
+EOF
                 my $sth = $dbh->prepare ($sql) || die "Couldn't prepare statement for listing users: " . $dbh->errstr;
                 my $stm = {};
                 $stm->{sth} = $sth;
                 $stm->{ttype} = 'JarvisTrackerList-users';
-                my $params = [ $parts[0] ];
+                my $params = [ $parts[0], $parts[0] ];
                 &Jarvis::Dataset::statement_execute ($jconfig, $stm, $params);
                 $stm->{'error'} && die "Unable to execute statement for listing users: " . $dbh->errstr;
 
