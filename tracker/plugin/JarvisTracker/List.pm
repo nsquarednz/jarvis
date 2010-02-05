@@ -162,7 +162,7 @@ sub JarvisTracker::List::do {
             #
             } elsif ($parts[1] eq "Users") {
                 my $dbh = &Jarvis::DB::handle ($jconfig);
-                my $sql = "SELECT DISTINCT username FROM login WHERE app_name = ? AND logged_in = 1";
+                my $sql = "SELECT DISTINCT username FROM request WHERE app_name = ?";
                 my $sth = $dbh->prepare ($sql) || die "Couldn't prepare statement for listing users: " . $dbh->errstr;
                 my $stm = {};
                 $stm->{sth} = $sth;
@@ -174,7 +174,7 @@ sub JarvisTracker::List::do {
                 my $users = $sth->fetchall_arrayref({});
                 map {
                     my $u = $_->{username};
-                    push(@list, { id => "$id/$u", text => $u, leaf => 1, icon => 'style/bullet_yellow.png' }); 
+                    push(@list, { id => "$id/$u", text => (length($u) == 0 ? '(none)' : $u), leaf => 1, icon => 'style/bullet_yellow.png' }); 
                 } @{$users};
             #
             # Plugins and execs
