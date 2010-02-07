@@ -50,23 +50,43 @@ return function (appName, extra) {
         dateParamAsDate: initialDate // Our own property as well
     });
 
-    var errorDetailsTemplate = new Ext.Template (
+    var errorDetailsTemplate = new Ext.XTemplate (
         '<table>',
         '  <tr><th>Event Time</th><td>{start_time}</td></tr>',
         '  <tr><th>Username</th><td>{username}</td>',
         '      <th>SID</th><td>{sid}</td></tr>',
         '  <tr><th>User Groups</th><td colspan="3">{group_list}</td></tr>',
         '  <tr><th>Dataset</th><td colspan="3">{dataset}</td></tr>',
-        '  <tr><th>Request Parameters</th><td colspan="3">{params}</td></tr>',
+        '  <tr><th>Error Message</th><td colspan="3"><code>{message}</code></td></tr>',
+        '  <tr><th>Request Parameters</th><td colspan="3"><table class="error-details-params">',
+        '  <tpl for="params">',
+        '    <tr><td class="edp-key">{key}</td><td width="100%">{value}</td></tr>',
+        '  </tpl></table>',
         '  <tr><th>Post Body</th><td colspan="3">{post_body}</td></tr>',
-        '  <tr><th>Error Message</th><td colspan="3"><pre>{message}</pre></td></tr>',
         '</table>'
     );
 
     var recentErrorDetailsId = Ext.id();
 
     var showErrorDetails = function(record) {
-        errorDetailsTemplate.overwrite (recentErrorDetailsId, record.json);
+        var data = {
+            username: record.json.username,
+            sid: record.json.sid,
+            group_list: record.json.group_list,
+            start_time: Date.parseDate(record.json.start_time, 'c'),
+            dataset: record.json.dataset,
+            message: record.json.message,
+            params: [],
+            post_body: record.json.post_body
+        };
+
+        Ext.each (record.json.params.split(':'),
+        function (a) {
+            var p = a.split ('=');
+            data.params.push ({key: p[0], value: p[1]});
+        });
+
+        errorDetailsTemplate.overwrite (recentErrorDetailsId, data);
     };
 
     var recentErrorsList = new Ext.grid.GridPanel({
@@ -95,7 +115,13 @@ return function (appName, extra) {
             }
         ],
         viewConfig: {
-            forceFit: true
+            forceFit: true,
+            getRowClass : function (row, index) { 
+              var cls = ''; 
+              var data = row.data; 
+
+              return 'grid-old';
+           } 
         },
         tbar: [
             'Viewing: ',

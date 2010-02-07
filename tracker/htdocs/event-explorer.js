@@ -92,7 +92,6 @@ return function (appName, extra) {
         Ext.each (lookups, function (e) {
             if (form.findById(e + '_' + timelineId).getValue())
                 var v = form.findById(e + '_' + timelineId).getValue();
-                console.log ('got param', e, v);
                 if (v && ((typeof v === 'string' && v.length > 0) || true)) {
                     params[e] = Ext.isDate(v) ? v.formatForServer() : v;
                 }

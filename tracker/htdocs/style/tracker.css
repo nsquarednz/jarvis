@@ -77,6 +77,18 @@ div.error-details th {
     font-family: tahoma,helvetica,sans-serif;
 }
 
+table.error-details-params {
+}
+table.error-details-params td {
+    padding: 0px;
+    font-size: 10px;
+    font-family: tahoma,helvetica,sans-serif;
+}
+table.error-details-params td.edp-key {
+    font-style: italic;
+    padding-right: 10px;
+}
+
 
 /**
  * For event timeline 
