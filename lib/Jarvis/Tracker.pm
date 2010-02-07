@@ -152,7 +152,13 @@ sub finish {
 
     # Parameters.  Discard system special (__abc...).  Separate with colons.  Escape special chars.
     my %params = $jconfig->{'params_href'} ? %{ $jconfig->{'params_href'} } : ();
-    my $param_string = join (':', map { my $pval = ($params{$_} || ''); s/\\/\\\\/g; s/=/\\=/g; s/:/\\:/g; "$_" . "=" . $pval } grep { ! m/^__/ } sort (keys %params));
+    my $param_string = join (':', map {
+        my $pval = ($params{$_} || '');
+        $pval =~ s/\\/\\\\/g;
+        $pval =~ s/=/\\=/g;
+        $pval =~ s/:/\\:/g;
+        "$_" . "=" . $pval
+    } grep { ! m/^__/ } sort (keys %params));
 
     # Julian time of request start.
     my $tstart = $jconfig->{'tstart'};
@@ -193,7 +199,7 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
 #       $http_response_code - the HTTP response code that will be or has been
 #                             used for the requests that caused the error (e.g.
 #                             401). Only the number is required - not the text
-#                             description of the code, though text after the 
+#                             description of the code, though text after the
 #                             initial number is discarded.
 #       $message - Error text that was printed to STDERR.
 #
@@ -230,7 +236,13 @@ sub error {
 
     # Parameters.  Discard system special (__abc...).  Separate with colons.  Escape special chars.
     my %params = $jconfig->{'params_href'} ? %{ $jconfig->{'params_href'} } : ();
-    my $param_string = join (':', map { my $pval = ($params{$_} || ''); s/\\/\\\\/g; s/=/\\=/g; s/:/\\:/g; "$_" . "=" . $pval } grep { ! m/^__/ } sort (keys %params));
+    my $param_string = join (':', map {
+        my $pval = ($params{$_} || '');
+        $pval =~ s/\\/\\\\/g;
+        $pval =~ s/=/\\=/g;
+        $pval =~ s/:/\\:/g;
+        "$_" . "=" . $pval
+    } grep { ! m/^__/ } sort (keys %params));
 
     # Julian time of request start.
     my $tstart = $jconfig->{'tstart'};
