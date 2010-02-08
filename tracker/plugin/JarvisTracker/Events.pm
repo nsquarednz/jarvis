@@ -39,7 +39,9 @@ sub JarvisTracker::Events::do {
     );
 
     my $limit = $jconfig->{cgi}->param('limit') || '500';
+    my $start = $jconfig->{cgi}->param('start') || '0';
     $limit =~ /^[0-9]+$/ || die 'Error in parameters. Limit must be a number.';
+    $start =~ /^[0-9]+$/ || die 'Error in parameters. Start must be a number.';
 
     my @eventList;
 
@@ -50,10 +52,14 @@ sub JarvisTracker::Events::do {
     ref($events) ne 'ARRAY' && die $events; # If there was an error, this is an error message, not an array of data!
 
     my $counter = 0;
-    foreach (@{$events}) {
+    for (my $i = $start; 
+            $i < ($start + $limit >= scalar(@{$events}) ? scalar(@{$events}) : ($start + $limit)); 
+            ++$i) {
+        my $e = $events->[$i];
+
         my $params = '';
         
-        my @parameters = (split /:/, $_->{params});
+        my @parameters = (split /:/, $e->{params});
         if (scalar(@parameters) > 0) {
             $params = "Parameters:<table>";
             map {
@@ -69,25 +75,24 @@ sub JarvisTracker::Events::do {
 
         my $eventData = {
             icon => 'style/instant-timeline-event-icon.png',
-            start => $_->{start_time},
-            title => ($_->{username} || '') . '/' . $_->{dataset},
+            start => $e->{start_time},
+            title => ($e->{username} || '') . '/' . $e->{dataset},
             durationEvent => 'false',
-            description => $_->{error} . "<p>" . $params
+            description => $e->{error} . "<p>" . $params
         };
 
-        $eventData->{end} = $_->{end_time} if $_->{instant} eq '0';
-        $eventData->{durationEvent} = 'true' if $_->{instant} eq '0';
-        $eventData->{color} = '#999' if $_->{dataset} =~ /^__/;
-        $eventData->{color} = 'red' if length($_->{error}) > 0;
+        $eventData->{end} = $_->{end_time} if $e->{instant} eq '0';
+        $eventData->{durationEvent} = 'true' if $e->{instant} eq '0';
+        $eventData->{color} = '#999' if $e->{dataset} =~ /^__/;
+        $eventData->{color} = 'red' if length($e->{error}) > 0;
 
         push(@eventList, $eventData);
 
         $counter ++;
-        last if $counter > $limit;
     }
 
     $events{'events'} = \@eventList;
-    $events{'fetched'} = $counter;
+    $events{'fetched'} = scalar(@{$events});
 
     my $json = JSON::PP->new->pretty(1);
     return $json->encode ( \%events );

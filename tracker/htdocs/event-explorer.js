@@ -26,7 +26,7 @@
 (function () {
 
 
-function displayTimeline(id, d, params) {
+function displayTimeline(id, d, params, afterLoadCallback) {
     var eventSource = new Timeline.DefaultEventSource(0);
     var theme = Timeline.ClassicTheme.create();
     theme.event.bubble.width = 450;  
@@ -72,6 +72,9 @@ function displayTimeline(id, d, params) {
         success: function (xhr, req) { 
             var data = Ext.util.JSON.decode (xhr.responseText);
             eventSource.loadJSON(data, '');
+            if (afterLoadCallback) {
+                afterLoadCallback (data);
+            }
         },
         failure: jarvis.tracker.extAjaxRequestFailureHandler
     });
@@ -84,10 +87,13 @@ return function (appName, extra) {
 
     var timelineId = Ext.id();
     var form = null;
+    var start = 0;
 
     var submitForm = function() {
 
-        var params = {};
+        var params = {
+            start: start
+        };
         var lookups = ['sid', 'user', 'limit', 'app_name', 'from', 'to' ];
         Ext.each (lookups, function (e) {
             if (form.findById(e + '_' + timelineId).getValue())
@@ -103,16 +109,20 @@ return function (appName, extra) {
             params: params,
             success: function (xhr) { 
                 var data = Ext.util.JSON.decode (xhr.responseText);
+                var dte = new Date();
                 if (data.data[0].t) {
-                    form.timelineObject = displayTimeline (timelineId, Date.fromJulian (data.data[0].t), params);
-                } else {
-                    Ext.Msg.show ({
-                        title: 'No data',
-                        msg: 'Cannot find data matching search terms',
-                        buttons: Ext.Msg.OK,
-                        icon: Ext.Msg.INFO
-                    });
+                    dte = Date.fromJulian (data.data[0].t)
                 }
+                form.timelineObject = displayTimeline (timelineId, dte, params, function (data) {
+                    form.ownerCt.getBottomToolbar().items.get('resultsinfo').setText('Viewing ' + start + ' to '  + (start + data.events.length) + ' of ' + data.fetched + ' events');
+                    window.mytb = form.ownerCt;
+
+                    if (data.events.length > 0) {
+                        console.log ("goin", data, data.events[0], Timeline.DateTime);
+                        console.log ("going to", Timeline.DateTime.parseIso8601DateTime(data.events[0].start));
+                        form.timelineObject.getBand(0).setCenterVisibleDate(Timeline.DateTime.parseIso8601DateTime(data.events[0].start));
+                    }
+                });
             },
             failure: jarvis.tracker.extAjaxRequestFailureHandler
         });
@@ -190,8 +200,8 @@ return function (appName, extra) {
                         fieldLabel: 'Max. # of Events',
                         id: 'limit_' + timelineId,
                         value: extra.params.maxEvents || '',
-                        store: [ '100', '500', '1000', '1500' ],
-                        value: '500',
+                        store: [ '100', '250', '500', '1000', '1500' ],
+                        value: '250',
                         mode: 'local'
                     })
                 ]
@@ -241,7 +251,37 @@ return function (appName, extra) {
                     setTimeout(function () { form.timelineObject.layout(); }, 0);
                 }
             }
-        }
+        },
+        bbar: [
+            {
+                xtype: 'label',
+                id: 'resultsinfo',
+                text: 'Viewing 0 of 0 events'
+            },
+            {
+                xtype: 'tbfill'
+            },
+            {
+                text: "Back",
+                cls: 'x-btn-text-icon',
+                icon: 'style/arrow_left.png',
+                handler: function () { 
+                    start -= form.findById('limit_' + timelineId).getValue();
+                    start = start < 0 ? 0 : start;
+                    submitForm();
+                }
+            },
+            {
+                xtype: 'tbbutton',
+                text: "Forward",
+                cls: 'x-btn-text-icon',
+                icon: 'style/arrow_right.png',
+                handler: function () { 
+                    start += 1 * form.findById('limit_' + timelineId).getValue();
+                    submitForm();
+                }
+            }
+        ]
     })
 
 }; })();
