@@ -118,8 +118,6 @@ return function (appName, extra) {
                     window.mytb = form.ownerCt;
 
                     if (data.events.length > 0) {
-                        console.log ("goin", data, data.events[0], Timeline.DateTime);
-                        console.log ("going to", Timeline.DateTime.parseIso8601DateTime(data.events[0].start));
                         form.timelineObject.getBand(0).setCenterVisibleDate(Timeline.DateTime.parseIso8601DateTime(data.events[0].start));
                     }
                 });
