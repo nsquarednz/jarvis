@@ -32,6 +32,9 @@ Ext.ux.ErrorList = Ext.extend (Ext.Panel, {
                 fields: ['sid', 'app_name', 'group_list', 'dataset', 'action', 'start_time', 'username', 'params', 'post_body', 'message']
             }),
             listeners: {
+                'load': function (store) {
+                    store.reload.defer(60 * 1000 * 5, store); // Reload automatically after a minute.
+                },
                 'loadexception': jarvis.tracker.extStoreLoadExceptionHandler
             }
         });
@@ -86,6 +89,15 @@ Ext.ux.ErrorList = Ext.extend (Ext.Panel, {
             layout: 'fit',
             items: [
                 errorList
+            ],
+            tools: [
+                {
+                    id: 'refresh',
+                    qtip: 'Reload recent error list from the server',
+                    handler: function () {
+                        errorsStore.reload();
+                    }
+                }
             ]
         });
 
