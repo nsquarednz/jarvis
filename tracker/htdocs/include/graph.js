@@ -381,12 +381,10 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
                 .bottom (0)
                 .fillStyle (pv.color ('#fff').alpha(0.01))
                 .event ('mouseover', function (d) {
-                    innerp.i(this.index);
-                    innerp.render();
+                    return innerp.i(this.index);
                 })
                 .event ('mouseout', function (d) {
-                    innerp.i(-1);
-                    innerp.render();
+                    return innerp.i(-1);
                 })
                 .event ('click', function (d) {
                     me.fireEvent ('click', d);
