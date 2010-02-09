@@ -130,6 +130,24 @@ return function (appName, extra) {
 
     var panelItems = [];
 
+    var tps = new Ext.ux.TimeBasedVisualisation ({
+        anchor: '100% -100',
+        dataSource: {
+            dataset: 'tps/' + appName + '/' + extra.query
+        },
+        graph: new jarvis.graph.TpsGraph({
+            listeners: {
+                click: function(data) {
+                    var path = appName + '/events?from=' + (data.t - 1.0 / 48.0) + '&to=' + (data.t + 1.0 / 48.0) + '&text=' + extra.query;
+                    jarvis.tracker.loadAndShowTabFromPath (path);
+                }
+            }
+        }),
+        graphConfig: {
+            timeframe: jarvis.tracker.configuration.defaultDateRange.clone()
+        }
+    });
+
     var center = new Ext.Panel({
         region: 'center',
         layout: 'anchor',
@@ -143,17 +161,7 @@ return function (appName, extra) {
                 },
                 graph: new jarvis.graph.DatasetPerformanceGraph()
             },
-            {
-                xtype: 'TimeBasedVisualisation',
-                anchor: '100% -100',
-                dataSource: {
-                    dataset: 'tps/' + appName + '/' + extra.query
-                },
-                graph: new jarvis.graph.TpsGraph(),
-                graphConfig: {
-                    timeframe: jarvis.tracker.configuration.defaultDateRange.clone()
-                }
-            }
+            tps
         ]
     });
 
@@ -322,7 +330,15 @@ return function (appName, extra) {
         layout: 'border',
         closable: true,
         hideMode: 'offsets',
-        items: panelItems
+        items: panelItems,
+        listeners: {
+            activate: function () {
+                tps.fireEvent ('activate');
+            },
+            deactivate: function () {
+                tps.fireEvent ('deactivate');
+            }
+        }
     });
 }; })();
 

@@ -196,28 +196,44 @@ return function (appName, extra) {
         ]
     });
 
+    var tps = new Ext.ux.TimeBasedVisualisation({
+        region: 'center',
+        dataSource: {
+            dataset: 'tps/' + appName,
+            params: {
+                user: user
+            }
+        },
+        graph: new jarvis.graph.TpsGraph({
+            listeners: {
+                click: function(data) {
+                    var path = appName + '/events?from=' + (data.t - 1.0 / 48.0) + '&to=' + (data.t + 1.0 / 48.0) + '&user=' + user;
+                    jarvis.tracker.loadAndShowTabFromPath (path);
+                }
+            }
+        }),
+        graphConfig: {
+            timeframe: jarvis.tracker.configuration.defaultDateRange.clone()
+        }
+    });
+
     return new Ext.Panel ({
         title: appName + ' - Users - ' + user,
         layout: 'border',
         hideMode: 'offsets',
         closable: true,
         items: [
-            {
-                xtype: 'TimeBasedVisualisation',
-                region: 'center',
-                dataSource: {
-                    dataset: 'tps/' + appName,
-                    params: {
-                        user: user
-                    }
-                },
-                graph: new jarvis.graph.TpsGraph(),
-                graphConfig: {
-                    timeframe: jarvis.tracker.configuration.defaultDateRange.clone()
-                }
+            sidePanel,
+            tps
+        ],
+        listeners: {
+            activate: function () {
+                tps.fireEvent ('activate');
             },
-            sidePanel
-        ]
+            deactivate: function () {
+                tps.fireEvent ('deactivate');
+            }
+        }
     });
 
 }; })();

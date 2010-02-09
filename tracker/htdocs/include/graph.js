@@ -189,71 +189,30 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
         var me = this;
         var elBox = el.getBox();
 
-        width = elBox.width - 20; // 20 pixels gives a buffer to avoid scrollbars under Chrome TODO - fix
+        width = elBox.width;
         height = width * (1 / 1.61803399);
 
         height = height > elBox.height && elBox.height > 0.25 * width ? elBox.height : height;
 
-        buffer = 10;
-        leftBuffer = 35;
-        bottomBuffer = 30;
+        buffer = 35;
 
         var maxTransactions = pv.max(data, function (x) { return x.c; });
         maxTransactions = maxTransactions > 0 ? maxTransactions : 1;
 
-        xscale = pv.Scale.linear (0, data.length).range (0, width - leftBuffer - buffer);
-        yscale = pv.Scale.linear (0, maxTransactions).range (0, height - buffer - bottomBuffer).nice();
+        xscale = pv.Scale.linear (0, data.length).range (0, width - buffer * 2);
+        yscale = pv.Scale.linear (0, maxTransactions).range (0, height - buffer * 2).nice();
 
 
         var g = new pv.Panel()
             .canvas (el.id)
-            .width (width - leftBuffer - buffer)
-            .height (height - buffer - bottomBuffer)
-            .left(leftBuffer)
+            .width (width - buffer * 2)
+            .height (height - buffer * 2)
+            .left(buffer)
             .top(buffer)
             .right(buffer)
-            .bottom(bottomBuffer);
+            .bottom(buffer);
 
         var barwidth = xscale(1) - xscale(0) > 4 ? Math.round((xscale(1) - xscale(0)) / 2) : 1;
-
-        if (barwidth < 2) {
-            g.add (pv.Area)
-                .data (data) 
-                .left (function (d) { return xscale(this.index); })
-                .height (function (d) { return yscale(d.c); })
-                .width (barwidth)
-                .bottom (0)
-                .fillStyle (this.defaultColors)
-                .title (function (d) {
-                    var date = Date.fromJulian(d.t);
-                    return 'For ' + date.format ('g:ia') + ': avg: ' + Math.round(d.c * 100) / 100;
-                });
-        } else {
-            g.add (pv.Bar)
-                .data (data) 
-                .left (function (d) { return xscale(this.index); })
-                .height (function (d) { return yscale(d.c); })
-                .width (barwidth)
-                .bottom (0)
-                .fillStyle (this.defaultColors);
-
-            // This is an invisible clickable bar that's big enough to click, and shows the highlighted 
-            // point in time.
-            g.add (pv.Bar)
-                .data (data) 
-                .left (function (d) { return xscale(this.index); })
-                .height (height - buffer - bottomBuffer)
-                .width (xscale(1) - xscale(0))
-                .bottom (0)
-                .fillStyle (pv.color ('#fff').alpha(0.01))
-                .title (function (d) {
-                    var date = Date.fromJulian(d.t);
-                    return 'For ' + date.format ('g:ia') + ': avg: ' + Math.round(d.c * 100) / 100;
-                })
-                .event ('click', function (d) {
-                    me.fireEvent ('click', d);
-                });
-        }
 
         var yticks = yscale.ticks();
         if (yscale (yticks [yticks.length - 1]) - yscale(maxTransactions) < -10 ) {
@@ -268,7 +227,7 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
         g.add (pv.Rule)
             .data (yticks)
             .left (-5)
-            .width (function (d) { return this.index == 0 ? width - buffer - leftBuffer + 5 : 5; })
+            .width (function (d) { return this.index == 0 ? width - buffer * 2 + 5 : 5; })
             .bottom (function (d) { return yscale (d); })
             .anchor ('left')
             .add (pv.Label)
@@ -343,6 +302,96 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
                     return '';
                 }
             });
+
+        var highlightColor = '#080';
+
+        var innerp = g.add (pv.Panel)
+                .def ('i', -1)
+                .def('x', function () { return xscale; });
+
+        if (barwidth < 2) {
+            innerp.add (pv.Area)
+                .data (data) 
+                .left (function (d) { return xscale(this.index); })
+                .height (function (d) { return yscale(d.c); })
+                .width (barwidth)
+                .bottom (0)
+                .fillStyle (this.defaultColors)
+                .title (function (d) {
+                    var date = Date.fromJulian(d.t);
+                    return 'For ' + date.format ('g:ia') + ': avg: ' + Math.round(d.c * 100) / 100;
+                });
+
+            innerp.add(pv.Dot)
+                .visible(function() { return innerp.i() >= 0 })
+                .left(function() { return xscale(innerp.i()); })
+                .bottom(function(d) { var c = data[innerp.i()]; return yscale(c ? c.c : 0); })
+                .fillStyle("green")
+                .strokeStyle(null)
+                .size(8)
+                .anchor ('top').add (pv.Label)
+                .text (function (d) {
+                    var c = data[innerp.i()];
+                    if (c) {
+                        var date = Date.fromJulian(c.t);
+                        return date.format ('g:ia') + ': ' + (Math.round(c.c * 100) / 100);
+                    }
+                    return '';
+                });
+
+
+            innerp.add(pv.Bar)
+                .fillStyle("rgba(0,0,0,.001)")
+                .event("mouseout", function() { return innerp.i(-1) })
+                .event("mousemove", function() { return innerp.i(innerp.x().invert(innerp.mouse().x) >> 0) })
+                .event ('click', function () {
+                    var c = data[innerp.i()];
+                    if (c) {
+                        me.fireEvent ('click', c);
+                    }
+                });
+
+        } else {
+            innerp.add (pv.Bar)
+                .data (data) 
+                .left (function (d) { return xscale(this.index); })
+                .height (function (d) { return yscale(d.c); })
+                .width (barwidth)
+                .bottom (0)
+                .fillStyle (this.defaultColors)
+                .anchor ('top').add (pv.Dot)
+                .size (8)
+                .visible(function (d) { return this.index == innerp.i(); })
+                .fillStyle (highlightColor)
+                .strokeStyle(null)
+                .anchor ('top').add (pv.Label)
+                .text (function (d) {
+                    var date = Date.fromJulian(d.t);
+                    return date.format ('g:ia') + ': ' + (Math.round(d.c * 100) / 100);
+                });
+
+            // This is an invisible clickable bar that's big enough to click, and shows the highlighted 
+            // point in time.
+            innerp.add (pv.Bar)
+                .def ('i', -1)
+                .data (data) 
+                .left (function (d) { return xscale(this.index); })
+                .height (height - buffer * 2)
+                .width (xscale(1) - xscale(0))
+                .bottom (0)
+                .fillStyle (pv.color ('#fff').alpha(0.01))
+                .event ('mouseover', function (d) {
+                    innerp.i(this.index);
+                    innerp.render();
+                })
+                .event ('mouseout', function (d) {
+                    innerp.i(-1);
+                    innerp.render();
+                })
+                .event ('click', function (d) {
+                    me.fireEvent ('click', d);
+                })
+        }
 
         g.root.render();
     }

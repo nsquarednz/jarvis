@@ -85,6 +85,20 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
         } 
     },
 
+    maybeMaskForLoading: function () {
+        if (this.rendered && this.body && this.showLoadingIndicator) {
+            if (!this.myLoadingMask) {
+                this.myLoadingMask = new Ext.LoadMask(this.body, {msg:"Loading.."});
+            }
+            this.myLoadingMask.show();
+        }
+    },
+    maybeUnMask: function () {
+        if (this.myLoadingMask) {
+            this.myLoadingMask.hide();
+        }
+    },
+
     /**
      * Description:  Override the initialisation of the component to 
      *               provide our own component elements. The creator
@@ -104,7 +118,7 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
             y: 0,
             anchor: '100% 100%',
             listeners: {
-                render: function () { me.renderGraph(this); }
+                render: function () { me.renderGraph(this); },
             }
         });
 
@@ -118,6 +132,9 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
             ]
         });
 
+        this.on ('activate', function () { this.renderGraph(this.dv); });
+        this.on ('deactivate', function () { this.dv.el.update(''); });
+
         // Redraw when resized. Ensure we watch the right object
         // when resizing.
         var resizer = function () { 
@@ -129,10 +146,12 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
         };
 
         this.dv.on('resize', resizer, this);
+        this.on('tabchange', function () { alert ('received tab change'); console.log (this, arguments); });
 
         Ext.ux.Visualisation.superclass.initComponent.apply(this, arguments);
 
-        this.loadGraphData();
+        // Doing this in a timeout allows the code to render a loading mask when it starts.
+        setTimeout (function () { this.loadGraphData(); }.createDelegate(this), 1);
     },
 
     /**
@@ -146,10 +165,8 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
         var url = jarvisUrl (this.dataSource.dataset);
         var myMask = null;
 
-        if (this.body) {
-            myMask = new Ext.LoadMask(this.body ? this.body : Ext.getBody(), {msg:"Please wait..."});
-            myMask.show();
-        }
+        this.showLoadingIndicator = true;
+        this.maybeMaskForLoading();
 
         // Fetch now the data for the component.
         Ext.Ajax.request({
@@ -159,8 +176,6 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
 
             // We received a response back from the server, that's a good start.
             success: function (response, request_options) {
-                if (myMask)
-                    myMask.hide();
                 try {
                     me.data = Ext.util.JSON.decode (response.responseText).data;
                 } catch (e) {
@@ -172,6 +187,7 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
                     });
                 }
                 me.renderGraph(me.items.get(me.dataVisualisationElementId));
+                me.maybeUnMask();
             },
             failure: jarvis.tracker.extAjaxRequestFailureHandler
         });
@@ -220,7 +236,6 @@ Ext.ux.TimeBasedVisualisation = Ext.extend(Ext.ux.Visualisation, {
                 {
                     toggleGroup: 'visualisationDateRangeToggleGroup',
                     text: 'Show a Day',
-                    pressed: true,
                     handler: function () { 
                         var currentTf = me.graphConfig.timeframe;
                         me.alterGraphTimeframe (new jarvis.Timeframe('..now', currentTf.to())); 
@@ -229,6 +244,7 @@ Ext.ux.TimeBasedVisualisation = Ext.extend(Ext.ux.Visualisation, {
                 {
                     toggleGroup: 'visualisationDateRangeToggleGroup',
                     text: 'Show a Week',
+                    pressed: true,
                     handler: function () { 
                         var currentTf = me.graphConfig.timeframe;
                         me.alterGraphTimeframe (new jarvis.Timeframe('...now', currentTf.to())); 

@@ -129,6 +129,7 @@ return function (appName, extra) {
     var form = new Ext.Panel({
         region: 'north',
         autoHeight: true,
+        border: false,
         layout: 'column',
         bodyStyle: {
             padding: '5px'
@@ -201,19 +202,24 @@ return function (appName, extra) {
                         store: [ '100', '250', '500', '1000', '1500' ],
                         value: '250',
                         mode: 'local'
+                    }),
+                    new Ext.form.TextField({
+                        fieldLabel: 'Text',
+                        id: 'text_' + timelineId,
+                        value: extra.params.text || ''
                     })
                 ]
             }
         ],
         buttons: [
-            {
-                text: 'Show',
-                id: 'show',
-                'default': true,
-                listeners: {
-                    click: submitForm
-                }
-            }
+                    new Ext.Button ({
+                        text: 'Show',
+                        id: 'show',
+                        'default': true,
+                        listeners: {
+                            click: submitForm
+                        }
+                    })
         ]
     });
 

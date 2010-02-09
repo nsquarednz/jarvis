@@ -46,8 +46,7 @@ return function (appName, extra) {
         }
     });
 
-    var tps = {
-        xtype: 'TimeBasedVisualisation',
+    var tps = new Ext.ux.TimeBasedVisualisation({
         region: 'center',
         dataSource: {
             dataset: 'tps/'+ appName
@@ -56,7 +55,7 @@ return function (appName, extra) {
         graphConfig: {
             timeframe: jarvis.tracker.configuration.defaultDateRange.clone()
         }
-    };
+    });
 
     return new Ext.Panel ({
         title: appName,
@@ -66,7 +65,15 @@ return function (appName, extra) {
         items: [
             errorList,
             tps
-        ]
+        ],
+        listeners: {
+            activate: function () {
+                tps.fireEvent ('activate');
+            },
+            deactivate: function () {
+                tps.fireEvent ('deactivate');
+            }
+        }
     });
 }; })();
 
