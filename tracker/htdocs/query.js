@@ -138,7 +138,7 @@ return function (appName, extra) {
         graph: new jarvis.graph.TpsGraph({
             listeners: {
                 click: function(data) {
-                    var path = appName + '/events?from=' + (data.t - 1.0 / 48.0) + '&to=' + (data.t + 1.0 / 48.0) + '&text=' + extra.query;
+                    var path = appName + '/events?from=' + (data.t - 1.0 / 48.0) + '&to=' + (data.t + 1.0 / 48.0) + '&dataset=' + extra.query;
                     jarvis.tracker.loadAndShowTabFromPath (path);
                 }
             }

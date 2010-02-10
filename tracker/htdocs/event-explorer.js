@@ -94,7 +94,7 @@ return function (appName, extra) {
         var params = {
             start: start
         };
-        var lookups = ['sid', 'user', 'limit', 'app_name', 'from', 'to' ];
+        var lookups = ['sid', 'user', 'dataset', 'limit', 'app_name', 'from', 'to', 'text'];
         Ext.each (lookups, function (e) {
             if (form.findById(e + '_' + timelineId).getValue())
                 var v = form.findById(e + '_' + timelineId).getValue();
@@ -187,6 +187,11 @@ return function (appName, extra) {
                         fieldLabel: 'User',
                         id: 'user_' + timelineId,
                         value: extra.params.user || ''
+                    }),
+                    new Ext.form.TextField({
+                        fieldLabel: 'Dataset',
+                        id: 'dataset_' + timelineId,
+                        value: extra.params.dataset || ''
                     })
                 ]
             },

@@ -16,8 +16,10 @@
             ({$sid} IS NULL OR sid = {$sid})
             AND ({$user} IS NULL OR username = {$user})
             AND ({$app_name} IS NULL OR app_name = {$app_name})
+            AND ({$dataset} IS NULL OR dataset = {$dataset})
             AND ({$from} IS NULL OR start_time >= {$from})
             AND ({$to} IS NULL OR start_time &lt;= {$to})
+            AND ({$text} IS NULL OR params like '%' || {$text} || '%')
         UNION
         SELECT 
             start_time AS start_time_raw,
@@ -35,8 +37,10 @@
             ({$sid} IS NULL OR sid = {$sid})
             AND ({$user} IS NULL OR username = {$user})
             AND ({$app_name} IS NULL OR app_name = {$app_name})
+            AND ({$dataset} IS NULL OR dataset = {$dataset})
             AND ({$from} IS NULL OR start_time >= {$from})
             AND ({$to} IS NULL OR start_time &lt;= {$to})
+            AND ({$text} IS NULL OR params like '%' || {$text} || '%' OR post_body like '%' || {$text} || '%')
         ORDER BY
             start_time_raw
     </select>
