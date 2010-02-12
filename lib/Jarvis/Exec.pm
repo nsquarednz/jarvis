@@ -74,7 +74,10 @@ sub do {
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
     if ($axml->{'exec'}) {
         foreach my $exec (@{ $axml->{'exec'} }) {
-            next if ($dataset ne $exec->{'dataset'}->content);
+            my $exec_ds = $exec->{'dataset'}->content;
+            &Jarvis::Error::debug ($jconfig, "Comparing '$dataset' to '$exec_ds'.");
+            next if (($dataset ne $exec_ds) && ($dataset !~ m/^$exec_ds\./));
+
             &Jarvis::Error::debug ($jconfig, "Found matching custom <exec> dataset '$dataset'.");
 
             $allowed_groups = $exec->{'access'}->content || die "No 'access' defined for exec dataset '$dataset'";
@@ -110,6 +113,12 @@ sub do {
     # we will return anonymous content in text/plain format.
     #
     my $filename = $param_values {$filename_parameter} || $default_filename;
+    if (defined $filename) {
+        &Jarvis::Error::debug ($jconfig, "Using filename '$filename'");
+
+    } else {
+        &Jarvis::Error::debug ($jconfig, "No return filename given.  Response will be text/plain.");
+    }
 
     # If we're under windows, force the use of tmp files.
     $use_tmpfile = 1 if $^O eq "MSWin32";
@@ -122,6 +131,9 @@ sub do {
         $tmpFile = new File::Temp();
         $safe_params{'__tmpfile'} = $tmpFile->filename;
     }
+
+    # Add the dataset as a safe variable too.
+    $safe_params{'__dataset'} = $dataset;
 
     # Add parameters to our command.  Die if any of the parameter names look dodgy.
     # This isn't a problem with datasets, since there we only look at parameters that
