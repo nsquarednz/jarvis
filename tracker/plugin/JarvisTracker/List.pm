@@ -113,23 +113,6 @@ sub JarvisTracker::List::do {
                     $datasetDirectory .= "/" . (join "/", @parts); # all parts have been previously checked for safety - no '..' or other unsafe characters are included.
                 }
 
-                opendir (QUERIES, $datasetDirectory) || die "Cannot read queries for '$id'. $!.";
-                my @files = grep (!/^\./, readdir (QUERIES));
-                closedir (QUERIES);
-                map { 
-                    if ($_ =~ /\.xml$/) {
-                        $_ =~ s/\.xml$//;
-                        push(@list, { id => "$id/$_", text => $_, leaf => 1, icon => 'style/bullet_blue.png' }); 
-                    } elsif (-d $datasetDirectory . "/" . $_) {
-                        opendir (QUERIES, $datasetDirectory . "/" . $_);
-                        my @testq = grep (/\.xml$/, readdir(QUERIES));
-                        closedir (QUERIES);
-                        if (@testq > 0) {
-                            push(@list, { id => "$id/$_", text => $_ }); 
-                        }
-                    }
-                } @files;
-
                 # If top level - don't do this for subdirectory SQL queries..
                 if ($inSubdirectory == 0) {
                     #
@@ -154,9 +137,61 @@ sub JarvisTracker::List::do {
 
                     my @execs = $xml->{jarvis}{app}{exec}('@');
                     map {
-                        push(@list, { id => "$id/" . $_->{dataset}->content, text => $_->{dataset}->content, leaf => 1, icon => 'style/application_xp_terminal.png' }); 
+                        push(@list, { id => "$id/" . $_->{dataset}->content, text => $_->{dataset}->content, icon => 'style/application_xp_terminal.png' }); 
                     } @execs;
                 }
+
+                # If we're looking to see the nodes in an <exec ...> defined dataset, look in the
+                # DB for any sub-datasets for the <exec ...>. Jarvis does a prefix match to match
+                # exec calls, and the app may look at the dataset string for further information
+                # on the actual sub-datset called.  E.g. jasper.MyReportName, where 'jasper' is the
+                # exec name, and MyReportName is something it may use.
+                if ($inSubdirectory != 0 and $xml->{jarvis}{app}{exec}('dataset', 'eq', $parts[0])) {
+                    my $dbh = &Jarvis::DB::handle ($jconfig);
+                    my $sql = <<EOF;
+                        SELECT DISTINCT dataset FROM request WHERE dataset like ? || '.%'
+                        UNION
+                        SELECT DISTINCT dataset FROM error WHERE dataset like  ? || '.%'
+EOF
+                    my $sth = $dbh->prepare ($sql) || die "Couldn't prepare statement for listing exec subdatasets: " . $dbh->errstr;
+                    my $stm = {};
+                    $stm->{sth} = $sth;
+                    $stm->{ttype} = 'JarvisTrackerList-exec';
+                    my $params = [ $parts[0], $parts[0] ];
+                    &Jarvis::Dataset::statement_execute ($jconfig, $stm, $params);
+                    $stm->{'error'} && die "Unable to execute statement for listing exec subdatasets: " . $dbh->errstr;
+
+                    my $datasets = $sth->fetchall_arrayref({});
+                    map {
+                        my $d = $_->{dataset};
+                        $d =~ s/^[^\.]+\.//;
+                        # Note we assume only one level deep here, but in reality it could be more.
+                        push(@list, { id => "$id/$d", text => $d, leaf => 1, datasetType => 'exec', icon => 'style/bullet_blue.png' }); 
+                    } @{$datasets};
+                }
+                #
+                # If we're not looking for <exec ...> subdatasets, run the normal query to get
+                # file stored SQL datasets.
+                else {
+
+                    opendir (QUERIES, $datasetDirectory) || die "Cannot read queries for '$id'. $!.";
+                    my @files = grep (!/^\./, readdir (QUERIES));
+                    closedir (QUERIES);
+                    map { 
+                        if ($_ =~ /\.xml$/) {
+                            $_ =~ s/\.xml$//;
+                            push(@list, { id => "$id/$_", text => $_, leaf => 1, icon => 'style/bullet_blue.png' }); 
+                        } elsif (-d $datasetDirectory . "/" . $_) {
+                            opendir (QUERIES, $datasetDirectory . "/" . $_);
+                            my @testq = grep (/\.xml$/, readdir(QUERIES));
+                            closedir (QUERIES);
+                            if (@testq > 0) {
+                                push(@list, { id => "$id/$_", text => $_ }); 
+                            }
+                        }
+                    } @files;
+                }
+
             #
             # Users
             #
@@ -180,11 +215,6 @@ EOF
                     my $u = $_->{username};
                     push(@list, { id => "$id/$u", text => (length($u) == 0 ? '(none)' : $u), leaf => 1, icon => 'style/bullet_yellow.png' }); 
                 } @{$users};
-            #
-            # Plugins and execs
-            #
-            } elsif ($parts[1] eq "Plugins") {
-
             }
         }
     }

@@ -62,17 +62,18 @@ sub JarvisTracker::DatasetInfo::do {
 
     if ($restArgs[0] =~ /^\__/) {
         $info{'type'} = 'i';
-    } elsif (scalar(@restArgs) > 1) {
-        $info{'type'} = 's';
     } else {
         my $xmlFilename = $jconfig->{'etc_dir'} . "/" . $app . ".xml";
         my $xml = XML::Smart->new ($xmlFilename) || die "Cannot read configuration for $app.xml: $!.";
 
-        my $exec = $xml->{jarvis}{app}{exec}('dataset', 'eq', $restArgs[0]);
+        my $main = $restArgs[0];
+        $main =~ s/\..*$//;
+
+        my $exec = $xml->{jarvis}{app}{exec}('dataset', 'eq', $main);
         if ($exec) {
             $info{'type'} = 'e';
         } else {
-            my $plugin = $xml->{jarvis}{app}{plugin}('dataset', 'eq', $restArgs[0]);
+            my $plugin = $xml->{jarvis}{app}{plugin}('dataset', 'eq', $main);
             if ($plugin) {
                 $info{'type'} = 'p';
             } else {

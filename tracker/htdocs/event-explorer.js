@@ -26,7 +26,7 @@
 (function () {
 
 
-function displayTimeline(id, d, params, afterLoadCallback) {
+function displayTimeline(id, d) {
     var eventSource = new Timeline.DefaultEventSource(0);
     var theme = Timeline.ClassicTheme.create();
     theme.event.bubble.width = 450;  
@@ -65,6 +65,15 @@ function displayTimeline(id, d, params, afterLoadCallback) {
     bandInfos[1].highlight = true;
     bandInfos[2].highlight = true;
                 
+    var timeline = Timeline.create(document.getElementById(id), bandInfos, Timeline.HORIZONTAL);
+
+    return {
+        timeline: timeline,
+        eventSource: eventSource
+    };
+}
+
+function loadEvents (eventSource, params, afterLoadCallback) {
     Ext.Ajax.request ({
         url: jarvisUrl ('events'),
         method: 'GET',
@@ -78,9 +87,7 @@ function displayTimeline(id, d, params, afterLoadCallback) {
         },
         failure: jarvis.tracker.extAjaxRequestFailureHandler
     });
-
-    return Timeline.create(document.getElementById(id), bandInfos, Timeline.HORIZONTAL);
-};
+}
 
 // This is the real function for creating a query page.
 return function (appName, extra) {
@@ -94,7 +101,7 @@ return function (appName, extra) {
         var params = {
             start: start
         };
-        var lookups = ['sid', 'user', 'dataset', 'limit', 'app_name', 'from', 'to', 'text'];
+        var lookups = ['sid', 'user', 'dataset', 'limit', 'app_name', 'text'];
         Ext.each (lookups, function (e) {
             if (form.findById(e + '_' + timelineId).getValue())
                 var v = form.findById(e + '_' + timelineId).getValue();
@@ -113,12 +120,12 @@ return function (appName, extra) {
                 if (data.data[0].t) {
                     dte = Date.fromJulian (data.data[0].t)
                 }
-                form.timelineObject = displayTimeline (timelineId, dte, params, function (data) {
+                loadEvents (form.timelineObject.eventSource, params, function (data) {
                     form.ownerCt.getBottomToolbar().items.get('resultsinfo').setText('Viewing ' + start + ' to '  + (start + data.events.length) + ' of ' + data.fetched + ' events');
                     window.mytb = form.ownerCt;
 
                     if (data.events.length > 0) {
-                        form.timelineObject.getBand(0).setCenterVisibleDate(Timeline.DateTime.parseIso8601DateTime(data.events[0].start));
+                        form.timelineObject.timeline.getBand(0).setCenterVisibleDate(Timeline.DateTime.parseIso8601DateTime(data.events[0].start));
                     }
                 });
             },
@@ -157,19 +164,10 @@ return function (appName, extra) {
                         forceSelection: true,
                         value: extra.params.appName || ''
                     }),
-                    new Ext.ux.form.DateTime ({
-                        dateFormat: 'd/m/Y',
-                        fieldLabel: 'From',
-                        id: 'from_' + timelineId,
-                        value: extra.params.from ? Date.fromJulian(extra.params.from) : 
-                            (extra.params.sid ? '' : Date.parseDate(new Date().format('Y-m-d\\TH:00:00'), 'c'))
-                    }),
-                    new Ext.ux.form.DateTime({
-                        dateFormat: 'd/m/Y',
-                        fieldLabel: 'To',
-                        id: 'to_' + timelineId,
-                        value: extra.params.to ? Date.fromJulian(extra.params.to) : 
-                            (extra.params.sid ? '' : Date.parseDate(new Date().add(Date.HOUR, 1).format('Y-m-d\\TH:00:00'), 'c'))
+                    new Ext.form.TextField({
+                        fieldLabel: 'Dataset',
+                        id: 'dataset_' + timelineId,
+                        value: extra.params.dataset || ''
                     })
                 ]
             },
@@ -187,11 +185,6 @@ return function (appName, extra) {
                         fieldLabel: 'User',
                         id: 'user_' + timelineId,
                         value: extra.params.user || ''
-                    }),
-                    new Ext.form.TextField({
-                        fieldLabel: 'Dataset',
-                        id: 'dataset_' + timelineId,
-                        value: extra.params.dataset || ''
                     })
                 ]
             },
@@ -228,8 +221,6 @@ return function (appName, extra) {
         ]
     });
 
-    submitForm.defer(1);
-
     var center = new Ext.Panel({
         region: 'center',
         layout: 'fit',
@@ -240,7 +231,15 @@ return function (appName, extra) {
                 cls: 'timeline-default',
                 x: 0,
                 y: 0,
-                anchor: '100% 100%'
+                anchor: '100% 100%',
+                listeners: {
+                    render: function () {
+                        setTimeout(function () {
+                            form.timelineObject = displayTimeline (timelineId, new Date());
+                            submitForm();
+                        }, 0);
+                    }
+                }
             })
         ]
     });
@@ -257,7 +256,7 @@ return function (appName, extra) {
         listeners: {
             resize: function () {
                 if (form.timelineObject) {
-                    setTimeout(function () { form.timelineObject.layout(); }, 0);
+                    setTimeout(function () { form.timelineObject.timeline.layout(); }, 0);
                 }
             }
         },
@@ -269,6 +268,12 @@ return function (appName, extra) {
             },
             {
                 xtype: 'tbfill'
+            },
+            {
+                cls: 'x-btn-icon',
+                icon: 'style/double_arrow_left.png',
+                handler: function () { 
+                }
             },
             {
                 text: "Back",
