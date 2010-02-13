@@ -137,7 +137,7 @@ sub JarvisTracker::List::do {
 
                     my @execs = $xml->{jarvis}{app}{exec}('@');
                     map {
-                        push(@list, { id => "$id/" . $_->{dataset}->content, text => $_->{dataset}->content, icon => 'style/application_xp_terminal.png' }); 
+                        push(@list, { id => "$id/" . $_->{dataset}->content, text => $_->{dataset}->content, datasetType => 'exec', icon => 'style/application_xp_terminal.png' }); 
                     } @execs;
                 }
 

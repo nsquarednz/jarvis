@@ -1,4 +1,12 @@
 <dataset read="*" write="">
+    <!--
+         Select details on all datasets on an application
+         or a subsection of datasets on an application.
+
+         REST arg 1 is the application name
+         REST arg 2 is the dataset name 
+      -->
+
     <select>
         <![CDATA[
         SELECT
@@ -13,6 +21,7 @@
             request
         WHERE
             (app_name = {$1} OR {$1} IS NULL)
+            AND ({$2} IS NULL OR dataset LIKE {$2} || '%')
             AND ({$from} IS NULL OR start_time >= CAST({$from} AS FLOAT))
             AND ({$to} IS NULL OR start_time <= CAST({$to} AS FLOAT))
         GROUP BY

@@ -41,7 +41,7 @@
                         start_time >= CAST({$from} AS FLOAT) AND start_time <= CAST({$to} AS FLOAT) 
                 ) d
                 WHERE (app_name IS NULL OR {$1} IS NULL OR {$1} = app_name)
-                    AND (dataset IS NULL OR {$2} IS NULL OR {$2} = dataset)
+                    AND (dataset IS NULL OR {$2} IS NULL OR {$2} like dataset || '%')
             ) r ON 
                 cal.time <= r.start_time AND cal.time + (15.0 / (60 * 24)) > r.start_time
         WHERE

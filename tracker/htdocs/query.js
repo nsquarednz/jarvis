@@ -326,7 +326,7 @@ return function (appName, extra) {
     }
 
     return new Ext.Panel({
-        title: appName + ' - Queries - ' + extra.query,
+        title: appName + ' - Datasets - ' + extra.query,
         layout: 'border',
         closable: true,
         hideMode: 'offsets',

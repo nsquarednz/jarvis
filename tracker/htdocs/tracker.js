@@ -243,11 +243,19 @@ jarvis.tracker.loadAndShowTabFromPath = function(path, callback) {
             method: 'GET',
             success: function (xhr, req) { 
                 var datasetInfo = Ext.util.JSON.decode (xhr.responseText);
-                jarvis.tracker.loadAndShowTab (pathAndParam[0], 'query.js', app, {
-                    query: parts.join ('/'),
-                    params: params,
-                    datasetInfo: datasetInfo
-                }, callback);
+
+                if (datasetInfo.type == 'e' && parts.length == 1) {
+                    jarvis.tracker.loadAndShowTab (pathAndParam[0], 'exec-summary.js', app, {
+                        query: parts.join ('/'),
+                        params: params
+                    }, callback);
+                } else {
+                    jarvis.tracker.loadAndShowTab (pathAndParam[0], 'query.js', app, {
+                        query: parts.join ('/'),
+                        params: params,
+                        datasetInfo: datasetInfo
+                    }, callback);
+                }
             },
             failure: jarvis.tracker.extAjaxRequestFailureHandler
         });
@@ -332,15 +340,7 @@ Ext.onReady (function () {
         }),
         listeners: {
             click: function (node, event) { 
-
-                // Load a path only if it's a leaf, or a special non-leaf node that
-                // we know has a summary.
-                var parts = node.id.split('/');
-
-                // avoid loading a tab for directories within 'Datasets'
-                if (node.leaf == 1 || parts.length < 3) { // node.isLeaf() does not work in ExtJS v2.3
-                    jarvis.tracker.loadAndShowTabFromPath (node.id);
-                }
+                jarvis.tracker.loadAndShowTabFromPath (node.id);
             }
         }
     });
