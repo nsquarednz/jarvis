@@ -118,7 +118,7 @@ Ext.ux.Visualisation = Ext.extend(Ext.Panel, {
             y: 0,
             anchor: '100% 100%',
             listeners: {
-                render: function () { me.renderGraph(this); },
+                render: function () { me.renderGraph(this); }
             }
         });
 
@@ -257,7 +257,7 @@ Ext.ux.TimeBasedVisualisation = Ext.extend(Ext.ux.Visualisation, {
                     xtype: 'tbspacer'
                 },
                 {
-                    text: 'From:',
+                    text: 'To:',
                     xtype: 'label'
                 },
                 { xtype: 'tbspacer' },
