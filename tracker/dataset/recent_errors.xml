@@ -32,7 +32,7 @@
             AND NOT (http_response_code = 401 AND (username = '' OR username IS NULL))
         ORDER BY
             start_time DESC
-        LIMIT 20
+        LIMIT 30
     </select>
 </dataset>
 

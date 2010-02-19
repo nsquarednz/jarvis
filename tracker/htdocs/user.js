@@ -170,7 +170,7 @@ return function (appName, extra) {
         region: 'east',
         width: '40%',
         split: true,
-        title: 'Recent Errors for ' + appName,
+        title: 'Recent Errors',
         anchor: '100% 50%',
         dataSourceParams: {
             limit: true,

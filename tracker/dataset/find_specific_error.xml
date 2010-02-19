@@ -3,24 +3,21 @@
      First REST parameter can be the application, if so wanted.
      Second REST parameter can be the user, if so wanted.
 
-     Errors are returned latest error first.
+     It then identifies how many errors in a specific error is - 
+     either an error given by a specific ID, or an error given by
+     a date.
 
-     Jarvis is expected to do paging on this data.
+     Filter criteria can be provided, the same as the 'errors.xml'
+     dataset.
+
+     Note that we add a day to the date (by subtracting 1), because
+     we want to show the user the last errors on the given date, not
+     start the user off immediately after that date.
   -->
 <dataset read="*" write="">
     <select>
         SELECT
-            id,
-            sid,
-            app_name,
-            username,
-            group_list,
-            dataset,
-            action,
-            params,
-            post_body,
-            message,
-            strftime('%Y-%m-%dT%H:%M:%S', start_time, 'localtime')  AS start_time
+            count(*) AS number_in
         FROM
             error
         WHERE
@@ -42,7 +39,10 @@
                 OR
                 id IN (SELECT id FROM error WHERE post_body LIKE '%' || {$filter} || '%')
             )
+            AND ({$id} IS NULL OR id > {$id})
+            AND ({$date} IS NULL OR start_time > ({$date} + 1))
         ORDER BY
             start_time DESC
     </select>
 </dataset>
+

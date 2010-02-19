@@ -40,7 +40,7 @@
             AND ({$dataset} IS NULL OR dataset = {$dataset})
             AND ({$from} IS NULL OR start_time >= {$from})
             AND ({$to} IS NULL OR start_time &lt;= {$to})
-            AND ({$text} IS NULL OR params like '%' || {$text} || '%' OR post_body like '%' || {$text} || '%')
+            AND ({$text} IS NULL OR params like '%' || {$text} || '%' OR post_body like '%' || {$text} || '%' OR message like '%' || {$text} || '%')
         ORDER BY
             start_time_raw
     </select>

@@ -272,6 +272,9 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
             .textAlign ('left')
             .textBaseline ('bottom')
             .text (function (d) { 
+                if (this.index == dateChangeIndexes.length - 1) {
+                    return '';
+                }
                 var date = Date.fromJulian(data[d].t);
                 var format = 'D dS';
                 if (date.format('y') != lastDate.format('y')) {

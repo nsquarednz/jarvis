@@ -24,13 +24,14 @@
 (function () {
 return function (appName, extra) {
 
+    var limit = 50;
+
     var initialDate = extra && extra.params && extra.params.date ? Date.parseDate (extra.params.date, 'c').clearTime() : null;
 
     // create the main Data Store for the fan list
     var recentErrorsStore = new Ext.data.Store ({
         proxy: new Ext.data.HttpProxy ({ url: jarvisUrl ('errors/' + appName), method: 'GET' }),
-        autoLoad: true,
-        baseParams: {},
+        autoLoad: false,
         reader: new Ext.data.JsonReader ({
             root: 'data',
             id: 'id',
@@ -39,16 +40,46 @@ return function (appName, extra) {
         }),
         listeners: {
             'loadexception': jarvis.tracker.extStoreLoadExceptionHandler,
-            'beforeload': function () {
-                delete this.baseParams.limit_to_date;
-                if (this.dateParamAsDate) {
-                    this.baseParams.limit_to_date = this.dateParamAsDate.formatForServer();
-                }
-            }
         },
         initialSelection: extra && extra.params ? extra.params.id : null, // Our own property for the initial ID to select.
         dateParamAsDate: initialDate // Our own property as well
     });
+
+    function findErrorsInStream () {
+        Ext.Ajax.request ({
+            url: jarvisUrl ('find_specific_error/' + appName),
+            method: 'GET',
+            params: {
+                id: recentErrorsStore.initialSelection,
+                date: recentErrorsStore.dateParamAsDate.formatForServer(),
+                filter: recentErrorsStore.baseParams.filter
+            },
+            success: function (xhr, req) { 
+                var data = Ext.util.JSON.decode (xhr.responseText);
+                if (data.fetched * 1 != 1) {
+                    recentErrorsStore.load({
+                        params: { start: 0, limit: limit }
+                    }); // No data found, just load what we have already
+                    return;
+                }
+
+                var numberIn = data.data[0].number_in * 1;
+                var page = Math.floor(numberIn / limit);
+                recentErrorsStore.load({
+                    params: { start: page * limit, limit: limit }
+                });
+            },
+            failure: jarvis.tracker.extAjaxRequestFailureHandler
+        });
+    }
+
+    if (recentErrorsStore.initialSelection || recentErrorsStore.dateParamAsDate) {
+        findErrorsInStream();
+    } else {
+        recentErrorsStore.load({
+            params: { start: 0, limit: limit }
+        });
+    }
 
     var errorDetailsTemplate = new Ext.XTemplate (
         '<table>',
@@ -89,6 +120,71 @@ return function (appName, extra) {
         errorDetailsTemplate.overwrite (recentErrorDetailsId, data);
     };
 
+    var filterField = new Ext.form.TextField( {
+        listeners: {
+            specialkey: function (field, e) {
+                if (e.getKey() == Ext.EventObject.ENTER) {
+                    recentErrorsStore.baseParams.filter = field.getValue();
+                    recentErrorsStore.load({
+                        params: { start: 0, limit: limit }
+                    });
+                }
+            }
+        }
+    });
+
+    var pagingRenderered = false;
+    var paging = new Ext.PagingToolbar({
+        store: recentErrorsStore,
+        pageSize: limit,
+        displayInfo: true,
+        displayMsg: 'Displaying errors {0} - {1} of {2}',
+        emptyMsg: "No errors found",
+        listeners: {
+            render: function () {
+                if (!pagingRenderered) {
+                    this.add(
+                        '-', 'Go to:', ' ', 
+                        new Ext.form.DateField ({
+                            format: 'd/m/Y',
+                            value: initialDate,
+                            altFormats: 'd/m/Y|n/j/Y|n/j/y|m/j/y|n/d/y|m/j/Y|n/d/Y|m-d-y|m-d-Y|m/d|m-d|md|mdy|mdY|d|Y-m-d',
+                            listeners: {
+                                specialkey: function (field, e) {
+                                    if (e.getKey() == Ext.EventObject.ENTER) {
+                                        recentErrorsStore.dateParamAsDate = field.getValue() || null;
+                                        findErrorsInStream();
+                                    }
+                                },
+                                select: function (field, e) {
+                                    recentErrorsStore.dateParamAsDate = e;
+                                    findErrorsInStream();
+                                }
+                            }
+                        }),
+                        '-', 'Filter:', ' ', filterField,
+                        {
+                            icon: 'style/cross.png',
+                            tooltip: 'clear filter',
+                            text: '&nbsp;&nbsp;',
+                            listeners: {
+                                click: function () {
+                                    recentErrorsStore.baseParams.filter = '';
+                                    filterField.setValue('');
+                                    recentErrorsStore.load({
+                                        params: { start: 0, limit: limit }
+                                    });
+                                }
+                            }
+                        }
+                    );
+                    pagingRenderered = true;
+                }
+            }
+        }
+    });
+
+
     var recentErrorsList = new Ext.grid.GridPanel({
         store: recentErrorsStore,
         border: false,
@@ -123,38 +219,6 @@ return function (appName, extra) {
               return 'grid-old';
            } 
         },
-        tbar: [
-            'Viewing: ',
-            new Ext.form.DateField({
-                format: 'd/m/Y',
-                value: initialDate,
-                altFormats: 'd/m/Y|n/j/Y|n/j/y|m/j/y|n/d/y|m/j/Y|n/d/Y|m-d-y|m-d-Y|m/d|m-d|md|mdy|mdY|d|Y-m-d',
-                listeners: {
-                    specialkey: function (field, e) {
-                        if (e.getKey() == Ext.EventObject.ENTER) {
-                            recentErrorsStore.dateParamAsDate = field.getValue() || null;
-                            recentErrorsStore.load();
-                        }
-                    },
-                    select: function (field, e) {
-                        recentErrorsStore.dateParamAsDate = e;
-                        recentErrorsStore.load();
-                    }
-                }
-            }),
-            {xtype: 'tbfill'},
-            'Filter: ',
-            new Ext.form.TextField( {
-                listeners: {
-                    specialkey: function (field, e) {
-                        if (e.getKey() == Ext.EventObject.ENTER) {
-                            recentErrorsStore.baseParams.filter = field.getValue();
-                            recentErrorsStore.load();
-                        }
-                    }
-                }
-            })
-        ],
         sm: new Ext.grid.RowSelectionModel({
             singleSelect:true,
             listeners: {
@@ -163,6 +227,7 @@ return function (appName, extra) {
                 }
             }
         }),
+        bbar: paging,
         listeners: {
             rowdblclick: function (g, i) {
                 var record = g.store.getAt (i);
@@ -178,6 +243,7 @@ return function (appName, extra) {
         if (this.initialSelection) {
             var record = this.getById (this.initialSelection * 1);
             recentErrorsList.getSelectionModel().selectRecords ([record]);
+            this.initialSelection = null;
         }
     });
 
@@ -212,20 +278,12 @@ return function (appName, extra) {
             updateparameters: function (p) {
                 if (p.params) {
                     recentErrorsStore.initialSelection = p.params.id
-                    var d = p.params.date ? Date.parseDate (p.params.date, 'c').clearTime() : null;
-                    if ((!recentErrorsStore.dateParamAsDate && d) || // If we have no previous date but do now
-                        (d && recentErrorsStore.dateParamAsDate && 
-                            d.getTime() != recentErrorsStore.dateParamAsDate.getTime())) { // or the dates are not the same
-                        recentErrorsStore.dateParamAsDate = d;
-                        recentErrorsStore.load();
-                    } else {
-                        // If we don't need to load, just set the correct selection.
-                        var record = recentErrorsStore.getById (p.params.id * 1);
-                        recentErrorsList.getSelectionModel().selectRecords ([record]);
-                    }
+                    recentErrorsStore.dateParamAsDate = p.params.date ? Date.parseDate (p.params.date, 'c').clearTime() : null;
+                    findErrorsInStream();
                 }
             }
         }
     });
 
 }; })();
+
