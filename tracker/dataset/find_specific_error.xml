@@ -1,0 +1,48 @@
+<!--
+     This dataset provides a list of the errors that have occurred.
+     First REST parameter can be the application, if so wanted.
+     Second REST parameter can be the user, if so wanted.
+
+     It then identifies how many errors in a specific error is - 
+     either an error given by a specific ID, or an error given by
+     a date.
+
+     Filter criteria can be provided, the same as the 'errors.xml'
+     dataset.
+
+     Note that we add a day to the date (by subtracting 1), because
+     we want to show the user the last errors on the given date, not
+     start the user off immediately after that date.
+  -->
+<dataset read="*" write="">
+    <select>
+        SELECT
+            count(*) AS number_in
+        FROM
+            error
+        WHERE
+            ({$1} IS NULL OR lower(app_name) = lower({$1}))
+            AND ({$2} IS NULL OR lower(username) = lower({$2}))
+            AND
+            (
+                {$filter} IS NULL OR {$filter} = ''
+                OR
+                id IN (SELECT id FROM error WHERE sid LIKE '%' || {$filter} || '%')
+                OR
+                id IN (SELECT id FROM error WHERE username LIKE '%' || {$filter} || '%')
+                OR
+                id IN (SELECT id FROM error WHERE dataset LIKE '%' || {$filter} || '%')
+                OR
+                id IN (SELECT id FROM error WHERE params LIKE '%' || {$filter} || '%')
+                OR
+                id IN (SELECT id FROM error WHERE message LIKE '%' || {$filter} || '%')
+                OR
+                id IN (SELECT id FROM error WHERE post_body LIKE '%' || {$filter} || '%')
+            )
+            AND ({$id} IS NULL OR id > {$id})
+            AND ({$date} IS NULL OR start_time > ({$date} + 1))
+        ORDER BY
+            start_time DESC
+    </select>
+</dataset>
+
