@@ -357,7 +357,7 @@ sub statement_execute {
     };
     $SIG{__DIE__} = $err_handler;
 
-    if ($@ || (! defined $stm->{'retval'})) {
+    if ($@ || $DBI::errstr || (! defined $stm->{'retval'})) {
         my $error_message = $stm->{'sth'}->errstr || $@ || 'Unknown error SQL execution error.';
         $error_message =~ s/\s+$//;
 
@@ -931,7 +931,7 @@ sub store {
 
         # Use "eval" as some drivers (e.g. SQL Server) will have already rolled-back on the
         # original failure, and hence a second rollback will fail.
-        eval { $dbh->rollback (); }
+        eval { local $SIG{'__DIE__'}; $dbh->rollback (); }
 
     } else {
         &Jarvis::Error::debug ($jconfig, "All successful.  Committing all changes.");
