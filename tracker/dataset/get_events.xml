@@ -9,6 +9,8 @@
             username, 
             dataset,
             params,
+            in_nrows,
+            out_nrows,
             '' AS error
         FROM 
             request 
@@ -30,6 +32,8 @@
             username, 
             dataset,
             params,
+            0 AS in_nrows,
+            0 AS out_nrows,
             message AS error
         FROM 
             error 

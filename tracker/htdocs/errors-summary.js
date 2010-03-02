@@ -28,7 +28,6 @@ return function (appName, extra) {
 
     var initialDate = extra && extra.params && extra.params.date ? Date.parseDate (extra.params.date, 'c').clearTime() : null;
 
-    // create the main Data Store for the fan list
     var recentErrorsStore = new Ext.data.Store ({
         proxy: new Ext.data.HttpProxy ({ url: jarvisUrl ('errors/' + appName), method: 'GET' }),
         autoLoad: false,

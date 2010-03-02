@@ -59,7 +59,7 @@ sub JarvisTracker::Events::do {
 
         my $params = '';
         
-        my @parameters = (split /:/, $e->{params});
+        my @parameters = (split /[^\\]:/, $e->{params});
         if (scalar(@parameters) > 0) {
             $params = "Parameters:<table>";
             map {
@@ -71,6 +71,10 @@ sub JarvisTracker::Events::do {
                 }
 
             } @parameters;
+        }
+
+        if (length($e->{error}) == 0) {
+            $params .= "<tr><td class='parameter'>in/out</td><td>" . $e->{in_nrows} . "/" . $e->{out_nrows} . "</td></tr>";
         }
 
         my $eventData = {
