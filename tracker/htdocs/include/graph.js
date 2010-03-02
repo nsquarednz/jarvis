@@ -131,6 +131,7 @@ jarvis.graph.DatasetPerformanceGraph = Ext.extend(jarvis.graph.Graph, {
         g.add (pv.Bar) 
             .data ( [ 1 ] )
             .top (0)
+            .antialias(false)
             .height (height / 3 * 2 )
             .left (xscale (lowerQuartile))
             .width (xscale (upperQuartile - lowerQuartile))
@@ -141,6 +142,7 @@ jarvis.graph.DatasetPerformanceGraph = Ext.extend(jarvis.graph.Graph, {
         g.add (pv.Rule)
             .data ( [ { f: lowerAdjacentValue, t: lowerQuartile }, { f: upperQuartile, t: upperAdjacentValue } ] )
             .top (height / 3)
+            .antialias(false)
             .left (function (d) { return xscale(d.f) })
             .width (function (d) { return xscale(d.t - d.f) });
 
@@ -164,6 +166,7 @@ jarvis.graph.DatasetPerformanceGraph = Ext.extend(jarvis.graph.Graph, {
 
         g.add (pv.Rule)
             .data ( xscale.ticks() )
+            .antialias(false)
             .left (function (d) { return xscale(d); })
             .bottom (-5)
             .height (5)
@@ -226,6 +229,7 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
 
         g.add (pv.Rule)
             .data (yticks)
+            .antialias(false)
             .left (-5)
             .width (function (d) { return this.index == 0 ? width - buffer * 2 + 5 : 5; })
             .bottom (function (d) { return yscale (d); })
@@ -264,6 +268,7 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
 
         g.add (pv.Rule)
             .data (dateChangeIndexes)
+            .antialias(false)
             .left (function (d) { return xscale (d); })
             .bottom (-30)
             .height (30)
@@ -292,6 +297,7 @@ jarvis.graph.TpsGraph = Ext.extend(jarvis.graph.Graph, {
             
         g.add (pv.Rule)
             .data (hourPoints)
+            .antialias(false)
             .left (function (d) { return xscale (d); })
             .bottom (-5)
             .height (5)
