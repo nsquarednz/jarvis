@@ -898,13 +898,16 @@ sub store {
                 # go digging for the return values via last_insert_rowid().
                 #
                 } elsif ($row_ttype eq 'insert') {
-                    my $rowid = $dbh->func('last_insert_rowid');
-                    if ($rowid) {
-                        my %return_values = %safe_params;
-                        $return_values {'id'} = $rowid;
+                    if ($jconfig->{'xml'}{'jarvis'}{'app'}{'database'}{'connect'}->content =~ m/^dbi:SQLite:/) {
+                        my $rowid = $dbh->func('last_insert_rowid');
+                        if ($rowid) {
+                            my %return_values = %safe_params;
+                            $return_values {'id'} = $rowid;
 
-                        $row_result{'returning'} = [ \%return_values ];
-                        $jconfig->{'out_nrows'} = 1;
+                            $row_result{'returning'} = [ \%return_values ];
+                            $jconfig->{'out_nrows'} = 1;
+                        }
+                        &Jarvis::Error::debug ($jconfig, "Used SQLite last_insert_rowid to get returned 'id' => '$rowid'.");
                     }
                 }
 
