@@ -877,19 +877,22 @@ sub store {
                     &Jarvis::Error::debug ($jconfig, "Returning " . (scalar @$returning_aref) . " rows.");
 
                 # Hmm... we're supposed to be returning data, but the query didn't give
-                # us any.  Interesting.  Maybe it's SQLite?  In that case, we need to
+                # us any. Interesting. Maybe it's SQLite? In that case, we need to
                 # go digging for the return values via last_insert_rowid().
                 #
                 } elsif ($row_ttype eq 'insert') {
-                    my $rowid = $dbh->func('last_insert_rowid');
-                    if ($rowid) {
-                        my %return_values = %safe_params;
-                        $return_values {'id'} = $rowid;
+                    if ($jconfig->{'xml'}{'jarvis'}{'app'}{'database'}{'connect'}->content =~ m/^dbi:SQLite:/) {
+                        my $rowid = $dbh->func('last_insert_rowid');
+                        if ($rowid) {
+                            my %return_values = %safe_params;
+                            $return_values {'id'} = $rowid;
 
-                        $row_result{'returning'} = [ \%return_values ];
-                        $jconfig->{'out_nrows'} = 1;
+                            $row_result{'returning'} = [ \%return_values ];
+                            $jconfig->{'out_nrows'} = 1;
+                        }
+                        &Jarvis::Error::debug ($jconfig, "Used SQLite last_insert_rowid to get returned 'id' => '$rowid'.");
                     }
-                }
+                } 
 
                 # This is disappointing, but perhaps a "die" is too strong here.
                 if (! $row_result{'returning'}) {
