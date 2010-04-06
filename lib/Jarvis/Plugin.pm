@@ -163,7 +163,7 @@ sub do {
         if ($filename) {
             print $jconfig->{'cgi'}->header(
                 -type => $mime_type->type,
-                'Content-Disposition' => $filename && "inline; filename=$filename",
+                'Content-Disposition' => $filename && "attachment; filename=$filename",
                 -cookie => $jconfig->{'cookie'},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             );

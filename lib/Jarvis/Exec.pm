@@ -189,7 +189,7 @@ sub do {
                 my $length = -s $tmpFile->filename;
                 print $jconfig->{'cgi'}->header(
                     -type                   => $mime_type->type,
-                    'Content-Disposition'   => "inline; filename=$filename",
+                    'Content-Disposition'   => "attachment; filename=$filename",
                     -cookie                 => $jconfig->{'cookie'},
                     'Cache-Control'         => 'no-store, no-cache, must-revalidate',
                     'Content-Length'        => $length
@@ -197,7 +197,7 @@ sub do {
             } else {
                 print $jconfig->{'cgi'}->header(
                     -type                   => $mime_type->type,
-                    'Content-Disposition'   => "inline; filename=$filename",
+                    'Content-Disposition'   => "attachment; filename=$filename",
                     -cookie                 => $jconfig->{'cookie'},
                     'Cache-Control'         => 'no-store, no-cache, must-revalidate'
                 );
