@@ -64,7 +64,7 @@ sub do {
     #
     my $allowed_groups = undef;         # Access groups permitted, or "*" or "**"
     my $command = undef;                # Command to exec.
-    my $add_headers = undef;            # Should we add headers.
+    my $add_headers = 0;                # Should we add headers.
     my $default_filename = undef;       # A default return filename to use.
     my $filename_parameter = undef;     # Which CGI parameter contains our filename.
 
@@ -73,6 +73,7 @@ sub do {
     my $tmp_http_path = undef;          # Public HTTP address of tmp file dir
                                         #  (implies HTTP redirection, not streaming)
     my $tmp_redirect = 0;               # Are we going to redirect the user to the results?
+    my $cleanup_after = 0;              # Cleanup after how many minutes?  0 = NEVER CLEANUP.
 
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
     if ($axml->{'exec'}) {
@@ -88,6 +89,7 @@ sub do {
             $add_headers = defined ($Jarvis::Config::yes_value {lc ($exec->{'add_headers'}->content || "no")});
             $default_filename = $exec->{'default_filename'}->content;
             $filename_parameter = $exec->{'filename_parameter'}->content;
+            $cleanup_after = $exec->{'cleanup_after'}->content || 0;
 
             # If HTTP redirection URL is specified, then use of tmp files is forced.
             $tmp_directory = $exec->{'tmp_directory'}->content;
@@ -281,7 +283,6 @@ sub do {
     # cleans up old temporary files.
     #
     } elsif ($tmp_redirect) {
-        &Jarvis::Error::debug ($jconfig, "File basename = " . &File::Basename::basename ($tmpFile->filename));
         (-f $tmpFile->filename) || die "Report output failed, no file created.";
 
         my $url = "http://" . $ENV{"HTTP_HOST"} . "/" . $tmp_http_path . (($tmp_http_path =~ m|\/$|) ? "" : "/") . &File::Basename::basename ($tmpFile->filename);
@@ -294,8 +295,34 @@ sub do {
     # to temporary files instead.
     #
     } else {
-        &Jarvis::Error::debug ($jconfig, "Printing received exec STDOUT back to client STDOUT.");
+        &Jarvis::Error::debug ($jconfig, "Printing exec STDOUT back to client STDOUT.");
         print $output;
+    }
+
+    # Cleanup if requested.
+    if ($tmp_directory && ($cleanup_after > 0)) {
+        &Jarvis::Error::debug ($jconfig, "Cleanup files in '$tmp_directory' older than $cleanup_after minutes.");
+
+        # Not fatal if we can't cleanup.  Don't want to bother the user with our internal problems.
+        opendir (my $dir, $tmp_directory) || (&Jarvis::Error::log ("Cannot opendir '$tmp_directory' for cleanup: $!") && return 1);
+        my @files = grep { -f "$tmp_directory/$_" } readdir($dir);
+        closedir $dir;
+
+        # Loop each file and get file info.  If we can't, that probably means the file belongs to
+        # somebody else in a shared /tmp directory.  Just ignore it and deal with those that are
+        # our files.
+        #
+        foreach my $file (@files) {
+            my @stat = stat "$tmp_directory/$file";
+            next if ! @stat;
+            next if ($> != $stat[4]);           # Only our files
+
+            my $age = time() - $stat[9];
+            next if ($age < $cleanup_after * 60);
+
+            &Jarvis::Error::debug ($jconfig, "Cleanup '$file' with age $age seconds.");
+            unlink "$tmp_directory/$file" || &Jarvis::Error::log ("Cannot cleanup '$file': $!");
+        }
     }
 
     return 1;
