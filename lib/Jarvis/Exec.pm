@@ -27,6 +27,7 @@ use strict;
 use warnings;
 
 use File::Temp;
+use File::Basename;
 use MIME::Types;
 
 package Jarvis::Exec;
@@ -66,10 +67,12 @@ sub do {
     my $add_headers = undef;            # Should we add headers.
     my $default_filename = undef;       # A default return filename to use.
     my $filename_parameter = undef;     # Which CGI parameter contains our filename.
-    my $use_tmpfile = undef;            # Whether or the output of the exec command
-                                        # should be written to a temporary file first
-                                        # or directly streamed to the client.
 
+    my $use_tmpfile = undef;            # Write to temporary file?
+    my $tmp_directory = undef;          # Override default tmp file directory
+    my $tmp_http_path = undef;          # Public HTTP address of tmp file dir
+                                        #  (implies HTTP redirection, not streaming)
+    my $tmp_redirect = 0;               # Are we going to redirect the user to the results?
 
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
     if ($axml->{'exec'}) {
@@ -85,7 +88,14 @@ sub do {
             $add_headers = defined ($Jarvis::Config::yes_value {lc ($exec->{'add_headers'}->content || "no")});
             $default_filename = $exec->{'default_filename'}->content;
             $filename_parameter = $exec->{'filename_parameter'}->content;
-            $use_tmpfile = defined ($Jarvis::Config::yes_value {lc ($exec->{'use_tmpfile'}->content || "no")});
+
+            # If HTTP redirection URL is specified, then use of tmp files is forced.
+            $tmp_directory = $exec->{'tmp_directory'}->content;
+            $tmp_http_path = $exec->{'tmp_http_path'}->content;
+
+            $use_tmpfile = $tmp_http_path || $tmp_directory || defined ($Jarvis::Config::yes_value {lc ($exec->{'use_tmpfile'}->content || "no")});
+            $tmp_redirect = $tmp_http_path;
+
             last;
         }
     }
@@ -112,12 +122,12 @@ sub do {
     # filename and we don't have a filename_parameter supplied and defined then
     # we will return anonymous content in text/plain format.
     #
-    my $filename = $param_values {$filename_parameter} || $default_filename;
+    my $filename = &File::Basename::basename ($param_values {$filename_parameter}) || $default_filename || undef;
     if (defined $filename) {
         &Jarvis::Error::debug ($jconfig, "Using filename '$filename'");
 
     } else {
-        &Jarvis::Error::debug ($jconfig, "No return filename given.  Response will be text/plain.");
+        &Jarvis::Error::debug ($jconfig, "No return filename given.  MIME types and redirection will make best efforts.");
     }
 
     # If we're under windows, force the use of tmp files.
@@ -128,8 +138,38 @@ sub do {
 
     my $tmpFile = undef;
     if ($use_tmpfile) {
-        $tmpFile = new File::Temp();
+        if ($tmp_directory) {
+            if (-d $tmp_directory) {
+                -w $tmp_directory || die "Cannot write to Exec temporary directory.";
+
+            } else {
+                (mkdir $tmp_directory) || die "Cannot create Exec temporary directory.";
+            }
+        }
+
+        # NB: Only delete if we're streaming immediately.  If we're redirecting, keep file.
+        my $template = $filename || "result.txt";
+        my $suffix = undef;
+
+        if ($template =~ s/(\.[a-z0-9]+)$//) {
+            $suffix = $1;
+
+        } else {
+            $suffix = ".dat";
+        }
+
+        # Don't put the user session ID in the filename, it's tempting but it's actually a
+        # security weakness.  Just add a random component.
+        $template .= "-XXXXXXXXXX";
+
+        $tmpFile = new File::Temp (
+            TEMPLATE => $template,
+            SUFFIX => $suffix,
+            DIR => $tmp_directory,
+            UNLINK => (! $tmp_http_path)
+        );
         $safe_params{'__tmpfile'} = $tmpFile->filename;
+        &Jarvis::Error::debug ($jconfig, "TMP filename = " . $tmpFile->filename);
     }
 
     # Add the dataset as a safe variable too.
@@ -178,7 +218,7 @@ sub do {
 
     # Are we supposed to add headers?  Does that include a filename header?
     # Note that if we really wanted to, we could squeeze in
-    if ($add_headers) {
+    if ($add_headers && ! $tmp_redirect) {
         my $mime_types = MIME::Types->new;
         my $mime_type = $mime_types->mimeTypeOf ($filename) || MIME::Types->type('text/plain');
 
@@ -215,9 +255,16 @@ sub do {
     # Now print the output.  If the report didn't add headers like it was supposed
     # to, then this will all turn to custard.
 
-    # Print via the output file, if we created one. This works under Windows/apache2
-    # but is not necessary under linux/apache2.
-    if ($use_tmpfile) {
+    # Option ONE - Pump out temporary file.
+    #
+    # Use this option if: use_tmpfile="yes" AND tmp_http_path is NOT defined.
+    #
+    # This appears to work under Windows/apache2 with HTTP, but isn't proven under
+    # linux/apache2.  Also, under Windows/apache2/HTTPS/mod_perl it can result in an
+    # "APR does not understand this error code" message which regular crashes Apache.
+    #
+    if ($use_tmpfile && ! $tmp_redirect) {
+        &Jarvis::Error::debug ($jconfig, "Streaming temporary file content back to client.");
         open(F, $tmpFile->filename) || die "Unable to open '" . $tmpFile->filename . "' to return output to the client.";
         binmode(F);
         my $buff;
@@ -225,7 +272,29 @@ sub do {
             print STDOUT $buff;
         }
         close(F);
+
+    # OPTION TWO - Redirect to temporary file.
+    #
+    # Use this option if: use_tmpfile="yes" AND tmp_http_path is defined.
+    #
+    # This should work in all cases.  BUT it does require that you have a process that
+    # cleans up old temporary files.
+    #
+    } elsif ($tmp_redirect) {
+        &Jarvis::Error::debug ($jconfig, "File basename = " . &File::Basename::basename ($tmpFile->filename));
+        (-f $tmpFile->filename) || die "Report output failed, no file created.";
+
+        my $url = "http://" . $ENV{"HTTP_HOST"} . "/" . $tmp_http_path . (($tmp_http_path =~ m|\/$|) ? "" : "/") . &File::Basename::basename ($tmpFile->filename);
+        &Jarvis::Error::debug ($jconfig, "Redirect to: $url");
+        print $jconfig->{'cgi'}->redirect( -URL => $url);
+
+    # OPTION THREE - Just print out whatever was pumped back via STDOUT.
+    #
+    # Works fine under Linunx.  Under Windows this didn't seem to work, and we went
+    # to temporary files instead.
+    #
     } else {
+        &Jarvis::Error::debug ($jconfig, "Printing received exec STDOUT back to client STDOUT.");
         print $output;
     }
 
