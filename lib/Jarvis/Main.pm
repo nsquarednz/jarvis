@@ -162,7 +162,7 @@ sub do {
     ($dataset_name eq '') || ($dataset_name =~ m|^[\w\-\.]+$|) || die "Invalid dataset_name '$dataset_name'!\n";
 
     # Now we can create our $jconfig at last!
-    $jconfig = new Jarvis::Config ($app_name, 'etc_dir' => "$jarvis_root/etc");
+    $jconfig = new Jarvis::Config ($app_name, ('etc_dir' => "$jarvis_root/etc", 'cgi' => $cgi) );
     $dataset_name && ($jconfig->{'dataset_name'} = $dataset_name);
 
     # Start tracking now.  Hopefully, not too much time has passed.
