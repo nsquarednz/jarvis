@@ -625,7 +625,7 @@ sub fetch {
         my $io = IO::String->new ($output);
 
         # Create a CSV object and print the header line.
-        my $csv = Text::CSV->new ();
+        my $csv = Text::CSV->new ( { binary => 1 } );
         $csv->print ($io, \@field_names);
         print $io "\n";
 

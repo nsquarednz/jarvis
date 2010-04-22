@@ -321,7 +321,26 @@ sub do {
         $jconfig->{'dataset_type'} = 's';
         my $return_text = &Jarvis::Dataset::fetch ($jconfig, \@rest_args);
 
-        print $cgi->header(-type => "text/plain; charset=UTF-8", -cookie => $jconfig->{'cookie'}, 'Cache-Control' => 'no-store, no-cache, must-revalidate');
+        #
+        # When providing CSV output, it is most likely going to be downloaded and
+        # stored by users, or downloaded and loaded into a spreadsheet application.
+        #
+        # So, for CSV we suggest it as an attachment, with the filename of the dataset.
+        #
+        if ($jconfig->{'format'} eq "csv") {
+            print $cgi->header(
+                -type => "text/csv; charset=UTF-8", 
+                'Content-Disposition' => 'attachment; filename=' . $jconfig->{'dataset_name'} . '.csv',
+                -cookie => $jconfig->{'cookie'}, 
+                'Cache-Control' => 'no-store, no-cache, must-revalidate'
+            );
+        } else {
+            print $cgi->header(
+                -type => "text/plain; charset=UTF-8", 
+                -cookie => $jconfig->{'cookie'}, 
+                'Cache-Control' => 'no-store, no-cache, must-revalidate'
+            );
+        }
         print $return_text;
 
     # Modify a regular dataset.
