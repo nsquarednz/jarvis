@@ -80,6 +80,9 @@ sub new {
     # We'll need a CGI handle.
     $self->{'cgi'} = $args{'cgi'} || new CGI;
 
+    # We also store the mod_perl IO object, if we get it
+    $self->{'mod_perl_io'} = $args{'mod_perl_io'} || undef;
+
     # Directory for a bunch of later config.
     $self->{'etc_dir'} = $args{'etc_dir'} || "../etc" || die "Missing parameter 'etc_dir'\n";
     (-d $self->{'etc_dir'}) || die "Parameter 'etc_dir' does not specify a directory.\n";

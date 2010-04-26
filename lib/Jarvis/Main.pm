@@ -102,6 +102,7 @@ sub error_handler {
 ###############################################################################
 #
 sub do {
+    my $mod_perl_io = shift; # possibly get our mod-perl stream output variable
 
     $SIG{__WARN__} = sub { die shift };
     $SIG{__DIE__} = \&Jarvis::Main::error_handler;
@@ -162,7 +163,7 @@ sub do {
     ($dataset_name eq '') || ($dataset_name =~ m|^[\w\-\.]+$|) || die "Invalid dataset_name '$dataset_name'!\n";
 
     # Now we can create our $jconfig at last!
-    $jconfig = new Jarvis::Config ($app_name, ('etc_dir' => "$jarvis_root/etc", 'cgi' => $cgi) );
+    $jconfig = new Jarvis::Config ($app_name, ('etc_dir' => "$jarvis_root/etc", 'cgi' => $cgi, 'mod_perl_io' => $mod_perl_io ) );
     $dataset_name && ($jconfig->{'dataset_name'} = $dataset_name);
 
     # Start tracking now.  Hopefully, not too much time has passed.

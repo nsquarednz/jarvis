@@ -39,7 +39,7 @@ use Jarvis::Main;
 sub handler {
     my $r = shift;
 
-    &Jarvis::Main::do ();
+    &Jarvis::Main::do ($r);
 
     return Apache2::Const::OK;
 }
