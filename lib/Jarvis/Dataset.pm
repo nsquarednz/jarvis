@@ -577,7 +577,8 @@ sub fetch {
 
         # Note that we always return a "data" field, even if it is an empty array.
         # That is because ExtJS and other libraries will flag an exception if we do not.
-        $return_data {"fetched"} = $num_rows;
+        $return_data {"fetched"} = $num_rows;                   # Fetched from database
+        $return_data {"returned"} = scalar @$rows_aref;         # Returned to client (after paging)
         $return_data {"data"} = $rows_aref;
 
         my $json = JSON::PP->new->pretty(1);
@@ -595,7 +596,8 @@ sub fetch {
         $xml->{'response'}{'error_string'} = $jconfig->{'error_string'};
         $xml->{'response'}{'group_list'} = $jconfig->{'group_list'};
 
-        $xml->{'response'}{'fetched'} = $num_rows;
+        $xml->{'response'}{'fetched'} = $num_rows;              # Fetched from database
+        $xml->{'response'}{'returned'} = scalar @$rows_aref;    # Returned to client (after paging)
         if (scalar @$rows_aref) {
             $xml->{'response'}{'data'}{'row'} = $rows_aref;
         }
