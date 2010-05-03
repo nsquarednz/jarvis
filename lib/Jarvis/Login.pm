@@ -124,7 +124,7 @@ sub check {
     # and group_list to be undef, too many things depend on it having some value,
     # even if that is just ''.
     #
-    my ($error_string, $username, $group_list, $logged_in) = ('', '', '', 0);
+    my ($error_string, $username, $group_list, $logged_in, $additional_safe) = ('', '', '', 0, undef);
     my $already_logged_in = 0;
 
     # Existing, successful session?  Fine, we trust this.
@@ -165,7 +165,7 @@ sub check {
         my $login_method = $login_module . "::check";
         {
             no strict 'refs';
-            ($error_string, $username, $group_list) = &$login_method ($jconfig, $offered_username, $offered_password, %login_parameters);
+            ($error_string, $username, $group_list, $additional_safe) = &$login_method ($jconfig, $offered_username, $offered_password, %login_parameters);
         }
 
         $username || ($username = '');
@@ -175,6 +175,13 @@ sub check {
         $session->param('logged_in', $logged_in);
         $session->param('username', $username);
         $session->param('group_list', $group_list);
+
+        # Do we have any additional safe parameters returned by the login module?
+        # These must begin with "__" because they are safe params.
+        foreach my $name (keys %$additional_safe) {
+            ($name =~ m/^__/) || die "Invalid additional safe parameter name '$name' returned by login module.";
+            $session->param($name, $additional_safe->{$name});
+        }
     }
 
     # Set/extend session expiry.  Flush new/modified session data.
@@ -193,6 +200,15 @@ sub check {
     $jconfig->{'username'} = $username;
     $jconfig->{'error_string'} = $error_string;
     $jconfig->{'group_list'} = $group_list;
+
+    # Copy any additional safe params from session context into $jconfig's area.
+    my $dataref = $session->dataref();
+    foreach my $name (keys %$dataref) {
+        next if ($name !~ m/^__/);
+        my $value = $dataref->{$name};
+        &Jarvis::Error::debug ($jconfig, "Session set additional safe parameter '$name' = '$value'.");
+        $jconfig->{'additional_safe'}{$name} = $value;
+    }
 
     # Log the results if we actually tried to login.  Write to tracker database too
     # if we are configured to do so.

@@ -133,6 +133,13 @@ sub new {
     $self->{'default_libs'} = [];
     map { push @{$self->{'default_libs'}}, $_->{'lib'}->{'path'}->content; } @{$axml->{'default_libs'}} if ($axml->{'default_libs'});
 
+    ###############################################################################
+    # Create a placeholder for a hash of ADDITIONAL safe parameters.  These are
+    # intended for additional information, e.g. extended login returned results.
+    ###############################################################################
+    my %additional_safe = ();
+    $self->{'additional_safe'} = \%additional_safe;
+
     return $self;
 }
 
@@ -211,6 +218,13 @@ sub safe_variables {
         &Jarvis::Error::debug ($jconfig, "Secure Parameter: __group:$group = 1");
     }
 
+    # Finally, any additional safe parameters that might have been added by
+    # login modules or other site-specific hooks.
+    foreach my $name (keys %{ $jconfig->{'additional_safe'} }) {
+        my $value = $jconfig->{'additional_safe'}{$name};
+        $safe_params {$name} = $value;
+        &Jarvis::Error::debug ($jconfig, "Secure Parameter: $name = $value");
+    }
 
     return %safe_params;
 }
