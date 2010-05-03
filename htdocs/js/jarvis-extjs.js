@@ -129,6 +129,7 @@ function jarvisProxyException (proxy, type, action, options, response, arg) {
 //      store            - The store to update.
 //      dataset_name     - Name of the .xml file containing dataset config.
 //      record           - The Ext.data.Record structure holding data.
+//      idfield          - Name of unique per-row ID field (default = "id")
 //
 // When the update attempt is over we will fire the store's 'writeback' listener with arguments
 //
@@ -142,7 +143,10 @@ function jarvisProxyException (proxy, type, action, options, response, arg) {
 //      records          - Record(s) to send.  May be hash (1 record) or array of hashes.
 //      num_pending      - Number of remaining changes still queued.
 //
-function jarvisSendChange (transaction_type, store, dataset_name, records) {
+function jarvisSendChange (transaction_type, store, dataset_name, records, idfield) {
+
+    // What is the name of the id fields which tells us if this is a new or existing record?
+    idfield = idfield || 'id';
 
     // Set _ttype on a per-record basis for MIXED requests.
     if (transaction_type.toUpperCase() == 'MIXED') {
@@ -150,13 +154,13 @@ function jarvisSendChange (transaction_type, store, dataset_name, records) {
             for (var i = 0; i < records.length; i++) {
                 var rd = records[i].data;
                 if (rd._type == null) {
-                    rd._ttype = rd._deleted ? 'delete' : (((rd.id == null) || (rd.id == 0)) ? 'insert' : 'update');
+                    rd._ttype = rd._deleted ? 'delete' : (((rd[idfield] == null) || (rd[idfield] == 0)) ? 'insert' : 'update');
                 }
             }
         } else {
             var rd = records.data;
             if (rd._type == null) {
-                rd._ttype = rd._deleted ? 'delete' : (((rd.id == null) || (rd.id == 0)) ? 'insert' : 'update');
+                rd._ttype = rd._deleted ? 'delete' : (((rd[idfield] == null) || (rd[idfield] == 0)) ? 'insert' : 'update');
             }
         }
     }
@@ -171,11 +175,11 @@ function jarvisSendChange (transaction_type, store, dataset_name, records) {
     if (typeof records.length === 'number') {
         for (var i = 0; i < records.length; i++) {
             fields.push (records[i].data);
-            fields[i]._record_id = records[i].id;
+            fields[i]._record_id = records[i][idfield];
         }
     } else {
         fields = records.data;
-        fields._record_id = records.id;
+        fields._record_id = records[idfield];
     }
 
     // One more request to track in our counter.
