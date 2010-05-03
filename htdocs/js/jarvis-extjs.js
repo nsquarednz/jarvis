@@ -130,6 +130,7 @@ function jarvisProxyException (proxy, type, action, options, response, arg) {
 //      dataset_name     - Name of the .xml file containing dataset config.
 //      record           - The Ext.data.Record structure holding data.
 //      idfield          - Name of unique per-row ID field (default = "id")
+//                              Note: This is used only for MIXED transactions.
 //
 // When the update attempt is over we will fire the store's 'writeback' listener with arguments
 //
@@ -175,11 +176,11 @@ function jarvisSendChange (transaction_type, store, dataset_name, records, idfie
     if (typeof records.length === 'number') {
         for (var i = 0; i < records.length; i++) {
             fields.push (records[i].data);
-            fields[i]._record_id = records[i][idfield];
+            fields[i]._record_id = records[i].id;
         }
     } else {
         fields = records.data;
-        fields._record_id = records[idfield];
+        fields._record_id = records.id;
     }
 
     // One more request to track in our counter.
