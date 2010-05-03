@@ -228,7 +228,11 @@ WHERE
     my $group_list = join (",", @role_array, @access_array);
 
     # Add safe params.
-    my %safe_params = ( '__ad_client_id' => $ad_client_id, '__ad_org_id' => $ad_org_id );
+    my %safe_params = (
+        '__ad_user_id' => $ad_user_id,
+        '__ad_client_id' => $ad_client_id,
+        '__ad_org_id' => $ad_org_id
+    );
 
     &Jarvis::Error::debug ($jconfig, "Group list = '$group_list'.");
     return ("", $username, $group_list, \%safe_params);
