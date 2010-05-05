@@ -88,7 +88,7 @@ sub do {
             $command = $exec->{'command'}->content || die "No 'command' defined for exec dataset '$dataset'";
             $add_headers = defined ($Jarvis::Config::yes_value {lc ($exec->{'add_headers'}->content || "no")});
             $default_filename = $exec->{'default_filename'}->content;
-            $filename_parameter = $exec->{'filename_parameter'}->content;
+            $filename_parameter = $exec->{'filename_parameter'}->content || 'filename';
             $cleanup_after = $exec->{'cleanup_after'}->content || 0;
 
             # If HTTP redirection URL is specified, then use of tmp files is forced.
@@ -124,7 +124,8 @@ sub do {
     # filename and we don't have a filename_parameter supplied and defined then
     # we will return anonymous content in text/plain format.
     #
-    my $filename = &File::Basename::basename ($param_values {$filename_parameter}) || $default_filename || undef;
+    my $filename = $param_values {$filename_parameter} ? &File::Basename::basename ($param_values {$filename_parameter}) : ($default_filename || undef);
+
     if (defined $filename) {
         &Jarvis::Error::debug ($jconfig, "Using filename '$filename'");
 
