@@ -48,6 +48,7 @@ use Jarvis::Status;
 use Jarvis::Habitat;
 use Jarvis::Exec;
 use Jarvis::Plugin;
+use Jarvis::Hook;
 use Jarvis::DB;
 use Jarvis::Tracker;
 
@@ -278,6 +279,9 @@ sub do {
         $jconfig->{'dataset_type'} = 'i';
         $jconfig->{'action'} = 'select';
 
+        # Invoke application-specific start hook(s).
+        &Jarvis::Hook::start ($jconfig);
+
         # Status.  I.e. are we logged in?
         if ($dataset_name eq "__status") {
             &Jarvis::Error::debug ($jconfig, "Returning status special dataset.");
@@ -298,6 +302,9 @@ sub do {
         } else {
             die "Unknown special dataset '$dataset_name'!\n";
         }
+
+        # Invoke application-specific finish hook(s).
+        &Jarvis::Hook::finish ($jconfig, \$return_text);
 
         print $cgi->header(-type => "text/plain; charset=UTF-8", -cookie => $jconfig->{'cookie'}, 'Cache-Control' => 'no-store, no-cache, must-revalidate');
         print $return_text;
@@ -320,7 +327,10 @@ sub do {
     # Fetch a regular dataset.
     } elsif ($action eq "select") {
         $jconfig->{'dataset_type'} = 's';
+
+        &Jarvis::Hook::start ($jconfig);
         my $return_text = &Jarvis::Dataset::fetch ($jconfig, \@rest_args);
+        &Jarvis::Hook::finish ($jconfig, \$return_text);
 
         #
         # When providing CSV output, it is most likely going to be downloaded and
@@ -330,15 +340,15 @@ sub do {
         #
         if ($jconfig->{'format'} eq "csv") {
             print $cgi->header(
-                -type => "text/csv; charset=UTF-8", 
+                -type => "text/csv; charset=UTF-8",
                 'Content-Disposition' => 'attachment; filename=' . $jconfig->{'dataset_name'} . '.csv',
-                -cookie => $jconfig->{'cookie'}, 
+                -cookie => $jconfig->{'cookie'},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             );
         } else {
             print $cgi->header(
-                -type => "text/plain; charset=UTF-8", 
-                -cookie => $jconfig->{'cookie'}, 
+                -type => "text/plain; charset=UTF-8",
+                -cookie => $jconfig->{'cookie'},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             );
         }
@@ -347,7 +357,10 @@ sub do {
     # Modify a regular dataset.
     } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete") || ($action eq "mixed")) {
         $jconfig->{'dataset_type'} = 's';
+
+        &Jarvis::Hook::start ($jconfig);
         my $return_text = &Jarvis::Dataset::store ($jconfig, \@rest_args);
+        &Jarvis::Hook::finish ($jconfig, \$return_text);
 
         print $cgi->header(-type => "text/plain; charset=UTF-8", -cookie => $jconfig->{'cookie'});
         print $return_text;

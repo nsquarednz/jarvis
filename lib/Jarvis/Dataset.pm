@@ -43,6 +43,7 @@ package Jarvis::Dataset;
 use Jarvis::Text;
 use Jarvis::Error;
 use Jarvis::DB;
+use Jarvis::Hook;
 
 use sort 'stable';      # Don't mix up records when server-side sorting
 
@@ -770,10 +771,13 @@ sub store {
     my $message = '';
 
     # We pre-compute the "before" statement parameters even if there is no before statement,
-    # since we may also wish to log them.  It's not
+    # since we may also wish to log them.
     my %restful_params = &Jarvis::Config::safe_variables ($jconfig, {}, $rest_args_aref);
     my %params_copy = %restful_params;
     $jconfig->{'params_href'} = \%params_copy;
+
+    # Invoke before_all hook.
+    &Jarvis::Hook::before_all ($jconfig, \%restful_params);
 
     # Execute our "before" statement.  This statement is NOT permitted to fail.  If it does,
     # then we immediately barf
@@ -816,6 +820,9 @@ sub store {
         if (scalar (keys %transforms)) {
             &transform (\%transforms, \%safe_params);
         }
+
+        # Invoke before_one hook.
+        &Jarvis::Hook::before_one ($jconfig, \%safe_params);
 
         # Figure out which statement type we will use for this row.
         my $row_ttype = $safe_params{'_ttype'} || $ttype;
@@ -960,6 +967,9 @@ sub store {
             }
         }
 
+        # Invoke after_one hook.
+        &Jarvis::Hook::after_one ($jconfig, \%safe_params, \%row_result);
+
         push (@results, \%row_result);
     }
 
@@ -972,6 +982,9 @@ sub store {
         &Jarvis::Error::debug ($jconfig, "Finished with statement for ttype '$stm_type'.");
         $stm{$stm_type}->{'sth'}->finish;
     }
+
+    # Invoke before_all hook.
+    &Jarvis::Hook::after_all ($jconfig, \%restful_params);
 
     # Execute our "after" statement.
     if ($success) {
