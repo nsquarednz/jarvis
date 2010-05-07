@@ -174,6 +174,8 @@ sub finish {
 # Params:
 #       $jconfig         - Jarvis::Config object
 #
+#       $dsxml           - The XML::Smart object for our dataset XML config.
+#
 #       $restful_args_href - Reference to the rest args that will be given to
 #                            any "before" SQL statement for this dataset.  Hook
 #                            may modify these parameters.
@@ -183,7 +185,7 @@ sub finish {
 ################################################################################
 #
 sub before_all {
-    my ($jconfig, $restful_args_href) = @_;
+    my ($jconfig, $dsxml, $restful_args_href) = @_;
 
     my @hooks = @{ $jconfig->{'hooks'} };
 
@@ -197,7 +199,7 @@ sub before_all {
         &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
-            &$method ($jconfig, $hook_parameters_href, $restful_args_href);
+            &$method ($jconfig, $hook_parameters_href, $dsxml, $restful_args_href);
         }
     }
 
@@ -211,6 +213,8 @@ sub before_all {
 # Params:
 #       $jconfig         - Jarvis::Config object
 #
+#       $dsxml           - The XML::Smart object for our dataset XML config.
+#
 #       $restful_args_href - Reference to the rest args that will be given to
 #                            any "after" SQL statement for this dataset.  Hook
 #                            may modify these parameters.
@@ -220,7 +224,7 @@ sub before_all {
 ################################################################################
 #
 sub after_all {
-    my ($jconfig, $restful_args_href) = @_;
+    my ($jconfig, $dsxml, $restful_args_href) = @_;
 
     my @hooks = @{ $jconfig->{'hooks'} };
 
@@ -234,7 +238,7 @@ sub after_all {
         &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
-            &$method ($jconfig, $hook_parameters_href, $restful_args_href);
+            &$method ($jconfig, $hook_parameters_href, $dsxml, $restful_args_href);
         }
     }
 
@@ -247,6 +251,8 @@ sub after_all {
 # Params:
 #       $jconfig         - Jarvis::Config object
 #
+#       $dsxml           - The XML::Smart object for our dataset XML config.
+#
 #       $sql_params_href - Reference to the processed and transformed args that
 #                          are just about to be bound to the SQL parameters.  The
 #                          hook may change these values.
@@ -256,7 +262,7 @@ sub after_all {
 ################################################################################
 #
 sub before_one {
-    my ($jconfig, $sql_params_href) = @_;
+    my ($jconfig, $dsxml, $sql_params_href) = @_;
 
     my @hooks = @{ $jconfig->{'hooks'} };
 
@@ -270,7 +276,7 @@ sub before_one {
         &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
-            &$method ($jconfig, $hook_parameters_href, $sql_params_href);
+            &$method ($jconfig, $hook_parameters_href, $dsxml, $sql_params_href);
         }
     }
 
@@ -282,6 +288,8 @@ sub before_one {
 #
 # Params:
 #       $jconfig         - Jarvis::Config object
+#
+#       $dsxml           - The XML::Smart object for our dataset XML config.
 #
 #       $sql_params_href - Reference to the processed and transformed args that
 #                          were bound to the SQL parameters.  No point changing.
@@ -295,7 +303,7 @@ sub before_one {
 ################################################################################
 #
 sub after_one {
-    my ($jconfig, $sql_params_href, $row_result_href) = @_;
+    my ($jconfig, $dsxml, $sql_params_href, $row_result_href) = @_;
 
     my @hooks = @{ $jconfig->{'hooks'} };
 
@@ -309,7 +317,7 @@ sub after_one {
         &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
-            &$method ($jconfig, $hook_parameters_href, $sql_params_href, $row_result_href);
+            &$method ($jconfig, $hook_parameters_href, $dsxml, $sql_params_href, $row_result_href);
         }
     }
 

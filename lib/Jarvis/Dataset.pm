@@ -777,7 +777,7 @@ sub store {
     $jconfig->{'params_href'} = \%params_copy;
 
     # Invoke before_all hook.
-    &Jarvis::Hook::before_all ($jconfig, \%restful_params);
+    &Jarvis::Hook::before_all ($jconfig, $dsxml, \%restful_params);
 
     # Execute our "before" statement.  This statement is NOT permitted to fail.  If it does,
     # then we immediately barf
@@ -822,7 +822,7 @@ sub store {
         }
 
         # Invoke before_one hook.
-        &Jarvis::Hook::before_one ($jconfig, \%safe_params);
+        &Jarvis::Hook::before_one ($jconfig, $dsxml, \%safe_params);
 
         # Figure out which statement type we will use for this row.
         my $row_ttype = $safe_params{'_ttype'} || $ttype;
@@ -968,7 +968,7 @@ sub store {
         }
 
         # Invoke after_one hook.
-        &Jarvis::Hook::after_one ($jconfig, \%safe_params, \%row_result);
+        &Jarvis::Hook::after_one ($jconfig, $dsxml, \%safe_params, \%row_result);
 
         push (@results, \%row_result);
     }
@@ -984,7 +984,7 @@ sub store {
     }
 
     # Invoke before_all hook.
-    &Jarvis::Hook::after_all ($jconfig, \%restful_params);
+    &Jarvis::Hook::after_all ($jconfig, $dsxml, \%restful_params);
 
     # Execute our "after" statement.
     if ($success) {
