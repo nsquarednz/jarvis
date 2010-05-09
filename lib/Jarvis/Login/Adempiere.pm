@@ -67,6 +67,7 @@
 #       This software is Copyright 2008 by Jonathan Couper-Smartt.
 ###############################################################################
 #
+use Socket;
 use CGI;
 
 use strict;
@@ -131,6 +132,8 @@ sub Jarvis::Login::Adempiere::check {
     $sth->execute ($client_name) || die "Couldn't execute statement '$query': " . $dbh->errstr;
 
     my $result_aref = $sth->fetchall_arrayref({});
+    $sth->finish ();
+
     if ((scalar @$result_aref) < 1) {
         return ("Client '$client_name' not known/active.");
     }
@@ -149,6 +152,8 @@ sub Jarvis::Login::Adempiere::check {
     $sth->execute ($org_name) || die "Couldn't execute statement '$query': " . $dbh->errstr;
 
     $result_aref = $sth->fetchall_arrayref({});
+    $sth->finish ();
+
     if ((scalar @$result_aref) < 1) {
         return ("Org '$org_name' not known/active.");
     }
@@ -167,6 +172,8 @@ sub Jarvis::Login::Adempiere::check {
     $sth->execute ($username, $ad_client_id, $ad_org_id) || die "Couldn't execute statement '$query': " . $dbh->errstr;
 
     $result_aref = $sth->fetchall_arrayref({});
+    $sth->finish ();
+
     if ((scalar @$result_aref) < 1) {
         return ("User '$username' not known/active.");
     }
@@ -200,6 +207,7 @@ WHERE ur.isactive = 'Y' AND ur.ad_user_id = ? AND (ur.ad_client_id = ? OR ur.ad_
     $sth->execute ($ad_user_id, $ad_client_id, $ad_org_id) || die "Couldn't execute statement '$query': " . $dbh->errstr;
 
     $result_aref = $sth->fetchall_arrayref({});
+    $sth->finish ();
 
     my @role_array = map { my $n = $_->{name}; $n =~ s/[^a-z0-9]//gi; "role-$n" } @$result_aref;
 
@@ -221,17 +229,56 @@ WHERE
     $sth->execute ($ad_user_id) || die "Couldn't execute statement '$query': " . $dbh->errstr;
 
     $result_aref = $sth->fetchall_arrayref({});
+    $sth->finish ();
 
     my @access_array = map { my $n = $_->{name}; $n =~ s/[^a-z0-9]//gi; (($_->{isreadwrite} eq 'Y') ? "write" : "read") . "-" . $n } @$result_aref;
 
     # Combine role and table access.
     my $group_list = join (",", @role_array, @access_array);
 
+    # Find the IP address and name.  Note that reverse DNS lookup can sometimes take
+    # a LONG TIME (up to 10 seconds or more).  In that case, the client is left waiting.
+    # That's why this is configurable and default disabled.
+    #
+    my $remote_addr = $ENV{"HTTP_X_FORWARDED_FOR"} || $ENV{"HTTP_CLIENT_IP"} || $ENV{"REMOTE_ADDR"} || undef;
+    my $reverse_dns = defined ($Jarvis::Config::yes_value {lc ($login_parameters{'reverse_dns'} || "no")});
+    my $remote_host = undef;
+    if ($remote_addr && $reverse_dns) {
+        my @bytes = split(/\./, $remote_addr);
+        my $packedaddr = pack("C4", @bytes);
+        $remote_host = (gethostbyaddr($packedaddr, 2))[0];
+    }
+
+    # Create a session row in Adempiere.
+    $query = "
+INSERT INTO ad_session (
+    ad_session_id, ad_client_id, ad_org_id, isactive,
+    created, createdby, updated, updatedby,
+    websession, remote_addr, remote_host,
+    processed, description, ad_role_id, logindate)
+VALUES (
+    nextid_by_name ('AD_Session'), ?, ?, 'Y',
+    now(), ?, now(), ?,
+    null, ?, ?,
+    'Y', 'Jarvis', null, now())
+RETURNING
+    ad_session_id";
+
+    $sth = $dbh->prepare ($query) || die "Couldn't prepare statement '$query': " . $dbh->errstr;
+    $sth->execute ($ad_client_id, $ad_org_id, $ad_user_id, $ad_user_id, $remote_addr, $remote_host) || die "Couldn't execute statement '$query': " . $dbh->errstr;
+
+    $result_aref = $sth->fetchall_arrayref({});
+    my $ad_session_id = $$result_aref[0]->{ad_session_id} || die "Cannot determine ad_session_id";
+    $sth->finish ();
+
+    &Jarvis::Error::debug ($jconfig, "Session ID = '$ad_session_id'.");
+
     # Add safe params.
     my %safe_params = (
         '__ad_user_id' => $ad_user_id,
         '__ad_client_id' => $ad_client_id,
-        '__ad_org_id' => $ad_org_id
+        '__ad_org_id' => $ad_org_id,
+        '__ad_session_id' => $ad_session_id
     );
 
     &Jarvis::Error::debug ($jconfig, "Group list = '$group_list'.");
