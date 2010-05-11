@@ -968,7 +968,9 @@ sub store {
         }
 
         # Invoke after_one hook.
-        &Jarvis::Hook::after_one ($jconfig, $dsxml, \%safe_params, \%row_result);
+        if ($success) {
+            &Jarvis::Hook::after_one ($jconfig, $dsxml, \%safe_params, \%row_result);
+        }
 
         push (@results, \%row_result);
     }
@@ -983,11 +985,10 @@ sub store {
         $stm{$stm_type}->{'sth'}->finish;
     }
 
-    # Invoke before_all hook.
-    &Jarvis::Hook::after_all ($jconfig, $dsxml, \%restful_params);
-
     # Execute our "after" statement.
     if ($success) {
+        &Jarvis::Hook::after_all ($jconfig, $dsxml, \%restful_params);
+
         my $astm = &parse_statement ($jconfig, $dsxml, $dbh, 'after');
         if ($astm) {
             my @aarg_values = &names_to_values ($jconfig, $astm->{'vnames_aref'}, \%restful_params);
