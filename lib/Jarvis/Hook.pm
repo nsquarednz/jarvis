@@ -134,6 +134,41 @@ sub start {
 }
 
 ################################################################################
+# Invoke the "finish" method on each hook.
+#
+# Params:
+#       $jconfig         - Jarvis::Config object
+#
+#       $return_text_ref - Reference to the text we are about to return.
+#                          Hook(s) may modify this content before it is returned.
+#
+# Returns:
+#       1
+################################################################################
+#
+sub finish {
+    my ($jconfig, $return_text_ref) = @_;
+
+    my @hooks = @{ $jconfig->{'hooks'} };
+
+    # Now invoke "start" on all the hooks we found.
+    foreach my $hook (@hooks) {
+        my $lib = $hook->{'lib'};
+        my $module = $hook->{'module'};
+        my $hook_parameters_href = $hook->{'parameters'};
+
+        my $method = $module . "::finish";
+        &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
+        {
+            no strict 'refs';
+            &$method ($jconfig, $hook_parameters_href, $return_text_ref);
+        }
+    }
+
+    return 1;
+}
+
+################################################################################
 # Invoke the "before_all" method on each hook.
 #
 # Params:
@@ -171,6 +206,44 @@ sub before_all {
     return 1;
 }
 
+
+################################################################################
+# Invoke the "after_all" method on each hook.
+#
+# Params:
+#       $jconfig         - Jarvis::Config object
+#
+#       $dsxml           - The XML::Smart object for our dataset XML config.
+#
+#       $restful_args_href - Reference to the rest args that will be given to
+#                            any "after" SQL statement for this dataset.  Hook
+#                            may modify these parameters.
+#
+# Returns:
+#       1
+################################################################################
+#
+sub after_all {
+    my ($jconfig, $dsxml, $restful_args_href) = @_;
+
+    my @hooks = @{ $jconfig->{'hooks'} };
+
+    # Now invoke "start" on all the hooks we found.
+    foreach my $hook (@hooks) {
+        my $lib = $hook->{'lib'};
+        my $module = $hook->{'module'};
+        my $hook_parameters_href = $hook->{'parameters'};
+
+        my $method = $module . "::after_all";
+        &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
+        {
+            no strict 'refs';
+            &$method ($jconfig, $hook_parameters_href, $dsxml, $restful_args_href);
+        }
+    }
+
+    return 1;
+}
 
 ################################################################################
 # Invoke the "before_one" method on each hook.
@@ -251,77 +324,5 @@ sub after_one {
     return 1;
 }
 
-################################################################################
-# Invoke the "after_all" method on each hook.
-#
-# Params:
-#       $jconfig         - Jarvis::Config object
-#
-#       $dsxml           - The XML::Smart object for our dataset XML config.
-#
-#       $restful_args_href - Reference to the rest args that will be given to
-#                            any "after" SQL statement for this dataset.  Hook
-#                            may modify these parameters.
-#
-# Returns:
-#       1
-################################################################################
-#
-sub after_all {
-    my ($jconfig, $dsxml, $restful_args_href) = @_;
-
-    my @hooks = @{ $jconfig->{'hooks'} };
-
-    # Now invoke "start" on all the hooks we found.
-    foreach my $hook (@hooks) {
-        my $lib = $hook->{'lib'};
-        my $module = $hook->{'module'};
-        my $hook_parameters_href = $hook->{'parameters'};
-
-        my $method = $module . "::after_all";
-        &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
-        {
-            no strict 'refs';
-            &$method ($jconfig, $hook_parameters_href, $dsxml, $restful_args_href);
-        }
-    }
-
-    return 1;
-}
-
-################################################################################
-# Invoke the "finish" method on each hook.
-#
-# Params:
-#       $jconfig         - Jarvis::Config object
-#
-#       $return_text_ref - Reference to the text we are about to return.
-#                          Hook(s) may modify this content before it is returned.
-#
-# Returns:
-#       1
-################################################################################
-#
-sub finish {
-    my ($jconfig, $return_text_ref) = @_;
-
-    my @hooks = @{ $jconfig->{'hooks'} };
-
-    # Now invoke "start" on all the hooks we found.
-    foreach my $hook (@hooks) {
-        my $lib = $hook->{'lib'};
-        my $module = $hook->{'module'};
-        my $hook_parameters_href = $hook->{'parameters'};
-
-        my $method = $module . "::finish";
-        &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
-        {
-            no strict 'refs';
-            &$method ($jconfig, $hook_parameters_href, $return_text_ref);
-        }
-    }
-
-    return 1;
-}
 
 1;
