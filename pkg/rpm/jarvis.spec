@@ -11,7 +11,7 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 %global Root /opt/jarvis
 
 #BuildRequires:
-#Requires:
+Requires: perl(DBD::SQLite) 
 
 %description
 Jarvis is "helper glue". It is designed to bridge the gap between your
