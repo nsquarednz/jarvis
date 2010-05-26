@@ -75,7 +75,7 @@ use warnings;
 
 use Jarvis::Error;
 
-package Jarvis::Login::Database;
+package Jarvis::Login::Adempiere;
 
 ###############################################################################
 # Public Functions
@@ -86,15 +86,6 @@ package Jarvis::Login::Database;
 # for the existing user/pass.  We validate this by checking a table in the
 # currently open database.  The user and pass columns are both within this same
 # table.
-#
-# To use this method, specify the following.  Note that no parameters are
-# required or available.
-#
-#    <app format="json" debug="no">
-#        ...
-#        <login module="Jarvis::Login::Adempiere"/>
-#        ...
-#    </app>
 #
 # Params:
 #       $jconfig - Jarvis::Config object
