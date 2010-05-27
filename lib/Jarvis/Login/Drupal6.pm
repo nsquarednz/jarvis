@@ -104,14 +104,7 @@ sub Jarvis::Login::Drupal6::check {
     my $dbh = &Jarvis::DB::handle ($jconfig);
 
     # Check the username from the user name table.
-    my $query = "SELECT uid, pass FROM users WHERE name = ? AND status = 1";
-
-    my $sth = $dbh->prepare ($query) || die "Couldn't prepare statement '$query': " . $dbh->errstr;
-    $sth->execute ($username) || die "Couldn't execute statement '$query': " . $dbh->errstr;
-
-    my $result_aref = $sth->fetchall_arrayref({});
-    $sth->finish ();
-
+    my $result_aref = $dbh->selectall_arrayref("SELECT uid, pass FROM users WHERE name = ? AND status = 1", { Slice => {} });
     if ((scalar @$result_aref) < 1) {
         return ("User '$username' not known/active.");
     }

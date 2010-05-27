@@ -117,14 +117,7 @@ sub Jarvis::Login::Adempiere::check {
     my $dbh = &Jarvis::DB::handle ($jconfig);
 
     # Get the Client ID
-    my $query = "SELECT ad_client_id FROM ad_client WHERE name = ? AND isactive = 'Y'";
-
-    my $sth = $dbh->prepare ($query) || die "Couldn't prepare statement '$query': " . $dbh->errstr;
-    $sth->execute ($client_name) || die "Couldn't execute statement '$query': " . $dbh->errstr;
-
-    my $result_aref = $sth->fetchall_arrayref({});
-    $sth->finish ();
-
+    my $result_aref = $dbh->selectall_arrayref("SELECT ad_client_id FROM ad_client WHERE name = ? AND isactive = 'Y'", { Slice => {} }, $client_name);
     if ((scalar @$result_aref) < 1) {
         return ("Client '$client_name' not known/active.");
     }
@@ -137,14 +130,7 @@ sub Jarvis::Login::Adempiere::check {
 
 
     # Get the Org ID
-    $query = "SELECT ad_org_id FROM ad_org WHERE name = ? AND isactive = 'Y'";
-
-    $sth = $dbh->prepare ($query) || die "Couldn't prepare statement '$query': " . $dbh->errstr;
-    $sth->execute ($org_name) || die "Couldn't execute statement '$query': " . $dbh->errstr;
-
-    $result_aref = $sth->fetchall_arrayref({});
-    $sth->finish ();
-
+    $result_aref = $dbh->selectall_arrayref("SELECT ad_org_id FROM ad_org WHERE name = ? AND isactive = 'Y'", { Slice => {} }, $org_name);
     if ((scalar @$result_aref) < 1) {
         return ("Org '$org_name' not known/active.");
     }
@@ -157,14 +143,7 @@ sub Jarvis::Login::Adempiere::check {
 
 
     # Check the username from the user name table.
-    $query = "SELECT ad_user_id, password FROM ad_user WHERE name = ? AND isactive = 'Y' AND (ad_client_id = ? OR ad_client_id = 0) AND (ad_org_id = ? OR ad_org_id = 0)";
-
-    $sth = $dbh->prepare ($query) || die "Couldn't prepare statement '$query': " . $dbh->errstr;
-    $sth->execute ($username, $ad_client_id, $ad_org_id) || die "Couldn't execute statement '$query': " . $dbh->errstr;
-
-    $result_aref = $sth->fetchall_arrayref({});
-    $sth->finish ();
-
+    $result_aref = $dbh->selectall_arrayref("SELECT ad_user_id, password FROM ad_user WHERE name = ? AND isactive = 'Y' AND (ad_client_id = ? OR ad_client_id = 0) AND (ad_org_id = ? OR ad_org_id = 0)", { Slice => {} }, $username, $ad_client_id, $ad_org_id);
     if ((scalar @$result_aref) < 1) {
         return ("User '$username' not known/active.");
     }
@@ -188,24 +167,20 @@ sub Jarvis::Login::Adempiere::check {
 
 
     # Fetch role configuration.
-    $query = "
-SELECT DISTINCT r.name
+    $result_aref = $dbh->selectall_arrayref(
+"SELECT DISTINCT r.name
 FROM ad_user_roles ur
 LEFT JOIN ad_role r
     ON r.ad_role_id = ur.ad_role_id
-WHERE ur.isactive = 'Y' AND ur.ad_user_id = ? AND (ur.ad_client_id = ? OR ur.ad_client_id = 0) AND (ur.ad_org_id = ? OR ur.ad_org_id = 0)";
-    $sth = $dbh->prepare ($query) || die "Couldn't prepare statement '$query': " . $dbh->errstr;
-    $sth->execute ($ad_user_id, $ad_client_id, $ad_org_id) || die "Couldn't execute statement '$query': " . $dbh->errstr;
-
-    $result_aref = $sth->fetchall_arrayref({});
-    $sth->finish ();
+WHERE ur.isactive = 'Y' AND ur.ad_user_id = ? AND (ur.ad_client_id = ? OR ur.ad_client_id = 0) AND (ur.ad_org_id = ? OR ur.ad_org_id = 0)",
+        { Slice => {} },
+        $ad_user_id, $ad_client_id, $ad_org_id);
 
     my @role_array = map { my $n = $_->{name}; $n =~ s/[^a-z0-9]//gi; "role-$n" } @$result_aref;
 
-
     # Fetch window access configuration.
-    $query = "
-SELECT DISTINCT w.name, wa.isreadwrite
+    $result_aref = $dbh->selectall_arrayref(
+"SELECT DISTINCT w.name, wa.isreadwrite
 FROM ad_window_access wa
 LEFT JOIN ad_window w
     ON wa.ad_window_id = w.ad_window_id
@@ -214,13 +189,9 @@ LEFT JOIN ad_role r
 LEFT JOIN ad_user_roles ur
     ON r.ad_role_id = ur.ad_role_id
 WHERE
-    ur.isactive = 'Y' AND wa.isactive = 'Y' AND ur.ad_user_id = ?";
-
-    $sth = $dbh->prepare ($query) || die "Couldn't prepare statement '$query': " . $dbh->errstr;
-    $sth->execute ($ad_user_id) || die "Couldn't execute statement '$query': " . $dbh->errstr;
-
-    $result_aref = $sth->fetchall_arrayref({});
-    $sth->finish ();
+    ur.isactive = 'Y' AND wa.isactive = 'Y' AND ur.ad_user_id = ?",
+        { Slice => {} },
+        $ad_user_id);
 
     my @access_array = map { my $n = $_->{name}; $n =~ s/[^a-z0-9]//gi; (($_->{isreadwrite} eq 'Y') ? "write" : "read") . "-" . $n } @$result_aref;
 
@@ -241,8 +212,8 @@ WHERE
     }
 
     # Create a session row in Adempiere.
-    $query = "
-INSERT INTO ad_session (
+    $result_aref = $dbh->selectall_arrayref(
+"INSERT INTO ad_session (
     ad_session_id, ad_client_id, ad_org_id, isactive,
     created, createdby, updated, updatedby,
     websession, remote_addr, remote_host,
@@ -253,14 +224,11 @@ VALUES (
     null, ?, ?,
     'Y', 'Jarvis', null, now())
 RETURNING
-    ad_session_id";
+    ad_session_id",
+        { Slice => {} },
+        $ad_client_id, $ad_org_id, $ad_user_id, $ad_user_id, $remote_addr, $remote_host);
 
-    $sth = $dbh->prepare ($query) || die "Couldn't prepare statement '$query': " . $dbh->errstr;
-    $sth->execute ($ad_client_id, $ad_org_id, $ad_user_id, $ad_user_id, $remote_addr, $remote_host) || die "Couldn't execute statement '$query': " . $dbh->errstr;
-
-    $result_aref = $sth->fetchall_arrayref({});
     my $ad_session_id = $$result_aref[0]->{ad_session_id} || die "Cannot determine ad_session_id";
-    $sth->finish ();
 
     &Jarvis::Error::debug ($jconfig, "Session ID = '$ad_session_id'.");
 

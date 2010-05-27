@@ -112,16 +112,7 @@ sub Jarvis::Login::Database::check {
     }
 
     # Check the username from the user name table.
-    my $query = "SELECT $user_password_column FROM $user_table WHERE $user_username_column = ?";
-
-    my $dbh = &Jarvis::DB::handle ($jconfig);
-    my $sth = $dbh->prepare ($query)
-            || die "Couldn't prepare statement '$query': " . $dbh->errstr;
-
-    $sth->execute ($username)
-            || die "Couldn't execute statement '$query': " . $dbh->errstr;
-
-    my $result_aref = $sth->fetchall_arrayref({});
+    my $result_aref = $sth->selectall_arrayref("SELECT $user_password_column FROM $user_table WHERE $user_username_column = ?", { Slice => {} }, $username);
     if ((scalar @$result_aref) < 1) {
         return ("User '$username' not known.");
     }
@@ -160,15 +151,7 @@ sub Jarvis::Login::Database::check {
     }
 
     # Fetch group configuration.
-    $query = "SELECT $group_group_column FROM $group_table WHERE $group_username_column = ?";
-    $sth = $dbh->prepare ($query)
-            || die "Couldn't prepare statement '$query': " . $dbh->errstr;
-
-    $sth->execute ($username)
-            || die "Couldn't execute statement '$query': " . $dbh->errstr;
-
-    $result_aref = $sth->fetchall_arrayref({});
-
+    my $result_aref = $sth->selectall_arrayref("SELECT $group_group_column FROM $group_table WHERE $group_username_column = ?", { Slice => {} }, $username);
     my $group_list = join (",", map { $_->{$group_group_column} } @$result_aref);
     &Jarvis::Error::debug ($jconfig, "Group list = '$group_list'.");
 
