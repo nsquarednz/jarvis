@@ -104,7 +104,7 @@ sub Jarvis::Login::Drupal6::check {
     my $dbh = &Jarvis::DB::handle ($jconfig);
 
     # Check the username from the user name table.
-    my $result_aref = $dbh->selectall_arrayref("SELECT uid, pass FROM users WHERE name = ? AND status = 1", { Slice => {} });
+    my $result_aref = $dbh->selectall_arrayref("SELECT uid, pass FROM users WHERE name = ? AND status = 1", { Slice => {} }, $username);
     if ((scalar @$result_aref) < 1) {
         return ("User '$username' not known/active.");
     }
