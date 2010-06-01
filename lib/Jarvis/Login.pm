@@ -64,7 +64,7 @@ sub check {
     my ($jconfig) = @_;
 
     ###############################################################################
-    # Login Process.  Happens after DB, 'cos login info can be in DB.
+    # Login Process.  Get our existing session cookie if we have one.
     ###############################################################################
     #
     my $axml = $jconfig->{'xml'}->{jarvis}{app};
@@ -215,10 +215,10 @@ sub check {
     #
     if (! $already_logged_in) {
         if ($logged_in) {
-            &Jarvis::Error::debug ($jconfig, "Login for '$username ($group_list)' on '" . $jconfig->{'sid'} . "'.");
+            &Jarvis::Error::debug ($jconfig, "Login for '$username ($group_list)' on sid '" . $jconfig->{'sid'} . "'.");
 
         } elsif ($offered_username) {
-            &Jarvis::Error::log ($jconfig, "Login fail for '$offered_username' on '" . $jconfig->{'sid'} . "': $error_string.");
+            &Jarvis::Error::log ($jconfig, "Login fail for '$offered_username' on sid '" . $jconfig->{'sid'} . "': $error_string.");
         }
         &Jarvis::Tracker::login ($jconfig);
     }
