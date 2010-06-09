@@ -15,7 +15,7 @@
 #    <app format="json" debug="no">
 #        ...
 #        <login module="Jarvis::Login::Drupal">
-#            <parameter name="allow_login" value="yes"/>
+#            <parameter name="login_type" value="yes"/>
 #            <parameter name="admin_only" value="yes"/>
 #        </login>
 #        ...
@@ -56,6 +56,7 @@
 #
 use Socket;
 use CGI;
+use CGI::Cookie;
 
 use strict;
 use warnings;
@@ -101,47 +102,56 @@ sub Jarvis::Login::Drupal6::check {
     #  no  = We require that the Drupal login procedure be used.  We only create a Jarvis
     #        session when we see a Drupal session has been created.
     #
-    my $allow_login = defined ($Jarvis::Config::yes_value {lc ($login_parameters{'allow_login'} || "no")});
+    my $login_type = lc ($login_parameters{'login_type'}) || "drupal";
+
     my $admin_only = defined ($Jarvis::Config::yes_value {lc ($login_parameters{'admin_only'} || "no")});
 
     # See if we can find a Drupal session.
     my $logged_in = 0;
     my $uid = undef;
 
-    my %cookies = fetch CGI::Cookie;
-    &Jarvis::Error::debug ($jconfig, "Checking for any existing Drupal session cookie.");
+    # Login Type "drupal" means that we MUST have an existing Drupal session.  We
+    # never perform a username/password check ourselves.
+    #
+    if ($login_type eq "drupal") {
+        my %cookies = fetch CGI::Cookie;
+        &Jarvis::Error::debug ($jconfig, "Checking for any existing Drupal session cookie.");
 
-    foreach my $cookie_name (keys %cookies) {
-        next if $cookie_name !~ m/^SESS/;
-        my $cookie_value = $cookies{$cookie_name}->value;
+        foreach my $cookie_name (keys %cookies) {
+            next if $cookie_name !~ m/^SESS/;
+            my $cookie_value = $cookies{$cookie_name}->value;
 
-        &Jarvis::Error::debug ($jconfig, "Checking existing Drupal sid '$cookie_value'.");
-        my $dbh = &Jarvis::DB::handle ($jconfig);
-        my $result_aref = $dbh->selectall_arrayref("SELECT u.uid, u.name FROM sessions s INNER JOIN users u ON u.uid = s.uid WHERE s.sid = ?", { Slice => {} }, $cookie_value);
+            &Jarvis::Error::debug ($jconfig, "Checking existing Drupal sid '$cookie_value'.");
+            my $dbh = &Jarvis::DB::handle ($jconfig);
+            my $result_aref = $dbh->selectall_arrayref("SELECT u.uid, u.name FROM sessions s INNER JOIN users u ON u.uid = s.uid WHERE s.sid = ?", { Slice => {} }, $cookie_value);
 
-        if ((scalar @$result_aref) >= 1) {
-            my $result_href = $$result_aref[0];
-            $uid = $$result_href{'uid'} || die "No uid for sid '$cookie_value'!";
+            if ((scalar @$result_aref) >= 1) {
+                my $result_href = $$result_aref[0];
+                $uid = $$result_href{'uid'} || die "No uid for sid '$cookie_value'!";
 
-            &Jarvis::Error::debug ($jconfig, "Found existing Drupal session for uid $uid, name '$username'.");
-            if ($admin_only && ($uid != 1)) {
-                &Jarvis::Error::debug ($jconfig, "Ignoring this one, we require an admin session.");
-                $uid = undef;
+                &Jarvis::Error::debug ($jconfig, "Found existing Drupal session for uid $uid, name '$username'.");
+                if ($admin_only && ($uid != 1)) {
+                    &Jarvis::Error::debug ($jconfig, "Ignoring this one, we require an admin session.");
+                    $uid = undef;
+
+                } else {
+                    $username = $$result_href{'name'} || die "No uid for sid '$cookie_value'!";
+                    $logged_in = 1;
+                    last;
+                }
 
             } else {
-                $username = $$result_href{'name'} || die "No uid for sid '$cookie_value'!";
-                $logged_in = 1;
-                last;
+                &Jarvis::Error::debug ($jconfig, "No such Drupal session (or unknown uid).");
             }
-
-        } else {
-            &Jarvis::Error::debug ($jconfig, "No such Drupal session (or unknown uid).");
         }
-    }
+        if (! $logged_in) {
+            return ("Could not locate existing Drupal session.");
+        }
 
-    # See if a username/password has been supplied and use that.
-    if (! $logged_in) {
-        $allow_login || return ("Drupal login is required.");
+    # Login Type "jarvis" means that we will never look at a Drupal session, we will always
+    # maintain our own session independent of the Drupal login.
+    #
+    } elsif ($login_type eq "jarvis") {
         &Jarvis::Error::debug ($jconfig, "Trying the Jarvis login process for Drupal.");
 
         $username || return ("No username supplied.");
@@ -182,6 +192,10 @@ sub Jarvis::Login::Drupal6::check {
         if ($admin_only && ($uid != 1)) {
             return ("Must be Drupal initial admin user.");
         }
+        $logged_in = 1;
+
+    } else {
+        die "Unrecognised Drupal6 login_type '$login_type'";
     }
 
     # By now we MUST have logged in.

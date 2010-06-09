@@ -65,50 +65,65 @@ sub check {
 
     ###############################################################################
     # Login Process.  Get our existing session cookie if we have one.
+    #
+    # Note that you can disable the Jarvis sessiondb cookie store if your login
+    # module uses its own cookie store.  Do that simply be removing the
+    # <sessiondb> tag entirely.
+    #
+    # Drupal6 with (allow_login=no) is an example of when you might not wish
+    # Jarvis to manage its own cookies.
     ###############################################################################
     #
     my $axml = $jconfig->{'xml'}->{jarvis}{app};
     (defined $axml) || die "Cannot find <jarvis><app> in '" . $jconfig->{'app_name'} . ".xml'!\n";
 
-    # Where are our sessions stored?
-    my $sid_store = $axml->{'sessiondb'}->{'store'}->content || "driver:file;serializer:default;id:md5";
-    &Jarvis::Error::debug ($jconfig, "SID Store '$sid_store'.");
+    if ($axml->{'sessiondb'}) {
 
-    my $default_cookie_name = uc ($jconfig->{'app_name'}) . "_CGISESSID";
-    my $sid_cookie_name = $axml->{'sessiondb'}->{'cookie'}->content || $default_cookie_name;
-    CGI::Session->name($sid_cookie_name);
-    &Jarvis::Error::debug ($jconfig, "SID Cookie Name '$sid_cookie_name'.");
+        # Where are our sessions stored?
+        my $sid_store = $axml->{'sessiondb'}->{'store'}->content || "driver:file;serializer:default;id:md5";
+        &Jarvis::Error::debug ($jconfig, "SID Store '$sid_store'.");
 
-    my %sid_params = ();
-    if ($axml->{'sessiondb'}->{'parameter'}) {
-        foreach my $sid_param (@{ $axml->{'sessiondb'}->{'parameter'} }) {
-            $sid_params {$sid_param->{'name'}->content} = $sid_param->{'value'}->content;
+        my $default_cookie_name = uc ($jconfig->{'app_name'}) . "_CGISESSID";
+        my $sid_cookie_name = $axml->{'sessiondb'}->{'cookie'}->content || $default_cookie_name;
+        CGI::Session->name($sid_cookie_name);
+        &Jarvis::Error::debug ($jconfig, "SID Cookie Name '$sid_cookie_name'.");
+
+        my %sid_params = ();
+        if ($axml->{'sessiondb'}->{'parameter'}) {
+            foreach my $sid_param (@{ $axml->{'sessiondb'}->{'parameter'} }) {
+                $sid_params {$sid_param->{'name'}->content} = $sid_param->{'value'}->content;
+            }
         }
+
+        # Get an existing/new session.
+        # Under windows, avoid having CGI::Session throw the error:
+        # 'Your vendor has not defined Fcntl macro O_NOFOLLOW, used at C:/Perl/site/lib/CGI/Session/Driver/file.pm line 26.'
+        # by hiding the signal handler.
+
+        my $err_handler = $SIG{__DIE__};
+        $SIG{__DIE__} = sub {};
+        my $session = new CGI::Session ($sid_store, $jconfig->{'cgi'}, \%sid_params);
+        $SIG{__DIE__} = $err_handler;
+        if (! $session) {
+            die "Error in creating CGI::Session: " . ($! || "Unknown Reason");
+        }
+
+        $jconfig->{'session'} = $session;
+        $jconfig->{'sname'} = $session->name();
+        $jconfig->{'sid'} = $session->id();
+
+        # CGI::Session does not appear to warn us if the CGI session is file based,
+        # and the directory being written to is not writable. Put a check in here to
+        # check for a writable session directory (otherwise you end up constantly
+        # logging in).
+        die "Webserver user has no permissions to write to CGI::Session directory '$sid_params{'Directory'}'."
+            if $sid_store =~ /driver:file/ && $sid_params{'Directory'} && ! -w $sid_params{'Directory'};
+
+    } else {
+        $jconfig->{'session'} = undef;
+        $jconfig->{'sname'} = '';
+        $jconfig->{'sid'} = '';
     }
-
-    # Get an existing/new session.
-    # Under windows, avoid having CGI::Session throw the error:
-    # 'Your vendor has not defined Fcntl macro O_NOFOLLOW, used at C:/Perl/site/lib/CGI/Session/Driver/file.pm line 26.'
-    # by hiding the signal handler.
-
-    my $err_handler = $SIG{__DIE__};
-    $SIG{__DIE__} = sub {};
-    my $session = new CGI::Session ($sid_store, $jconfig->{'cgi'}, \%sid_params);
-    $SIG{__DIE__} = $err_handler;
-    if (! $session) {
-        die "Error in creating CGI::Session: " . ($! || "Unknown Reason");
-    }
-
-    $jconfig->{'session'} = $session;
-    $jconfig->{'sname'} = $session->name();
-    $jconfig->{'sid'} = $session->id();
-
-    # CGI::Session does not appear to warn us if the CGI session is file based,
-    # and the directory being written to is not writable. Put a check in here to
-    # check for a writable session directory (otherwise you end up constantly
-    # logging in).
-    die "Webserver user has no permissions to write to CGI::Session directory '$sid_params{'Directory'}'."
-        if $sid_store =~ /driver:file/ && $sid_params{'Directory'} && ! -w $sid_params{'Directory'};
 
     # Now see what we got passed.  These are the user's provided info that we will validate.
     my $offered_username = $jconfig->{'cgi'}->param('username') || '';
@@ -127,13 +142,24 @@ sub check {
     my ($error_string, $username, $group_list, $logged_in, $additional_safe) = ('', '', '', 0, undef);
     my $already_logged_in = 0;
 
-    # Existing, successful session?  Fine, we trust this.
-    if ($session->param('logged_in') && $session->param('username')) {
+    # Existing, successful Jarvis session?  Fine, we trust this.
+    #
+    my $session = $jconfig->{'session'};
+    if ($session && $session->param('logged_in') && $session->param('username')) {
         &Jarvis::Error::debug ($jconfig, "Already logged in for session '" . $jconfig->{'sid'} . "'.");
         $logged_in = $session->param('logged_in') || 0;
         $username = $session->param('username') || '';
         $group_list = $session->param('group_list') || '';
         $already_logged_in = 1;
+
+        # Copy any additional safe params from session context into $jconfig's area.
+        my $dataref = $session->dataref();
+        foreach my $name (keys %$dataref) {
+            next if ($name !~ m/^__/);
+            my $value = $dataref->{$name};
+            &Jarvis::Error::debug ($jconfig, "Session set additional safe parameter '$name' = '$value'.");
+            $jconfig->{'additional_safe'}{$name} = $value;
+        }
 
     # No successful session?  Login.  Note that we store failed sessions too.
     #
@@ -172,28 +198,43 @@ sub check {
         $group_list || ($group_list = '');
 
         $logged_in = (($error_string eq "") && ($username ne "")) ? 1 : 0;
-        $session->param('logged_in', $logged_in);
-        $session->param('username', $username);
-        $session->param('group_list', $group_list);
+
+        # If Jarvis is maintaining its own session (and it usually is) then track
+        # these parameters for future requests also.
+        #
+        if ($session) {
+            $session->param('logged_in', $logged_in);
+            $session->param('username', $username);
+            $session->param('group_list', $group_list);
+        }
 
         # Do we have any additional safe parameters returned by the login module?
         # These must begin with "__" because they are safe params.
+        #
+        # Set them in our jconfig, and also put them in the session to be saved
+        # for next time (if we have a session, which we usually do).
+        #
         foreach my $name (keys %$additional_safe) {
             ($name =~ m/^__/) || die "Invalid additional safe parameter name '$name' returned by login module.";
-            $session->param($name, $additional_safe->{$name});
+            my $value = $additional_safe->{$name};
+
+            $jconfig->{'additional_safe'}{$name} = $value;
+            $session && $session->param($name, $value);
         }
     }
 
     # Set/extend session expiry.  Flush new/modified session data.
-    my $session_expiry = $axml->{'sessiondb'}->{'expiry'}->content || '+1h';
-    $session->expire ($session_expiry);
-    $session->flush ();
+    if ($session) {
+        my $session_expiry = $axml->{'sessiondb'}->{'expiry'}->content || '+1h';
+        $session->expire ($session_expiry);
+        $session->flush ();
 
-    # Store the new cookie in the context, whoever returns the result should return this.
-    $jconfig->{'cookie'} = CGI::Cookie->new (
-        -name => $jconfig->{'sname'},
-        -value => $jconfig->{'sid'},
-        -expires => $session_expiry);
+        # Store the new cookie in the context, whoever returns the result should return this.
+        $jconfig->{'cookie'} = CGI::Cookie->new (
+            -name => $jconfig->{'sname'},
+            -value => $jconfig->{'sid'},
+            -expires => $session_expiry);
+   }
 
     # Add to our $args_href since e.g. fetch queries might use them.
     $jconfig->{'logged_in'} = $logged_in;
@@ -201,24 +242,16 @@ sub check {
     $jconfig->{'error_string'} = $error_string;
     $jconfig->{'group_list'} = $group_list;
 
-    # Copy any additional safe params from session context into $jconfig's area.
-    my $dataref = $session->dataref();
-    foreach my $name (keys %$dataref) {
-        next if ($name !~ m/^__/);
-        my $value = $dataref->{$name};
-        &Jarvis::Error::debug ($jconfig, "Session set additional safe parameter '$name' = '$value'.");
-        $jconfig->{'additional_safe'}{$name} = $value;
-    }
-
     # Log the results if we actually tried to login.  Write to tracker database too
     # if we are configured to do so.
     #
     if (! $already_logged_in) {
+        my $sid = $session ? ("'" . $jconfig->{'sid'} . "'") : "NO JARVIS SESSION";
         if ($logged_in) {
-            &Jarvis::Error::debug ($jconfig, "Login for '$username ($group_list)' on sid '" . $jconfig->{'sid'} . "'.");
+            &Jarvis::Error::debug ($jconfig, "Login for '$username ($group_list)' on sid $sid.");
 
         } elsif ($offered_username) {
-            &Jarvis::Error::log ($jconfig, "Login fail for '$offered_username' on sid '" . $jconfig->{'sid'} . "': $error_string.");
+            &Jarvis::Error::log ($jconfig, "Login fail for '$offered_username' on sid $sid: $error_string.");
         }
         &Jarvis::Tracker::login ($jconfig);
     }
@@ -255,20 +288,24 @@ sub logout {
     my $sid = $jconfig->{'sid'} || '';
 
     &Jarvis::Error::debug ($jconfig, "Logout for '$username' on '$sid'.");
-    $jconfig->{'session'} || die "Not logged in!  Logic error!";
+    my $session = $jconfig->{'session'};
+    if ($session) {
+        $jconfig->{'session'} = undef;
+        $jconfig->{'sname'} = '';
+        $jconfig->{'sid'} = '';
+        if ($jconfig->{'logged_in'}) {
+            $jconfig->{'logged_in'} = 0;
+            $jconfig->{'error_string'} = "Logged out at client request.";
+            $jconfig->{'username'} = '';
+            $jconfig->{'group_list'} = '';
+        }
 
-    $jconfig->{'sname'} = '';
-    $jconfig->{'sid'} = '';
-    if ($jconfig->{'logged_in'}) {
-        $jconfig->{'logged_in'} = 0;
-        $jconfig->{'error_string'} = "Logged out at client request.";
-        $jconfig->{'username'} = '';
-        $jconfig->{'group_list'} = '';
+        $session->delete();
+        $session->flush();
+
+    } else {
+        &Jarvis::Error::debug ($jconfig, "Jarvis has no session information.  Cannot logout.");
     }
-
-    # Delete the session.  Maybe
-    $jconfig->{'session'}->delete();
-    $jconfig->{'session'}->flush();
 
     return 1;
 }
