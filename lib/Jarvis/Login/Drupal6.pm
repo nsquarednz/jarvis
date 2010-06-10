@@ -123,11 +123,17 @@ sub Jarvis::Login::Drupal6::check {
 
             &Jarvis::Error::debug ($jconfig, "Checking existing Drupal sid '$cookie_value'.");
             my $dbh = &Jarvis::DB::handle ($jconfig);
+
             my $result_aref = $dbh->selectall_arrayref("SELECT u.uid, u.name FROM sessions s INNER JOIN users u ON u.uid = s.uid WHERE s.sid = ?", { Slice => {} }, $cookie_value);
 
             if ((scalar @$result_aref) >= 1) {
                 my $result_href = $$result_aref[0];
-                $uid = $$result_href{'uid'} || die "No uid for sid '$cookie_value'!";
+                $uid = $$result_href{'uid'};
+
+                if (! $uid) {
+                    &Jarvis::Error::debug ($jconfig, "Session has expired.  Look for any other cookies.");
+                    next;
+                }
 
                 &Jarvis::Error::debug ($jconfig, "Found existing Drupal session for uid $uid, name '$username'.");
                 if ($admin_only && ($uid != 1)) {
