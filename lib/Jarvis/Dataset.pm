@@ -762,7 +762,6 @@ sub store {
 
     # Shared database handle.
     my $dbh = &Jarvis::DB::handle ($jconfig);
-    $dbh->begin_work() || die;
 
     # Loop for each set of updates.
     my $success = 1;
