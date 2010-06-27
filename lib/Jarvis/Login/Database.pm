@@ -111,8 +111,10 @@ sub Jarvis::Login::Database::check {
         return ("Missing configuration for Login module Database.");
     }
 
+    my $dbh = &Jarvis::DB::handle ($jconfig);
+
     # Check the username from the user name table.
-    my $result_aref = $sth->selectall_arrayref("SELECT $user_password_column FROM $user_table WHERE $user_username_column = ?", { Slice => {} }, $username);
+    my $result_aref = $dbh->selectall_arrayref("SELECT $user_password_column FROM $user_table WHERE $user_username_column = ?", { Slice => {} }, $username);
     if ((scalar @$result_aref) < 1) {
         return ("User '$username' not known.");
     }
@@ -151,7 +153,7 @@ sub Jarvis::Login::Database::check {
     }
 
     # Fetch group configuration.
-    my $result_aref = $sth->selectall_arrayref("SELECT $group_group_column FROM $group_table WHERE $group_username_column = ?", { Slice => {} }, $username);
+    $result_aref = $dbh->selectall_arrayref("SELECT $group_group_column FROM $group_table WHERE $group_username_column = ?", { Slice => {} }, $username);
     my $group_list = join (",", map { $_->{$group_group_column} } @$result_aref);
     &Jarvis::Error::debug ($jconfig, "Group list = '$group_list'.");
 
