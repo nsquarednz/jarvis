@@ -126,7 +126,7 @@ sub start {
         &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
-            &$method ($jconfig, $hook_parameters_href);
+            exists &$method && &$method ($jconfig, $hook_parameters_href);
         }
     }
 
@@ -164,7 +164,7 @@ sub before_all {
         &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
-            &$method ($jconfig, $hook_parameters_href, $dsxml, $restful_args_href);
+            exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $restful_args_href);
         }
     }
 
@@ -203,7 +203,7 @@ sub before_one {
         &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
-            &$method ($jconfig, $hook_parameters_href, $dsxml, $sql_params_href);
+            exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $sql_params_href);
         }
     }
 
@@ -244,7 +244,7 @@ sub after_one {
         &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
-            &$method ($jconfig, $hook_parameters_href, $dsxml, $sql_params_href, $row_result_href);
+            exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $sql_params_href, $row_result_href);
         }
     }
 
@@ -282,7 +282,7 @@ sub after_all {
         &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
-            &$method ($jconfig, $hook_parameters_href, $dsxml, $restful_args_href);
+            exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $restful_args_href);
         }
     }
 
@@ -317,7 +317,7 @@ sub finish {
         &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
-            &$method ($jconfig, $hook_parameters_href, $return_text_ref);
+            exists &$method && &$method ($jconfig, $hook_parameters_href, $return_text_ref);
         }
     }
 
