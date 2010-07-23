@@ -118,6 +118,9 @@ sub get_config_xml {
     $jconfig->{'sort_field_param'} = lc ($axml->{'sort_field_param'}->content || 'sort_field');
     $jconfig->{'sort_dir_param'} = lc ($axml->{'sort_dir_param'}->content || 'sort_dir');
 
+    # Load dataset specific hooks.
+    &Jarvis::Hook::load_dataset ($jconfig, $dsxml);
+
     return $dsxml;
 }
 
@@ -442,6 +445,7 @@ sub fetch {
     my ($jconfig, $rest_args_aref) = @_;
 
     my $dsxml = &get_config_xml ($jconfig) || die "Cannot load configuration for dataset '" . ($jconfig->{'dataset_name'} || '') . "'.";
+    &Jarvis::Hook::start ($jconfig);
 
     my $allowed_groups = $dsxml->{dataset}{"read"};
 
@@ -567,6 +571,8 @@ sub fetch {
         }
     }
 
+    my $return_text = undef;
+
     # Return content in requested format.  JSON is simple.
     if ($jconfig->{'format'} eq "json") {
         my %return_data = ();
@@ -583,10 +589,9 @@ sub fetch {
         $return_data {"data"} = $rows_aref;
 
         my $json = JSON::PP->new->pretty(1);
-        my $json_string = $json->encode ( \%return_data );
-        &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($json_string));
-        &Jarvis::Error::dump ($jconfig, $json_string);
-        return $json_string;
+        $return_text = $json->encode ( \%return_data );
+        &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($return_text));
+        &Jarvis::Error::dump ($jconfig, $return_text);
 
     # XML is also simple.
     } elsif ($jconfig->{'format'} eq "xml") {
@@ -603,10 +608,9 @@ sub fetch {
             $xml->{'response'}{'data'}{'row'} = $rows_aref;
         }
 
-        my $xml_string = $xml->data ();
-        &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($xml_string));
-        &Jarvis::Error::dump ($jconfig, $xml_string);
-        return $xml_string;
+        $return_text = $xml->data ();
+        &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($return_text));
+        &Jarvis::Error::dump ($jconfig, $return_text);
 
     # CSV format is the trickiest.  Note that it is dependent on the $sth->{NAME} data
     # being available.  In some cases, e.g. some (all?) stored procedures under MS-SQL
@@ -624,8 +628,8 @@ sub fetch {
         @field_index { @field_names } = (0 .. $#field_names);
 
         # Create a string IO handle to print CSV into.
-        my $output = '';
-        my $io = IO::String->new ($output);
+        $return_text = '';
+        my $io = IO::String->new ($return_text);
 
         # Create a CSV object and print the header line.
         my $csv = Text::CSV->new ( { binary => 1 } );
@@ -639,9 +643,8 @@ sub fetch {
             print $io "\n";
         }
 
-        &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($output));
-        &Jarvis::Error::dump ($jconfig, $output);
-        return $output;
+        &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($return_text));
+        &Jarvis::Error::dump ($jconfig, $return_text);
 
     # This is for INTERNAL use only!  Plugins for example might like to get the raw hash
     # and do their own formatting.  If you try this from a browser, you're going to
@@ -653,6 +656,10 @@ sub fetch {
     } else {
         die "Unsupported format '" . $jconfig->{'format'} ."' for Dataset::fetch return data.\n";
     }
+
+    &Jarvis::Hook::finish ($jconfig, \$return_text);
+
+    return $return_text;
 }
 
 ################################################################################
@@ -678,6 +685,7 @@ sub store {
     my ($jconfig, $rest_args_aref) = @_;
 
     my $dsxml = &get_config_xml ($jconfig) || die "Cannot load configuration for dataset '" . ($jconfig->{'dataset_name'} || '') . "'.";
+    &Jarvis::Hook::start ($jconfig);
 
     my $allowed_groups = $dsxml->{dataset}{"write"};
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
@@ -777,7 +785,7 @@ sub store {
     $jconfig->{'params_href'} = \%params_copy;
 
     # Invoke before_all hook.
-    &Jarvis::Hook::before_all ($jconfig, $dsxml, \%restful_params);
+    &Jarvis::Hook::before_all ($jconfig, $dsxml, \%restful_params, $fields_aref);
 
     # Execute our "before" statement.  This statement is NOT permitted to fail.  If it does,
     # then we immediately barf
@@ -987,8 +995,6 @@ sub store {
 
     # Execute our "after" statement.
     if ($success) {
-        &Jarvis::Hook::after_all ($jconfig, $dsxml, \%restful_params);
-
         my $astm = &parse_statement ($jconfig, $dsxml, $dbh, 'after');
         if ($astm) {
             my @aarg_values = &names_to_values ($jconfig, $astm->{'vnames_aref'}, \%restful_params);
@@ -999,6 +1005,7 @@ sub store {
                 $message || ($message = $astm->{'error'});
             }
         }
+        &Jarvis::Hook::after_all ($jconfig, $dsxml, \%restful_params, $fields_aref, \@results);
     }
 
     # Determine if we're going to rollback.
@@ -1024,6 +1031,7 @@ sub store {
     # just one record (not in an array), or if you gave us an array of records.  An array
     # containing one record is NOT the same as a single record not in an array.
     #
+    my $return_text = undef;
     if ($jconfig->{'format'} eq "json") {
         my %return_data = ();
         $return_data {'success'} = $success;
@@ -1040,10 +1048,9 @@ sub store {
             $results[0]{'returning'} && ($return_data {'returning'} = $results[0]{'returning'});
         }
         my $json = JSON::PP->new->pretty(1);
-        my $json_string = $json->encode ( \%return_data );
-        &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($json_string));
-        &Jarvis::Error::dump ($jconfig, $json_string);
-        return $json_string;
+        $return_text = $json->encode ( \%return_data );
+        &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($return_text));
+        &Jarvis::Error::dump ($jconfig, $return_text);
 
     } elsif ($jconfig->{'format'} eq "xml") {
         my $xml = XML::Smart->new ();
@@ -1060,14 +1067,17 @@ sub store {
         if ($success && ! $return_array) {
             $results[0]{'returning'} && ($xml->{'response'}{'returning'} = $results[0]{'returning'});
         }
-        my $xml_string = $xml->data ();
-        &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($xml_string));
-        &Jarvis::Error::dump ($jconfig, $xml_string);
-        return $xml_string;
+        $return_text = $xml->data ();
+        &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($return_text));
+        &Jarvis::Error::dump ($jconfig, $return_text);
 
     } else {
         die "Unsupported format '" . $jconfig->{'format'} ."' for Dataset::store return data.\n";
     }
+
+    &Jarvis::Hook::finish ($jconfig, \$return_text);
+
+    return $return_text;
 }
 
 1;

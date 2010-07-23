@@ -19,7 +19,7 @@
 #                 start ($jconfig, $hook_params_href)
 #                 CALLED: After all Jarvis setup is complete.
 #
-#                 before_all ($jconfig, $hook_params_href, $restful_params_href)
+#                 before_all ($jconfig, $hook_params_href, $restful_params_href, $fields_aref)
 #                 CALLED: After transaction begins.  Just before any "before" SQL.
 #
 #                 before_one ($jconfig, $hook_params_href, $sql_params_href)
@@ -28,8 +28,8 @@
 #                 after_one ($jconfig, $hook_params_href, $sql_params_href, $row_result_href)
 #                 CALLED: After we execute the row SQL.  After any returning values are found.
 #
-#                 after_all ($jconfig, $hook_params_href, $restful_params_href)
-#                 CALLED: Just before any "after" SQL.  This is before transaction ends.
+#                 after_all ($jconfig, $hook_params_href, $restful_params_href, $fields_aref, $results_aref)
+#                 CALLED: Just after any "after" SQL.  This is before transaction ends.
 #
 #                 finish ($jconfig, $hook_params_href, $return_text_ref)
 #                 CALLED: Just before return text is sent to client
@@ -78,15 +78,15 @@ use Jarvis::Text;
 sub load_global {
     my ($jconfig) = @_;
 
-    my @hooks = ();
+    (defined $jconfig->{'hooks'}) || ($jconfig->{'hooks'} = []);
 
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
     if ($axml->{'hook'}) {
         foreach my $hook (@{ $axml->{'hook'} }) {
             my $lib = $hook->{'lib'} ? $hook->{'lib'}->content : undef;
-            my $module = $hook->{'module'}->content || die "Invalid configuration, <hook> configured with no module.";
+            my $module = $hook->{'module'}->content || die "Invalid global hook configuration, <hook> configured with no module.";
 
-            &Jarvis::Error::debug ($jconfig, "Found <hook> with module '$module'.");
+            &Jarvis::Error::debug ($jconfig, "Found global <hook> with module '$module'.");
 
             my %hook_parameter = ();
             if ($hook->{'parameter'}) {
@@ -97,10 +97,48 @@ sub load_global {
             }
 
             my %hook_def = ('module' => $module, 'lib' => $lib, 'parameters' => \%hook_parameter);
-            push (@hooks, \%hook_def);
+            push (@{ $jconfig->{'hooks'} }, \%hook_def);
         }
     }
-    $jconfig->{'hooks'} = \@hooks;
+
+    return 1;
+}
+
+################################################################################
+# Load all dataset specific hook definitions.
+#
+# Params:
+#       $jconfig - Jarvis::Config object
+#       $dsxml - Dataset XML object.
+#
+# Returns:
+#       1
+################################################################################
+#
+sub load_dataset {
+    my ($jconfig, $dsxml) = @_;
+
+    (defined $jconfig->{'hooks'}) || ($jconfig->{'hooks'} = []);
+
+    if ($dsxml->{'dataset'}{'hook'}) {
+        foreach my $hook (@{ $dsxml->{'dataset'}{'hook'} }) {
+            my $lib = $hook->{'lib'} ? $hook->{'lib'}->content : undef;
+            my $module = $hook->{'module'}->content || die "Invalid dataset hook configuration, <hook> configured with no module.";
+
+            &Jarvis::Error::debug ($jconfig, "Found dataset-specific <hook> with module '$module'.");
+
+            my %hook_parameter = ();
+            if ($hook->{'parameter'}) {
+                foreach my $parameter ($hook->{'parameter'}('@')) {
+                    &Jarvis::Error::debug ($jconfig, "Hook Parameter: " . $parameter->{'name'}->content . " -> " . $parameter->{'value'}->content);
+                    $hook_parameter {$parameter->{'name'}->content} = $parameter->{'value'}->content;
+                }
+            }
+
+            my %hook_def = ('module' => $module, 'lib' => $lib, 'parameters' => \%hook_parameter);
+            push (@{ $jconfig->{'hooks'} }, \%hook_def);
+        }
+    }
 
     return 1;
 }
@@ -153,20 +191,22 @@ sub start {
 # Invoke the "before_all" method on each hook.
 #
 # Params:
-#       $jconfig         - Jarvis::Config object
+#       $jconfig        - Jarvis::Config object
 #
-#       $dsxml           - The XML::Smart object for our dataset XML config.
+#       $dsxml          - The XML::Smart object for our dataset XML config.
 #
 #       $restful_args_href - Reference to the rest args that will be given to
 #                            any "before" SQL statement for this dataset.  Hook
 #                            may modify these parameters.
+#
+#       $fields_aref    - The submitted rows we are about to apply.
 #
 # Returns:
 #       1
 ################################################################################
 #
 sub before_all {
-    my ($jconfig, $dsxml, $restful_args_href) = @_;
+    my ($jconfig, $dsxml, $restful_args_href, $fields_aref) = @_;
 
     my @hooks = @{ $jconfig->{'hooks'} };
 
@@ -180,7 +220,7 @@ sub before_all {
         &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
-            exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $restful_args_href);
+            exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $restful_args_href, $fields_aref);
         }
     }
 
@@ -268,23 +308,26 @@ sub after_one {
 }
 
 ################################################################################
-# Invoke the "after_all" method on each hook.
+# Invoke the "after_all" method on each hook.  This occurs AFTER any <after>
+# SQL has been executed.
 #
 # Params:
-#       $jconfig         - Jarvis::Config object
+#       $jconfig        - Jarvis::Config object
 #
-#       $dsxml           - The XML::Smart object for our dataset XML config.
+#       $dsxml          - The XML::Smart object for our dataset XML config.
 #
-#       $restful_args_href - Reference to the rest args that will be given to
-#                            any "after" SQL statement for this dataset.  Hook
-#                            may modify these parameters.
+#       $restful_args_href - Our rest args.
+#
+#       $fields_aref    - The submitted rows we just applied.
+#
+#       $results_aref   - Reference to the @results array we plan to return.
 #
 # Returns:
 #       1
 ################################################################################
 #
 sub after_all {
-    my ($jconfig, $dsxml, $restful_args_href) = @_;
+    my ($jconfig, $dsxml, $restful_args_href, $fields_aref, $results_aref) = @_;
 
     my @hooks = @{ $jconfig->{'hooks'} };
 
@@ -298,7 +341,7 @@ sub after_all {
         &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
-            exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $restful_args_href);
+            exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $restful_args_href, $fields_aref, $results_aref);
         }
     }
 

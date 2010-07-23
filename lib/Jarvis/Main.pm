@@ -330,9 +330,7 @@ sub do {
         $jconfig->{'dataset_type'} = 's';
 
         &Jarvis::Hook::load_global ($jconfig);
-        &Jarvis::Hook::start ($jconfig);
         my $return_text = &Jarvis::Dataset::fetch ($jconfig, \@rest_args);
-        &Jarvis::Hook::finish ($jconfig, \$return_text);
 
         #
         # When providing CSV output, it is most likely going to be downloaded and
@@ -361,9 +359,7 @@ sub do {
         $jconfig->{'dataset_type'} = 's';
 
         &Jarvis::Hook::load_global ($jconfig);
-        &Jarvis::Hook::start ($jconfig);
         my $return_text = &Jarvis::Dataset::store ($jconfig, \@rest_args);
-        &Jarvis::Hook::finish ($jconfig, \$return_text);
 
         print $cgi->header(-type => "text/plain; charset=UTF-8", -cookie => $jconfig->{'cookie'});
         print $return_text;
