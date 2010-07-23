@@ -66,7 +66,7 @@ use Jarvis::Error;
 use Jarvis::Text;
 
 ################################################################################
-# Load all our hook definitions.  Invoke the "start" method on each hook.
+# Load all our GLOBAL hook definitions.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -75,7 +75,7 @@ use Jarvis::Text;
 #       1
 ################################################################################
 #
-sub start {
+sub load_global {
     my ($jconfig) = @_;
 
     my @hooks = ();
@@ -102,8 +102,24 @@ sub start {
     }
     $jconfig->{'hooks'} = \@hooks;
 
+    return 1;
+}
+
+#################################################################
+# Invoke the "start" method on each hook.
+#
+# Params:
+#       $jconfig - Jarvis::Config object
+#
+# Returns:
+#       1
+################################################################################
+#
+sub start {
+    my ($jconfig) = @_;
+
     # Now invoke "start" on all the hooks we found.
-    foreach my $hook (@hooks) {
+    foreach my $hook (@{ $jconfig->{'hooks'} }) {
         my $lib = $hook->{'lib'};
         my $module = $hook->{'module'};
         my $hook_parameters_href = $hook->{'parameters'};

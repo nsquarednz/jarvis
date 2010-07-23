@@ -280,6 +280,7 @@ sub do {
         $jconfig->{'action'} = 'select';
 
         # Invoke application-specific start hook(s).
+        &Jarvis::Hook::load_global ($jconfig);
         &Jarvis::Hook::start ($jconfig);
 
         # Status.  I.e. are we logged in?
@@ -328,6 +329,7 @@ sub do {
     } elsif ($action eq "select") {
         $jconfig->{'dataset_type'} = 's';
 
+        &Jarvis::Hook::load_global ($jconfig);
         &Jarvis::Hook::start ($jconfig);
         my $return_text = &Jarvis::Dataset::fetch ($jconfig, \@rest_args);
         &Jarvis::Hook::finish ($jconfig, \$return_text);
@@ -358,6 +360,7 @@ sub do {
     } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete") || ($action eq "mixed")) {
         $jconfig->{'dataset_type'} = 's';
 
+        &Jarvis::Hook::load_global ($jconfig);
         &Jarvis::Hook::start ($jconfig);
         my $return_text = &Jarvis::Dataset::store ($jconfig, \@rest_args);
         &Jarvis::Hook::finish ($jconfig, \$return_text);
