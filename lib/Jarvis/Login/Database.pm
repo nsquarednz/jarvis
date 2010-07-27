@@ -87,12 +87,16 @@ package Jarvis::Login::Database;
 sub Jarvis::Login::Database::check {
     my ($jconfig, $username, $password, %login_parameters) = @_;
 
+    # Additional safe parameters?
+    my %additional_safe = ();
+
     # No info?
     $username || return ("No username supplied.");
     $password || return ("No password supplied.");
 
     # Our user name login parameters are here...
     my $user_table = $login_parameters{'user_table'};
+    my $user_id_column = $login_parameters{'user_id_column'};
     my $user_username_column = $login_parameters{'user_username_column'};
     my $user_password_column = $login_parameters{'user_password_column'};
     my $group_table = $login_parameters{'group_table'};
@@ -114,7 +118,8 @@ sub Jarvis::Login::Database::check {
     my $dbh = &Jarvis::DB::handle ($jconfig);
 
     # Check the username from the user name table.
-    my $result_aref = $dbh->selectall_arrayref("SELECT $user_password_column FROM $user_table WHERE $user_username_column = ?", { Slice => {} }, $username);
+    my $user_columns = $user_password_column . ($user_id_column ? ", $user_id_column": "");
+    my $result_aref = $dbh->selectall_arrayref("SELECT $user_columns FROM $user_table WHERE $user_username_column = ?", { Slice => {} }, $username);
     if ((scalar @$result_aref) < 1) {
         return ("User '$username' not known.");
     }
@@ -146,6 +151,11 @@ sub Jarvis::Login::Database::check {
         }
     }
 
+    # Add __user_id parameter?
+    if ($user_id_column) {
+        $additional_safe{'__user_id'} = $$result_href{$user_id_column};
+    }
+
     # Need our group configuration, otherwise just put them in group 'default'.
     if (! ($group_table && $group_username_column && $group_group_column)) {
         &Jarvis::Error::debug ($jconfig, "No group configuration.  Place in group 'default'.");
@@ -157,7 +167,7 @@ sub Jarvis::Login::Database::check {
     my $group_list = join (",", map { $_->{$group_group_column} } @$result_aref);
     &Jarvis::Error::debug ($jconfig, "Group list = '$group_list'.");
 
-    return ("", $username, $group_list);
+    return ("", $username, $group_list, \%additional_safe);
 }
 
 1;
