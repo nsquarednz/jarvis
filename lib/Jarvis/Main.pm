@@ -250,9 +250,8 @@ sub do {
 
     $jconfig->{'action'} = $action;
 
-    # Invoke application-specific start hook(s).
-    &Jarvis::Hook::load_global ($jconfig);
-    &Jarvis::Hook::start ($jconfig);
+    # Load/Start application-specific start hook(s).
+    &Jarvis::Hook::start_global ($jconfig);
 
     # Login as required.
     &Jarvis::Login::check ($jconfig);

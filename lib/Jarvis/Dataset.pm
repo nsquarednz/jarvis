@@ -118,8 +118,8 @@ sub get_config_xml {
     $jconfig->{'sort_field_param'} = $axml->{'sort_field_param'}->content || 'sort_field';
     $jconfig->{'sort_dir_param'} = $axml->{'sort_dir_param'}->content || 'sort_dir';
 
-    # Load dataset specific hooks.
-    &Jarvis::Hook::load_dataset ($jconfig, $dsxml);
+    # Load/Start dataset specific hooks.
+    &Jarvis::Hook::start_dataset ($jconfig, $dsxml);
 
     return $dsxml;
 }

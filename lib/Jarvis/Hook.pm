@@ -66,7 +66,7 @@ use Jarvis::Error;
 use Jarvis::Text;
 
 ################################################################################
-# Load all our GLOBAL hook definitions.
+# Load all our GLOBAL hook definitions and call the ::start hook on each one.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -75,7 +75,7 @@ use Jarvis::Text;
 #       1
 ################################################################################
 #
-sub load_global {
+sub start_global {
     my ($jconfig) = @_;
 
     (defined $jconfig->{'hooks'}) || ($jconfig->{'hooks'} = []);
@@ -98,6 +98,7 @@ sub load_global {
 
             my %hook_def = ('module' => $module, 'lib' => $lib, 'parameters' => \%hook_parameter);
             push (@{ $jconfig->{'hooks'} }, \%hook_def);
+            &start_one ($jconfig, \%hook_def);
         }
     }
 
@@ -105,7 +106,7 @@ sub load_global {
 }
 
 ################################################################################
-# Load all dataset specific hook definitions.
+# Load all dataset specific hook definitions and call ::start hook on each one.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -115,7 +116,7 @@ sub load_global {
 #       1
 ################################################################################
 #
-sub load_dataset {
+sub start_dataset {
     my ($jconfig, $dsxml) = @_;
 
     (defined $jconfig->{'hooks'}) || ($jconfig->{'hooks'} = []);
@@ -137,6 +138,7 @@ sub load_dataset {
 
             my %hook_def = ('module' => $module, 'lib' => $lib, 'parameters' => \%hook_parameter);
             push (@{ $jconfig->{'hooks'} }, \%hook_def);
+            &start_one ($jconfig, \%hook_def);
         }
     }
 
@@ -144,7 +146,7 @@ sub load_dataset {
 }
 
 #################################################################
-# Invoke the "start" method on each hook.
+# Invoke the "start" method on a specified hook.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -153,35 +155,32 @@ sub load_dataset {
 #       1
 ################################################################################
 #
-sub start {
-    my ($jconfig) = @_;
+sub start_one {
+    my ($jconfig, $hook) = @_;
 
-    # Now invoke "start" on all the hooks we found.
-    foreach my $hook (@{ $jconfig->{'hooks'} }) {
-        my $lib = $hook->{'lib'};
-        my $module = $hook->{'module'};
-        my $hook_parameters_href = $hook->{'parameters'};
+    my $lib = $hook->{'lib'};
+    my $module = $hook->{'module'};
+    my $hook_parameters_href = $hook->{'parameters'};
 
-        &Jarvis::Error::debug ($jconfig, "Using default libs: '" . (join ',', @{$jconfig->{'default_libs'}}) . "'". ($lib ? ", hook lib '$lib'." : ", no hook specific lib."));
-        &Jarvis::Error::debug ($jconfig, "Loading hook module '$module'.");
+    &Jarvis::Error::debug ($jconfig, "Using default libs: '" . (join ',', @{$jconfig->{'default_libs'}}) . "'". ($lib ? ", hook lib '$lib'." : ", no hook specific lib."));
+    &Jarvis::Error::debug ($jconfig, "Loading hook module '$module'.");
 
-        # Load the module.  This only needs to be done once.
-        {
-            map { eval "use lib \"$_\""; } @{$jconfig->{'default_libs'}};
-            eval "use lib \"$lib\"" if $lib;
-            eval "require $module";
-            if ($@) {
-                die "Cannot load hook module '$module': " . $@;
-            }
+    # Load the module.  This only needs to be done once.
+    {
+        map { eval "use lib \"$_\""; } @{$jconfig->{'default_libs'}};
+        eval "use lib \"$lib\"" if $lib;
+        eval "require $module";
+        if ($@) {
+            die "Cannot load hook module '$module': " . $@;
         }
+    }
 
-        # The module loaded OK, now try the "start" method.
-        my $method = $module . "::start";
-        {
-            no strict 'refs';
-            exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
-            exists &$method && &$method ($jconfig, $hook_parameters_href);
-        }
+    # The module loaded OK, now try the "start" method.
+    my $method = $module . "::start";
+    {
+        no strict 'refs';
+        exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
+        exists &$method && &$method ($jconfig, $hook_parameters_href);
     }
 
     return 1;
