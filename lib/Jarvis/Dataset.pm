@@ -507,9 +507,9 @@ sub fetch {
     my $sort_field = $jconfig->{'cgi'}->param ($jconfig->{'sort_field_param'}) || '';
     my $sort_dir = $jconfig->{'cgi'}->param ($jconfig->{'sort_dir_param'}) || 'ASC';
 
+    my $field_names_aref = $stm->{'sth'}->{NAME};
     if ($sort_field) {
         &Jarvis::Error::debug ($jconfig, "Server Sort on '$sort_field', Dir = '$sort_dir'.");
-        my $field_names_aref = $stm->{'sth'}->{NAME};
 
         if (! grep { /$sort_field/ } @$field_names_aref) {
             &Jarvis::Error::log ($jconfig, "Unknown sort field: '$sort_field'.");
@@ -521,6 +521,7 @@ sub fetch {
             @$rows_aref = sort { ($a->{$sort_field} || chr(255)) cmp ($b->{$sort_field} || chr(255)) } @$rows_aref;
         }
     }
+    $jconfig->{'field_names_aref'} = $field_names_aref;
 
     # Should we truncate the data to a specific page?
     my $limit = $jconfig->{'cgi'}->param ($jconfig->{'page_limit_param'}) || 0;
