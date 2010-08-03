@@ -177,9 +177,9 @@ sub start {
 
         # The module loaded OK, now try the "start" method.
         my $method = $module . "::start";
-        &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
+            exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
             exists &$method && &$method ($jconfig, $hook_parameters_href);
         }
     }
@@ -212,9 +212,9 @@ sub after_login {
         my $hook_parameters_href = $hook->{'parameters'};
 
         my $method = $module . "::after_login";
-        &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
+            exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
             exists &$method && &$method ($jconfig, $hook_parameters_href, $additional_safe_href);
         }
     }
@@ -252,9 +252,9 @@ sub before_all {
         my $hook_parameters_href = $hook->{'parameters'};
 
         my $method = $module . "::before_all";
-        &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
+            exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
             exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $rest_args_href, $fields_aref);
         }
     }
@@ -291,9 +291,9 @@ sub before_one {
         my $hook_parameters_href = $hook->{'parameters'};
 
         my $method = $module . "::before_one";
-        &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
+            exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
             exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $sql_params_href);
         }
     }
@@ -332,9 +332,9 @@ sub after_one {
         my $hook_parameters_href = $hook->{'parameters'};
 
         my $method = $module . "::after_one";
-        &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
+            exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
             exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $sql_params_href, $row_result_href);
         }
     }
@@ -373,9 +373,9 @@ sub after_all {
         my $hook_parameters_href = $hook->{'parameters'};
 
         my $method = $module . "::after_all";
-        &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
+            exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
             exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $rest_args_href, $fields_aref, $results_aref);
         }
     }
@@ -419,9 +419,9 @@ sub return_status {
         my $hook_parameters_href = $hook->{'parameters'};
 
         my $method = $module . "::return_status";
-        &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
+            exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
             exists &$method && &$method ($jconfig, $hook_parameters_href, $extra_href, $return_text_ref);
         }
     }
@@ -473,9 +473,9 @@ sub return_fetch {
         my $hook_parameters_href = $hook->{'parameters'};
 
         my $method = $module . "::return_fetch";
-        &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
+            exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
             exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $sql_params_href, $rows_aref, $extra_href, $return_text_ref);
         }
     }
@@ -530,9 +530,9 @@ sub return_store {
         my $hook_parameters_href = $hook->{'parameters'};
 
         my $method = $module . "::return_store";
-        &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
+            exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
             exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $rest_args_href, $fields_aref, $results_aref, $extra_href, $return_text_ref);
         }
     }
@@ -563,9 +563,9 @@ sub finish {
         my $hook_parameters_href = $hook->{'parameters'};
 
         my $method = $module . "::finish";
-        &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
+            exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
             exists &$method && &$method ($jconfig, $hook_parameters_href);
         }
     }
