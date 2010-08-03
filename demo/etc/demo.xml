@@ -47,9 +47,9 @@
             <parameter name="group_table" value="groups"/>
             <parameter name="group_username_column" value="name"/>
             <parameter name="group_group_column" value="group_name"/>
-            <parameter name="md5" value="yes"/>
-            <parameter name="md5_salt_prefix_len" value="2"/>
-	</login>
+            <parameter name="encryption" value="md5"/>
+            <parameter name="salt_prefix_len" value="2"/>
+        </login>
 
         <!-- This defines our database connection.  SQLite in our case. -->
         <database connect="dbi:SQLite:dbname=/opt/jarvis/demo/db/demo.db" username="" password=""/>
