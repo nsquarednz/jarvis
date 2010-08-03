@@ -148,37 +148,84 @@ sub get_sql {
 }
 
 ################################################################################
-# Expand the SQL, replace args with ?, and return list of arg names.
+# Expand the SQL:
+#       - Replace {{args}} with ?
+#       - Replace [[args]] with text equivalent.
+#       - Return list of ? arg names only.
+#
+# Note that for textual substitution, numeric values will not be quoted, while
+# string values will be quoted using $dbh->quote.
+#
+# You can override this by specifying :noquote.  In that case, any characters
+# outside the set [0-9a-zA-Z ,-_] will be deleted from the string, and quotes
+# will not be used.
 #
 # Params:
-#       SQL text.
+#       $sql       - SQL text.
+#       $args_href - Hash of Fetch and REST args.
 #
 # Returns:
-#       ($sql_with_placeholders, @variable_names).
+#       ($sql_with_substitutions, @variable_names).
 ################################################################################
 #
-sub sql_with_placeholders {
+sub sql_with_substitutions {
 
-    my ($sql) = @_;
+    my ($jconfig, $sql, $args_href) = @_;
+
+    # Need dbh for safe quoting function.
+    my $dbh = &Jarvis::DB::handle ($jconfig);
 
     # Parse the update SQL to get a prepared statement, pulling out the list
-    # of names of variables we need to replace for each execution.
-    my $sql_with_placeholders = "";
+    # of names of {{variables}} we replaced by ?.
+    my $sql2 = "";
     my @bits = split (/\{\{?\$?([^\}]+)\}\}?/i, $sql);
     my @variable_names = ();
 
-    my $num_params = 0;
     foreach my $idx (0 .. $#bits) {
         if ($idx % 2) {
             push (@variable_names, $bits[$idx]);
-            $sql_with_placeholders .= "?";
+            $sql2 .= "?";
 
         } else {
-            $sql_with_placeholders .= $bits[$idx];
+            $sql2 .= $bits[$idx];
         }
     }
 
-    return ($sql_with_placeholders, @variable_names);
+    # Now perform any textual substitution of [[ ]] variables.  Note that
+    # this really only makes sense with FETCH statements, and with rest
+    # args in store statements.
+    @bits = split (/\[\[?\$?([^\]]+)\]\]?/i, $sql2);
+
+    my $sql3 = "";
+    foreach my $idx (0 .. $#bits) {
+        if ($idx % 2) {
+            my $name = $bits[$idx];
+            my %flags = ();
+            while ($name =~ m/^(.*)\:([^\:]+)$/) {
+                $name = $1;
+                $flags{$2} = 1;
+            }
+            my $value = $args_href->{$name} || '';
+            if ($flags{'noquote'}) {
+                $value =~ s/[^0-9a-zA-Z _\-,]//g;
+            }
+
+            if ($value =~ m/^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$/) {
+                $sql3 .= $value;
+
+            } elsif ($flags{'noquote'}) {
+                $sql3 .= $value;
+
+            } else {
+                $sql3 .= $dbh->quote($value);
+            }
+
+        } else {
+            $sql3 .= $bits[$idx];
+        }
+    }
+
+    return ($sql3, @variable_names);
 }
 
 ################################################################################
@@ -281,7 +328,7 @@ sub transform {
 #       STM hash with keys
 #               {'ttype'}
 #               {'raw_sql'}
-#               {'sql_with_placeholders'}
+#               {'sql_with_substitutions'}
 #               {'returning'}
 #               {'sth'}
 #               {'vnames_aref'}
@@ -292,7 +339,7 @@ sub transform {
 ################################################################################
 #
 sub parse_statement {
-    my ($jconfig, $dsxml, $dbh, $ttype) = @_;
+    my ($jconfig, $dsxml, $dbh, $ttype, $args_href) = @_;
 
     my $obj = {};
 
@@ -311,15 +358,17 @@ sub parse_statement {
     &Jarvis::Error::debug ($jconfig, "Returning? = " . $obj->{'returning'});
 
     # Get our SQL with placeholders and prepare it.
-    my ($sql_with_placeholders, @variable_names) = &sql_with_placeholders ($obj->{'raw_sql'});
-    $obj->{'sql_with_placeholders'} = $sql_with_placeholders;
+    my ($sql_with_substitutions, @variable_names) = &sql_with_substitutions ($jconfig, $obj->{'raw_sql'}, $args_href);
+    $obj->{'sql_with_substitutions'} = $sql_with_substitutions;
     $obj->{'vnames_aref'} = \@variable_names;
+
+    &Jarvis::Error::dump ($jconfig, "SQL after substition = " . $sql_with_substitutions);
 
     # Do the prepare, with RaiseError & PrintError disabled.
     {
         local $dbh->{RaiseError};
         local $dbh->{PrintError};
-        $obj->{'sth'} = $dbh->prepare ($sql_with_placeholders) ||
+        $obj->{'sth'} = $dbh->prepare ($sql_with_substitutions) ||
             die "Couldn't prepare statement for $ttype on '" . $jconfig->{'dataset_name'} . "'.\nSQL ERROR = '" . $dbh->errstr . "'.";
     }
 
@@ -366,7 +415,7 @@ sub statement_execute {
         $error_message =~ s/\s+$//;
 
         &Jarvis::Error::log ($jconfig, "Failure executing SQL for '" . $stm->{'ttype'} . "'.  Details follow.");
-        &Jarvis::Error::log ($jconfig, $stm->{'sql_with_placeholders'}) if $stm->{'sql_with_placeholders'};
+        &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
         &Jarvis::Error::log ($jconfig, $error_message);
         &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @$arg_values_aref) || 'NONE'));
 
@@ -462,10 +511,6 @@ sub fetch {
     # Attach to the database.
     my $dbh = &Jarvis::DB::handle ($jconfig);
 
-    # Get our STM.  This has everything attached.
-    my $stm = &parse_statement ($jconfig, $dsxml, $dbh, 'select') ||
-        die "Dataset '" . ($jconfig->{'dataset_name'} || '') . "' has no SQL of type 'select'.";
-
     # Handle our parameters.  Always with placeholders.  Note that our special variables
     # like __username are safe, and cannot come from user-defined values.
     #
@@ -475,6 +520,10 @@ sub fetch {
     # Store the params for logging purposes.
     my %params_copy = %safe_params;
     $jconfig->{'params_href'} = \%params_copy;
+
+    # Get our STM.  This has everything attached.
+    my $stm = &parse_statement ($jconfig, $dsxml, $dbh, 'select', \%params_copy) ||
+        die "Dataset '" . ($jconfig->{'dataset_name'} || '') . "' has no SQL of type 'select'.";
 
     # Convert the parameter names to corresponding values.
     my @arg_values = &names_to_values ($jconfig, $stm->{'vnames_aref'}, \%safe_params);
@@ -807,7 +856,7 @@ sub store {
     # Execute our "before" statement.  This statement is NOT permitted to fail.  If it does,
     # then we immediately barf
     {
-        my $bstm = &parse_statement ($jconfig, $dsxml, $dbh, 'before');
+        my $bstm = &parse_statement ($jconfig, $dsxml, $dbh, 'before', \%params_copy);
         if ($bstm) {
             my @barg_values = &names_to_values ($jconfig, $bstm->{'vnames_aref'}, \%restful_params);
 
@@ -855,7 +904,7 @@ sub store {
 
         # Get the statement type for this ttype if we don't have it.  This raises debug.
         if (! $stm{$row_ttype}) {
-            $stm{$row_ttype} = &parse_statement ($jconfig, $dsxml, $dbh, $row_ttype);
+            $stm{$row_ttype} = &parse_statement ($jconfig, $dsxml, $dbh, $row_ttype, \%params_copy);
         }
 
         # Check we have an stm for this row.
@@ -912,7 +961,7 @@ sub store {
                         $error_message =~ s/\s+$//;
 
                         &Jarvis::Error::log ($jconfig, "Failure fetching first return result set for '" . $stm->{'ttype'} . "'.  Details follow.");
-                        &Jarvis::Error::log ($jconfig, $stm->{'sql_with_placeholders'}) if $stm->{'sql_with_placeholders'};
+                        &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
                         &Jarvis::Error::log ($jconfig, $error_message);
                         &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) || 'NONE'));
 
@@ -974,7 +1023,7 @@ sub store {
                         $error_message =~ s/\s+$//;
 
                         &Jarvis::Error::log ($jconfig, "Failure fetching additional result sets for '" . $stm->{'ttype'} . "'.  Details follow.");
-                        &Jarvis::Error::log ($jconfig, $stm->{'sql_with_placeholders'}) if $stm->{'sql_with_placeholders'};
+                        &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
                         &Jarvis::Error::log ($jconfig, $error_message);
                         &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) || 'NONE'));
 
@@ -1012,7 +1061,7 @@ sub store {
 
     # Execute our "after" statement.
     if ($success) {
-        my $astm = &parse_statement ($jconfig, $dsxml, $dbh, 'after');
+        my $astm = &parse_statement ($jconfig, $dsxml, $dbh, 'after', \%params_copy);
         if ($astm) {
             my @aarg_values = &names_to_values ($jconfig, $astm->{'vnames_aref'}, \%restful_params);
 
