@@ -4,6 +4,8 @@
 #       usernames and passwords from a database table, and optionally
 #       fetches group ownership from a second database table.
 #
+#       Passwords can be encrypted.
+#
 #       Refer to the documentation for the "check" function for how
 #       to configure your <application>.xml to use this login module.
 #
@@ -32,6 +34,7 @@ use strict;
 use warnings;
 
 use Digest::MD5 qw (md5 md5_hex);
+use Crypt::Eksblowfish::Bcrypt qw(bcrypt_hash);
 
 use Jarvis::Error;
 
@@ -54,7 +57,7 @@ package Jarvis::Login::Database;
 #    <app format="json" debug="no">
 #        ...
 #        <login module="Jarvis::Login::Database">
-#  	     <parameter name="user_table" value="staff"/>
+#            <parameter name="user_table" value="staff"/>
 #            <parameter name="user_username_column" value="name"/>
 #            <parameter name="user_password_column" value="password"/>
 #            <parameter name="group_table" value="staff_group"/>
@@ -62,8 +65,8 @@ package Jarvis::Login::Database;
 #            <parameter name="group_group_column" value="group_name"/>
 #
 #            ...
-#            <parameter name="md5" value="yes|no"/>
-#            <parameter name="md5_salt_prefix_len" value="2"/>
+#            <parameter name="encryption" value="none|md5|eksblowfish"/>
+#            <parameter name="salt_prefix_len" value="2"/> <!-- Note, for eksblowfish, this must be 16, so you don't need to specify this -->
 #        </login>
 #        ...
 #    </app>
@@ -78,6 +81,18 @@ package Jarvis::Login::Database;
 #       $password - The offered password
 #       %login_parameters - Hash of login parameters parsed from
 #               the master application XML file by the master Login class.
+#
+# Note that for eksblowfish, the password is stored in the database in the
+# form:
+#   salt+encrypted_password
+#
+# where the '+' is a distinct character. salt must be 16 characters.
+#
+# To encrypt a eksblowfish password, use the following perl code:
+#
+#    use Crypt::Eksblowfish::Bcrypt qw(bcrypt_hash);
+#    my $salt = "abcdefghijklmnop";
+#    my $hash = $salt . '+' . bcrypt_hash({ key_nul => 1, cost => 8, salt => $salt }, "mypassword");
 #
 #
 # Returns:
@@ -103,12 +118,13 @@ sub Jarvis::Login::Database::check {
     my $group_username_column = $login_parameters{'group_username_column'};
     my $group_group_column = $login_parameters{'group_group_column'};
 
-    # Does the database store an MD5 hash (in HEX format, we don't support binary).
-    my $use_md5 = defined ($Jarvis::Config::yes_value {lc ($login_parameters{'md5'} || "no")});
+    # Does the database store plain text, a MD5 hash (in HEX format, we don't support binary), 
+    # or a HEX formatted version of an Eksblowfish encrypted password?
+    my $encryption = lc ($login_parameters{'encryption'} || "none");
 
-    # Does the database MD5 hash include "N" digits of ASCII salt, which we also
-    # prefix to the password before hashing it?
-    my $md5_salt_prefix_len = $login_parameters{'md5_salt_prefix_len'} || 0;
+    # Does the database encryption, if there is some include "N" digits of ASCII salt, 
+    # which we also prefix to the password before hashing it?
+    my $salt_prefix_len = $login_parameters{'salt_prefix_len'} || 0;
 
     # Sanity check our args.
     if (! ($user_table && $user_username_column && $user_password_column)) {
@@ -133,18 +149,36 @@ sub Jarvis::Login::Database::check {
         return ("Account has no password.");
     }
 
-    # Check the password.  Either MD5, or plain text.
-    if ($use_md5) {
-        if (length ($stored_password) != ($md5_salt_prefix_len + 32)) {
+    # Check the password.
+    if ($encryption eq "md5") {
+        if (length ($stored_password) != ($salt_prefix_len + 32)) {
             return ("Stored password is invalid length for MD5 + salt");
         }
-        my $salt = substr ($stored_password, 0, $md5_salt_prefix_len);
-        my $stored_md5 = substr ($stored_password, $md5_salt_prefix_len);
+        my $salt = substr ($stored_password, 0, $salt_prefix_len);
+        my $stored_md5 = substr ($stored_password, $salt_prefix_len);
 
         if (&Digest::MD5::md5_hex ($salt . $password) ne $stored_md5) {
-            return ("Incorrect password hash.");
+            return ("Incorrect password.");
         }
 
+    } elsif ($encryption eq "eksblowfish") {
+        $salt_prefix_len = 16; # eksblowfish requires a salt of 16. 
+        if (length ($stored_password) <= $salt_prefix_len) {
+            return ("Stored password is invalid length for Eksblowfish + salt");
+        }
+        my $salt = substr ($stored_password, 0, $salt_prefix_len);
+        my $p = substr ($stored_password, $salt_prefix_len + 1); 
+
+        my $hash = &Crypt::Eksblowfish::Bcrypt::bcrypt_hash({
+                key_nul => 1,
+                cost => 8,
+                salt => $salt
+        }, $password);
+        my $checkVal = unpack("H*", $hash);
+        &Jarvis::Error::debug ($jconfig, $checkVal . " vs " . $p);
+        if ($checkVal ne $p) {
+            return ("Incorrect password.");
+        }
     } else {
         if ($stored_password ne $password) {
             return ("Incorrect password.");
