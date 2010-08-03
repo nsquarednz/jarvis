@@ -33,9 +33,6 @@ use CGI;
 use strict;
 use warnings;
 
-use Digest::MD5 qw (md5 md5_hex);
-use Crypt::Eksblowfish::Bcrypt qw(bcrypt_hash);
-
 use Jarvis::Error;
 
 package Jarvis::Login::Database;
@@ -157,6 +154,7 @@ sub Jarvis::Login::Database::check {
         my $salt = substr ($stored_password, 0, $salt_prefix_len);
         my $stored_md5 = substr ($stored_password, $salt_prefix_len);
 
+        eval "use Digest::MD5 qw (md5 md5_hex);";
         if (&Digest::MD5::md5_hex ($salt . $password) ne $stored_md5) {
             return ("Incorrect password.");
         }
@@ -169,6 +167,7 @@ sub Jarvis::Login::Database::check {
         my $salt = substr ($stored_password, 0, $salt_prefix_len);
         my $p = substr ($stored_password, $salt_prefix_len + 1); 
 
+        eval "use Crypt::Eksblowfish::Bcrypt qw(bcrypt_hash);";
         my $hash = &Crypt::Eksblowfish::Bcrypt::bcrypt_hash({
                 key_nul => 1,
                 cost => 8,
