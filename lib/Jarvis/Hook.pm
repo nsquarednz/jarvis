@@ -384,12 +384,60 @@ sub after_all {
 }
 
 ################################################################################
+# Invoke the "return_status" method on each hook.  This occurs for all "__status"
+# requests.  It is performed just before we convert the status return results
+# into JSON or XML.
+#
+# This hook may do one or more of:
+#
+#   - Add some extra root level parameters (by modifying $extra_href)
+#   - Peform a custom encoding into text (by setting $return_text)
+#
+# Params:
+#       $jconfig        - Jarvis::Config object
+#
+#       $extra_href     - Hash of extra parameters to add to the root of
+#                         the returned JSON/XML document.
+#
+#       $return_text_ref - Return text.  If we define this, it will be used
+#                          instead of the default JSON/XML encoding.
+#
+# Returns:
+#       1
+################################################################################
+#
+sub return_status {
+
+    my ($jconfig, $extra_href, $return_text_ref) = @_;
+
+    my @hooks = @{ $jconfig->{'hooks'} };
+
+    # Now invoke "return_status" on all the hooks we found.
+    foreach my $hook (@hooks) {
+        my $lib = $hook->{'lib'};
+        my $module = $hook->{'module'};
+        my $hook_parameters_href = $hook->{'parameters'};
+
+        my $method = $module . "::return_status";
+        &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
+        {
+            no strict 'refs';
+            exists &$method && &$method ($jconfig, $hook_parameters_href, $extra_href, $return_text_ref);
+        }
+    }
+
+    return 1;
+}
+
+
+################################################################################
 # Invoke the "return_fetch" method on each hook.  This occurs for all "fetch"
 # requests on regular datasets.  It is performed just before we convert the
 # fetch return results into JSON or XML.
 #
-# This hook may do one or both of:
+# This hook may do one or more of:
 #
+#   - Add some extra root level parameters (by modifying $extra_href)
 #   - Completely modify the returned content (by modifying $rows_aref)
 #   - Peform a custom encoding into text (by setting $return_text)
 #
@@ -402,6 +450,9 @@ sub after_all {
 #
 #       $rows_aref      - The array of return objects to be encoded.
 #
+#       $extra_href     - Hash of extra parameters to add to the root of
+#                         the returned JSON/XML document.
+#
 #       $return_text_ref - Return text.  If we define this, it will be used
 #                          instead of the default JSON/XML encoding.
 #
@@ -411,7 +462,7 @@ sub after_all {
 #
 sub return_fetch {
 
-    my ($jconfig, $dsxml, $sql_params_href, $rows_aref, $return_text_ref) = @_;
+    my ($jconfig, $dsxml, $sql_params_href, $rows_aref, $extra_href, $return_text_ref) = @_;
 
     my @hooks = @{ $jconfig->{'hooks'} };
 
@@ -425,7 +476,7 @@ sub return_fetch {
         &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
-            exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $sql_params_href, $rows_aref, $return_text_ref);
+            exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $sql_params_href, $rows_aref, $extra_href, $return_text_ref);
         }
     }
 
@@ -438,8 +489,9 @@ sub return_fetch {
 # requests on regular datasets.  It is performed just before we convert the
 # fetch return results into JSON or XML.
 #
-# This hook may do one or both of:
+# This hook may do one or more of:
 #
+#   - Add some extra root level parameters (by modifying $extra_href)
 #   - Completely modify the returned content (by modifying $results_aref)
 #   - Peform a custom encoding into text (by setting $return_text)
 #
@@ -456,6 +508,9 @@ sub return_fetch {
 #       $results_aref   - The results rows, one per store operation that
 #                         we will return as the response.
 #
+#       $extra_href     - Hash of extra parameters to add to the root of
+#                         the returned JSON/XML document.
+#
 #       $return_text_ref - Return text.  If we define this, it will be used
 #                          instead of the default JSON/XML encoding of results.
 #
@@ -464,7 +519,7 @@ sub return_fetch {
 ################################################################################
 #
 sub return_store {
-    my ($jconfig, $dsxml, $rest_args_href, $fields_aref, $results_aref, $return_text_ref) = @_;
+    my ($jconfig, $dsxml, $rest_args_href, $fields_aref, $results_aref, $extra_href, $return_text_ref) = @_;
 
     my @hooks = @{ $jconfig->{'hooks'} };
 
@@ -478,7 +533,7 @@ sub return_store {
         &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
-            exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $rest_args_href, $fields_aref, $results_aref, $return_text_ref);
+            exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $rest_args_href, $fields_aref, $results_aref, $extra_href, $return_text_ref);
         }
     }
 

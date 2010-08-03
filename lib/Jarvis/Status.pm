@@ -54,7 +54,19 @@ sub report {
     $fields{"group_list"} = $jconfig->{'group_list'};
     $fields{"sid"} = $jconfig->{'sid'};
 
-    if ($jconfig->{'format'} eq "json") {
+    my $extra_href = {};
+    my $return_text = undef;
+    &Jarvis::Hook::return_status ($jconfig, $extra_href, \$return_text);
+
+    foreach my $name (sort (keys %$extra_href)) {
+        $fields {$name} = $extra_href->{$name};
+    }
+
+    if ($return_text) {
+        &Jarvis::Error::debug ($jconfig, "Return content determined by hook ::return_fetch");
+        return $return_text;
+
+    } elsif ($jconfig->{'format'} eq "json") {
         my $json = JSON::PP->new->pretty(1);
         my $json_string = $json->encode ( \%fields );
         &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($json_string));

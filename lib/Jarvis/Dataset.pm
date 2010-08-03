@@ -580,8 +580,9 @@ sub fetch {
     #   - Completely modify the returned content (by modifying $rows_aref)
     #   - Peform a custom encoding into text (by setting $return_text)
     #
+    my $extra_href = {};
     my $return_text = undef;
-    &Jarvis::Hook::return_fetch ($jconfig, $dsxml, \%params_copy, $rows_aref, \$return_text);
+    &Jarvis::Hook::return_fetch ($jconfig, $dsxml, \%params_copy, $rows_aref, $extra_href, \$return_text);
 
     # Otherwise we encode to a supported format.  Note that the hook may have modified
     # the data prior to this encoding.
@@ -597,6 +598,9 @@ sub fetch {
         $return_data {"username"} = $jconfig->{'username'};
         $return_data {"error_string"} = $jconfig->{'error_string'};
         $return_data {"group_list"} = $jconfig->{'group_list'};
+        foreach my $name (sort (keys %$extra_href)) {
+            $return_data {$name} = $extra_href->{$name};
+        }
 
         # Note that we always return a "data" field, even if it is an empty array.
         # That is because ExtJS and other libraries will flag an exception if we do not.
@@ -615,6 +619,9 @@ sub fetch {
         $xml->{'response'}{'username'} = $jconfig->{'username'};
         $xml->{'response'}{'error_string'} = $jconfig->{'error_string'};
         $xml->{'response'}{'group_list'} = $jconfig->{'group_list'};
+        foreach my $name (sort (keys %$extra_href)) {
+            $xml->{'response'}{$name} = $extra_href->{$name};
+        }
 
         $xml->{'response'}{'fetched'} = $num_rows;              # Fetched from database
         $xml->{'response'}{'returned'} = scalar @$rows_aref;    # Returned to client (after paging)
@@ -1048,8 +1055,9 @@ sub store {
     #   - Completely modify the returned content (by modifying \@results)
     #   - Peform a custom encoding into text (by setting $return_text)
     #
+    my $extra_href = {};
     my $return_text = undef;
-    &Jarvis::Hook::return_store ($jconfig, $dsxml, \%restful_params, $fields_aref, \@results, \$return_text);
+    &Jarvis::Hook::return_store ($jconfig, $dsxml, \%restful_params, $fields_aref, \@results, $extra_href, \$return_text);
 
     # If the hook set $return_text then we use that.
     if ($return_text) {
@@ -1067,6 +1075,9 @@ sub store {
         $return_data {'success'} = $success;
         $success && ($return_data {'modified'} = $modified);
         $success || ($return_data {'message'} = &trim($message));
+        foreach my $name (sort (keys %$extra_href)) {
+            $return_data {$name} = $extra_href->{$name};
+        }
 
         # Return the array data if we succeded.
         if ($success && $return_array) {
@@ -1085,6 +1096,9 @@ sub store {
         $xml->{'response'}{'success'} = $success;
         $success && ($xml->{'response'}{'modified'} = $modified);
         $success || ($xml->{'response'}{'message'} = &trim($message));
+        foreach my $name (sort (keys %$extra_href)) {
+            $xml->{'response'}{$name} = $extra_href->{$name};
+        }
 
         # Return the array data if we succeeded.
         if ($success && $return_array) {
