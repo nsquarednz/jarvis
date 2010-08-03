@@ -160,6 +160,8 @@ sub get_sql {
 # outside the set [0-9a-zA-Z ,-_] will be deleted from the string, and quotes
 # will not be used.
 #
+# You can alternatively specify :quote.  That will always quote.
+#
 # Params:
 #       $sql       - SQL text.
 #       $args_href - Hash of Fetch and REST args.
@@ -214,6 +216,7 @@ sub sql_with_substitutions {
             # each flag.  Supported flags at this stage are:
             #
             #   :noquote        Don't wrap strings with quotes, instead just restrict content.
+            #   :quote          Always quote, even for numbers.
             #
             while ($name =~ m/^(.*)\:([^\:]+)$/) {
                 $name = $1;
@@ -228,10 +231,10 @@ sub sql_with_substitutions {
                 $value =~ s/[^0-9a-zA-Z _\-,]//g;
             }
 
-            if ($value =~ m/^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$/) {
+            if ($value =~ m/^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$/ && ! $flags{'quote'}) {
                 $sql3 .= $value;
 
-            } elsif ($flags{'noquote'}) {
+            } elsif ($flags{'noquote'} && ! $flags{'quote'}) {
                 $sql3 .= $value;
 
             } else {
