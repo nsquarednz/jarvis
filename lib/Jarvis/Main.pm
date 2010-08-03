@@ -250,6 +250,11 @@ sub do {
 
     $jconfig->{'action'} = $action;
 
+    # Invoke application-specific start hook(s).
+    &Jarvis::Hook::load_global ($jconfig);
+    &Jarvis::Hook::start ($jconfig);
+
+    # Login as required.
     &Jarvis::Login::check ($jconfig);
 
     &Jarvis::Error::debug ($jconfig, "User Name = '" . $jconfig->{'username'} . "'");
@@ -279,10 +284,6 @@ sub do {
         $jconfig->{'dataset_type'} = 'i';
         $jconfig->{'action'} = 'select';
 
-        # Invoke application-specific start hook(s).
-        &Jarvis::Hook::load_global ($jconfig);
-        &Jarvis::Hook::start ($jconfig);
-
         # Status.  I.e. are we logged in?
         if ($dataset_name eq "__status") {
             &Jarvis::Error::debug ($jconfig, "Returning status special dataset.");
@@ -303,9 +304,6 @@ sub do {
         } else {
             die "Unknown special dataset '$dataset_name'!\n";
         }
-
-        # Invoke application-specific finish hook(s).
-        &Jarvis::Hook::finish ($jconfig, \$return_text);
 
         print $cgi->header(-type => "text/plain; charset=UTF-8", -cookie => $jconfig->{'cookie'}, 'Cache-Control' => 'no-store, no-cache, must-revalidate');
         print $return_text;
@@ -329,7 +327,6 @@ sub do {
     } elsif ($action eq "select") {
         $jconfig->{'dataset_type'} = 's';
 
-        &Jarvis::Hook::load_global ($jconfig);
         my $return_text = &Jarvis::Dataset::fetch ($jconfig, \@rest_args);
 
         #
@@ -358,7 +355,6 @@ sub do {
     } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete") || ($action eq "mixed")) {
         $jconfig->{'dataset_type'} = 's';
 
-        &Jarvis::Hook::load_global ($jconfig);
         my $return_text = &Jarvis::Dataset::store ($jconfig, \@rest_args);
 
         print $cgi->header(-type => "text/plain; charset=UTF-8", -cookie => $jconfig->{'cookie'});
@@ -370,9 +366,13 @@ sub do {
     }
 
     ###############################################################################
-    # Cleanup.  Under mod_perl with Apache::DBI, this will actually do nothing.
+    # Cleanup.
     ###############################################################################
-    #
+
+    # Invoke application-specific finish hook(s).
+    &Jarvis::Hook::finish ($jconfig);
+
+    # Close database connection.  Under mod_perl with Apache::DBI, this will actually do nothing.
     &Jarvis::DB::disconnect ($jconfig);
 
     # Track the request end, and then disconnect from tracker DB.

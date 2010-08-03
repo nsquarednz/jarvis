@@ -445,7 +445,6 @@ sub fetch {
     my ($jconfig, $rest_args_aref) = @_;
 
     my $dsxml = &get_config_xml ($jconfig) || die "Cannot load configuration for dataset '" . ($jconfig->{'dataset_name'} || '') . "'.";
-    &Jarvis::Hook::start ($jconfig);
 
     my $allowed_groups = $dsxml->{dataset}{"read"};
 
@@ -571,6 +570,10 @@ sub fetch {
         }
     }
 
+    # TBD: Need another hook point in here to give the hook a chance to
+    # modify the returned content and/or add additional return data.
+
+    # Return text.
     my $return_text = undef;
 
     # Return content in requested format.  JSON is simple.
@@ -657,8 +660,6 @@ sub fetch {
         die "Unsupported format '" . $jconfig->{'format'} ."' for Dataset::fetch return data.\n";
     }
 
-    &Jarvis::Hook::finish ($jconfig, \$return_text);
-
     return $return_text;
 }
 
@@ -685,7 +686,6 @@ sub store {
     my ($jconfig, $rest_args_aref) = @_;
 
     my $dsxml = &get_config_xml ($jconfig) || die "Cannot load configuration for dataset '" . ($jconfig->{'dataset_name'} || '') . "'.";
-    &Jarvis::Hook::start ($jconfig);
 
     my $allowed_groups = $dsxml->{dataset}{"write"};
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
@@ -1027,6 +1027,9 @@ sub store {
     # Cleanup SQL Server message for reporting purposes.
     $message =~ s/^Server message number=[0-9]+ severity=[0-9]+ state=[0-9]+ line=[0-9]+ server=[A-Z0-9\\]+text=//i;
 
+    # TBD: Need another hook point in here to give the hook a chance to
+    # modify the returned content and/or add additional return data.
+
     # Note here that our return structure is different depending on whether you handed us
     # just one record (not in an array), or if you gave us an array of records.  An array
     # containing one record is NOT the same as a single record not in an array.
@@ -1074,8 +1077,6 @@ sub store {
     } else {
         die "Unsupported format '" . $jconfig->{'format'} ."' for Dataset::store return data.\n";
     }
-
-    &Jarvis::Hook::finish ($jconfig, \$return_text);
 
     return $return_text;
 }

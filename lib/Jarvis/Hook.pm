@@ -188,6 +188,41 @@ sub start {
 }
 
 ################################################################################
+# Invoke the "after_login" method on each hook.
+#
+# Params:
+#       $jconfig        - Jarvis::Config object
+#
+#       $additional_safe_href - Reference to the has of additional safe
+#                               parameters.  Hook module may add new ones.
+#
+# Returns:
+#       1
+################################################################################
+#
+sub after_login {
+    my ($jconfig,  $additional_safe_href) = @_;
+
+    my @hooks = @{ $jconfig->{'hooks'} };
+
+    # Now invoke "after_login" on all the hooks we found.
+    foreach my $hook (@hooks) {
+        my $lib = $hook->{'lib'};
+        my $module = $hook->{'module'};
+        my $hook_parameters_href = $hook->{'parameters'};
+
+        my $method = $module . "::after_login";
+        &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
+        {
+            no strict 'refs';
+            exists &$method && &$method ($jconfig, $hook_parameters_href, $additional_safe_href);
+        }
+    }
+
+    return 1;
+}
+
+################################################################################
 # Invoke the "before_all" method on each hook.
 #
 # Params:
@@ -210,7 +245,7 @@ sub before_all {
 
     my @hooks = @{ $jconfig->{'hooks'} };
 
-    # Now invoke "start" on all the hooks we found.
+    # Now invoke "before_all" on all the hooks we found.
     foreach my $hook (@hooks) {
         my $lib = $hook->{'lib'};
         my $module = $hook->{'module'};
@@ -249,7 +284,7 @@ sub before_one {
 
     my @hooks = @{ $jconfig->{'hooks'} };
 
-    # Now invoke "start" on all the hooks we found.
+    # Now invoke "before_one" on all the hooks we found.
     foreach my $hook (@hooks) {
         my $lib = $hook->{'lib'};
         my $module = $hook->{'module'};
@@ -290,7 +325,7 @@ sub after_one {
 
     my @hooks = @{ $jconfig->{'hooks'} };
 
-    # Now invoke "start" on all the hooks we found.
+    # Now invoke "after_one" on all the hooks we found.
     foreach my $hook (@hooks) {
         my $lib = $hook->{'lib'};
         my $module = $hook->{'module'};
@@ -331,7 +366,7 @@ sub after_all {
 
     my @hooks = @{ $jconfig->{'hooks'} };
 
-    # Now invoke "start" on all the hooks we found.
+    # Now invoke "after_all" on all the hooks we found.
     foreach my $hook (@hooks) {
         my $lib = $hook->{'lib'};
         my $module = $hook->{'module'};
@@ -354,19 +389,16 @@ sub after_all {
 # Params:
 #       $jconfig         - Jarvis::Config object
 #
-#       $return_text_ref - Reference to the text we are about to return.
-#                          Hook(s) may modify this content before it is returned.
-#
 # Returns:
 #       1
 ################################################################################
 #
 sub finish {
-    my ($jconfig, $return_text_ref) = @_;
+    my ($jconfig) = @_;
 
     my @hooks = @{ $jconfig->{'hooks'} };
 
-    # Now invoke "start" on all the hooks we found.
+    # Now invoke "finish" on all the hooks we found.
     foreach my $hook (@hooks) {
         my $lib = $hook->{'lib'};
         my $module = $hook->{'module'};
@@ -376,7 +408,7 @@ sub finish {
         &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
-            exists &$method && &$method ($jconfig, $hook_parameters_href, $return_text_ref);
+            exists &$method && &$method ($jconfig, $hook_parameters_href);
         }
     }
 

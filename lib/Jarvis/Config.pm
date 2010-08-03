@@ -43,6 +43,13 @@ use Jarvis::Error;
 
 %Jarvis::Config::yes_value = ('yes' => 1, 'true' => 1, 'on' => 1, '1' => 1);
 
+###############################################################################
+# LOCAL VARIABLES
+###############################################################################
+#
+my $default_parameters_loaded = 0;
+my %default_parameters_cache = ();
+
 ################################################################################
 # Setup our entire jarvis config, based on the application name provided, which
 # directs us to our application xml file.
@@ -143,6 +150,36 @@ sub new {
     return $self;
 }
 
+
+################################################################################
+# Returns a cached list of our default parameters.  Could be handy to some.
+#
+# Params:
+#       $jconfig - Jarvis::Config object
+#
+# Returns:
+#       Hash of default parameters configured in the application XML file.
+################################################################################
+#
+sub default_parameters () {
+    my ($jconfig) = @_;
+
+    if ($default_parameters_loaded) {
+        return %default_parameters_cache;
+    }
+
+    # First set the default parameters configured in the config file.
+    my $pxml = $jconfig->{'xml'}{'jarvis'}{'app'}{'default_parameters'};
+    if ($pxml && $pxml->{'parameter'}) {
+        foreach my $parameter ($pxml->{'parameter'}('@')) {
+            $default_parameters_cache {$parameter->{'name'}->content} = $parameter->{'value'}->content;
+        }
+    }
+    $default_parameters_loaded = 1;
+    return %default_parameters_cache;
+}
+
+
 ################################################################################
 # Go through the list of user-supplied variables and decide which ones are
 # safe.
@@ -173,20 +210,14 @@ sub safe_variables {
 
     my ($jconfig, $raw_params_href, $rest_args_aref, $rest_arg_prefix) = @_;
 
-    my %safe_params = ();
     $rest_arg_prefix = $rest_arg_prefix || '';
 
-    # First set the default parameters configured in the config file.
-    my $pxml = $jconfig->{'xml'}{'jarvis'}{'app'}{'default_parameters'};
-    if ($pxml && $pxml->{'parameter'}) {
-        foreach my $parameter ($pxml->{'parameter'}('@')) {
-            &Jarvis::Error::debug ($jconfig, "Default Parameter: " . $parameter->{'name'}->content . " -> " . $parameter->{'value'}->content);
-            $safe_params {$parameter->{'name'}->content} = $parameter->{'value'}->content;
-        }
-    }
+    # Start with our default parameters.
+    my %safe_params = &default_parameters ($jconfig);
 
-    # Copy through the SAFE user-provided parameters.  One leading underscore
-    # is permitted, but never TWO leading underscores.  No special characters.
+    # Copy through some user-provided parameters.  Do not copy any user-provided
+    # variable which begins with "__" (two underscores).  That prefix is strictly
+    # reserved for our server-controlled "safe" parameters.
     foreach my $name (keys %$raw_params_href) {
         if ($name =~ m/^_?[a-z][a-z0-9_\-]*$/i) {
             my $value = $$raw_params_href {$name};

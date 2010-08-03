@@ -161,6 +161,12 @@ sub check {
             $jconfig->{'additional_safe'}{$name} = $value;
         }
 
+        # Add to our $args_href since e.g. fetch queries might use them.
+        $jconfig->{'logged_in'} = $logged_in;
+        $jconfig->{'username'} = $username;
+        $jconfig->{'error_string'} = $error_string;
+        $jconfig->{'group_list'} = $group_list;
+
     # No successful session?  Login.  Note that we store failed sessions too.
     #
     # Note that not all actions allow you to provide a username and password for
@@ -193,6 +199,7 @@ sub check {
             no strict 'refs';
             ($error_string, $username, $group_list, $additional_safe) = &$login_method ($jconfig, $offered_username, $offered_password, %login_parameters);
         }
+        (defined $additional_safe) || ($additional_safe = {});
 
         $username || ($username = '');
         $group_list || ($group_list = '');
@@ -208,6 +215,20 @@ sub check {
             $session->param('group_list', $group_list);
         }
 
+        # Add to our $args_href since e.g. fetch queries might use them.
+        $jconfig->{'logged_in'} = $logged_in;
+        $jconfig->{'username'} = $username;
+        $jconfig->{'error_string'} = $error_string;
+        $jconfig->{'group_list'} = $group_list;
+
+        # Invoke our after-login hook.  This can invoke "die" if it wants.  But
+        # generally it just gives it the chance to do extra auditing and/or add
+        # extra "safe" parameters.
+        #
+        if ($logged_in) {
+            &Jarvis::Hook::after_login ($jconfig, $additional_safe);
+        }
+
         # Do we have any additional safe parameters returned by the login module?
         # These must begin with "__" because they are safe params.
         #
@@ -217,6 +238,7 @@ sub check {
         foreach my $name (keys %$additional_safe) {
             ($name =~ m/^__/) || die "Invalid additional safe parameter name '$name' returned by login module.";
             my $value = $additional_safe->{$name};
+            &Jarvis::Error::debug ($jconfig, "Login module and/or plugin returned additional safe param '$name'.");
 
             $jconfig->{'additional_safe'}{$name} = $value;
             $session && $session->param($name, $value);
@@ -235,12 +257,6 @@ sub check {
             -value => $jconfig->{'sid'},
             -expires => $session_expiry);
    }
-
-    # Add to our $args_href since e.g. fetch queries might use them.
-    $jconfig->{'logged_in'} = $logged_in;
-    $jconfig->{'username'} = $username;
-    $jconfig->{'error_string'} = $error_string;
-    $jconfig->{'group_list'} = $group_list;
 
     # Log the results if we actually tried to login.  Write to tracker database too
     # if we are configured to do so.
