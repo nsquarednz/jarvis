@@ -113,10 +113,10 @@ sub get_config_xml {
     $jconfig->{'debug'} = $jconfig->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($dsxml->{'dataset'}{'debug'}->content || "no")});
 
     # Load a couple of other parameters.  This is a "side-effect".  Yeah, it's a bit yucky.
-    $jconfig->{'page_start_param'} = lc ($axml->{'page_start_param'}->content || 'page_start');
-    $jconfig->{'page_limit_param'} = lc ($axml->{'page_limit_param'}->content || 'page_limit');
-    $jconfig->{'sort_field_param'} = lc ($axml->{'sort_field_param'}->content || 'sort_field');
-    $jconfig->{'sort_dir_param'} = lc ($axml->{'sort_dir_param'}->content || 'sort_dir');
+    $jconfig->{'page_start_param'} = $axml->{'page_start_param'}->content || 'page_start';
+    $jconfig->{'page_limit_param'} = $axml->{'page_limit_param'}->content || 'page_limit';
+    $jconfig->{'sort_field_param'} = $axml->{'sort_field_param'}->content || 'sort_field';
+    $jconfig->{'sort_dir_param'} = $axml->{'sort_dir_param'}->content || 'sort_dir';
 
     # Load dataset specific hooks.
     &Jarvis::Hook::load_dataset ($jconfig, $dsxml);
