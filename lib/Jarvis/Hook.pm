@@ -230,9 +230,9 @@ sub after_login {
 #
 #       $dsxml          - The XML::Smart object for our dataset XML config.
 #
-#       $restful_args_href - Reference to the rest args that will be given to
-#                            any "before" SQL statement for this dataset.  Hook
-#                            may modify these parameters.
+#       $rest_args_href - Reference to the RESTful args that will be given to
+#                         any "before" SQL statement for this dataset.  Hook
+#                         may modify these parameters.
 #
 #       $fields_aref    - The submitted rows we are about to apply.
 #
@@ -241,7 +241,7 @@ sub after_login {
 ################################################################################
 #
 sub before_all {
-    my ($jconfig, $dsxml, $restful_args_href, $fields_aref) = @_;
+    my ($jconfig, $dsxml, $rest_args_href, $fields_aref) = @_;
 
     my @hooks = @{ $jconfig->{'hooks'} };
 
@@ -255,7 +255,7 @@ sub before_all {
         &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
-            exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $restful_args_href, $fields_aref);
+            exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $rest_args_href, $fields_aref);
         }
     }
 
@@ -351,7 +351,7 @@ sub after_one {
 #
 #       $dsxml          - The XML::Smart object for our dataset XML config.
 #
-#       $restful_args_href - Our rest args.
+#       $rest_args_href - Our RESTful args.
 #
 #       $fields_aref    - The submitted rows we just applied.
 #
@@ -362,7 +362,7 @@ sub after_one {
 ################################################################################
 #
 sub after_all {
-    my ($jconfig, $dsxml, $restful_args_href, $fields_aref, $results_aref) = @_;
+    my ($jconfig, $dsxml, $rest_args_href, $fields_aref, $results_aref) = @_;
 
     my @hooks = @{ $jconfig->{'hooks'} };
 
@@ -376,12 +376,115 @@ sub after_all {
         &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
         {
             no strict 'refs';
-            exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $restful_args_href, $fields_aref, $results_aref);
+            exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $rest_args_href, $fields_aref, $results_aref);
         }
     }
 
     return 1;
 }
+
+################################################################################
+# Invoke the "return_fetch" method on each hook.  This occurs for all "fetch"
+# requests on regular datasets.  It is performed just before we convert the
+# fetch return results into JSON or XML.
+#
+# This hook may do one or both of:
+#
+#   - Completely modify the returned content (by modifying $rows_aref)
+#   - Peform a custom encoding into text (by setting $return_text)
+#
+# Params:
+#       $jconfig        - Jarvis::Config object
+#
+#       $dsxml          - The XML::Smart object for our dataset XML config.
+#
+#       $sql_params_href - All query args (CGI, restful, safe and default).
+#
+#       $rows_aref      - The array of return objects to be encoded.
+#
+#       $return_text_ref - Return text.  If we define this, it will be used
+#                          instead of the default JSON/XML encoding.
+#
+# Returns:
+#       1
+################################################################################
+#
+sub return_fetch {
+
+    my ($jconfig, $dsxml, $sql_params_href, $rows_aref, $return_text_ref) = @_;
+
+    my @hooks = @{ $jconfig->{'hooks'} };
+
+    # Now invoke "return_fetch" on all the hooks we found.
+    foreach my $hook (@hooks) {
+        my $lib = $hook->{'lib'};
+        my $module = $hook->{'module'};
+        my $hook_parameters_href = $hook->{'parameters'};
+
+        my $method = $module . "::return_fetch";
+        &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
+        {
+            no strict 'refs';
+            exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $sql_params_href, $rows_aref, $return_text_ref);
+        }
+    }
+
+    return 1;
+}
+
+
+################################################################################
+# Invoke the "return_store" method on each hook.  This occurs for all "fetch"
+# requests on regular datasets.  It is performed just before we convert the
+# fetch return results into JSON or XML.
+#
+# This hook may do one or both of:
+#
+#   - Completely modify the returned content (by modifying $results_aref)
+#   - Peform a custom encoding into text (by setting $return_text)
+#
+# Params:
+#       $jconfig        - Jarvis::Config object
+#
+#       $dsxml          - The XML::Smart object for our dataset XML config.
+#
+#       $rest_args_href - All RESTful args given to this store request.
+#
+#       $fields_aref    - The client-supplied per-row parameters, one per
+#                         store request given to us.
+#
+#       $results_aref   - The results rows, one per store operation that
+#                         we will return as the response.
+#
+#       $return_text_ref - Return text.  If we define this, it will be used
+#                          instead of the default JSON/XML encoding of results.
+#
+# Returns:
+#       1
+################################################################################
+#
+sub return_store {
+    my ($jconfig, $dsxml, $rest_args_href, $fields_aref, $results_aref, $return_text_ref) = @_;
+
+    my @hooks = @{ $jconfig->{'hooks'} };
+
+    # Now invoke "return_store" on all the hooks we found.
+    foreach my $hook (@hooks) {
+        my $lib = $hook->{'lib'};
+        my $module = $hook->{'module'};
+        my $hook_parameters_href = $hook->{'parameters'};
+
+        my $method = $module . "::return_store";
+        &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
+        {
+            no strict 'refs';
+            exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $rest_args_href, $fields_aref, $results_aref, $return_text_ref);
+        }
+    }
+
+    return 1;
+}
+
 
 ################################################################################
 # Invoke the "finish" method on each hook.

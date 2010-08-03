@@ -570,14 +570,27 @@ sub fetch {
         }
     }
 
-    # TBD: Need another hook point in here to give the hook a chance to
-    # modify the returned content and/or add additional return data.
+    # Store some additional info in jconfig just in case the hook needs it.
+    $jconfig->{'fetched'} = $num_rows;
+    $jconfig->{'returned'} = scalar @$rows_aref;
 
-    # Return text.
+    # This final hook allows you to do whatever you want to modify the returned
+    # data.  This hook may do one or both of:
+    #
+    #   - Completely modify the returned content (by modifying $rows_aref)
+    #   - Peform a custom encoding into text (by setting $return_text)
+    #
     my $return_text = undef;
+    &Jarvis::Hook::return_fetch ($jconfig, $dsxml, \%params_copy, $rows_aref, \$return_text);
+
+    # Otherwise we encode to a supported format.  Note that the hook may have modified
+    # the data prior to this encoding.
+    #
+    if ($return_text) {
+        &Jarvis::Error::debug ($jconfig, "Return content determined by hook ::return_fetch");
 
     # Return content in requested format.  JSON is simple.
-    if ($jconfig->{'format'} eq "json") {
+    } elsif ($jconfig->{'format'} eq "json") {
         my %return_data = ();
 
         $return_data {"logged_in"} = $jconfig->{'logged_in'};
@@ -593,8 +606,6 @@ sub fetch {
 
         my $json = JSON::PP->new->pretty(1);
         $return_text = $json->encode ( \%return_data );
-        &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($return_text));
-        &Jarvis::Error::dump ($jconfig, $return_text);
 
     # XML is also simple.
     } elsif ($jconfig->{'format'} eq "xml") {
@@ -612,8 +623,6 @@ sub fetch {
         }
 
         $return_text = $xml->data ();
-        &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($return_text));
-        &Jarvis::Error::dump ($jconfig, $return_text);
 
     # CSV format is the trickiest.  Note that it is dependent on the $sth->{NAME} data
     # being available.  In some cases, e.g. some (all?) stored procedures under MS-SQL
@@ -646,9 +655,6 @@ sub fetch {
             print $io "\n";
         }
 
-        &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($return_text));
-        &Jarvis::Error::dump ($jconfig, $return_text);
-
     # This is for INTERNAL use only!  Plugins for example might like to get the raw hash
     # and do their own formatting.  If you try this from a browser, you're going to
     # get something nasty happening.
@@ -659,6 +665,9 @@ sub fetch {
     } else {
         die "Unsupported format '" . $jconfig->{'format'} ."' for Dataset::fetch return data.\n";
     }
+
+    &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($return_text));
+    &Jarvis::Error::dump ($jconfig, $return_text);
 
     return $return_text;
 }
@@ -1027,15 +1036,33 @@ sub store {
     # Cleanup SQL Server message for reporting purposes.
     $message =~ s/^Server message number=[0-9]+ severity=[0-9]+ state=[0-9]+ line=[0-9]+ server=[A-Z0-9\\]+text=//i;
 
-    # TBD: Need another hook point in here to give the hook a chance to
-    # modify the returned content and/or add additional return data.
+    # Store some additional info in jconfig just in case the hook needs it.
+    $jconfig->{'return_array'} = $return_array;
+    $jconfig->{'success'} = $success;
+    $jconfig->{'message'} = $message;
+    $jconfig->{'modified'} = $modified;
 
+    # This final hook allows you to do whatever you want to modify the returned
+    # data.  This hook may do one or both of:
+    #
+    #   - Completely modify the returned content (by modifying \@results)
+    #   - Peform a custom encoding into text (by setting $return_text)
+    #
+    my $return_text = undef;
+    &Jarvis::Hook::return_store ($jconfig, $dsxml, \%restful_params, $fields_aref, \@results, \$return_text);
+
+    # If the hook set $return_text then we use that.
+    if ($return_text) {
+        &Jarvis::Error::debug ($jconfig, "Return content determined by hook ::return_store");
+
+    # Otherwise we encode to a supported format.  Note that the hook may have modified
+    # the data prior to this encoding.
+    #
     # Note here that our return structure is different depending on whether you handed us
     # just one record (not in an array), or if you gave us an array of records.  An array
     # containing one record is NOT the same as a single record not in an array.
     #
-    my $return_text = undef;
-    if ($jconfig->{'format'} eq "json") {
+    } elsif ($jconfig->{'format'} eq "json") {
         my %return_data = ();
         $return_data {'success'} = $success;
         $success && ($return_data {'modified'} = $modified);
@@ -1052,8 +1079,6 @@ sub store {
         }
         my $json = JSON::PP->new->pretty(1);
         $return_text = $json->encode ( \%return_data );
-        &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($return_text));
-        &Jarvis::Error::dump ($jconfig, $return_text);
 
     } elsif ($jconfig->{'format'} eq "xml") {
         my $xml = XML::Smart->new ();
@@ -1071,13 +1096,13 @@ sub store {
             $results[0]{'returning'} && ($xml->{'response'}{'returning'} = $results[0]{'returning'});
         }
         $return_text = $xml->data ();
-        &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($return_text));
-        &Jarvis::Error::dump ($jconfig, $return_text);
 
     } else {
         die "Unsupported format '" . $jconfig->{'format'} ."' for Dataset::store return data.\n";
     }
 
+    &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($return_text));
+    &Jarvis::Error::dump ($jconfig, $return_text);
     return $return_text;
 }
 
