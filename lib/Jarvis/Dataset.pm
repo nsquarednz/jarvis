@@ -181,9 +181,13 @@ sub sql_with_substitutions {
     my @bits = split (/\{\{?\$?([^\}]+)\}\}?/i, $sql);
     my @variable_names = ();
 
+    # Names of bind parameters may contain only a-z, A-Z, 0-9, underscore(_) and hyphen(-)
+    # All other characters are silently discarded.
     foreach my $idx (0 .. $#bits) {
         if ($idx % 2) {
-            push (@variable_names, $bits[$idx]);
+            my $name = $bits[$idx];
+            $name =~ s/[^a-zA-Z0-9_\-]//g;
+            push (@variable_names, $name);
             $sql2 .= "?";
 
         } else {
@@ -201,10 +205,24 @@ sub sql_with_substitutions {
         if ($idx % 2) {
             my $name = $bits[$idx];
             my %flags = ();
+
+            # Names of bind parameters may contain only a-z, A-Z, 0-9, underscore(_) and hyphen(-)
+            # All other characters are silently discarded.
+            #
+            # Flags may be specified after the variable name with a colon separating the variable
+            # name and the flag.  Multiple flags are permitted in theory, with a colon before
+            # each flag.  Supported flags at this stage are:
+            #
+            #   :noquote        Don't wrap strings with quotes, instead just restrict content.
+            #
             while ($name =~ m/^(.*)\:([^\:]+)$/) {
                 $name = $1;
-                $flags{$2} = 1;
+                my $flag = lc ($2);
+                $flag =~ s/[^a-z]//g;
+                $flags {$flag} = 1;
             }
+            $name =~ s/[^a-zA-Z0-9_\-]//g;
+
             my $value = $args_href->{$name} || '';
             if ($flags{'noquote'}) {
                 $value =~ s/[^0-9a-zA-Z _\-,]//g;
