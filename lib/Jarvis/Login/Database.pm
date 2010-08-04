@@ -55,6 +55,7 @@ package Jarvis::Login::Database;
 #        ...
 #        <login module="Jarvis::Login::Database">
 #            <parameter name="user_table" value="staff"/>
+#            <parameter name="user_id_column" value="id"/>
 #            <parameter name="user_username_column" value="name"/>
 #            <parameter name="user_password_column" value="password"/>
 #            <parameter name="group_table" value="staff_group"/>

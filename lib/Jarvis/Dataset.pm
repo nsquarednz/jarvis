@@ -226,7 +226,7 @@ sub sql_with_substitutions {
             }
             $name =~ s/[^a-zA-Z0-9_\-]//g;
 
-            my $value = $args_href->{$name} || '';
+            my $value = defined $args_href->{$name} ? $args_href->{$name} :  '';
             if ($flags{'noquote'}) {
                 $value =~ s/[^0-9a-zA-Z _\-,]//g;
             }
