@@ -183,12 +183,12 @@ sub sql_with_substitutions {
     my @bits = split (/\{\{?\$?([^\}]+)\}\}?/i, $sql);
     my @variable_names = ();
 
-    # Names of bind parameters may contain only a-z, A-Z, 0-9, underscore(_) and hyphen(-)
+    # Parameters NAMES may contain only a-z, A-Z, 0-9, underscore(_), colon(:) and hyphen(-)
     # All other characters are silently discarded.
     foreach my $idx (0 .. $#bits) {
         if ($idx % 2) {
             my $name = $bits[$idx];
-            $name =~ s/[^a-zA-Z0-9_\-]//g;
+            $name =~ s/[^a-zA-Z0-9_\-:]//g;
             push (@variable_names, $name);
             $sql2 .= "?";
 
@@ -208,7 +208,7 @@ sub sql_with_substitutions {
             my $name = $bits[$idx];
             my %flags = ();
 
-            # Names of bind parameters may contain only a-z, A-Z, 0-9, underscore(_) and hyphen(-)
+            # Parameters NAMES may contain only a-z, A-Z, 0-9, underscore(_), colon(:) and hyphen(-)
             # All other characters are silently discarded.
             #
             # Flags may be specified after the variable name with a colon separating the variable
@@ -224,7 +224,7 @@ sub sql_with_substitutions {
                 $flag =~ s/[^a-z]//g;
                 $flags {$flag} = 1;
             }
-            $name =~ s/[^a-zA-Z0-9_\-]//g;
+            $name =~ s/[^a-zA-Z0-9_\-:]//g;
 
             my $value = defined $args_href->{$name} ? $args_href->{$name} :  '';
             if ($flags{'noquote'}) {
