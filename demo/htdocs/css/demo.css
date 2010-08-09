@@ -131,11 +131,6 @@ td.x-grid3-hd-inner, .x-grid3-hd-inner {
     font-style: italic;
 }
 
-/* This one applies only to GridPanel.  EditGridPanel uses cell selection and doesn't use this style. */
-.x-grid3-row-selected div {
-    background-color: #b8cfee;
-}
-
 /* This is for visually marking a row as deleted */
 .x-grid3-deleted-row div {
     text-decoration: line-through;
