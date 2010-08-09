@@ -55,7 +55,10 @@ Ext.onReady (function () {
                 renderer: renderCheckbox
             }
         ],
-        renderTo:'extjs', width: 780, height: 400, viewConfig: { forceFit:true },
+        renderTo:'extjs', width: 780, height: 400, viewConfig: {
+            forceFit:true,
+            getRowClass: function (r, rowIndex, rp, ds) { return r.get('_deleted') ? 'x-grid3-deleted-row' : '' }
+        },
         tbar: [
             {
                 text: 'New',
@@ -81,7 +84,6 @@ Ext.onReady (function () {
 
                         } else if (! r.get ('_deleted')) {
                             r.set ('_deleted', true);
-                            grid.getView().getRow (rowcol[0]).className += ' x-grid3-deleted-row';
                         }
                         setButtons ();
                     }
