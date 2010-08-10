@@ -195,8 +195,24 @@ WHERE
 
     my @access_array = map { my $n = $_->{name}; $n =~ s/[^a-z0-9]//gi; (($_->{isreadwrite} eq 'Y') ? "write" : "read") . "-" . $n } @$result_aref;
 
+    $result_aref = $dbh->selectall_arrayref(
+"SELECT DISTINCT p.value, pa.isreadwrite
+FROM ad_process_access pa
+LEFT JOIN ad_process p
+    ON pa.ad_process_id = p.ad_process_id
+LEFT JOIN ad_role r
+    ON pa.ad_role_id = r.ad_role_id
+LEFT JOIN ad_user_roles ur
+    ON r.ad_role_id = ur.ad_role_id
+WHERE
+    ur.isactive = 'Y' AND pa.isactive = 'Y' AND ur.ad_user_id = ?",
+        { Slice => {} },
+        $ad_user_id);
+
+    my @process_access_array = map { my $n = $_->{value}; $n =~ s/[^a-z0-9]//gi; (($_->{isreadwrite} eq 'Y') ? "write" : "read") . "-" . $n } @$result_aref;
+
     # Combine role and table access.
-    my $group_list = join (",", @role_array, @access_array);
+    my $group_list = join (",", @role_array, @access_array, @process_access_array);
 
     # Find the IP address and name.  Note that reverse DNS lookup can sometimes take
     # a LONG TIME (up to 10 seconds or more).  In that case, the client is left waiting.
