@@ -200,7 +200,7 @@ sub sql_with_substitutions {
     # Now perform any textual substitution of [[ ]] variables.  Note that
     # this really only makes sense with FETCH statements, and with rest
     # args in store statements.
-    @bits = split (/\[\[?\$?([^\]]+)\]\]?/i, $sql2);
+    @bits = split (/\[\[([^\]]+)\]\]/i, $sql2);
 
     my $sql3 = "";
     foreach my $idx (0 .. $#bits) {
