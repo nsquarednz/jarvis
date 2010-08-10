@@ -206,15 +206,6 @@ sub check {
 
         $logged_in = (($error_string eq "") && ($username ne "")) ? 1 : 0;
 
-        # If Jarvis is maintaining its own session (and it usually is) then track
-        # these parameters for future requests also.
-        #
-        if ($session) {
-            $session->param('logged_in', $logged_in);
-            $session->param('username', $username);
-            $session->param('group_list', $group_list);
-        }
-
         # Add to our $args_href since e.g. fetch queries might use them.
         $jconfig->{'logged_in'} = $logged_in;
         $jconfig->{'username'} = $username;
@@ -227,6 +218,16 @@ sub check {
         #
         if ($logged_in) {
             &Jarvis::Hook::after_login ($jconfig, $additional_safe);
+        }
+
+        # If Jarvis is maintaining its own session (and it usually is) then track
+        # these parameters for future requests also.  Note that the hook may have
+        # modified them in jconfig.
+        #
+        if ($session) {
+            $session->param('logged_in', $jconfig->{'logged_in'});
+            $session->param('username', $jconfig->{'username'});
+            $session->param('group_list', $jconfig->{'group_list'});
         }
 
         # Do we have any additional safe parameters returned by the login module?
