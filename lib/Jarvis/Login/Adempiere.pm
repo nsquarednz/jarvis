@@ -211,8 +211,23 @@ WHERE
 
     my @process_access_array = map { my $n = $_->{value}; $n =~ s/[^a-z0-9]//gi; (($_->{isreadwrite} eq 'Y') ? "write" : "read") . "-" . $n } @$result_aref;
 
-    # Combine role and table access.
-    my $group_list = join (",", @role_array, @access_array, @process_access_array);
+    my $group_list;
+
+    # If we're given a relevant_groups parameter, restrict our groups to the intersection of the two lists.
+    if ($login_parameters{'relevant_groups'}) {
+        my %relevant_groups;
+        map { $relevant_groups{$_} = 1; } (split ',', $login_parameters{'relevant_groups'});
+
+        my @all_groups = (@role_array, @access_array, @process_access_array);
+        my @intersection;
+        foreach my $element (@all_groups) {
+            push @intersection, $element if $relevant_groups{$element};
+        }
+        $group_list = join (",", @intersection);
+    } else {
+        # Otherwise combine role and table access.
+        $group_list = join (",", @role_array, @access_array, @process_access_array);
+    }
 
     # Find the IP address and name.  Note that reverse DNS lookup can sometimes take
     # a LONG TIME (up to 10 seconds or more).  In that case, the client is left waiting.
