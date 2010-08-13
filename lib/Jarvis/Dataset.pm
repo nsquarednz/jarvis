@@ -184,11 +184,12 @@ sub sql_with_substitutions {
     my @variable_names = ();
 
     # Parameters NAMES may contain only a-z, A-Z, 0-9, underscore(_), colon(:) and hyphen(-)
+    # Note pipe(|) is also allowed at this point as it separates (try-else variable names)
     # All other characters are silently discarded.
     foreach my $idx (0 .. $#bits) {
         if ($idx % 2) {
             my $name = $bits[$idx];
-            $name =~ s/[^a-zA-Z0-9_\-:]//g;
+            $name =~ s/[^a-zA-Z0-9_\-:\|]//g;
             push (@variable_names, $name);
             $sql2 .= "?";
 
@@ -210,6 +211,7 @@ sub sql_with_substitutions {
 
             # Parameters NAMES may contain only a-z, A-Z, 0-9, underscore(_), colon(:) and hyphen(-)
             # All other characters are silently discarded.
+            # Note pipe(|) is also allowed at this point as it separates (try-else variable names)
             #
             # Flags may be specified after the variable name with a colon separating the variable
             # name and the flag.  Multiple flags are permitted in theory, with a colon before
@@ -224,9 +226,16 @@ sub sql_with_substitutions {
                 $flag =~ s/[^a-z]//g;
                 $flags {$flag} = 1;
             }
-            $name =~ s/[^a-zA-Z0-9_\-:]//g;
+            $name =~ s/[^a-zA-Z0-9_\-:\|]//g;
 
-            my $value = defined $args_href->{$name} ? $args_href->{$name} :  '';
+            # The name may be a pipe-separated sequence of "names to try".
+            my $value = undef;
+            foreach my $option (split ('\|', $name)) {
+                $value = $args_href->{$option};
+                last if (defined $value);
+            }
+            (defined $value) || ($value = '');
+
             if ($flags{'noquote'}) {
                 $value =~ s/[^0-9a-zA-Z _\-,]//g;
             }
