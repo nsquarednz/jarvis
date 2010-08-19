@@ -264,7 +264,9 @@ Ext.override (Ext.data.Store, {
                     var r = this.getById (result.returning[j]._record_id);
                     for (var key in result.returning[j]) {
                         if (key != '_record_id') {
-                            r.data[key] = result.returning[j][key];
+                            var v = result.returning[j][key];
+                            var f = this.fields.get (key);
+                            r.data[key] = f ? f.convert(v) : v;
                         }
                     }
                 }
@@ -298,7 +300,9 @@ Ext.override (Ext.data.Store, {
                                 var r = this.getById (result.row[i].returning[j]._record_id);
                                 for (var key in result.row[i].returning[j]) {
                                     if (key != '_record_id') {
-                                        r.data[key] = result.row[i].returning[j][key];
+                                        var v = result.row[i].returning[j][key];
+                                        var f = this.fields.get (key);
+                                        r.data[key] = f ? f.convert(v) : v;
                                     }
                                 }
                             }
