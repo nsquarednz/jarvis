@@ -29,12 +29,14 @@ use warnings;
 
 use CGI;
 use CGI::Session;
+use CGI::Cookie;
 use DBI;
 use XML::Smart;
 
 package Jarvis::Login;
 
 use Jarvis::Error;
+use Jarvis::Text;
 
 ################################################################################
 # Checks to see if we are logged in.  If permitted, we will create a new
@@ -95,6 +97,24 @@ sub check {
             }
         }
 
+        # Find the session ID. Look up the source options configured.
+        # by default look only in the cookie.
+        #
+        # To trigger a new login overriding any cookie that may exist 
+        # (if configured to look up cookies), configure the order as 'url,cookie'
+        # and send a URL with the relevant parameter, but empty.
+        my @sid_sources = map { lc (&trim($_)) } split (',', ($axml->{'sessiondb'}->{'sid_source'}->content || "cookie"));
+        my $sid = undef;
+        foreach my $source (@sid_sources) {
+            $sid = $jconfig->{'cgi'}->param($sid_cookie_name) if $source eq 'url';
+            $sid = $jconfig->{'cgi'}->cookie($sid_cookie_name) if $source eq 'cookie';
+            if (defined $sid) {
+                $jconfig->{'sid_source'} = $source;
+                last;
+            }
+        }
+        &Jarvis::Error::debug ($jconfig, "SID source: " . ($jconfig->{'sid_source'} || "none"));
+        
         # Get an existing/new session.
         # Under windows, avoid having CGI::Session throw the error:
         # 'Your vendor has not defined Fcntl macro O_NOFOLLOW, used at C:/Perl/site/lib/CGI/Session/Driver/file.pm line 26.'
@@ -102,7 +122,7 @@ sub check {
 
         my $err_handler = $SIG{__DIE__};
         $SIG{__DIE__} = sub {};
-        my $session = new CGI::Session ($sid_store, $jconfig->{'cgi'}, \%sid_params);
+        my $session = new CGI::Session ($sid_store, $sid, \%sid_params);
         $SIG{__DIE__} = $err_handler;
         if (! $session) {
             die "Error in creating CGI::Session: " . ($! || "Unknown Reason");
@@ -111,6 +131,7 @@ sub check {
         $jconfig->{'session'} = $session;
         $jconfig->{'sname'} = $session->name();
         $jconfig->{'sid'} = $session->id();
+        $jconfig->{'sid_param'} = $sid_cookie_name;
 
         # CGI::Session does not appear to warn us if the CGI session is file based,
         # and the directory being written to is not writable. Put a check in here to
@@ -123,6 +144,7 @@ sub check {
         $jconfig->{'session'} = undef;
         $jconfig->{'sname'} = '';
         $jconfig->{'sid'} = '';
+        $jconfig->{'sid_param'} = '';
     }
 
     # Now see what we got passed.  These are the user's provided info that we will validate.
@@ -253,10 +275,20 @@ sub check {
         $session->flush ();
 
         # Store the new cookie in the context, whoever returns the result should return this.
-        $jconfig->{'cookie'} = CGI::Cookie->new (
-            -name => $jconfig->{'sname'},
-            -value => $jconfig->{'sid'},
-            -expires => $session_expiry);
+        # 
+        # We only send the cookie back to the user if the source of our sid was a cookie.
+        # This ensures that we don't trample a pre-existing cookie if the sid came from 
+        # a URL.
+        #
+        # This in turn allows us to have both a cookie based session alongside one or more
+        # url based sessions. We get the best of both worlds.
+        #
+        if ($jconfig->{'sid_source'} eq 'cookie') {
+            $jconfig->{'cookie'} = CGI::Cookie->new (
+                -name => $jconfig->{'sname'},
+                -value => $jconfig->{'sid'},
+                -expires => $session_expiry);
+        }
    }
 
     # Log the results if we actually tried to login.  Write to tracker database too

@@ -53,6 +53,7 @@ sub report {
     $fields{"error_string"} = $jconfig->{'error_string'};
     $fields{"group_list"} = $jconfig->{'group_list'};
     $fields{"sid"} = $jconfig->{'sid'};
+    $fields{"sid_param"} = $jconfig->{'sid_param'};
 
     my $extra_href = {};
     my $return_text = undef;
