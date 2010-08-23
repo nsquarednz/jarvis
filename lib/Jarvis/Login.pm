@@ -283,7 +283,7 @@ sub check {
         # This in turn allows us to have both a cookie based session alongside one or more
         # url based sessions. We get the best of both worlds.
         #
-        if ($jconfig->{'sid_source'} eq 'cookie') {
+        if (!$jconfig->{'sid_source'} || $jconfig->{'sid_source'} eq 'cookie') {
             $jconfig->{'cookie'} = CGI::Cookie->new (
                 -name => $jconfig->{'sname'},
                 -value => $jconfig->{'sid'},
