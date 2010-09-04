@@ -19,17 +19,29 @@
 #                 start ($jconfig, $hook_params_href)
 #                 CALLED: After all Jarvis setup is complete.
 #
-#                 before_all ($jconfig, $hook_params_href, $restful_params_href, $fields_aref)
+#                 after_login ($jconfig, $hook_params_href, $additional_safe_href)
+#                 CALLED: After first login for the session.
+#
+#                 before_all ($jconfig, $hook_params_href, $dsxml, $rest_args_href, $fields_aref)
 #                 CALLED: After transaction begins.  Just before any "before" SQL.
 #
-#                 before_one ($jconfig, $hook_params_href, $sql_params_href)
+#                 before_one ($jconfig, $hook_params_href, $dsxml, $sql_params_href)
 #                 CALLED: Before we execute the row SQL.
 #
-#                 after_one ($jconfig, $hook_params_href, $sql_params_href, $row_result_href)
+#                 after_one ($jconfig, $hook_params_href, $dsxml, $sql_params_href, $row_result_href)
 #                 CALLED: After we execute the row SQL.  After any returning values are found.
 #
-#                 after_all ($jconfig, $hook_params_href, $restful_params_href, $fields_aref, $results_aref)
+#                 after_all ($jconfig, $hook_params_href, $dsxml, $rest_args_href, $fields_aref, $results_aref)
 #                 CALLED: Just after any "after" SQL.  This is before transaction ends.
+#
+#                 return_status (($jconfig, $hook_params_href, $extra_href, $return_text_aref)
+#                 CALLED: Just before returning result of a "__status" request.
+#
+#                 return_fetch (($jconfig, $hook_params_href, $dsxml, $sql_params_href, $rows_aref, $extra_href, $return_text_aref)
+#                 CALLED: Just before returning result of a "fetch" request.
+#
+#                 return_store (($jconfig, $hook_params_href, $dsxml, $rest_args_href, $fields_aref, $results_aref, $extra_href, $return_text_aref)
+#                 CALLED: Just before returning result of a "store" request.
 #
 #                 finish ($jconfig, $hook_params_href, $return_text_ref)
 #                 CALLED: Just before return text is sent to client
