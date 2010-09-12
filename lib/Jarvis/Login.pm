@@ -37,6 +37,7 @@ package Jarvis::Login;
 
 use Jarvis::Error;
 use Jarvis::Text;
+use Jarvis::Tracker;
 
 ################################################################################
 # Checks to see if we are logged in.  If permitted, we will create a new
@@ -100,7 +101,7 @@ sub check {
         # Find the session ID. Look up the source options configured.
         # by default look only in the cookie.
         #
-        # To trigger a new login overriding any cookie that may exist 
+        # To trigger a new login overriding any cookie that may exist
         # (if configured to look up cookies), configure the order as 'url,cookie'
         # and send a URL with the relevant parameter, but empty.
         my @sid_sources = map { lc (&trim($_)) } split (',', ($axml->{'sessiondb'}->{'sid_source'}->content || "cookie"));
@@ -114,7 +115,7 @@ sub check {
             }
         }
         &Jarvis::Error::debug ($jconfig, "SID source: " . ($jconfig->{'sid_source'} || "none"));
-        
+
         # Get an existing/new session.
         # Under windows, avoid having CGI::Session throw the error:
         # 'Your vendor has not defined Fcntl macro O_NOFOLLOW, used at C:/Perl/site/lib/CGI/Session/Driver/file.pm line 26.'
@@ -275,9 +276,9 @@ sub check {
         $session->flush ();
 
         # Store the new cookie in the context, whoever returns the result should return this.
-        # 
+        #
         # We only send the cookie back to the user if the source of our sid was a cookie.
-        # This ensures that we don't trample a pre-existing cookie if the sid came from 
+        # This ensures that we don't trample a pre-existing cookie if the sid came from
         # a URL.
         #
         # This in turn allows us to have both a cookie based session alongside one or more
