@@ -162,11 +162,13 @@ sub Jarvis::Login::ActiveDirectory::check {
 
     $mesg = $ldap->bind ($dn, password => $password);
     if ($mesg->code == 49) {
+        &Jarvis::Error::debug ($jconfig, "Password check failed for user '$username'.");
         return ("Incorrect password.");
     }
     $mesg->code && die "Bind to server '$server:$port' failed with " . $mesg->code . " '" . $mesg->error . "'";
     $ldap->unbind ();
 
+    &Jarvis::Error::debug ($jconfig, "Password check succeeded for user '$username'.");
     return ("", $username, $group_list);
 }
 
