@@ -61,10 +61,14 @@ use Jarvis::Tracker;
 #               sname               Name of the session cookie.  Default "CGISESSID".
 #               sid                 Session ID.  A big long number.
 #               cookie              CGI::Cookie object to send back with session info
+#
+#       $override_href - Optional hash of override parameters.
+#           username - Login with this username to use instead of CGI parameter
+#           password - Login with this username to use instead of CGI parameter
 ################################################################################
 #
 sub check {
-    my ($jconfig) = @_;
+    my ($jconfig, $override_href) = @_;
 
     ###############################################################################
     # Login Process.  Get our existing session cookie if we have one.
@@ -148,15 +152,20 @@ sub check {
         $jconfig->{'sid_param'} = '';
     }
 
-    # Now see what we got passed.  These are the user's provided info that we will validate.
-    my $offered_username = $jconfig->{'cgi'}->param('username') || '';
+    # Username can come from a couple of different places.  Normally from CGI,
+    # but the ::check method can also be called programmatically with an
+    # override username.
+    #
+    my $offered_username = ($override_href && $$override_href{'username'}) || $jconfig->{'cgi'}->param('username') || '';
     $jconfig->{'offered_username'} = $offered_username;
-
-    # A nice helper for user applications - strip leading/trailing whitespace of usernames.
     $offered_username =~ s/^\s+//;
     $offered_username =~ s/\s+$//;
 
-    my $offered_password = $jconfig->{'cgi'}->param('password') || '';
+    # Same with password.
+    #
+    my $offered_password = ($override_href && $$override_href{'password'}) || $jconfig->{'cgi'}->param('password') || '';
+    $offered_password =~ s/^\s+//;
+    $offered_password =~ s/\s+$//;
 
     # By default these values are all empty.  Note that we never allow username
     # and group_list to be undef, too many things depend on it having some value,
@@ -198,7 +207,6 @@ sub check {
     # "username" won't get misinterpreted as an attempt to login.
     #
     } else {
-
         # Get our login parameter values.  We were using $axml->{login}{parameter}('[@]', 'name');
         # but that seemed to cause all sorts of DataDumper and cleanup problems.  This seems to
         # work smoothly.
@@ -211,11 +219,17 @@ sub check {
         }
 
         my $login_module = $axml->{login}{module} || die "Application '" . $jconfig->{'app_name'} . "' has no defined login module.\n";
+        my $lib = $axml->{login}{lib} || undef;
 
+        &Jarvis::Error::debug ($jconfig, "Using default libs: '" . (join ',', @{$jconfig->{'default_libs'}}) . "'". ($lib ? ", plugin lib '$lib'." : ", no plugin specific lib."));
         &Jarvis::Error::debug ($jconfig, "Loading login module '" . $login_module . "'.");
-        eval "require $login_module";
-        if ($@) {
-            die "Cannot load login module '$login_module': " . $@;
+        {
+            map { eval "use lib \"$_\""; } @{$jconfig->{'default_libs'}};
+            eval "use lib \"$lib\"" if $lib;
+            eval "require $login_module";
+            if ($@) {
+                die "Cannot load login module '$login_module': " . $@;
+            }
         }
         my $login_method = $login_module . "::check";
         {
