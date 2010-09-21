@@ -38,13 +38,12 @@ BEGIN {
 ###############################################################################
 
 # ARGS: TextString
-# Returns: Escape characters that will bother javascript.
+# Returns: Escape characters that will bother javascript in a " string ".
 sub escape_java_script {
     my $text = $_[0];
     $text =~ s|\\|\\\\|og;
-    $text =~ s|'|\\'|og;
     $text =~ s|"|\\"|og;
-    $text =~ s|\n|\\n\\\n|osg;
+    $text =~ s|\n|\\n|osg;
     return $text;
 }
 
