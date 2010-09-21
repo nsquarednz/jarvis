@@ -65,6 +65,7 @@ use Jarvis::Tracker;
 #       $override_href - Optional hash of override parameters.
 #           username - Login with this username to use instead of CGI parameter
 #           password - Login with this username to use instead of CGI parameter
+#           force_relogin - Ignore any existing "logged_in" session.
 ################################################################################
 #
 sub check {
@@ -174,10 +175,15 @@ sub check {
     my ($error_string, $username, $group_list, $logged_in, $additional_safe) = ('', '', '', 0, undef);
     my $already_logged_in = 0;
 
+    my $force_relogin = $override_href && $$override_href{'force_relogin'};
+    if ($force_relogin) {
+        &Jarvis::Error::debug ($jconfig, "Forcing new login check.  Ignore any existing logged_in session status.");
+    }
+
     # Existing, successful Jarvis session?  Fine, we trust this.
     #
     my $session = $jconfig->{'session'};
-    if ($session && $session->param('logged_in') && $session->param('username')) {
+    if ($session && $session->param('logged_in') && $session->param('username') && ! $force_relogin) {
         &Jarvis::Error::debug ($jconfig, "Already logged in for session '" . $jconfig->{'sid'} . "'.");
         $logged_in = $session->param('logged_in') || 0;
         $username = $session->param('username') || '';
@@ -189,7 +195,7 @@ sub check {
         foreach my $name (keys %$dataref) {
             next if ($name !~ m/^__/);
             my $value = $dataref->{$name};
-            &Jarvis::Error::debug ($jconfig, "Session set additional safe parameter '$name' = '$value'.");
+            &Jarvis::Error::debug ($jconfig, "Session set additional safe parameter '$name' = " . ($value ? "'$value'" : "undefined"));
             $jconfig->{'additional_safe'}{$name} = $value;
         }
 
@@ -240,8 +246,12 @@ sub check {
 
         $username || ($username = '');
         $group_list || ($group_list = '');
-
         $logged_in = (($error_string eq "") && ($username ne "")) ? 1 : 0;
+
+        &Jarvis::Error::debug ($jconfig, "Login check complete.  Logged in = $logged_in.  User = $username.");
+        if (! $logged_in) {
+            &Jarvis::Error::debug ($jconfig, "Not logged in.  Error string = '$error_string'.");
+        }
 
         # Add to our $args_href since e.g. fetch queries might use them.
         $jconfig->{'logged_in'} = $logged_in;
