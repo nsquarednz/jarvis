@@ -254,7 +254,7 @@ sub safe_variables {
     foreach my $name (keys %{ $jconfig->{'additional_safe'} }) {
         my $value = $jconfig->{'additional_safe'}{$name};
         $safe_params {$name} = $value;
-        &Jarvis::Error::debug ($jconfig, "Secure Parameter: $name = $value");
+        &Jarvis::Error::debug ($jconfig, "Secure Parameter: $name = " . (defined $value ? "'$value'" : "NULL"));
     }
 
     return %safe_params;
