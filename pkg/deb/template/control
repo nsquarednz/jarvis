@@ -8,7 +8,7 @@ Homepage: http://www.nsquaredsoftware.com/
 
 Package: jarvis
 Architecture: all
-Depends: ${shlibs:Depends}, ${misc:Depends}, ${perl:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${perl:Depends}, ${apache:Depends}
 Description: Extensible RESTful server for any DBI-supported database.
  Jarvis is a server which provides HTTP access to any SQL-based database known
  to the Perl DBI library.  You can provide SELECT/INSERT/UPDATE/DELETE access

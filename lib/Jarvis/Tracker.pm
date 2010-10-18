@@ -61,7 +61,7 @@ sub handle {
         return;
     }
 
-    my $dbfile = $tracker->{'dbfile'}->content || "/opt/jarvis/tracker/db/tracker.db";
+    my $dbfile = $tracker->{'dbfile'}->content || "/var/lib/jarvis/tracker/tracker.db";
     &Jarvis::Error::debug ($jconfig, "Tracker DB File = '$dbfile'");
 
     $tdbh = DBI->connect ("dbi:SQLite:dbname=$dbfile", '', '', { RaiseError => 0, PrintError => 0, AutoCommit => 1 });

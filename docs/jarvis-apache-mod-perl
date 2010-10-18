@@ -5,13 +5,13 @@
 # Copy this file into /etc/apache2/conf.d and restart apache with
 # "apache2ctl restart".
 #
-# This assumes that you have unpacked into /opt/jarvis/.
+# This assumes that you have installed the standard Debian package.
 # Otherwise change the paths as appropriate.
 #
-PerlRequire /opt/jarvis/etc/startup.pl
+PerlRequire /etc/jarvis/startup.pl
 <Location ~ "/jarvis-agent/.*">
     SetHandler perl-script
     PerlResponseHandler Jarvis::Agent
 </Location>
 
-Alias /jarvis/ "/opt/jarvis/htdocs/"
+Alias /jarvis/ "/usr/share/jarvis/htdocs/"

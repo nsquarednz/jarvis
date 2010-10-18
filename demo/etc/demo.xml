@@ -2,11 +2,11 @@
 <jarvis>
     <app format="json" dump="no">
         <tracker logins="yes" requests="yes" errors="yes">
-            <dbfile>/opt/jarvis/tracker/db/tracker.db</dbfile>
+            <dbfile>/var/lib/jarvis/tracker/tracker.db</dbfile>
         </tracker>
 
         <!-- This is where our <dataset>.xml are all stored -->
-	<dataset_dir>/opt/jarvis/demo/dataset</dataset_dir>
+	<dataset_dir>/usr/share/jarvis/demo/dataset</dataset_dir>
 
         <!-- For server-side paging and sorting -->
         <page_limit_param>limit</page_limit_param>
@@ -52,10 +52,10 @@
         </login>
 
         <!-- This defines our database connection.  SQLite in our case. -->
-        <database connect="dbi:SQLite:dbname=/opt/jarvis/demo/db/demo.db" username="" password=""/>
+        <database connect="dbi:SQLite:dbname=/var/lib/jarvis/demo/demo.db" username="" password=""/>
 
         <!-- This plugin is used to allow admin users to reset any user's password. -->
-        <plugin dataset="SetPassword" access="*" lib="/opt/jarvis/demo" module="plugin::SetPassword" add_headers="yes"/>
+        <plugin dataset="SetPassword" access="*" lib="/usr/share/jarvis/demo" module="plugin::SetPassword" add_headers="yes"/>
 
         <!-- This is a very simple 'exec' action.  It uses "echo" to show you the supplied
              command line parameters.  Access it via:

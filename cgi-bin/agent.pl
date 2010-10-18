@@ -28,7 +28,7 @@ use warnings;
 use Carp;
 $Carp::CarpLevel = 1;
 
-# If "/opt/jarvis" is not your root jarvis directory, then either change
+# If "/usr/share/jarvis" is not your root jarvis directory, then either change
 # this script by hand, or preferably set the environment variable in your
 # webserver config.  E.g. in apache, add the following line (without the
 # leading hash).
@@ -36,7 +36,7 @@ $Carp::CarpLevel = 1;
 # SetEnv JARVIS_ROOT "/path/to/jarvis"
 #
 my $jarvis_root;
-BEGIN { $jarvis_root = $ENV{'JARVIS_ROOT'} || "/opt/jarvis" }
+BEGIN { $jarvis_root = $ENV{'JARVIS_ROOT'} || "/usr/share/jarvis" }
 
 use lib "$jarvis_root/lib";
 

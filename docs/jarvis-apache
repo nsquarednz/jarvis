@@ -3,8 +3,8 @@
 # Copy this file into /etc/apache2/conf.d and restart apache with
 # "apache2ctl restart".
 #
-# This assumes that you have unpacked into /opt/jarvis/.
+# This assumes that you have installed the standard Debian package.
 # Otherwise change the paths as appropriate.
 #
-ScriptAlias /jarvis-agent "/opt/jarvis/cgi-bin/agent.pl"
-Alias /jarvis/ "/opt/jarvis/htdocs/"
+ScriptAlias /jarvis-agent "/usr/share/jarvis/cgi-bin/agent.pl"
+Alias /jarvis/ "/usr/share/jarvis/htdocs/"

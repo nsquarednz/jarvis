@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <jarvis>
     <app format="json">
-        <dataset_dir>/opt/jarvis/tracker/dataset/</dataset_dir>
+        <dataset_dir>/usr/share/jarvis/tracker/dataset/</dataset_dir>
 
         <default_libs>
-            <lib path="/opt/jarvis/tracker/plugin/"/>
+            <lib path="/usr/share/jarvis/tracker/plugin/"/>
         </default_libs>
 
         <tracker requests="yes" errors="yes" logins="yes">
-            <dbfile>/opt/jarvis/tracker/db/tracker.db</dbfile>
+            <dbfile>/var/lib/jarvis/tracker/tracker.db</dbfile>
         </tracker>
 
         <login module="Jarvis::Login::None">
@@ -41,7 +41,7 @@
             <parameter name="Directory" value="/tmp/tracker"/>
         </sessiondb>
 
-        <database connect="dbi:SQLite:dbname=/opt/jarvis/tracker/db/tracker.db" username="" password=""/>
+        <database connect="dbi:SQLite:dbname=/var/lib/jarvis/tracker/tracker.db" username="" password=""/>
     </app>
 </jarvis>
 
