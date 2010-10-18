@@ -9,7 +9,8 @@ Copyright:
 License:
 
     This software is provided under the GNU LESSER GENERAL PUBLIC LICENSE.
-    A copy of this licence is included in the "docs" directory of this package.
+    A copy of this licence is present on your system in the following file:
+    /usr/share/common-licenses/LGPL-3
 
 The Debian packaging is:
 

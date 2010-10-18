@@ -3,7 +3,7 @@ Section: unknown
 Priority: extra
 Maintainer: Jonathan Couper-Smartt <jarvis@nsquaredsoftware.com>
 Build-Depends: debhelper (>= 7)
-Standards-Version: 3.8.3
+Standards-Version: 3.8.4
 Homepage: http://www.nsquaredsoftware.com/
 
 Package: jarvis

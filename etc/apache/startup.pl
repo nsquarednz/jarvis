@@ -1,6 +1,6 @@
 # This startup.pl is run via PerlRequire in the http configuration, e.g.
 #
-# PerlRequire /etc/jarvis/startup.pl
+# PerlRequire /etc/jarvis/apache/startup.pl
 #
 # This is run once only, for each mod_perl server process started for this
 # Jarvis agent.
