@@ -7,18 +7,16 @@ Standards-Version: 3.8.3
 Homepage: http://www.nsquaredsoftware.com/
 
 Package: jarvis
-Architecture: any
+Architecture: all
 Depends: ${shlibs:Depends}, ${misc:Depends}, ${perl:Depends}
 Description: Extensible RESTful server for any DBI-supported database.
  Jarvis is a server which provides HTTP access to any SQL-based database known
  to the Perl DBI library.  You can provide SELECT/INSERT/UPDATE/DELETE access
  to any database table by writing SQL statements with no coding required.
-
- However, for advanced features you can write Perl "plugins" and "hooks" which
- deal with situations where SQL alone is not sufficient.
-
- Jarvis can be used with any HTTP client.  It has been extensively tested with 
- jQuery, ExtJS and Flex clients in all major browsers.
-
- An extensive PDF documentation manual is provided.  It contains the package
- change log, and describes the process of integrationg Jarvis.
+ For enhanced features you can write Perl "plugins" and "hooks" to suppliment
+ SQL functionality, and to add generic back-end enhancements such as auditing.
+ Jarvis can be used with any HTTP client.  It has been extensively tested with
+ jQuery, ExtJS and Flex clients in all major browsers.  An extensive PDF
+ documentation manual is provided.  It contains the package change log, and
+ how to integrate Jarvis with your web-based client software.  A complete
+ client/server demo is also included.
