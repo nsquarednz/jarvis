@@ -1,0 +1,13 @@
+docs/jarvis_guide.pdf usr/share/doc/jarvis
+docs/COPYING.LESSER usr/share/doc/jarvis
+docs/jarvis-apache usr/share/doc/jarvis
+docs/jarvis-apache-mod-perl usr/share/doc/jarvis
+etc/startup.pl etc/jarvis
+etc/README.txt etc/jarvis
+cgi-bin usr/share/jarvis
+demo usr/share/jarvis
+htdocs usr/share/jarvis
+lib usr/share/jarvis
+tracker usr/share/jarvis
+
+

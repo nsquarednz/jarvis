@@ -2,15 +2,13 @@ This work was packaged for Debian by:
 
     Jonathan Couper-Smartt <jarvis@nsquaredsoftware.com> on Mon, 18 Oct 2010 11:35:08 +1300
 
-It was downloaded from <url://example.com>
-
 Copyright:
 
     Copyright (C) 2010 Jonathan Couper-Smartt
 
 License:
 
-    This software is provided under the GNU LESSER GENERAL PUBLIC LICENSE.  
+    This software is provided under the GNU LESSER GENERAL PUBLIC LICENSE.
     A copy of this licence is included in the "docs" directory of this package.
 
 The Debian packaging is:
