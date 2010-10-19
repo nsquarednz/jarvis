@@ -11,7 +11,8 @@
 #
 use Apache::DBI;
 
-# This enables us to find Jarvis::Agent.
-use lib qw(/usr/share/jarvis/lib);
+# This enables us to find Jarvis::Agent in standard locations.
+use lib qw(/usr/share/jarvis/lib);      # For Debian.
+use lib qw(/opt/jarvis/lib);            # For other systems.
 
 1;

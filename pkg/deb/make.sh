@@ -1,8 +1,24 @@
-# CONFIGURATION.  CHANGE FOR EACH RELEASE.
-VERSION=3.2.5
-RELEASE=2
-DATE=`date -R`
+#!/bin/bash
+#
+# Script to create debian packages.
+VERSION=$1
+RELEASE=$2
 
+# Check validity of version numbers.
+if [[ -z "$RELEASE" ]]; then RELEASE=1; fi
+if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || [[ ! $RELEASE =~ ^[0-9]+$ ]]; then
+    echo " "
+    echo "usage: make.sh <version> [release]"
+    echo " "
+    echo "  e.g. make.sh 3.2.1"
+    echo "  Version must be X.Y with optional .Z"
+    echo "  Release must be number, default = 1"
+    echo " "
+    exit 1
+fi
+
+# Other parameters.
+DATE=`date -R`
 TAR_ORIG=jarvis_$VERSION.orig.tar.gz
 
 # Clean up.

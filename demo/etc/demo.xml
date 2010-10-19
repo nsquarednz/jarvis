@@ -28,7 +28,7 @@
 
         <!-- This defines how our sessions are stored.  See CGI::Session. -->
         <sessiondb store="driver:file;serializer:default;id:md5" expiry="+2h" cookie="DEMO_CGISESSID">
-            <parameter name="Directory" value="/tmp/demo"/>
+            <parameter name="Directory" value="/var/lib/jarvis/demo/sessions"/>
         </sessiondb>
 
         <!-- Global default parameters -->

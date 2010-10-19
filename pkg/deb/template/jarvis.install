@@ -1,11 +1,8 @@
 cgi-bin usr/share/jarvis
 demo usr/share/jarvis
 docs/jarvis_guide.pdf usr/share/doc/jarvis
-etc etc/jarvis
+etc/README.txt etc/jarvis/README.txt
+etc/apache etc/jarvis
 htdocs usr/share/jarvis
 lib usr/share/jarvis
 tracker usr/share/jarvis
-
-# Copy the clean/empty files into /var/lib for working purposes.
-demo/db/demo-empty.db var/lib/jarvis/demo/demo.db
-tracker/db/tracker-empty.db var/lib/jarvis/tracker/tracker.db

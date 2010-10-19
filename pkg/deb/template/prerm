@@ -19,6 +19,13 @@ set -e
 
 case "$1" in
     remove|upgrade|deconfigure)
+        # Unlink in our Jarvis Apache configuration files from Apache.
+        if [ -h /etc/apache2/conf.d/jarvis.conf ] ; then
+            rm -f /etc/apache2/conf.d/jarvis.conf
+        fi
+        if [ -h /etc/apache2/conf.d/jarvis-mod-perl.conf ] ; then
+            rm -f /etc/apache2/conf.d/jarvis-mod-perl.conf
+        fi
     ;;
 
     failed-upgrade)

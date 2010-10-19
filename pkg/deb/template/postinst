@@ -20,8 +20,27 @@ set -e
 
 case "$1" in
     configure)
-        if [ -d /etc/apache2/conf.d/ ] && [ ! -e /etc/apache2/conf.d/jarvis.conf ] ; then
-            ln -s /etc/apache2/conf.d/jarvis.conf /etc/jarvis/apache/jarvis.conf
+        # Soft link our Jarvis Demo Application XML file.
+        if [ ! -e /etc/jarvis/demo.xml ]; then
+            ln -s /usr/share/jarvis/demo/etc/demo.xml /etc/jarvis/demo.xml
+        fi
+
+        # Copy the demo database.
+        if [ ! -e /var/lib/jarvis/demo/demo.db ]; then
+            mkdir -p /var/lib/jarvis/demo
+            cp /usr/share/jarvis/demo/db/demo-empty.db /var/lib/jarvis/demo/demo.db
+
+            set +e
+            ID=`id -u www-data || id -u apache`;
+            set -e
+            if [ -n "$ID" ]; then
+                chown -R $ID /var/lib/jarvis/demo
+            fi
+        fi
+
+        # Link in our Jarvis Apache configuration files to Apache.
+        if [ -d /etc/apache2/conf.d/ ] && [ ! -e /etc/apache2/conf.d/jarvis.conf ] && [ ! -e /etc/apache2/conf.d/jarvis-mod-perl.conf ] ; then
+            ln -s /etc/jarvis/apache/jarvis.conf /etc/apache2/conf.d/jarvis.conf
         fi
         [ -x `which apache2ctl` ] && apache2ctl restart
     ;;

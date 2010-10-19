@@ -143,8 +143,18 @@ sub check {
         # and the directory being written to is not writable. Put a check in here to
         # check for a writable session directory (otherwise you end up constantly
         # logging in).
-        die "Webserver user has no permissions to write to CGI::Session directory '$sid_params{'Directory'}'."
-            if $sid_store =~ /driver:file/ && $sid_params{'Directory'} && ! -w $sid_params{'Directory'};
+        if ($sid_store =~ /driver:file/ && $sid_params{'Directory'}) {
+            if (-e $sid_params{'Directory'}) {
+                if (! -w $sid_params{'Directory'}) {
+                    die "Webserver user cannot write to CGI::Session directory '$sid_params{'Directory'}'.";
+                }
+
+            } else {
+                if (! mkdir $sid_params{'Directory'}) {
+                    die "Webserver user cannot create CGI::Session directory '$sid_params{'Directory'}'.";
+                }
+            }
+        }
 
     } else {
         $jconfig->{'session'} = undef;
