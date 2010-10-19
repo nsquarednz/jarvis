@@ -10,9 +10,10 @@ Package: jarvis
 Architecture: all
 Depends: ${shlibs:Depends}, ${misc:Depends}, ${perl:Depends}, ${apache:Depends}
 Description: Extensible RESTful server for any DBI-supported database.
- Jarvis is a server which provides HTTP access to any SQL-based database known
- to the Perl DBI library.  You can provide SELECT/INSERT/UPDATE/DELETE access
- to any database table by writing SQL statements with no coding required.
+ Jarvis is a standalone server script which provides HTTP access to any
+ SQL-based database known to the Perl DBI library.  You can implement an
+ simple front end for secure, web-based (SELECT, INSERT, UPDATE, DELETE)
+ access to any database table by writing SQL statements with no code required.
  For enhanced features you can write Perl "plugins" and "hooks" to suppliment
  SQL functionality, and to add generic back-end enhancements such as auditing.
  Jarvis can be used with any HTTP client.  It has been extensively tested with
