@@ -1,5 +1,5 @@
 Source: jarvis
-Section: unknown
+Section: web
 Priority: extra
 Maintainer: Jonathan Couper-Smartt <jarvis@nsquaredsoftware.com>
 Build-Depends: debhelper (>= 7)
