@@ -1,0 +1,56 @@
+.\"                                      Hey, EMACS: -*- nroff -*-
+.\" First parameter, NAME, should be all caps
+.\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
+.\" other parameters are allowed: see man(7), man(1)
+.TH JARVIS SECTION "October 18, 2010"
+.\" Please adjust this date whenever revising the manpage.
+.\"
+.\" Some roff macros, for reference:
+.\" .nh        disable hyphenation
+.\" .hy        enable hyphenation
+.\" .ad l      left justify
+.\" .ad b      justify to both left and right margins
+.\" .nf        disable filling
+.\" .fi        enable filling
+.\" .br        insert line break
+.\" .sp <n>    insert n+1 empty lines
+.\" for manpage-specific macros, see man(7)
+.SH NAME
+jarvis \- RESTful web-service with no coding required
+.SH SYNOPSIS
+.B jarvis
+.SH DESCRIPTION
+This manual page briefly introduces the
+.B jarvis
+system.
+.PP
+.\" TeX users may be more comfortable with the \fB<whatever>\fP and
+.\" \fI<whatever>\fP escape sequences to invode bold face and italics,
+.\" respectively.
+.B jarvis
+is a standalone server script which provides HTTP access to any
+SQL-based database known to the Perl DBI library.  You can implement an
+simple front end for secure, web-based (SELECT, INSERT, UPDATE, DELETE)
+access to any database table by writing SQL statements with no code required.
+
+For enhanced features you can write Perl "plugins" and "hooks" to suppliment
+SQL functionality, and to add generic back-end enhancements such as auditing.
+
+Jarvis can be used with any HTTP client.  It has been extensively tested with
+jQuery, ExtJS and Flex clients in all major browsers.  An extensive PDF
+documentation manual is provided.  It contains the package change log, and
+how to integrate Jarvis with your web-based client software.  A complete
+client/server demo is also included.
+.SH SEE ALSO
+.BR perl (1),
+.BR apache2 (1).
+.br
+Installation and configuration of the Jarvis system is described by the
+associated document
+.IR "Working with Jarvis" ,
+provided in the file "jarvis_guide.pdf".
+.SH AUTHOR
+jarvis was written by Jonathan Couper-Smartt <jarvis@nsquaredsoftware.com>.
+.PP
+This manual page was written by Jonathan Couper-Smartt <jarvis@nsquaredsoftware.com>,
+for the Debian project (and may be used by others).
