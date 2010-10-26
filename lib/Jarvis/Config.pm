@@ -138,7 +138,11 @@ sub new {
     # Pull out the list of default (Perl) library paths to use for perl plugins scripts
     # from the configuration, and store in an array in the config item.
     $self->{'default_libs'} = [];
-    map { push @{$self->{'default_libs'}}, $_->{'lib'}->{'path'}->content; } @{$axml->{'default_libs'}} if ($axml->{'default_libs'});
+    if ($axml->{'default_libs'}) {
+        my @libs = $axml->{default_libs}{lib}('@');
+        my @paths = map { $_->{'path'} } @libs;
+        $self->{'default_libs'} = \@paths;
+    }
 
     # Basic security check here.
     $self->{'require_https'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'require_https'}->content || "no")});
