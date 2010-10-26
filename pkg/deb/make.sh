@@ -22,7 +22,7 @@ DATE=`date -R`
 TAR_ORIG=jarvis_$VERSION.orig.tar.gz
 
 # Clean up.
-rm -rf jarvis-$VERSION
+rm -rf jarvis-*
 rm -f jarvis_*.orig.tar.gz
 rm -f jarvis_*_all.deb
 rm -f jarvis_*.diff.gz

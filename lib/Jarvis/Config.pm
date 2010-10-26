@@ -140,6 +140,12 @@ sub new {
     $self->{'default_libs'} = [];
     map { push @{$self->{'default_libs'}}, $_->{'lib'}->{'path'}->content; } @{$axml->{'default_libs'}} if ($axml->{'default_libs'});
 
+    # Basic security check here.
+    $self->{'require_https'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'require_https'}->content || "no")});
+    if ($self->{'require_https'} && ! $self->{'cgi'}->https()) {
+        die "Client must access over HTTPS for this application.";
+    }
+
     ###############################################################################
     # Create a placeholder for a hash of ADDITIONAL safe parameters.  These are
     # intended for additional information, e.g. extended login returned results.
