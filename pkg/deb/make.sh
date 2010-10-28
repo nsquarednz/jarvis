@@ -53,6 +53,7 @@ find template -maxdepth 1 -type f -exec cp {} jarvis-$VERSION/debian/ \;
 perl -pi -e "s/VERSION/$VERSION/" jarvis-$VERSION/debian/changelog
 perl -pi -e "s/RELEASE/$RELEASE/" jarvis-$VERSION/debian/changelog
 perl -pi -e "s/DATE/$DATE/" jarvis-$VERSION/debian/changelog
+perl -pi -e "s/DATE/$DATE/" jarvis-$VERSION/debian/copyright
 
 # PERFORM THE PACKAGE BUILD
 #
