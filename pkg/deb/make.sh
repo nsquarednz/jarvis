@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Script to create debian packages.
+# Script to create debian packages. To be run in the directory with make.sh
 VERSION=$1
 RELEASE=$2
 
@@ -21,6 +21,12 @@ fi
 DATE=`date -R`
 TAR_ORIG=jarvis_$VERSION.orig.tar.gz
 
+# Find our base directory, so we can build the package directory correctly
+DIR=`pwd`
+BASEPATH=`dirname $DIR`
+BASEPATH=`dirname $BASEPATH`
+BASEDIR=`basename $BASEPATH`
+
 # Clean up.
 rm -rf jarvis-*
 rm -f jarvis_*.orig.tar.gz
@@ -31,11 +37,11 @@ rm -f jarvis_*.build
 rm -f jarvis_*.changes
 
 # BUILD THE SOURCE TARBALL.
-tar zcf $TAR_ORIG ../../../jarvis \
+tar zcf $TAR_ORIG "../../../$BASEDIR" \
     --exclude=jarvis/pkg \
     --exclude=CVS \
     --exclude=CVS/* \
-    --transform "s/^jarvis/jarvis-$VERSION/"
+    --transform "s/^$BASEDIR/jarvis-$VERSION/"
 
 # COPY THE DEBIAN PACKAGE TEMPLATE.
 #
