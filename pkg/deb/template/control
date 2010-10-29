@@ -1,7 +1,7 @@
 Source: jarvis
 Section: web
 Priority: extra
-Maintainer: Jonathan Couper-Smartt <jarvis@nsquaredsoftware.com>
+Maintainer: N-Squared Software <jarvis@nsquaredsoftware.com>
 Build-Depends: debhelper (>= 7)
 Standards-Version: 3.8.4
 Homepage: http://www.nsquaredsoftware.com/

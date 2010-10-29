@@ -68,4 +68,4 @@ perl -pi -e "s/DATE/$DATE/" jarvis-$VERSION/debian/copyright
 # (Fixed in dpkg version 1.15.6)
 #
 cd jarvis-$VERSION
-debuild
+debuild -uc -us 
