@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <jarvis>
     <app format="json" dump="no">
-        <tracker logins="yes" requests="yes" errors="yes">
+        <tracker logins="no" requests="no" errors="no">
             <dbfile>/var/lib/jarvis/tracker/tracker.db</dbfile>
         </tracker>
 
