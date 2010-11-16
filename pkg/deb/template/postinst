@@ -42,7 +42,10 @@ case "$1" in
         if [ -d /etc/apache2/conf.d/ ] && [ ! -e /etc/apache2/conf.d/jarvis.conf ] && [ ! -e /etc/apache2/conf.d/jarvis-mod-perl.conf ] ; then
             ln -s /etc/jarvis/apache/jarvis.conf /etc/apache2/conf.d/jarvis.conf
         fi
-        [ -x `which apache2ctl` ] && apache2ctl restart
+
+	# Don't restart apache.  It's not nice.
+        # [ -x `which apache2ctl` ] && apache2ctl restart
+	echo "Apache requires a restart for changes to take effect."
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
