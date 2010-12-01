@@ -466,11 +466,6 @@ sub statement_execute {
 #       $jconfig - Jarvis::Config object
 #           READ
 #               cgi                 Contains data values for {{param}} in SQL
-#               username            Used for {{username}} in SQL
-#               group_list          Used for {{group_list}} in SQL
-#               format              Either "json" or "xml" or "csv".
-#
-#       $rest_args_aref - Optional ref to our REST args (slash-separated after dataset).
 #
 # Returns:
 #       Reference to Hash of returned data.  You may convert to JSON or XML.
