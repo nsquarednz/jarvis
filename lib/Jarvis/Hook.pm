@@ -34,13 +34,16 @@
 #                 after_all ($jconfig, $hook_params_href, $dsxml, $rest_args_href, $fields_aref, $results_aref)
 #                 CALLED: Just after any "after" SQL.  This is before transaction ends.
 #
-#                 return_status (($jconfig, $hook_params_href, $extra_href, $return_text_aref)
+#                 return_status ($jconfig, $hook_params_href, $extra_href, $return_text_aref)
 #                 CALLED: Just before returning result of a "__status" request.
 #
-#                 return_fetch (($jconfig, $hook_params_href, $dsxml, $sql_params_href, $rows_aref, $extra_href, $return_text_aref)
-#                 CALLED: Just before returning result of a "fetch" request.
+#                 dataset_fetched ($jconfig, $hook_params_href, $dsxml, $sql_params_href, $rows_aref, $extra_href)
+#                 CALLED: Just after fetching all the rows for a single dataset within in a (possibly multi-dataset) "fetch" request.
 #
-#                 return_store (($jconfig, $hook_params_href, $dsxml, $rest_args_href, $fields_aref, $results_aref, $extra_href, $return_text_aref)
+#                 return_fetch ($jconfig, $hook_params_href, $sql_params_href, $return_object, $extra_href, $return_text_aref)
+#                 CALLED: Just before returning the full result of a (possibly multi-dataset) "fetch" request.
+#
+#                 return_store ($jconfig, $hook_params_href, $dsxml, $rest_args_href, $fields_aref, $results_aref, $extra_href, $return_text_aref)
 #                 CALLED: Just before returning result of a "store" request.
 #
 #                 finish ($jconfig, $hook_params_href, $return_text_ref)
@@ -442,15 +445,14 @@ sub return_status {
 
 
 ################################################################################
-# Invoke the "return_fetch" method on each hook.  This occurs for all "fetch"
-# requests on regular datasets.  It is performed just before we convert the
-# fetch return results into JSON or XML.
+# Invoke the "dataset_fetched" method on each hook.  This occurs for all
+# dataset within a regular SQL fetch.  If the fetch specifies more than one
+# dataset in a comma-separated list, then we call this for each one.
 #
 # This hook may do one or more of:
 #
-#   - Add some extra root level parameters (by modifying $extra_href)
-#   - Completely modify the returned content (by modifying $rows_aref)
-#   - Peform a custom encoding into text (by setting $return_text)
+#   - Add some extra per-dataset parameters (by modifying $extra_href)
+#   - Modify the returned content (by modifying $rows_aref)
 #
 # Params:
 #       $jconfig        - Jarvis::Config object
@@ -460,6 +462,61 @@ sub return_status {
 #       $sql_params_href - All query args (CGI, restful, safe and default).
 #
 #       $rows_aref      - The array of return objects to be encoded.
+#
+#       $extra_href     - Hash of extra parameters to add inside the per-dataset
+#                         object that we will return.
+#
+# Returns:
+#       1
+################################################################################
+#
+sub dataset_fetched {
+
+    my ($jconfig, $dsxml, $sql_params_href, $rows_aref, $extra_href) = @_;
+
+    my @hooks = @{ $jconfig->{'hooks'} };
+
+    # Now invoke "return_fetch" on all the hooks we found.
+    foreach my $hook (@hooks) {
+        my $lib = $hook->{'lib'};
+        my $module = $hook->{'module'};
+        my $hook_parameters_href = $hook->{'parameters'};
+
+        my $method = $module . "::dataset_fetched";
+        {
+            no strict 'refs';
+            exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
+            exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $sql_params_href, $rows_aref, $extra_href);
+        }
+    }
+
+    return 1;
+}
+
+################################################################################
+# Invoke the "return_fetch" method on each hook.  This occurs for all
+# dataset within a regular SQL fetch.  If the fetch specifies more than one
+# dataset in a comma-separated list, then we call this for each one.
+#
+# This hook may do one or more of:
+#
+#   - Add some extra per-dataset parameters (by modifying $extra_href)
+#   - Completely modify the returned content (by modifying $rows_aref)
+#
+# Params:
+#       $jconfig        - Jarvis::Config object
+#
+#       $sql_params_href - All query args (CGI, restful, safe and default).
+#
+#       $return_object  - The complete nested object that we intend to
+#                         encode in JSON/XML and send back to the client.
+#                         This includes the "rows_aref" for each contained
+#                         dataset in the fetch request.
+#
+#       NOTE: In Jarvis 4.0 this $return_object parameter replaced the
+#       simple $rows_aref structure, as part of the extension to support
+#       multiple datasets within a single fetch request.  It is likely
+#       that your existing hook will be broken.  We apologise in advance.
 #
 #       $extra_href     - Hash of extra parameters to add to the root of
 #                         the returned JSON/XML document.
@@ -473,7 +530,7 @@ sub return_status {
 #
 sub return_fetch {
 
-    my ($jconfig, $dsxml, $sql_params_href, $rows_aref, $extra_href, $return_text_ref) = @_;
+    my ($jconfig, $sql_params_href, $return_object, $extra_href, $return_text_ref) = @_;
 
     my @hooks = @{ $jconfig->{'hooks'} };
 
@@ -487,7 +544,7 @@ sub return_fetch {
         {
             no strict 'refs';
             exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
-            exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $sql_params_href, $rows_aref, $extra_href, $return_text_ref);
+            exists &$method && &$method ($jconfig, $hook_parameters_href, $sql_params_href, $return_object, $extra_href, $return_text_ref);
         }
     }
 

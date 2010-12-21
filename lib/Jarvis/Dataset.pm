@@ -64,8 +64,10 @@ use sort 'stable';      # Don't mix up records when server-side sorting
 #               sort_field_param    Name of the CGI param specifying page sort field
 #               sort_dir_param      Name of the CGI param specifying page sort direction
 #
+#       $dataset_name - Name of dataset file to load (may be a subset).
+#
 #   Note that a "." in a dataset name is a directory path.  Note that the
-#   caller may NOT ever specify the ".xml" suffix, since we would confuse
+#   caller should NOT ever specify the ".xml" suffix, since we would confuse
 #   "test.xml" for "<dataset_dir>/test/xml.xml".  And that would be bad.
 #
 #   Note that it is OUR job to check that the path is safe before opening
@@ -76,7 +78,7 @@ use sort 'stable';      # Don't mix up records when server-side sorting
 ################################################################################
 #
 sub get_config_xml {
-    my ($jconfig) = @_;
+    my ($jconfig, $dataset_name) = @_;
 
     my $cgi = $jconfig->{"cgi"};
 
@@ -87,7 +89,6 @@ sub get_config_xml {
     &Jarvis::Error::debug ($jconfig, "Dataset Directory '$dataset_dir'.");
 
     # Determine the raw dataset name, before "." translation.
-    my $dataset_name = $jconfig->{'dataset_name'};
     &Jarvis::Error::debug ($jconfig, "Dataset Name '$dataset_name' (as supplied).");
 
     ($dataset_name =~ m/^\./) && die "Leading '.' not permitted on dataset name '$dataset_name'";
@@ -497,8 +498,11 @@ sub get_post_data {
 }
 
 ################################################################################
-# Loads the data for the current data set, and puts it into our return data
+# Loads the data for the current dataset(s), and puts it into our return data
 # hash so that it can be presented to the client in JSON.
+#
+# If the dataset is a comma-separated metaset, we perform multiple fetches
+# and build the results into a larger object.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -518,20 +522,23 @@ sub get_post_data {
 sub fetch {
     my ($jconfig, $rest_args_aref) = @_;
 
-    my $dsxml = &get_config_xml ($jconfig) || die "Cannot load configuration for dataset '" . ($jconfig->{'dataset_name'} || '') . "'.";
-
-    my $allowed_groups = $dsxml->{dataset}{"read"};
-
-    # Die on failure.  Note the trailing \n which blocks the stack-trace.
-    my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
-    if ($failure ne '') {
-        $jconfig->{'status'} = "401 Unauthorized";
-        die "Insufficient privileges to read '" . $jconfig->{'dataset_name'} . "'. $failure\n";
+    my @subsets = split (',', $jconfig->{'dataset_name'});
+    if ((scalar @subsets) > 1) {
+        if (($jconfig->{'format'} ne "json") && ($jconfig->{'format'} ne "xml")) {
+            die "Multiple comma-separated datasets not supported for format '" . $jconfig->{'format'} . "'\n";
+        }
     }
 
-    # What transformations should we use when sending out fetch data?
-    my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->{dataset}{transform}{fetch});
-    &Jarvis::Error::debug ($jconfig, "Fetch transformations = " . join (', ', keys %transforms) . " (applied to returned results)");
+    # For JSON and XML we can build up nested responses.  This is the object used
+    # to construct them piece by piece.
+    my $all_results_object = undef;
+
+    if ($jconfig->{'format'} eq "json") {
+        $all_results_object = {};
+
+    } elsif ($jconfig->{'format'} eq "xml") {
+        $all_results_object = XML::Smart->new ();
+    }
 
     # Attach to the database.
     my $dbh = &Jarvis::DB::handle ($jconfig);
@@ -546,206 +553,285 @@ sub fetch {
     my %params_copy = %safe_params;
     $jconfig->{'params_href'} = \%params_copy;
 
-    # Get our STM.  This has everything attached.
-    my $stm = &parse_statement ($jconfig, $dsxml, $dbh, 'select', \%params_copy) ||
-        die "Dataset '" . ($jconfig->{'dataset_name'} || '') . "' has no SQL of type 'select'.";
+    # Loop through each dataset file.  In most cases there is only one file.
+    foreach my $subset_name (@subsets) {
 
-    # Convert the parameter names to corresponding values.
-    my @arg_values = &names_to_values ($jconfig, $stm->{'vnames_aref'}, \%safe_params);
+        # Where will the return structure be placed?  For JSON/XML only.
+        my $result_object = undef;
 
-    # Execute Select, return on error
-    &statement_execute($jconfig, $stm, \@arg_values);
+        # For JSON and XML, we store to an object and encode it at the end.
+        if (defined $all_results_object) {
 
-    # On error, log and track the error, then return it to be given back as plain
-    # text to the caller.  We don't wrap it in JSON or XML, since we don't want it
-    # to be interpreted as "valid" data at all.
-    #
-    if ($stm->{'error'}) {
-        $stm->{'sth'}->finish;
-        &Jarvis::Tracker::error ($jconfig, '200', $stm->{'error'});
-        return $stm->{'error'};
-    }
+            # Multiple datasets.  Nest each dataset's results in a sub-structure.
+            if ((scalar @subsets) > 1) {
+                if ($jconfig->{'format'} eq "xml") {
+                    $result_object = { 'name' => $subset_name };
+                    push (@{ $all_results_object->{'response'}{'dataset'} }, $result_object);
 
-    # Fetch the data.
-    my $rows_aref = $stm->{'sth'}->fetchall_arrayref({});
-    my $num_rows = scalar @$rows_aref;
-    &Jarvis::Error::debug ($jconfig, "Number of rows fetched = $num_rows.");
+                } elsif ($jconfig->{'format'} eq "json") {
+                    $all_results_object->{'dataset'}{$subset_name} = {};
+                    $result_object = $all_results_object->{'dataset'}{$subset_name};
+                }
 
-    $stm->{'sth'}->finish;
 
-    # Do we want to do server side sorting?  This happens BEFORE paging.  Note that this
-    # will only work when $sth->{NAME} is available.  Some (all?) stored procedures
-    # under MS-SQL Server will not provide field names, and hence this feature will not
-    # be available.
-    #
-    my $sort_field = $jconfig->{'cgi'}->param ($jconfig->{'sort_field_param'}) || '';
-    my $sort_dir = $jconfig->{'cgi'}->param ($jconfig->{'sort_dir_param'}) || 'ASC';
+            # Single dataset.  This is backwards compatible with Jarvis 3.
+            } else {
+                if ($jconfig->{'format'} eq "xml") {
+                    $result_object = $all_results_object->{'response'}
 
-    my $field_names_aref = $stm->{'sth'}->{NAME};
-    if ($sort_field) {
-        &Jarvis::Error::debug ($jconfig, "Server Sort on '$sort_field', Dir = '$sort_dir'.");
-
-        if (! grep { /$sort_field/ } @$field_names_aref) {
-            &Jarvis::Error::log ($jconfig, "Unknown sort field: '$sort_field'.");
-
-        } elsif (uc (substr ($sort_dir, 0, 1)) eq 'D') {
-            @$rows_aref = sort { ($b->{$sort_field} || chr(255)) cmp ($a->{$sort_field} || chr(255)) } @$rows_aref;
-
-        } else {
-            @$rows_aref = sort { ($a->{$sort_field} || chr(255)) cmp ($b->{$sort_field} || chr(255)) } @$rows_aref;
-        }
-    }
-    $jconfig->{'field_names_aref'} = $field_names_aref;
-
-    # Should we truncate the data to a specific page?
-    my $limit = $jconfig->{'cgi'}->param ($jconfig->{'page_limit_param'}) || 0;
-    my $start = $jconfig->{'cgi'}->param ($jconfig->{'page_start_param'}) || 0;
-
-    if ($limit > 0) {
-        ($start > 0) || ($start = 0); # Check we have a real zero, not ''
-
-        &Jarvis::Error::debug ($jconfig, "Limit = $limit, Offset = $start, Num Rows = $num_rows.");
-
-        if ($start > $#$rows_aref) {
-            &Jarvis::Error::debug ($jconfig, "Page start over-run.  No data fetched perhaps.");
-            @$rows_aref = ();
-
-        } else {
-            if (($start + ($limit - 1)) > $#$rows_aref) {
-                &Jarvis::Error::debug ($jconfig, "Page finish over-run.  Partial page.");
-                $limit = 1 + ($#$rows_aref - $start);
+                } elsif ($jconfig->{'format'} eq "json") {
+                    $result_object = $all_results_object;
+                }
             }
-            @$rows_aref = @$rows_aref[$start .. $start + ($limit - 1)];
         }
-    }
 
-    # Store the number of returned rows.
-    $jconfig->{'out_nrows'} = scalar @$rows_aref;
+        # Load dataset definition.
+        my $dsxml = &get_config_xml ($jconfig, $subset_name) || die "Cannot load configuration for dataset '$subset_name'.\n";
 
-    # Apply any output transformations to remaining hashes.
-    if (scalar (keys %transforms)) {
+        # Check the allowed groups.
+        my $allowed_groups = $dsxml->{dataset}{"read"};
+
+        my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
+        if ($failure ne '') {
+            $jconfig->{'status'} = "401 Unauthorized";
+            die "Insufficient privileges to read '$subset_name'. $failure\n";
+        }
+
+        # Get our STM.  This has everything attached.
+        my $stm = &parse_statement ($jconfig, $dsxml, $dbh, 'select', \%params_copy) ||
+            die "Dataset '$subset_name' has no SQL of type 'select'.";
+
+        # Convert the parameter names to corresponding values.
+        my @arg_values = &names_to_values ($jconfig, $stm->{'vnames_aref'}, \%safe_params);
+
+        # Execute Select, return on error
+        &statement_execute($jconfig, $stm, \@arg_values);
+
+        # On error, log and track the error, then return it to be given back as plain
+        # text to the caller.  We don't wrap it in JSON or XML, since we don't want it
+        # to be interpreted as "valid" data at all.
+        #
+        if ($stm->{'error'}) {
+            $stm->{'sth'}->finish;
+            &Jarvis::Tracker::error ($jconfig, '200', $stm->{'error'});
+            return $stm->{'error'};
+        }
+
+        # Fetch the data.
+        my $rows_aref = $stm->{'sth'}->fetchall_arrayref({});
+        my $num_rows = scalar @$rows_aref;
+        &Jarvis::Error::debug ($jconfig, "Number of rows fetched = $num_rows.");
+
+        $stm->{'sth'}->finish;
+
+        # Do we want to do server side sorting?  This happens BEFORE paging.  Note that this
+        # will only work when $sth->{NAME} is available.  Some (all?) stored procedures
+        # under MS-SQL Server will not provide field names, and hence this feature will not
+        # be available.
+        #
+        my $sort_field = $jconfig->{'cgi'}->param ($jconfig->{'sort_field_param'}) || '';
+        my $sort_dir = $jconfig->{'cgi'}->param ($jconfig->{'sort_dir_param'}) || 'ASC';
+
+        my $field_names_aref = $stm->{'sth'}->{NAME};
+        if ($sort_field) {
+            &Jarvis::Error::debug ($jconfig, "Server Sort on '$sort_field', Dir = '$sort_dir'.");
+
+            if (! grep { /$sort_field/ } @$field_names_aref) {
+                &Jarvis::Error::log ($jconfig, "Unknown sort field: '$sort_field'.");
+
+            } elsif (uc (substr ($sort_dir, 0, 1)) eq 'D') {
+                @$rows_aref = sort { ($b->{$sort_field} || chr(255)) cmp ($a->{$sort_field} || chr(255)) } @$rows_aref;
+
+            } else {
+                @$rows_aref = sort { ($a->{$sort_field} || chr(255)) cmp ($b->{$sort_field} || chr(255)) } @$rows_aref;
+            }
+        }
+
+        # Store field names for the current dataset in the list.  Hook may want it.
+        $jconfig->{'field_names_aref'} = $field_names_aref;
+
+        # Should we truncate the data to a specific page?
+        my $limit = $jconfig->{'cgi'}->param ($jconfig->{'page_limit_param'}) || 0;
+        my $start = $jconfig->{'cgi'}->param ($jconfig->{'page_start_param'}) || 0;
+
+        if ($limit > 0) {
+            ($start > 0) || ($start = 0); # Check we have a real zero, not ''
+
+            &Jarvis::Error::debug ($jconfig, "Limit = $limit, Offset = $start, Num Rows = $num_rows.");
+
+            if ($start > $#$rows_aref) {
+                &Jarvis::Error::debug ($jconfig, "Page start over-run.  No data fetched perhaps.");
+                @$rows_aref = ();
+
+            } else {
+                if (($start + ($limit - 1)) > $#$rows_aref) {
+                    &Jarvis::Error::debug ($jconfig, "Page finish over-run.  Partial page.");
+                    $limit = 1 + ($#$rows_aref - $start);
+                }
+                @$rows_aref = @$rows_aref[$start .. $start + ($limit - 1)];
+            }
+        }
+
+        # Store the number of returned rows for the current dataset in the list.
+        $jconfig->{'out_nrows'} = scalar @$rows_aref;
+
+        # What transformations should we use when sending out fetch data?
+        my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->{dataset}{transform}{fetch});
+        &Jarvis::Error::debug ($jconfig, "Fetch transformations = " . join (', ', keys %transforms) . " (applied to returned results)");
+
+        # Apply any output transformations to remaining hashes.
+        if (scalar (keys %transforms)) {
+            foreach my $row_href (@$rows_aref) {
+                &transform (\%transforms, $row_href);
+            }
+        }
+
+        # Delete null (undef) values, otherwise JSON/XML will represent them as ''.
+        #
+        # Note that this must happen AFTER the transform step, for two reasons:
+        # (a) any preceding "notnull" transform (if specified for "fetch" on
+        #     this dataset) will have turned NULLs into "" by this stage, meaning that
+        #     we won't be deleting them here.
+        #
+        # (b) any preceding "null" transform will have set whitespace values to
+        #     undef, meaning that we will now delete them here.
+        #
         foreach my $row_href (@$rows_aref) {
-            &transform (\%transforms, $row_href);
+            foreach my $key (keys %$row_href) {
+                (defined $$row_href{$key}) || delete $$row_href{$key};
+            }
+        }
+
+        # Store some additional info in jconfig just in case the hook needs it.
+        # These will refer to the most recent dataset being processed.
+        $jconfig->{'subset_name'} = $subset_name;
+        $jconfig->{'fetched'} = $num_rows;
+        $jconfig->{'returned'} = scalar @$rows_aref;
+
+        # This final hook allows you to modify the data returned by SQL for one dataset.
+        # This hook may do one or both of:
+        #
+        #   - Completely modify the returned content (by modifying $rows_aref)
+        #   - Add additional per-dataset scalar parameters (by setting $extra_href)
+        #
+        my $extra_href = {};
+        &Jarvis::Hook::dataset_fetched ($jconfig, $dsxml, \%params_copy, $rows_aref, $extra_href);
+
+        # Return in structured format for JSON.
+        if ($jconfig->{'format'} eq "json") {
+
+            foreach my $name (sort (keys %$extra_href)) {
+                $result_object->{$name} = $extra_href->{$name};
+            }
+
+            # Note that we always return a 'data' field, even if it is an empty array.
+            # That is because ExtJS and other libraries will flag an exception if we do not.
+            $result_object->{'fetched'} = $num_rows;                   # Fetched from database
+            $result_object->{'returned'} = scalar @$rows_aref;         # Returned to client (after paging)
+            $result_object->{'data'} = $rows_aref;
+
+        # Return in structured format for XML.
+        } elsif ($jconfig->{'format'} eq "xml") {
+
+            foreach my $name (sort (keys %$extra_href)) {
+                $result_object->{$name} = $extra_href->{$name};
+            }
+
+            $result_object->{'fetched'} = $num_rows;              # Fetched from database
+            $result_object->{'returned'} = scalar @$rows_aref;    # Returned to client (after paging)
+            if (scalar @$rows_aref) {
+                $result_object->{'data'}{'row'} = $rows_aref;
+            }
+
+        # CSV format is the trickiest.  Note that it is dependent on the $sth->{NAME} data
+        # being available.  In some cases, e.g. some (all?) stored procedures under MS-SQL
+        # Server (definitely those using a pivot, and possibly others) the list of field
+        # names is not available by this method, and hence this CSV cannot find the data
+        # it requires.  In that case, you will need to write a "smart" plugin which can
+        # figure out the field names itself, access the data with "rows_aref" format, and
+        # put two and two together.
+        #
+        } elsif ($jconfig->{'format'} eq "csv") {
+
+            my @field_names = @{ $stm->{'sth'}->{NAME} };
+            my %field_index = ();
+
+            @field_index { @field_names } = (0 .. $#field_names);
+
+            # Create a string IO handle to print CSV into.
+            my $csv_return_text = '';
+            my $io = IO::String->new ($csv_return_text);
+
+            # Create a CSV object and print the header line.
+            my $csv = Text::CSV->new ( { binary => 1 } );
+            $csv->print ($io, \@field_names);
+            print $io "\n";
+
+            # Now print the data.
+            foreach my $row_href (@$rows_aref) {
+                my @columns = map { $$row_href{$_} } @field_names;
+                $csv->print ($io, \@columns);
+                print $io "\n";
+            }
+
+            &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($csv_return_text));
+            &Jarvis::Error::dump ($jconfig, $csv_return_text);
+
+            return $csv_return_text;
+
+        # This is for INTERNAL use only!  Plugins for example might like to get the raw hash
+        # and do their own formatting.  If you try this from a browser, you're going to
+        # get something nasty happening.  Note also that this only works for a single dataset,
+        # if you try it with a comma-separated list of datasets, you'll simply get the rows_aref
+        # for the FIRST dataset in the list.
+        #
+        } elsif ($jconfig->{'format'} eq "rows_aref") {
+
+            &Jarvis::Error::debug ($jconfig, "Returning array references.  Caller will handle formatting.");
+            return $rows_aref;
+
+        } else {
+            die "Unsupported format '" . $jconfig->{'format'} ."' for Dataset::fetch return data.\n";
         }
     }
 
-    # Delete null (undef) values, otherwise JSON/XML will represent them as ''.
-    #
-    # Note that this must happen AFTER the transform step, for two reasons:
-    # (a) any preceding "notnull" transform (if specified for "fetch" on
-    #     this dataset) will have turned NULLs into "" by this stage, meaning that
-    #     we won't be deleting them here.
-    #
-    # (b) any preceding "null" transform will have set whitespace values to
-    #     undef, meaning that we will now delete them here.
-    #
-    foreach my $row_href (@$rows_aref) {
-        foreach my $key (keys %$row_href) {
-            (defined $$row_href{$key}) || delete $$row_href{$key};
-        }
-    }
-
-    # Store some additional info in jconfig just in case the hook needs it.
-    $jconfig->{'fetched'} = $num_rows;
-    $jconfig->{'returned'} = scalar @$rows_aref;
-
-    # This final hook allows you to do whatever you want to modify the returned
-    # data.  This hook may do one or both of:
-    #
-    #   - Completely modify the returned content (by modifying $rows_aref)
-    #   - Peform a custom encoding into text (by setting $return_text)
-    #
+    # Standard case.  JSON/XML format.  Encode to text and return it.
+    my $return_text;
     my $extra_href = {};
-    my $return_text = undef;
-    &Jarvis::Hook::return_fetch ($jconfig, $dsxml, \%params_copy, $rows_aref, $extra_href, \$return_text);
+    &Jarvis::Hook::return_fetch ($jconfig, \%safe_params, $all_results_object, $extra_href, \$return_text);
 
-    # Otherwise we encode to a supported format.  Note that the hook may have modified
-    # the data prior to this encoding.
-    #
+    # Copy across any extra root parameters set by the return_fetch hook.
+    foreach my $name (sort (keys %$extra_href)) {
+        $all_results_object->{$name} = $extra_href->{$name};
+    }
+
+    # If the hook performed its own encoding, we have no further work to do.
     if ($return_text) {
         &Jarvis::Error::debug ($jconfig, "Return content determined by hook ::return_fetch");
 
-    # Return content in requested format.  JSON is simple.
+    # JSON encoding is now simple.
     } elsif ($jconfig->{'format'} eq "json") {
-        my %return_data = ();
 
-        $return_data {"logged_in"} = $jconfig->{'logged_in'};
-        $return_data {"username"} = $jconfig->{'username'};
-        $return_data {"error_string"} = $jconfig->{'error_string'};
-        $return_data {"group_list"} = $jconfig->{'group_list'};
-        foreach my $name (sort (keys %$extra_href)) {
-            $return_data {$name} = $extra_href->{$name};
-        }
-
-        # Note that we always return a "data" field, even if it is an empty array.
-        # That is because ExtJS and other libraries will flag an exception if we do not.
-        $return_data {"fetched"} = $num_rows;                   # Fetched from database
-        $return_data {"returned"} = scalar @$rows_aref;         # Returned to client (after paging)
-        $return_data {"data"} = $rows_aref;
+        $all_results_object->{'logged_in'} = $jconfig->{'logged_in'};
+        $all_results_object->{'username'} = $jconfig->{'username'};
+        $all_results_object->{'error_string'} = $jconfig->{'error_string'};
+        $all_results_object->{'group_list'} = $jconfig->{'group_list'};
 
         my $json = JSON::PP->new->pretty(1);
-        $return_text = $json->encode ( \%return_data );
+        $return_text = $json->encode ( $all_results_object );
 
     # XML is also simple.
     } elsif ($jconfig->{'format'} eq "xml") {
-        my $xml = XML::Smart->new ();
 
-        $xml->{'response'}{'logged_in'} = $jconfig->{'logged_in'};
-        $xml->{'response'}{'username'} = $jconfig->{'username'};
-        $xml->{'response'}{'error_string'} = $jconfig->{'error_string'};
-        $xml->{'response'}{'group_list'} = $jconfig->{'group_list'};
-        foreach my $name (sort (keys %$extra_href)) {
-            $xml->{'response'}{$name} = $extra_href->{$name};
-        }
+        $all_results_object->{'response'}{'logged_in'} = $jconfig->{'logged_in'};
+        $all_results_object->{'response'}{'username'} = $jconfig->{'username'};
+        $all_results_object->{'response'}{'error_string'} = $jconfig->{'error_string'};
+        $all_results_object->{'response'}{'group_list'} = $jconfig->{'group_list'};
 
-        $xml->{'response'}{'fetched'} = $num_rows;              # Fetched from database
-        $xml->{'response'}{'returned'} = scalar @$rows_aref;    # Returned to client (after paging)
-        if (scalar @$rows_aref) {
-            $xml->{'response'}{'data'}{'row'} = $rows_aref;
-        }
-
-        $return_text = $xml->data ();
-
-    # CSV format is the trickiest.  Note that it is dependent on the $sth->{NAME} data
-    # being available.  In some cases, e.g. some (all?) stored procedures under MS-SQL
-    # Server (definitely those using a pivot, and possibly others) the list of field
-    # names is not available by this method, and hence this CSV cannot find the data
-    # it requires.  In that case, you will need to write a "smart" plugin which can
-    # figure out the field names itself, access the data with "rows_aref" format, and
-    # put two and two together.
-    #
-    } elsif ($jconfig->{'format'} eq "csv") {
-
-        my @field_names = @{ $stm->{'sth'}->{NAME} };
-        my %field_index = ();
-
-        @field_index { @field_names } = (0 .. $#field_names);
-
-        # Create a string IO handle to print CSV into.
-        $return_text = '';
-        my $io = IO::String->new ($return_text);
-
-        # Create a CSV object and print the header line.
-        my $csv = Text::CSV->new ( { binary => 1 } );
-        $csv->print ($io, \@field_names);
-        print $io "\n";
-
-        # Now print the data.
-        foreach my $row_href (@$rows_aref) {
-            my @columns = map { $$row_href{$_} } @field_names;
-            $csv->print ($io, \@columns);
-            print $io "\n";
-        }
-
-    # This is for INTERNAL use only!  Plugins for example might like to get the raw hash
-    # and do their own formatting.  If you try this from a browser, you're going to
-    # get something nasty happening.
-    #
-    } elsif ($jconfig->{'format'} eq "rows_aref") {
-        return $rows_aref;
+        $return_text = $all_results_object->data ();
 
     } else {
-        die "Unsupported format '" . $jconfig->{'format'} ."' for Dataset::fetch return data.\n";
+        die "Unsupported format.  Cannot encode into '" . $jconfig->{'format'} ."' for Dataset::fetch return data.\n";
     }
 
     &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($return_text));
@@ -776,13 +862,14 @@ sub fetch {
 sub store {
     my ($jconfig, $rest_args_aref) = @_;
 
-    my $dsxml = &get_config_xml ($jconfig) || die "Cannot load configuration for dataset '" . ($jconfig->{'dataset_name'} || '') . "'.";
+    my $dataset_name = $jconfig->{'dataset_name'} || '';
+    my $dsxml = &get_config_xml ($jconfig, $dataset_name) || die "Cannot load configuration for dataset '$dataset_name'.";
 
     my $allowed_groups = $dsxml->{dataset}{"write"};
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
     if ($failure ne '') {
         $jconfig->{'status'} = "401 Unauthorized";
-        die "Insufficient privileges to write '" . $jconfig->{'dataset_name'} . "'. $failure\n";
+        die "Insufficient privileges to write '$dataset_name'. $failure\n";
     }
 
     # What transforms should we use when processing store data?
@@ -934,7 +1021,7 @@ sub store {
 
         # Check we have an stm for this row.
         my $stm = $stm{$row_ttype} ||
-            die "Dataset '" . ($jconfig->{'dataset_name'} || '') . "' has no SQL of type '$row_ttype'.";
+            die "Dataset '$dataset_name' has no SQL of type '$row_ttype'.";
 
         # Determine our argument values.
         my @arg_values = &names_to_values ($jconfig, $stm->{'vnames_aref'}, \%safe_params);

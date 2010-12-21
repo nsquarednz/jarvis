@@ -175,7 +175,11 @@ sub do {
     # the file, because maybe some execs/plugins might allow it, and we don't want
     # to restrict them.
     #
-    ($dataset_name eq '') || ($dataset_name =~ m|^[\w\-\.]+$|) || die "Invalid dataset_name '$dataset_name'!\n";
+    # A "metaset" will allow multiple comma-separated dataset names.  This is allowed
+    # only for "fetch" and only for XML or JSON formats.  There will be additional 
+    # checks to follow to ensure that "," datasets are used only in specific cases.
+    #
+    ($dataset_name eq '') || ($dataset_name =~ m|^[\w\-\.,]+$|) || die "Invalid dataset_name '$dataset_name'!\n";
 
     # Now we can create our $jconfig at last!
     $jconfig = new Jarvis::Config ($app_name, ('etc_dir' => "$jarvis_etc", 'cgi' => $cgi, 'mod_perl_io' => $mod_perl_io ) );
@@ -366,8 +370,11 @@ sub do {
 
     # Modify a regular dataset.
     } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete") || ($action eq "mixed")) {
-        $jconfig->{'dataset_type'} = 's';
 
+        # Meta-sets are for FETCH only, not STORE.
+        ($dataset_name =~ m/,/) && die "Comma-Separated dataset '$dataset_name' not permitted for action '$action'\n";
+
+        $jconfig->{'dataset_type'} = 's';
         my $return_text = &Jarvis::Dataset::store ($jconfig, \@rest_args);
 
         print $cgi->header(-type => "text/plain; charset=UTF-8", -cookie => $jconfig->{'cookie'});
