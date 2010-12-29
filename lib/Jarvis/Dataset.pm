@@ -800,11 +800,6 @@ sub fetch {
     my $extra_href = {};
     &Jarvis::Hook::return_fetch ($jconfig, \%safe_params, $all_results_object, $extra_href, \$return_text);
 
-    # Copy across any extra root parameters set by the return_fetch hook.
-    foreach my $name (sort (keys %$extra_href)) {
-        $all_results_object->{$name} = $extra_href->{$name};
-    }
-
     # If the hook performed its own encoding, we have no further work to do.
     if ($return_text) {
         &Jarvis::Error::debug ($jconfig, "Return content determined by hook ::return_fetch");
@@ -817,6 +812,11 @@ sub fetch {
         $all_results_object->{'error_string'} = $jconfig->{'error_string'};
         $all_results_object->{'group_list'} = $jconfig->{'group_list'};
 
+        # Copy across any extra root parameters set by the return_fetch hook.
+        foreach my $name (sort (keys %$extra_href)) {
+            $all_results_object->{$name} = $extra_href->{$name};
+        }
+
         my $json = JSON::PP->new->pretty(1);
         $return_text = $json->encode ( $all_results_object );
 
@@ -827,6 +827,11 @@ sub fetch {
         $all_results_object->{'response'}{'username'} = $jconfig->{'username'};
         $all_results_object->{'response'}{'error_string'} = $jconfig->{'error_string'};
         $all_results_object->{'response'}{'group_list'} = $jconfig->{'group_list'};
+
+        # Copy across any extra root parameters set by the return_fetch hook.
+        foreach my $name (sort (keys %$extra_href)) {
+            $all_results_object->{'response'}{$name} = $extra_href->{$name};
+        }
 
         $return_text = $all_results_object->data ();
 
