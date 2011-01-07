@@ -150,7 +150,7 @@ sub Jarvis::Login::Database::check {
     # Check the password.
     if ($encryption eq "md5") {
         if (length ($stored_password) != ($salt_prefix_len + 32)) {
-            return ("Stored password is invalid length for MD5 + salt");
+            return ("Stored password length " . length ($stored_password) . " is invalid for MD5 + salt");
         }
         my $salt = substr ($stored_password, 0, $salt_prefix_len);
         my $stored_md5 = substr ($stored_password, $salt_prefix_len);
@@ -163,7 +163,7 @@ sub Jarvis::Login::Database::check {
     } elsif ($encryption eq "eksblowfish") {
         $salt_prefix_len = 16; # eksblowfish requires a salt of 16. 
         if (length ($stored_password) <= $salt_prefix_len) {
-            return ("Stored password is invalid length for Eksblowfish + salt");
+            return ("Stored password length " . length ($stored_password) . " is invalid for Eksblowfish + salt");
         }
         my $salt = substr ($stored_password, 0, $salt_prefix_len);
         my $p = substr ($stored_password, $salt_prefix_len + 1); 
