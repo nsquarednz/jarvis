@@ -238,8 +238,11 @@ WHERE
     my $remote_host = undef;
     if ($remote_addr && $reverse_dns) {
         my @bytes = split(/\./, $remote_addr);
-        my $packedaddr = pack("C4", @bytes);
-        $remote_host = (gethostbyaddr($packedaddr, 2))[0];
+
+        if (scalar(@bytes) == 4) {
+            my $packedaddr = pack("C4", @bytes);
+            $remote_host = (gethostbyaddr($packedaddr, 2))[0];
+        }
     }
 
     # Create a session row in Adempiere.
