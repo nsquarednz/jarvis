@@ -60,7 +60,7 @@ use Jarvis::Tracker;
 #               session             The session object.
 #               sname               Name of the session cookie.  Default "CGISESSID".
 #               sid                 Session ID.  A big long number.
-#               cookie              CGI::Cookie object to send back with session info
+#               cookie              CGI::Cookie objects to send back with session info
 #
 #       $override_href - Optional hash of override parameters.
 #           username - Login with this username to use instead of CGI parameter
@@ -319,10 +319,10 @@ sub check {
         # url based sessions. We get the best of both worlds.
         #
         if (!$jconfig->{'sid_source'} || $jconfig->{'sid_source'} eq 'cookie') {
-            $jconfig->{'cookie'} = CGI::Cookie->new (
+            $jconfig->{'cookie'} = [ CGI::Cookie->new (
                 -name => $jconfig->{'sname'},
                 -value => $jconfig->{'sid'},
-                -expires => $session_expiry);
+                -expires => $session_expiry) ];
         }
    }
 
