@@ -1,5 +1,5 @@
 Name: jarvis
-Version: 3.2.4
+Version: %(echo $VERSION)
 Release: 1
 Summary: A web application framework written in Perl
 Group: Application/Enterprise

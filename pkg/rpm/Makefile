@@ -33,6 +33,6 @@ install:
 	mkdir -p ${DESTDIR}/${ROOT}/
 	mkdir -p ${DESTDIR}/etc/httpd/conf.d/
 	tar xvf ${PACKAGE}.tar -C ${DESTDIR}/${ROOT}/
-	cp ${DESTDIR}/${ROOT}/docs/jarvis-apache-mod-perl ${DESTDIR}/etc/httpd/conf.d/jarvis.conf
+	cp ${DESTDIR}/${ROOT}/etc/apache/jarvis-mod-perl-rpm.conf ${DESTDIR}/etc/httpd/conf.d/jarvis.conf
 
 
