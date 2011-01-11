@@ -311,7 +311,7 @@ sub login {
     my $logged_in = $jconfig->{'logged_in'};
     my $error_string = $jconfig->{'error_string'};
     my $group_list = $jconfig->{'group_list'};
-    my $actual_ip = $ENV{"HTTP_X_FORWARDED_FOR"} || $ENV{"HTTP_CLIENT_IP"} || $ENV{"REMOTE_ADDR"} || '';
+    my $actual_ip = $jconfig->{'client_ip'};
 
     # Julian time of request start.
     my $tstart = $jconfig->{'tstart'};

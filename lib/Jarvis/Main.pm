@@ -185,6 +185,9 @@ sub do {
     $jconfig = new Jarvis::Config ($app_name, ('etc_dir' => "$jarvis_etc", 'cgi' => $cgi, 'mod_perl_io' => $mod_perl_io ) );
     $dataset_name && ($jconfig->{'dataset_name'} = $dataset_name);
 
+    # Determine client's IP.
+    $jconfig->{'client_ip'} = $ENV{"HTTP_X_FORWARDED_FOR"} || $ENV{"HTTP_CLIENT_IP"} || $ENV{"REMOTE_ADDR"} || '';
+
     # Start tracking now.  Hopefully, not too much time has passed.
     &Jarvis::Tracker::start ($jconfig);
 

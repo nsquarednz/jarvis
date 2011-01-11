@@ -233,7 +233,7 @@ WHERE
     # a LONG TIME (up to 10 seconds or more).  In that case, the client is left waiting.
     # That's why this is configurable and default disabled.
     #
-    my $remote_addr = $ENV{"HTTP_X_FORWARDED_FOR"} || $ENV{"HTTP_CLIENT_IP"} || $ENV{"REMOTE_ADDR"} || undef;
+    my $remote_addr = $jconfig->{'client_ip'};
     my $reverse_dns = defined ($Jarvis::Config::yes_value {lc ($login_parameters{'reverse_dns'} || "no")});
     my $remote_host = undef;
     if ($remote_addr && $reverse_dns) {

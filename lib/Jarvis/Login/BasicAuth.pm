@@ -132,7 +132,7 @@ sub Jarvis::Login::BasicAuth::check {
 
     # Check the IP address first.
     if ($remote_ip_list) {
-        my $actual_ip = $ENV{"HTTP_X_FORWARDED_FOR"} || $ENV{"HTTP_CLIENT_IP"} || $ENV{"REMOTE_ADDR"} || '';
+        my $actual_ip = $jconfig->{'client_ip'};
         &Jarvis::Error::debug ($jconfig, "Actual Remote IP: '$actual_ip'.");
         my $matched = 0;
         foreach my $remote_ip (split (',', $remote_ip_list)) {
