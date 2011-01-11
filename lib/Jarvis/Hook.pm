@@ -204,6 +204,9 @@ sub start_one {
 ################################################################################
 # Invoke the "after_login" method on each hook.
 #
+# Note that this hook is only invoked if the client was not previously logged
+# in.  Don't bother overriding session expiry in this hook, as it won't last.
+#
 # Params:
 #       $jconfig        - Jarvis::Config object
 #

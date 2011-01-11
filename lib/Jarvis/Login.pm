@@ -305,7 +305,7 @@ sub check {
 
     # Set/extend session expiry.  Flush new/modified session data.
     if ($session) {
-        my $session_expiry = $axml->{'sessiondb'}->{'expiry'}->content || '+1h';
+        my $session_expiry = $jconfig->{'expiry'} || $axml->{'sessiondb'}->{'expiry'}->content || '+1h';
         $session->expire ($session_expiry);
         $session->flush ();
 
