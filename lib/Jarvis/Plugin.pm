@@ -76,6 +76,7 @@ sub do {
     my $add_headers = undef;            # Should we add headers.
     my $default_filename = undef;       # A default return filename to use.
     my $filename_parameter = undef;     # Which CGI parameter contains our filename.
+    my $mime_type = undef;              # Override the mime type if you want.
     my %plugin_parameters = ();         # Taken from XML and handed to plugin
 
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
@@ -93,6 +94,7 @@ sub do {
             $add_headers = defined ($Jarvis::Config::yes_value {lc ($plugin->{'add_headers'}->content || "no")});
             $default_filename = $plugin->{'default_filename'}->content;
             $filename_parameter = $plugin->{'filename_parameter'}->content;
+            $mime_type = $plugin->{'mime_type'}->content;
 
             $jconfig->{'dump'} = $jconfig->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($plugin->{'dump'}->content || "no")});
             $jconfig->{'debug'} = $jconfig->{'dump'} || $jconfig->{'debug'} || defined ($Jarvis::Config::yes_value {lc ($plugin->{'debug'}->content || "no")});
@@ -158,14 +160,17 @@ sub do {
     # Are we supposed to add headers?  Does that include a filename header?
     # Note that if we really wanted to, we could squeeze in
     if ($add_headers) {
-        my $mime_types = MIME::Types->new;
-        my $mime_type = $mime_types->mimeTypeOf ($filename) || MIME::Types->type('text/plain');
-
-        &Jarvis::Error::debug ($jconfig, "Plugin returned mime type '" . $mime_type->type . "'");
+        if (! $mime_type) {
+            my $mime_types = MIME::Types->new;
+            my $filename_type = $mime_types->mimeTypeOf ($filename);
+            $mime_type = $filename_type ? $filename_type->type : 'text/plain';
+        }
+        &Jarvis::Error::debug ($jconfig, "Plugin returning mime type '$mime_type'");
 
         if ($filename) {
+            &Jarvis::Error::debug ($jconfig, "Plugin returning filename '$filename'");
             print $jconfig->{'cgi'}->header(
-                -type => $mime_type->type,
+                -type => $mime_type,
                 'Content-Disposition' => $filename && "attachment; filename=$filename",
                 -cookie => $jconfig->{'cookie'},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
@@ -173,7 +178,7 @@ sub do {
 
         } else {
             print $jconfig->{'cgi'}->header(
-                -type => $mime_type->type,
+                -type => $mime_type,
                 -cookie => $jconfig->{'cookie'},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             );
