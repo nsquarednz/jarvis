@@ -36,7 +36,7 @@ use Jarvis::Error;
 ###############################################################################
 #
 
-my $dbh = undef;
+my %dbhs = ();
 
 ################################################################################
 # Connect to DB (if required) and return DBH.
@@ -48,17 +48,34 @@ my $dbh = undef;
 #               dbuser              Database username
 #               dbpass              Database password
 #
+#       $dbname - Identify which database to connect to, default = "default"
+#
 # Returns:
 #       1
 ################################################################################
 #
 sub handle {
-    my ($jconfig) = @_;
+    my ($jconfig, $dbname) = @_;
 
-    $dbh && return $dbh;
+    $dbname || ($dbname = "default");
 
+    if ($dbhs{$dbname}) {
+        &Jarvis::Error::debug ($jconfig, "Returning cached connection to database name = '$dbname'");
+        return $dbhs{$dbname};
+    }
+
+    &Jarvis::Error::debug ($jconfig, "Making new connection to database name = '$dbname'");
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
-    my $dbxml = $axml->{'database'} || die "No 'database' config present.  Cannot connect to DB.";
+
+    # Find the specific database config we need.
+    foreach (@{ $axml->{'database'} }) {
+        &Jarvis::Error::debug ($jconfig, "DB NAME = '" . ($_->{'name'}->content || 'default') . "'");
+    }
+    my @dbs = grep { ($_->{'name'}->content || 'default') eq $dbname } @{ $axml->{'database'} };
+    (scalar @dbs) || die "No database with name '$dbname' is currently configured in Jarvis.";
+    ((scalar @dbs) == 1) || die "Multiple databases with name '$dbname' are currently configured in Jarvis.";
+
+    my $dbxml = $dbs[0];
 
     my $dbconnect = $dbxml->{'connect'}->content || "dbi:Pg:dbname=" . $jconfig->{'app_name'};
     my $dbusername = $dbxml->{'username'}->content || '';
@@ -68,10 +85,10 @@ sub handle {
     &Jarvis::Error::debug ($jconfig, "DB Username = '$dbusername'");
     &Jarvis::Error::debug ($jconfig, "DB Password = '$dbpassword'");
 
-    $dbh = DBI->connect ($dbconnect, $dbusername, $dbpassword, { RaiseError => 1, PrintError => 1, AutoCommit => 1 }) ||
+    $dbhs{$dbname} = DBI->connect ($dbconnect, $dbusername, $dbpassword, { RaiseError => 1, PrintError => 1, AutoCommit => 1 }) ||
         die "Cannot connect to database. " . DBI::errstr;
 
-    return $dbh;
+    return $dbhs{$dbname};
 }
 
 ################################################################################
@@ -89,8 +106,10 @@ sub handle {
 sub disconnect {
     my ($jconfig) = @_;
 
-    $dbh && $dbh->disconnect();
-    $dbh = undef;
+    foreach my $dbname (sort (keys %dbhs)) {
+        $dbhs{$dbname} && $dbhs{$dbname}->disconnect();
+        delete $dbhs{$dbname};
+    }
 }
 
 1;

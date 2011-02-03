@@ -115,6 +115,7 @@ sub Jarvis::Login::Database::check {
     my $group_table = $login_parameters{'group_table'};
     my $group_username_column = $login_parameters{'group_username_column'};
     my $group_group_column = $login_parameters{'group_group_column'};
+    my $dbname = $login_parameters{'dbname'} || 'default';
 
     # Does the database store plain text, a MD5 hash (in HEX format, we don't support binary), 
     # or a HEX formatted version of an Eksblowfish encrypted password?
@@ -129,7 +130,7 @@ sub Jarvis::Login::Database::check {
         return ("Missing configuration for Login module Database.");
     }
 
-    my $dbh = &Jarvis::DB::handle ($jconfig);
+    my $dbh = &Jarvis::DB::handle ($jconfig, $dbname);
 
     # Check the username from the user name table.
     my $user_columns = $user_password_column . ($user_id_column ? ", $user_id_column": "");

@@ -105,6 +105,7 @@ sub Jarvis::Login::Drupal6::check {
     my $login_type = lc ($login_parameters{'login_type'}) || "drupal";
 
     my $admin_only = defined ($Jarvis::Config::yes_value {lc ($login_parameters{'admin_only'} || "no")});
+    my $dbname = $login_parameters{'dbname'} || 'default';
 
     # See if we can find a Drupal session.
     my $logged_in = 0;
@@ -122,7 +123,7 @@ sub Jarvis::Login::Drupal6::check {
             my $cookie_value = $cookies{$cookie_name}->value;
 
             &Jarvis::Error::debug ($jconfig, "Checking existing Drupal sid '$cookie_value'.");
-            my $dbh = &Jarvis::DB::handle ($jconfig);
+            my $dbh = &Jarvis::DB::handle ($jconfig, $dbname);
 
             my $result_aref = $dbh->selectall_arrayref("SELECT u.uid, u.name FROM sessions s INNER JOIN users u ON u.uid = s.uid WHERE s.sid = ?", { Slice => {} }, $cookie_value);
 

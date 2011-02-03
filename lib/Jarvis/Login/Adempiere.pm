@@ -113,8 +113,9 @@ sub Jarvis::Login::Adempiere::check {
     # Client & Org Name
     my $client_name = $login_parameters{'client_name'};
     my $org_name = $login_parameters{'org_name'};
+    my $dbname = $login_parameters{'dbname'} || 'default';
 
-    my $dbh = &Jarvis::DB::handle ($jconfig);
+    my $dbh = &Jarvis::DB::handle ($jconfig, $dbname);
 
     # Get the Client ID
     my $result_aref = $dbh->selectall_arrayref("SELECT ad_client_id FROM ad_client WHERE name = ? AND isactive = 'Y'", { Slice => {} }, $client_name);
