@@ -68,9 +68,6 @@ sub handle {
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
 
     # Find the specific database config we need.
-    foreach (@{ $axml->{'database'} }) {
-        &Jarvis::Error::debug ($jconfig, "DB NAME = '" . ($_->{'name'}->content || 'default') . "'");
-    }
     my @dbs = grep { ($_->{'name'}->content || 'default') eq $dbname } @{ $axml->{'database'} };
     (scalar @dbs) || die "No database with name '$dbname' is currently configured in Jarvis.";
     ((scalar @dbs) == 1) || die "Multiple databases with name '$dbname' are currently configured in Jarvis.";

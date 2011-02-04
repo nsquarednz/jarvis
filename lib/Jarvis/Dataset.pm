@@ -109,6 +109,9 @@ sub get_config_xml {
     my $dsxml = XML::Smart->new ("$dsxml_filename") || die "Cannot read '$dsxml_filename': $!\n";
     ($dsxml->{dataset}) || die "Missing <dataset> tag in '$dsxml_filename'!\n";
 
+    # Per-dataset DB name override default.
+    $jconfig->{'dataset_dbname'} = $dsxml->{'dataset'}{'dbname'}->content || "default";
+
     # Enable per dataset dump/debug
     $jconfig->{'dump'} = $jconfig->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($dsxml->{'dataset'}{'dump'}->content || "no")});
     $jconfig->{'debug'} = $jconfig->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($dsxml->{'dataset'}{'debug'}->content || "no")});
@@ -173,10 +176,7 @@ sub get_sql {
 #
 sub sql_with_substitutions {
 
-    my ($jconfig, $sql, $args_href) = @_;
-
-    # Need dbh for safe quoting function.
-    my $dbh = &Jarvis::DB::handle ($jconfig);
+    my ($jconfig, $dbh, $sql, $args_href) = @_;
 
     # Parse the update SQL to get a prepared statement, pulling out the list
     # of names of {{variables}} we replaced by ?.
@@ -389,7 +389,7 @@ sub parse_statement {
     &Jarvis::Error::debug ($jconfig, "Returning? = " . $obj->{'returning'});
 
     # Get our SQL with placeholders and prepare it.
-    my ($sql_with_substitutions, @variable_names) = &sql_with_substitutions ($jconfig, $obj->{'raw_sql'}, $args_href);
+    my ($sql_with_substitutions, @variable_names) = &sql_with_substitutions ($jconfig, $dbh, $obj->{'raw_sql'}, $args_href);
     $obj->{'sql_with_substitutions'} = $sql_with_substitutions;
     $obj->{'vnames_aref'} = \@variable_names;
 
@@ -540,9 +540,6 @@ sub fetch {
         $all_results_object = XML::Smart->new ();
     }
 
-    # Attach to the database.
-    my $dbh = &Jarvis::DB::handle ($jconfig);
-
     # Handle our parameters.  Always with placeholders.  Note that our special variables
     # like __username are safe, and cannot come from user-defined values.
     #
@@ -596,6 +593,9 @@ sub fetch {
             $jconfig->{'status'} = "401 Unauthorized";
             die "Insufficient privileges to read '$subset_name'. $failure\n";
         }
+
+        # Attach to the database.
+        my $dbh = &Jarvis::DB::handle ($jconfig, $jconfig->{'dataset_dbname'});
 
         # Get our STM.  This has everything attached.
         my $stm = &parse_statement ($jconfig, $dsxml, $dbh, 'select', \%params_copy) ||
@@ -952,7 +952,7 @@ sub store {
         die "Unsupported transaction type '$ttype'.";
 
     # Shared database handle.
-    my $dbh = &Jarvis::DB::handle ($jconfig);
+    my $dbh = &Jarvis::DB::handle ($jconfig, $jconfig->{'dataset_dbname'});
     $dbh->begin_work() || die;
 
     # Loop for each set of updates.
