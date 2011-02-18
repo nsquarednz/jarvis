@@ -182,25 +182,25 @@ sub do {
     # Add the dataset as a safe variable too.
     $safe_params{'__dataset'} = $dataset;
 
-    # Add parameters to our command.  Die if any of the parameter names look dodgy.
-    # This isn't a problem with datasets, since there we only look at parameters that
-    # are coded into our SQL string.  But here we will take ALL parameters supplied
+    # Add parameters to our command.  Note that we will take ALL parameters supplied
     # by the user, so we need to watch out for any funny business.
     foreach my $param (sort (keys %safe_params)) {
-        # With the values we are more forgiving, but we quote them up hard in single
-        # quotes for the shell.
+
+        # Quote param names AND values for the shell.
         my $param_value = $safe_params{$param};
         &Jarvis::Error::debug ($jconfig, "Exec Parameter '$param' = '$param_value'");
 
         # MS Windows, we use double quotes.
         if ($^O eq "MSWin32") {
+            $param = &escape_shell_windows ($param);
             $param_value = &escape_shell_windows ($param_value);
-            $command .= " $param=\"$param_value\"";
+            $command .= " \"$param\"=\"$param_value\"";
 
         # These unix variants we use single quotes.
         } elsif (($^O eq "linux") || ($^O eq "solaris") || ($^O eq "darwin")) {
+            $param = &escape_shell_unix ($param);
             $param_value = &escape_shell_unix ($param_value);
-            $command .= " $param='$param_value'";
+            $command .= " '$param'='$param_value'";
 
         # Not safe to continue.
         } else {
