@@ -98,6 +98,10 @@ sub do {
             $use_tmpfile = $tmp_http_path || $tmp_directory || defined ($Jarvis::Config::yes_value {lc ($exec->{'use_tmpfile'}->content || "no")});
             $tmp_redirect = $tmp_http_path;
 
+            # Override debug/dump.  Won't get much, but at least we'll see what is produced.
+            $jconfig->{'dump'} = $jconfig->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($exec->{'dump'}->content || "no")});
+            $jconfig->{'debug'} = $jconfig->{'dump'} || $jconfig->{'debug'} || defined ($Jarvis::Config::yes_value {lc ($exec->{'debug'}->content || "no")});
+
             last;
         }
     }
