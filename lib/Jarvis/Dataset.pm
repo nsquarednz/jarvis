@@ -317,6 +317,15 @@ sub names_to_values {
 sub transform {
     my ($transforms_href, $vals_href) = @_;
 
+    # Convert MS Word characters into their HTML equivalent.  This will stop
+    # XML::Smart from attempting to encode them in base64.
+    if ($$transforms_href{'word2html'}) {
+        foreach my $key (keys %$vals_href) {
+            next if ! defined $$vals_href{$key};
+            $$vals_href{$key} = &word2html ($$vals_href{$key});
+        }
+    }
+
     # Trim leading and trailing space off any defined value.
     if ($$transforms_href{'trim'}) {
         foreach my $key (keys %$vals_href) {
