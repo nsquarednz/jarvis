@@ -114,7 +114,7 @@ sub get_config_xml {
 
     # Enable per dataset dump/debug
     $jconfig->{'dump'} = $jconfig->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($dsxml->{'dataset'}{'dump'}->content || "no")});
-    $jconfig->{'debug'} = $jconfig->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($dsxml->{'dataset'}{'debug'}->content || "no")});
+    $jconfig->{'debug'} = $jconfig->{'debug'} || $jconfig->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($dsxml->{'dataset'}{'debug'}->content || "no")});
 
     # Load a couple of other parameters.  This is a "side-effect".  Yeah, it's a bit yucky.
     $jconfig->{'page_start_param'} = $axml->{'page_start_param'}->content || 'page_start';
