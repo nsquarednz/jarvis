@@ -32,12 +32,12 @@
 use strict;
 use warnings;
 
+package Jarvis::Config;
+
 use CGI;
 use CGI::Session;
 use DBI;
 use XML::Smart;
-
-package Jarvis::Config;
 
 use Jarvis::Error;
 
@@ -178,6 +178,7 @@ sub new {
 sub default_parameters () {
     my ($jconfig) = @_;
 
+    $jconfig || die;
     if ($default_parameters_loaded) {
         return %default_parameters_cache;
     }
