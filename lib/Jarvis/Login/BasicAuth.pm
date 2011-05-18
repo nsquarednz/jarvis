@@ -60,9 +60,9 @@ use CGI;
 use strict;
 use warnings;
 
-use Jarvis::Error;
-
 package Jarvis::Login::BasicAuth;
+
+use Jarvis::Error;
 
 ###############################################################################
 # Public Functions

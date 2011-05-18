@@ -17,6 +17,7 @@
 #        <login module="Jarvis::Login::Drupal">
 #            <parameter name="login_type" value="yes"/>
 #            <parameter name="admin_only" value="yes"/>
+#            <parameter name="admin_role" value="admin"/>
 #        </login>
 #        ...
 #    </app>
@@ -34,6 +35,14 @@
 #       safe params.
 #
 #           "__uid"  - Value of "uid" from the Drupal "users" table.
+#
+# PERMISSIONS:
+#
+#       You will probably need:
+#
+#       GRANT SELECT ON sessions TO "www-data";
+#       GRANT SELECT ON users_roles TO "www-data";
+#       GRANT SELECT ON role TO "www-data";
 #
 # Licence:
 #       This file is part of the Jarvis WebApp/Database gateway utility.
@@ -61,11 +70,13 @@ use CGI::Cookie;
 use strict;
 use warnings;
 
+package Jarvis::Login::Drupal6;
+
+use Data::Dumper;
 use Digest::MD5 qw (md5 md5_hex);
+use PHP::Serialization qw(serialize unserialize);
 
 use Jarvis::Error;
-
-package Jarvis::Login::Drupal6;
 
 ###############################################################################
 # Public Functions
@@ -208,8 +219,21 @@ sub Jarvis::Login::Drupal6::check {
     # By now we MUST have logged in.
     $uid || die;
 
-    # Set groups list.
-    my $group_list = ($uid == 1) ? "admin,user" : "user";
+    # Determine groups list.
+    my $group_list = "";
+
+    # Admin users don't have regular roles.  We give them a single, special group.
+    if ($uid == 1) {
+        $group_list = $login_parameters{"admin_role"} || "admin";
+
+    # Regular users have their roles in the users_roles table.
+    } else {
+        my $dbh = &Jarvis::DB::handle ($jconfig, $dbname);
+        my $result_aref = $dbh->selectall_arrayref("SELECT r.name FROM users_roles ur INNER JOIN role r ON r.rid = ur.rid WHERE ur.uid = ?", { Slice => {} }, $uid);
+
+        my @role_names = map { $_->{name} } @$result_aref;
+        $group_list = join (',', @role_names);
+    }
 
     # Add safe params.
     my %safe_params = (

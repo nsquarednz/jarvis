@@ -30,11 +30,11 @@ use CGI;
 use strict;
 use warnings;
 
+package Jarvis::Login::ActiveDirectory;
+
 use Net::LDAP;
 
 use Jarvis::Error;
-
-package Jarvis::Login::ActiveDirectory;
 
 ###############################################################################
 # Public Functions

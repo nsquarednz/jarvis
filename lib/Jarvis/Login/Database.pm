@@ -33,9 +33,9 @@ use CGI;
 use strict;
 use warnings;
 
-use Jarvis::Error;
-
 package Jarvis::Login::Database;
+
+use Jarvis::Error;
 
 ###############################################################################
 # Public Functions
