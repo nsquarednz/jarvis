@@ -116,7 +116,7 @@ sub Jarvis::Login::ActiveDirectory::check {
     $mesg = $ldap->search (
         base => $base_object,
         deref => 'always',
-        attrs => ['memberOf'],
+        attrs => ['memberOf', 'mail'],
         filter => "(samaccountname=$username)"
     );
 
@@ -155,6 +155,10 @@ sub Jarvis::Login::ActiveDirectory::check {
 
     }
     $ldap->unbind ();
+
+    # Did we get an email address?  Store it if we did.
+    $jconfig->{'email'} = $entry->get_value ('mail');
+    &Jarvis::Error::debug ($jconfig, "Mail Address is '" . ($jconfig->{'email'} || '') . "'.");
 
     # Reconnect and check the password.
     &Jarvis::Error::debug ($jconfig, "Connecting to ActiveDirectory Server: '$server:$port'.");
