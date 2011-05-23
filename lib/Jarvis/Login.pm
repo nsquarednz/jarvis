@@ -190,6 +190,9 @@ sub check {
         &Jarvis::Error::debug ($jconfig, "Forcing new login check.  Ignore any existing logged_in session status.");
     }
 
+    # Our login module configuration.
+    my $login_module = $axml->{login}{module};
+
     # Existing, successful Jarvis session?  Fine, we trust this.
     #
     my $session = $jconfig->{'session'};
@@ -222,7 +225,7 @@ sub check {
     # For exec scripts that's good, since it means that a report parameter named
     # "username" won't get misinterpreted as an attempt to login.
     #
-    } else {
+    } elsif ($login_module) {
         # Get our login parameter values.  We were using $axml->{login}{parameter}('[@]', 'name');
         # but that seemed to cause all sorts of DataDumper and cleanup problems.  This seems to
         # work smoothly.
@@ -232,13 +235,6 @@ sub check {
                 &Jarvis::Error::debug ($jconfig, "Login Parameter: " . $parameter->{'name'}->content . " -> " . $parameter->{'value'}->content);
                 $login_parameters {$parameter->{'name'}->content} = $parameter->{'value'}->content;
             }
-        }
-
-        # Login module is actually optional.  Some applications just don't do login.
-        my $login_module = $axml->{login}{module};
-        if (! $login_module) {
-            &Jarvis::Error::debug ($jconfig, "Application has no defined login module.");
-            return ("No Login Module Configured", "", "");
         }
 
         my $lib = $axml->{login}{lib} || undef;
@@ -307,7 +303,16 @@ sub check {
             $jconfig->{'additional_safe'}{$name} = $value;
             $session && $session->param($name, $value);
         }
+
+    # Login module is actually optional.  Some applications just don't do login.
+    } else {
+        &Jarvis::Error::debug ($jconfig, "Application has no defined login module.");
+        $jconfig->{'logged_in'} = 0;
+        $jconfig->{'username'} = "";
+        $jconfig->{'error_string'} = "No Login Module Configured";
+        $jconfig->{'group_list'} = "";
     }
+
 
     # Set/extend session expiry.  Flush new/modified session data.
     if ($session) {
