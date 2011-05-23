@@ -234,7 +234,13 @@ sub check {
             }
         }
 
-        my $login_module = $axml->{login}{module} || die "Application '" . $jconfig->{'app_name'} . "' has no defined login module.\n";
+        # Login module is actually optional.  Some applications just don't do login.
+        my $login_module = $axml->{login}{module};
+        if (! $login_module) {
+            &Jarvis::Error::debug ($jconfig, "Application has no defined login module.");
+            return ("No Login Module Configured", "", "");
+        }
+
         my $lib = $axml->{login}{lib} || undef;
 
         &Jarvis::Error::debug ($jconfig, "Using default libs: '" . (join ',', @{$jconfig->{'default_libs'}}) . "'". ($lib ? ", plugin lib '$lib'." : ", no plugin specific lib."));
