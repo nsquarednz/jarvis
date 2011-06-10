@@ -79,7 +79,7 @@ sub do {
     if ($axml->{'exec'}) {
         foreach my $exec (@{ $axml->{'exec'} }) {
             my $exec_ds = $exec->{'dataset'}->content;
-            &Jarvis::Error::debug ($jconfig, "Comparing '$dataset' to '$exec_ds'.");
+            &Jarvis::Error::dump ($jconfig, "Comparing '$dataset' to '$exec_ds'.");
             next if (($dataset ne $exec_ds) && ($dataset !~ m/^$exec_ds\./));
 
             &Jarvis::Error::debug ($jconfig, "Found matching custom <exec> dataset '$dataset'.");
