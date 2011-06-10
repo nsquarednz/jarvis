@@ -355,6 +355,106 @@ sub check {
 }
 
 ################################################################################
+# Update stored session variables.
+#
+# Params:
+#       jconfig   - Jasper::Config object
+#           READ
+#               session
+#
+#       new_vars - Hash of session variables to set/update.
+#
+# Returns:
+#       1 on success.
+#       0 if no session is currently active.
+################################################################################
+#
+sub alter_session {
+    my ($jconfig, $new_vars) = @_;
+
+    &Jarvis::Error::debug ($jconfig, "Updating session variables.");
+
+    my $axml = $jconfig->{'xml'}->{jarvis}{app};
+    (defined $axml) || die "Cannot find <jarvis><app> in '" . $jconfig->{'app_name'} . ".xml'!\n";
+
+    if (! $axml->{'sessiondb'}) {
+        &Jarvis::Error::debug ($jconfig, "No session DB is defined.");
+        return 0;
+    }
+
+    # Where are our sessions stored?
+    my $sid_store = $axml->{'sessiondb'}->{'store'}->content || "driver:file;serializer:default;id:md5";
+    &Jarvis::Error::debug ($jconfig, "SID Store '$sid_store'.");
+
+    my $default_cookie_name = uc ($jconfig->{'app_name'}) . "_CGISESSID";
+    my $sid_cookie_name = $axml->{'sessiondb'}->{'cookie'}->content || $default_cookie_name;
+    CGI::Session->name($sid_cookie_name);
+    &Jarvis::Error::debug ($jconfig, "SID Cookie Name '$sid_cookie_name'.");
+
+    my %sid_params = ();
+    if ($axml->{'sessiondb'}->{'parameter'}) {
+        foreach my $sid_param (@{ $axml->{'sessiondb'}->{'parameter'} }) {
+            $sid_params {$sid_param->{'name'}->content} = $sid_param->{'value'}->content;
+        }
+    }
+
+    # Find the session ID. Look up the source options configured.
+    # by default look only in the cookie.
+    #
+    # To trigger a new login overriding any cookie that may exist
+    # (if configured to look up cookies), configure the order as 'url,cookie'
+    # and send a URL with the relevant parameter, but empty.
+    my @sid_sources = map { lc (&trim($_)) } split (',', ($axml->{'sessiondb'}->{'sid_source'}->content || "cookie"));
+    my $sid = undef;
+    foreach my $source (@sid_sources) {
+        $sid = $jconfig->{'cgi'}->param($sid_cookie_name) if $source eq 'url';
+        $sid = $jconfig->{'cgi'}->cookie($sid_cookie_name) if $source eq 'cookie';
+        if (defined $sid) {
+            $jconfig->{'sid_source'} = $source;
+            last;
+        }
+    }
+    &Jarvis::Error::debug ($jconfig, "SID source: " . ($jconfig->{'sid_source'} || "none"));
+
+    # If we have no existing session ID, then we cannot alter the session.
+    if (! $sid) {
+        &Jarvis::Error::debug ($jconfig, "There is no SID for this session.");
+        return 0;
+    }
+
+    # Get an existing session.
+    # Under windows, avoid having CGI::Session throw the error:
+    # 'Your vendor has not defined Fcntl macro O_NOFOLLOW, used at C:/Perl/site/lib/CGI/Session/Driver/file.pm line 26.'
+    # by hiding the signal handler.
+
+    my $err_handler = $SIG{__DIE__};
+    $SIG{__DIE__} = sub {};
+    my $session = new CGI::Session ($sid_store, $sid, \%sid_params);
+    $SIG{__DIE__} = $err_handler;
+    if (! $session) {
+        die "Error in creating CGI::Session: " . ($! || "Unknown Reason");
+    }
+    
+    # Now modify the session vars.
+    my $dataref = $session->dataref();
+    foreach my $name (keys %$new_vars) {
+        my $value = $new_vars->{$name};
+        &Jarvis::Error::debug ($jconfig, "Session modified parameter '$name' = " . ($value ? "'$value'" : "undefined"));
+        $dataref->{$name} = $value;
+
+        if ($name =~ m/^__/) {
+            &Jarvis::Error::debug ($jconfig, "Updated safe parameter '$name' = " . ($value ? "'$value'" : "undefined"));
+            $jconfig->{'additional_safe'}{$name} = $value;
+        }
+    }
+
+    # Write to the session file.
+    my $session_expiry = $jconfig->{'expiry'} || $axml->{'sessiondb'}->{'expiry'}->content || '+1h';
+    $session->expire ($session_expiry);
+    $session->flush ();
+}
+
+################################################################################
 # Logout by deleting the session.
 #
 # Params:
