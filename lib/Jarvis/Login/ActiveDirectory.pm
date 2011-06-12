@@ -60,8 +60,12 @@ use Jarvis::Error;
 #        ...
 #    </app>
 #
-#       server:   address of server.  Required.
-#       port:     port for server.  Default 389.
+#       server:         Address of server.  Required.
+#       port:           Port for server.  Default 389.
+#       bind_username:  Username to bind to server for search.
+#       bind_password:  Password to bind to server for search.
+#       base_object:    Root of the search tree for user lookup.
+#       no_password:    Don't validate the password.  Only check user details.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -80,17 +84,19 @@ use Jarvis::Error;
 sub Jarvis::Login::ActiveDirectory::check {
     my ($jconfig, $username, $password, %login_parameters) = @_;
 
-    # No info?
-    $username || return ("No username supplied.");
-    $password || return ("No password supplied.");
-
     # Our user name login parameters are here...
     my $server = $login_parameters{'server'};
     my $port = $login_parameters{'port'} || 389;
     my $bind_username = $login_parameters{'bind_username'} || '';
     my $bind_password = $login_parameters{'bind_password'} || '';
     my $base_object = $login_parameters{'base_object'} || '';
+    my $no_password = $login_parameters{'no_password'} || 0;
 
+    # No info?
+    $username || return ("No username supplied.");
+    $password || $no_password || return ("No password supplied.");
+
+    # Sanity check on config.
     $server || return ("Missing 'server' configuration for Login module ActiveDirectory.");
     $base_object || return ("Missing 'base_object' configuration for Login module ActiveDirectory.");
 
@@ -159,6 +165,12 @@ sub Jarvis::Login::ActiveDirectory::check {
     # Did we get an email address?  Store it if we did.
     $jconfig->{'email'} = $entry->get_value ('mail');
     &Jarvis::Error::debug ($jconfig, "Mail Address is '" . ($jconfig->{'email'} || '') . "'.");
+
+    # Sometimes we don't want to check the password.
+    if ($no_password) {
+        &Jarvis::Error::debug ($jconfig, "Skipping Password Check (as per configuration).");
+        return ("", $username, $group_list);
+    }
 
     # Reconnect and check the password.
     &Jarvis::Error::debug ($jconfig, "Connecting to ActiveDirectory Server: '$server:$port'.");
