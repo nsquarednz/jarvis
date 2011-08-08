@@ -147,10 +147,10 @@ sub do {
     if ($use_tmpfile) {
         if ($tmp_directory) {
             if (-d $tmp_directory) {
-                -w $tmp_directory || die "Cannot write to Exec temporary directory.";
+                -w $tmp_directory || die "Cannot write to Exec temporary directory '$tmp_directory'.";
 
             } else {
-                (mkdir $tmp_directory) || die "Cannot create Exec temporary directory.";
+                (mkdir $tmp_directory) || die "Cannot create Exec temporary directory '$tmp_directory'.";
             }
         }
 
