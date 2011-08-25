@@ -27,6 +27,7 @@ use warnings;
 package Jarvis::Error;
 
 use Jarvis::Text;
+use Time::HiRes;
 
 ###############################################################################
 # Public Functions
@@ -59,19 +60,25 @@ use Jarvis::Text;
 sub print_message {
     my ($jconfig, $level, $msg) = @_;
 
+    use integer;
     my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime();
+    my (undef,$micsec) = Time::HiRes::gettimeofday();
     my @days = ('Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat');
     my @months = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec');
     my $timestamp = sprintf "%s %s %d %02d:%02d:%02d %04d", $days[$wday], $months[$mon], $mday, $hour, $min, $sec, $year + 1900;
+    my $hires_timestamp = sprintf "%s %s %d %02d:%02d:%02d.%06d %04d", $days[$wday], $months[$mon], $mday, $hour, $min, $sec, $micsec, $year + 1900;
     $msg =~ s/\s*$/\n/;
 
-    my @bits = split ( /\%([TLUDAPM])/i, ($jconfig->{'log_format'} || '[%P/%A/%U/%D] %M'));
+    my @bits = split ( /\%([THLUDAPM])/i, ($jconfig->{'log_format'} || '[%P/%A/%U/%D] %M'));
     my $output = '';
 
     foreach my $idx (0 .. $#bits) {
         if ($idx % 2) {
             if ($bits[$idx] eq 'T') {
                 $output .= $timestamp;
+
+            } elsif ($bits[$idx] eq 'H') {
+                $output .= $hires_timestamp;
 
             } elsif ($bits[$idx] eq 'L') {
                 $output .= $level;
