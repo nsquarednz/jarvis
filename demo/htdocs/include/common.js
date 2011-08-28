@@ -2,7 +2,7 @@
 // Common functions used by all Jarvis Demo pages.
 //----------------------------------------------------------------------
 
-Ext.BLANK_IMAGE_URL = '/ext-3.1/resources/images/default/s.gif';
+Ext.BLANK_IMAGE_URL = '/jarvis-demo/images/s.gif';
 
 //----------------------------------------------------------------------
 //----------------------------------------------------------------------
