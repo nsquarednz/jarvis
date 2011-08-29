@@ -287,44 +287,6 @@ sub statement_execute {
 }
 
 ################################################################################
-# Gets our POSTDATA from a number of potential difference sources.  Stores it
-# in $jconfig, just in case it is needed later.
-#
-# Params:
-#       $jconfig - Jarvis::Config object
-#           READ
-#               cgi                 Contains data values for {{param}} in SQL
-#
-# Returns:
-#       Reference to Hash of returned data.  You may convert to JSON or XML.
-#       die on error (including permissions error)
-################################################################################
-#
-sub get_post_data {
-    my ($jconfig) = @_;
-
-    $jconfig->{'post_data'} && return $jconfig->{'post_data'};
-
-    # Get our submitted content.  This works for POST (insert) on non-XML data.  If the
-    # content_type was "application/xml" then I think we will find our content in the
-    # 'XForms:Model' parameter instead.
-    $jconfig->{'post_data'} = $jconfig->{'cgi'}->param ('POSTDATA');
-
-    # This is for POST (insert) on XML data.
-    if (! $jconfig->{'post_data'}) {
-        $jconfig->{'post_data'} = $jconfig->{'cgi'}->param ('XForms:Model');
-    }
-
-    # This works for DELETE (delete) and PUT (update) on any content.
-    if (! $jconfig->{'post_data'}) {
-        while (<STDIN>) {
-            $jconfig->{'post_data'} .= $_;
-        }
-    }
-    return $jconfig->{'post_data'};
-}
-
-################################################################################
 # Loads the data for the current dataset(s), and puts it into our return data
 # hash so that it can be presented to the client in JSON.
 #
@@ -352,9 +314,6 @@ sub get_post_data {
 sub fetch {
     my ($jconfig, $subset_name, $dsxml, $dbh, $safe_params_href) = @_;
     
-    # Some other parameters from $jconfig, used for tracing/debugging.
-    my $subset_name = $jconfig->{'subset_name'};    
-
     # Get our STM.  This has everything attached.
     my $stm = &parse_statement ($jconfig, $dsxml, $dbh, 'select', $safe_params_href) ||
         die "Dataset '$subset_name' has no SQL of type 'select'.";
@@ -498,7 +457,7 @@ sub store {
     &Jarvis::Error::debug ($jconfig, "Store transformations = " . join (', ', keys %transforms) . " (applied to incoming row data)");
 
     # Get our submitted content
-    my $content = &get_post_data ($jconfig);
+    my $content = &Jarvis::Dataset::get_post_data ($jconfig);
     $content || die "No content body to store";
     &Jarvis::Error::debug ($jconfig, "Request Content Length = " . length ($content));
     &Jarvis::Error::dump ($jconfig, $content);

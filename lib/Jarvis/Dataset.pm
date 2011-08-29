@@ -48,6 +48,22 @@ use Jarvis::Dataset::DBI;
 use Jarvis::Dataset::SDP;
 
 ###############################################################################
+# Deprecated Functions
+###############################################################################
+
+# These should never be called by external functions.  You should use a hook
+# if you need to tinker with these.  But if you HAVE to use them, please 
+# reference the versions in Jarvis::Dataset::DBI so that we can remove these
+# pass through functions ASAP.
+
+sub parse_statement {
+    return &Jarvis::Dataset::DBI::parse_statement (@_);
+}
+sub statement_execute {
+    return &Jarvis::Dataset::DBI::statement_execute (@_);
+}
+
+###############################################################################
 # Internal Functions
 ###############################################################################
 
@@ -256,6 +272,44 @@ sub transform {
         }
     }
     return 1;
+}
+
+################################################################################
+# Gets our POSTDATA from a number of potential difference sources.  Stores it
+# in $jconfig, just in case it is needed later.
+#
+# Params:
+#       $jconfig - Jarvis::Config object
+#           READ
+#               cgi                 Contains data values for {{param}} in SQL
+#
+# Returns:
+#       Reference to Hash of returned data.  You may convert to JSON or XML.
+#       die on error (including permissions error)
+################################################################################
+#
+sub get_post_data {
+    my ($jconfig) = @_;
+
+    $jconfig->{'post_data'} && return $jconfig->{'post_data'};
+
+    # Get our submitted content.  This works for POST (insert) on non-XML data.  If the
+    # content_type was "application/xml" then I think we will find our content in the
+    # 'XForms:Model' parameter instead.
+    $jconfig->{'post_data'} = $jconfig->{'cgi'}->param ('POSTDATA');
+
+    # This is for POST (insert) on XML data.
+    if (! $jconfig->{'post_data'}) {
+        $jconfig->{'post_data'} = $jconfig->{'cgi'}->param ('XForms:Model');
+    }
+
+    # This works for DELETE (delete) and PUT (update) on any content.
+    if (! $jconfig->{'post_data'}) {
+        while (<STDIN>) {
+            $jconfig->{'post_data'} .= $_;
+        }
+    }
+    return $jconfig->{'post_data'};
 }
 
 ################################################################################
