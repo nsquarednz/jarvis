@@ -169,9 +169,11 @@ sub check {
     
     my $cgi_username = $jconfig->{'cgi'}->param('username');
     my $cgi_password = $jconfig->{'cgi'}->param('password');
+    my $require_post_error = undef;
 
     if ($login_requires_post and ($cgi_username or $cgi_password)) {
         &Jarvis::Error::log ($jconfig, "Username/password provided as CGI parameters when require-post was specified (removed).");
+        $require_post_error = "username/password provided as CGI parameters when require-post was specified";
         $cgi_username = undef;
         $cgi_password = undef;
     }
@@ -266,6 +268,8 @@ sub check {
         {
             no strict 'refs';
             ($error_string, $username, $group_list, $additional_safe) = &$login_method ($jconfig, $offered_username, $offered_password, %login_parameters);
+            # login is likely to fail if CGI username/password are deleted due to require-post
+            $error_string = ($error_string ? "$error_string ($require_post_error)" : "Login ok, but $require_post_error");
         }
         (defined $additional_safe) || ($additional_safe = {});
 
