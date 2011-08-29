@@ -269,7 +269,9 @@ sub check {
             no strict 'refs';
             ($error_string, $username, $group_list, $additional_safe) = &$login_method ($jconfig, $offered_username, $offered_password, %login_parameters);
             # login is likely to fail if CGI username/password are deleted due to require-post
-            $error_string = ($error_string ? "$error_string ($require_post_error)" : "Login ok, but $require_post_error");
+            if ($require_post_error) {
+                $error_string = ($error_string ? "$error_string ($require_post_error)" : "Login ok, but $require_post_error");
+            }
         }
         (defined $additional_safe) || ($additional_safe = {});
 
