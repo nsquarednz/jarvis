@@ -37,7 +37,6 @@ use warnings;
 package Jarvis::Main;
 
 use CGI;
-use DBI;
 use File::Basename;
 
 use Jarvis::Error;

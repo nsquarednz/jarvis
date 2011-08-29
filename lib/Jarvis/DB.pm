@@ -25,9 +25,10 @@
 use strict;
 use warnings;
 
-use DBI;
-
 package Jarvis::DB;
+
+use DBI;
+use Data::Dumper;
 
 use Jarvis::Error;
 
@@ -36,6 +37,7 @@ use Jarvis::Error;
 ###############################################################################
 #
 
+# Hash {type}{name}
 my %dbhs = ();
 
 ################################################################################
@@ -49,43 +51,69 @@ my %dbhs = ();
 #               dbpass              Database password
 #
 #       $dbname - Identify which database to connect to, default = "default"
+#       $dbtype - Identify which database to connect to, default = "dbi"
 #
 # Returns:
 #       1
 ################################################################################
 #
 sub handle {
-    my ($jconfig, $dbname) = @_;
+    my ($jconfig, $dbname, $dbtype) = @_;
 
     $dbname || ($dbname = "default");
+    $dbtype || ($dbtype = "dbi");
 
-    if ($dbhs{$dbname}) {
-        &Jarvis::Error::debug ($jconfig, "Returning cached connection to database name = '$dbname'");
-        return $dbhs{$dbname};
+    if ($dbhs{$dbtype}{$dbname}) {
+        &Jarvis::Error::debug ($jconfig, "Returning cached connection to database name = '$dbname', type = '$dbtype'");
+        return $dbhs{$dbtype}{$dbname};
     }
 
-    &Jarvis::Error::debug ($jconfig, "Making new connection to database name = '$dbname'");
+    &Jarvis::Error::debug ($jconfig, "Making new connection to database name = '$dbname', type = '$dbtype'");
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
 
     # Find the specific database config we need.
-    my @dbs = grep { ($_->{'name'}->content || 'default') eq $dbname } @{ $axml->{'database'} };
-    (scalar @dbs) || die "No database with name '$dbname' is currently configured in Jarvis.";
-    ((scalar @dbs) == 1) || die "Multiple databases with name '$dbname' are currently configured in Jarvis.";
+    my @dbs = grep { (($_->{'name'}->content || 'default') eq $dbname) && (($_->{'type'}->content || 'dbi') eq $dbtype) } @{ $axml->{'database'} };
+    (scalar @dbs) || die "No database with name '$dbname', type '$dbtype' is currently configured in Jarvis.";
+    ((scalar @dbs) == 1) || die "Multiple databases with name '$dbname', type '$dbtype' are currently configured in Jarvis.";
 
+    # Configuration common to all database types.
     my $dbxml = $dbs[0];
-
-    my $dbconnect = $dbxml->{'connect'}->content || "dbi:Pg:dbname=" . $jconfig->{'app_name'};
+    my $dbconnect = $dbxml->{'connect'}->content || '';
     my $dbusername = $dbxml->{'username'}->content || '';
     my $dbpassword = $dbxml->{'password'}->content || '';
-
+    
     &Jarvis::Error::debug ($jconfig, "DB Connect = '$dbconnect'");
     &Jarvis::Error::debug ($jconfig, "DB Username = '$dbusername'");
     &Jarvis::Error::debug ($jconfig, "DB Password = '$dbpassword'");
 
-    $dbhs{$dbname} = DBI->connect ($dbconnect, $dbusername, $dbpassword, { RaiseError => 1, PrintError => 1, AutoCommit => 1 }) ||
-        die "Cannot connect to database. " . DBI::errstr;
-
-    return $dbhs{$dbname};
+    # Optional parameters, handled per-database type.
+    my %parameters = ();
+    if ($dbxml->{'parameter'}) {
+        foreach my $parameter ($dbxml->{'parameter'}('@')) {
+            &Jarvis::Error::debug ($jconfig, "DB Parameter: " . $parameter->{'name'}->content . " -> " . $parameter->{'value'}->content);
+            $parameters {$parameter->{'name'}->content} = $parameter->{'value'}->content;
+        }
+    }        
+    
+    # DBI is our "standard" type.
+    &Jarvis::Error::debug ($jconfig, "Connecting to '$dbtype' database with handle named '$dbname'");
+    if ($dbtype eq "dbi") {
+        if (! $dbconnect) {
+            $dbconnect = "dbi:Pg:dbname=" . $jconfig->{'app_name'};
+            &Jarvis::Error::debug ($jconfig, "DB Connect = '$dbconnect' (default)");
+        }            
+        $dbhs{$dbtype}{$dbname} = DBI->connect ($dbconnect, $dbusername, $dbpassword, { RaiseError => 1, PrintError => 1, AutoCommit => 1 }) ||
+            die "Cannot connect to DBI database '$dbname': " . DBI::errstr;
+        
+    # SDP is a SSAS DataPump pseudo-database.
+    } elsif ($dbtype eq "sdp") {
+        $dbconnect || die "Missing 'connect' parameter on SSAS DataPump database '$dbname'.";
+        $dbhs{$dbtype}{$dbname} = DB::SDP->new ($jconfig, $dbconnect, $dbusername, $dbpassword, \%parameters);
+        
+    } else {
+        die "Unsupported Database Type '$dbtype'.";
+    }
+    return $dbhs{$dbtype}{$dbname};
 }
 
 ################################################################################
@@ -103,9 +131,12 @@ sub handle {
 sub disconnect {
     my ($jconfig) = @_;
 
-    foreach my $dbname (sort (keys %dbhs)) {
-        $dbhs{$dbname} && $dbhs{$dbname}->disconnect();
-        delete $dbhs{$dbname};
+    foreach my $dbtype (sort (keys %dbhs)) {
+        foreach my $dbname (sort (keys %{ $dbhs{$dbtype} })) {
+            &Jarvis::Error::debug ($jconfig, "Disconnecting from database type = '$dbtype', name = '$dbname'.");
+            $dbhs{$dbtype}{$dbname} && $dbhs{$dbtype}{$dbname}->disconnect();
+            delete $dbhs{$dbtype}{$dbname};
+        }
     }
 }
 
