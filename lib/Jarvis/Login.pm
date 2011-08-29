@@ -163,18 +163,31 @@ sub check {
         $jconfig->{'sid_param'} = '';
     }
 
+    # require-post flag. If true, we prohibit username/password as cgi parameters
+    # this is to prevent them from getting logged (e.g. by apache)
+    my $login_requires_post = defined ($Jarvis::Config::yes_value {lc ($axml->{'login'}{'require-post'} || 'no')});
+    
+    my $cgi_username = $jconfig->{'cgi'}->param('username');
+    my $cgi_password = $jconfig->{'cgi'}->param('password');
+
+    if ($login_requires_post and ($cgi_username or $cgi_password)) {
+        &Jarvis::Error::log ($jconfig, "Username/password provided as CGI parameters when require-post was specified (removed).");
+        $cgi_username = undef;
+        $cgi_password = undef;
+    }
+
     # Username can come from a couple of different places.  Normally from CGI,
     # but the ::check method can also be called programmatically with an
     # override username.
     #
-    my $offered_username = ($override_href && $$override_href{'username'}) || $jconfig->{'cgi'}->param('username') || '';
+    my $offered_username = ($override_href && $$override_href{'username'}) || $cgi_username || '';
     $jconfig->{'offered_username'} = $offered_username;
     $offered_username =~ s/^\s+//;
     $offered_username =~ s/\s+$//;
 
     # Same with password.
     #
-    my $offered_password = ($override_href && $$override_href{'password'}) || $jconfig->{'cgi'}->param('password') || '';
+    my $offered_password = ($override_href && $$override_href{'password'}) || $cgi_password || '';
     $offered_password =~ s/^\s+//;
     $offered_password =~ s/\s+$//;
 
