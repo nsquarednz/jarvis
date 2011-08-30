@@ -163,9 +163,9 @@ sub check {
         $jconfig->{'sid_param'} = '';
     }
 
-    # require-post flag. If true, we prohibit username/password as url parameters
+    # require_post flag. If true, we prohibit username/password as url parameters
     # this is to prevent them from getting logged (e.g. by apache)
-    my $login_requires_post = defined ($Jarvis::Config::yes_value {lc ($axml->{'login'}{'require-post'} || 'no')});
+    my $login_requires_post = defined ($Jarvis::Config::yes_value {lc ($axml->{'login'}{'require_post'} || 'no')});
     # by this stage URL parameters have already been copied into POST parameters
     my $cgi_username = $jconfig->{'cgi'}->param('username');
     my $cgi_password = $jconfig->{'cgi'}->param('password');
@@ -174,8 +174,8 @@ sub check {
     my $require_post_error = undef;
 
     if ($login_requires_post and ($url_username or $url_password)) {
-        &Jarvis::Error::log ($jconfig, "Username/password provided as URL parameters when require-post was specified (removed).");
-        $require_post_error = "username/password provided as URL parameters when require-post was specified";
+        &Jarvis::Error::log ($jconfig, "Username/password provided as URL parameters when require_post was specified (removed).");
+        $require_post_error = "username/password provided as URL parameters when require_post was specified";
         $cgi_username = undef;
         $cgi_password = undef;
     }
@@ -270,7 +270,7 @@ sub check {
         {
             no strict 'refs';
             ($error_string, $username, $group_list, $additional_safe) = &$login_method ($jconfig, $offered_username, $offered_password, %login_parameters);
-            # login is likely to fail if URL username/password are deleted due to require-post
+            # login is likely to fail if URL username/password are deleted due to require_post
             if ($require_post_error) {
                 $error_string = ($error_string ? "$error_string ($require_post_error)" : "Login ok, but $require_post_error");
             }
