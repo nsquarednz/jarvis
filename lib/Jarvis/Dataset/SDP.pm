@@ -192,10 +192,8 @@ sub parse_mdx {
 #       $safe_params_href - All our safe parameters.
 #
 # Returns:
-#       $num_fetched - Raw number of rows fetched from DB, for paging.
 #       $rows_aref - Array of tuple data returned.
 #       $column_names_aref - Array of tuple column names, if available.
-#       $extra_href - Hash of dataset-level parameters set by hooks. 
 ################################################################################
 #
 sub fetch {
@@ -206,98 +204,12 @@ sub fetch {
         die "Dataset '$subset_name' (type 'sdp') has no MDX query.";
 
     # What key will we use to store the row labels?
-    my $row_label = $dsxml->{dataset}{mdx}{row_label} || 'row_label';
+    my $row_label = $dsxml->{dataset}{mdx}{row_label}->content || 'row_label';
         
     # Execute Fetch in 2D tuple format.
-    my ($rows_aref, $column_names_aref) = $dbh->fetchall_arrayref ($jconfig, $mdx, $row_label);
-    
-    my $num_fetched = scalar @$rows_aref;
-    &Jarvis::Error::debug ($jconfig, "Number of rows fetched = $num_fetched.");
+    my ($rows_aref, $column_names_aref) = $dbh->fetchall_arrayref ($jconfig, $mdx, $row_label);    
 
-    # Do we want to do server side sorting?  This happens BEFORE paging.  Note that this
-    # will only work when $sth->{NAME} is available.  Some (all?) stored procedures
-    # under MS-MDX Server will not provide field names, and hence this feature will not
-    # be available.
-    #
-    my $sort_field = $jconfig->{'cgi'}->param ($jconfig->{'sort_field_param'}) || '';
-    my $sort_dir = $jconfig->{'cgi'}->param ($jconfig->{'sort_dir_param'}) || 'ASC';
-
-    if ($sort_field) {
-        &Jarvis::Error::debug ($jconfig, "Server Sort on '$sort_field', Dir = '$sort_dir'.");
-
-        if (! grep { /$sort_field/ } @$column_names_aref) {
-            &Jarvis::Error::log ($jconfig, "Unknown sort field: '$sort_field'.");
-
-        } elsif (uc (substr ($sort_dir, 0, 1)) eq 'D') {
-            @$rows_aref = sort { ($b->{$sort_field} || chr(255)) cmp ($a->{$sort_field} || chr(255)) } @$rows_aref;
-
-        } else {
-            @$rows_aref = sort { ($a->{$sort_field} || chr(255)) cmp ($b->{$sort_field} || chr(255)) } @$rows_aref;
-        }
-    }
-
-    # Should we truncate the data to a specific page?
-    my $limit = $jconfig->{'cgi'}->param ($jconfig->{'page_limit_param'}) || 0;
-    my $start = $jconfig->{'cgi'}->param ($jconfig->{'page_start_param'}) || 0;
-
-    if ($limit > 0) {
-        ($start > 0) || ($start = 0); # Check we have a real zero, not ''
-
-        &Jarvis::Error::debug ($jconfig, "Limit = $limit, Offset = $start, Num Rows = $num_fetched.");
-
-        if ($start > $#$rows_aref) {
-            &Jarvis::Error::debug ($jconfig, "Page start over-run.  No data fetched perhaps.");
-            @$rows_aref = ();
-
-        } else {
-            if (($start + ($limit - 1)) > $#$rows_aref) {
-                &Jarvis::Error::debug ($jconfig, "Page finish over-run.  Partial page.");
-                $limit = 1 + ($#$rows_aref - $start);
-            }
-            @$rows_aref = @$rows_aref[$start .. $start + ($limit - 1)];
-        }
-    }
-
-    # Store the number of returned rows for the current dataset in the list.
-    $jconfig->{'out_nrows'} = scalar @$rows_aref;
-
-    # What transformations should we use when sending out fetch data?
-    my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->{dataset}{transform}{fetch});
-    &Jarvis::Error::debug ($jconfig, "Fetch transformations = " . join (', ', keys %transforms) . " (applied to returned results)");
-
-    # Apply any output transformations to remaining hashes.
-    if (scalar (keys %transforms)) {
-        foreach my $row_href (@$rows_aref) {
-            &Jarvis::Dataset::transform (\%transforms, $row_href);
-        }
-    }
-
-    # Delete null (undef) values, otherwise JSON/XML will represent them as ''.
-    #
-    # Note that this must happen AFTER the transform step, for two reasons:
-    # (a) any preceding "notnull" transform (if specified for "fetch" on
-    #     this dataset) will have turned NULLs into "" by this stage, meaning that
-    #     we won't be deleting them here.
-    #
-    # (b) any preceding "null" transform will have set whitespace values to
-    #     undef, meaning that we will now delete them here.
-    #
-    foreach my $row_href (@$rows_aref) {
-        foreach my $key (keys %$row_href) {
-            (defined $$row_href{$key}) || delete $$row_href{$key};
-        }
-    }
-
-    # This final hook allows you to modify the data returned by MDX for one dataset.
-    # This hook may do one or both of:
-    #
-    #   - Completely modify the returned content (by modifying $rows_aref)
-    #   - Add additional per-dataset scalar parameters (by setting $extra_href)
-    #
-    my $extra_href = {};
-    &Jarvis::Hook::dataset_fetched ($jconfig, $dsxml, $safe_params_href, $rows_aref, $extra_href);
-                            
-    return ($num_fetched, $rows_aref, $column_names_aref, $extra_href); 
+    return ($rows_aref, $column_names_aref); 
 }
 
 

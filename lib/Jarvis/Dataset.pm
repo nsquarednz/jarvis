@@ -325,7 +325,8 @@ sub get_post_data {
 #               cgi                 Contains data values for {{param}} in SQL
 #               username            Used for {{username}} in SQL
 #               group_list          Used for {{group_list}} in SQL
-#               format              Either "json" or "xml" or "csv".
+#               format              Either "json", "json.array", "xml", "csv", 
+#                                   or "rows_aref".
 #
 #       $rest_args_aref - Optional ref to our REST args (slash-separated after dataset).
 #
@@ -342,7 +343,7 @@ sub fetch {
     # Handle multiple subsets, possibly.
     my @subsets = split (',', $jconfig->{'dataset_name'});
     if ((scalar @subsets) > 1) {
-        if (($format ne "json") && ($format ne "xml")) {
+        if (($format !~ m/^json/) && ($format !~ m/^xml/)) {
             die "Multiple comma-separated datasets not supported for format '" . $format . "'\n";
         }
     }
@@ -351,10 +352,10 @@ sub fetch {
     # to construct them piece by piece.
     my $all_results_object = undef;
 
-    if ($format eq "json") {
+    if ($format =~ m/^json/) {
         $all_results_object = {};
 
-    } elsif ($format eq "xml") {
+    } elsif ($format =~ m/^xml/) {
         $all_results_object = XML::Smart->new ();
     }
     
@@ -384,11 +385,11 @@ sub fetch {
 
             # Multiple datasets.  Nest each dataset's results in a sub-structure.
             if ((scalar @subsets) > 1) {
-                if ($format eq "xml") {
+                if ($format =~ m/^xml/) {
                     $result_object = { 'name' => $subset_name };
                     push (@{ $all_results_object->{'response'}{'dataset'} }, $result_object);
 
-                } elsif ($format eq "json") {
+                } elsif ($format =~ m/^json/) {
                     $all_results_object->{'dataset'}{$subset_name} = {};
                     $result_object = $all_results_object->{'dataset'}{$subset_name};
                 }
@@ -396,10 +397,10 @@ sub fetch {
 
             # Single dataset.  This is backwards compatible with Jarvis 3.
             } else {
-                if ($format eq "xml") {
+                if ($format =~ m/^xml/) {
                     $result_object = $all_results_object->{'response'}
 
-                } elsif ($format eq "json") {
+                } elsif ($format =~ m/^json/) {
                     $result_object = $all_results_object;
                 }
             }
@@ -422,23 +423,116 @@ sub fetch {
         my $subset_dbname = $jconfig->{'subset_dbname'}; 
         my $dbh = &Jarvis::DB::handle ($jconfig, $subset_dbname, $subset_type);
         
-        # Get the data.        
-        if (($format eq 'xml') || ($format eq 'json') || ($format eq 'csv') || ($format eq 'rows_aref')) {
+        # Get the data.  Note that this is the very first time in fetch processing
+        # that we have performed an EXACT match on the requested format.  Until
+        # now, we have only validated the prefix part (e.g. json*, xml*).  Now
+        # we will be fussy about the exact requested return format. 
+        #
+        if (($format eq 'xml') || ($format eq 'xml.array') || 
+            ($format eq 'json') || ($format eq 'json.array') || 
+            ($format eq 'csv') || ($format eq 'rows_aref')) {
             
             # Call to the DBI interface to fetch the tuples.
-            my ($num_fetched, $rows_aref, $column_names_aref, $extra_href);
+            my ($rows_aref, $column_names_aref);
             
             if ($subset_type eq 'dbi') {
-                ($num_fetched, $rows_aref, $column_names_aref, $extra_href) 
+                ($rows_aref, $column_names_aref) 
                     = &Jarvis::Dataset::DBI::fetch ($jconfig, $subset_name, $dsxml, $dbh, \%safe_params);
                     
             } elsif ($subset_type eq 'sdp') {
-                ($num_fetched, $rows_aref, $column_names_aref, $extra_href) 
+                ($rows_aref, $column_names_aref) 
                     = &Jarvis::Dataset::SDP::fetch ($jconfig, $subset_name, $dsxml, $dbh, \%safe_params);
                     
             } else {
                 die "Unrecognised dataset type '$subset_type' in fetch of format '$format'.";
             }
+            
+            # Now we have an array of hash objects.
+            my $num_fetched = scalar @$rows_aref;
+            &Jarvis::Error::debug ($jconfig, "Number of rows fetched = $num_fetched.");
+        
+            # Do we want to do server side sorting?  This happens BEFORE paging.  Note that this
+            # will only work when $sth->{NAME} is available.  Some (all?) stored procedures
+            # under MS-SQL Server will not provide field names, and hence this feature will not
+            # be available.
+            #
+            my $sort_field = $jconfig->{'cgi'}->param ($jconfig->{'sort_field_param'}) || '';
+            my $sort_dir = $jconfig->{'cgi'}->param ($jconfig->{'sort_dir_param'}) || 'ASC';
+        
+            if ($sort_field) {
+                &Jarvis::Error::debug ($jconfig, "Server Sort on '$sort_field', Dir = '$sort_dir'.");
+        
+                if (! grep { /$sort_field/ } @$column_names_aref) {
+                    &Jarvis::Error::log ($jconfig, "Unknown sort field: '$sort_field'.");
+        
+                } elsif (uc (substr ($sort_dir, 0, 1)) eq 'D') {
+                    @$rows_aref = sort { ($b->{$sort_field} || chr(255)) cmp ($a->{$sort_field} || chr(255)) } @$rows_aref;
+        
+                } else {
+                    @$rows_aref = sort { ($a->{$sort_field} || chr(255)) cmp ($b->{$sort_field} || chr(255)) } @$rows_aref;
+                }
+            }
+        
+            # Should we truncate the data to a specific page?
+            my $limit = $jconfig->{'cgi'}->param ($jconfig->{'page_limit_param'}) || 0;
+            my $start = $jconfig->{'cgi'}->param ($jconfig->{'page_start_param'}) || 0;
+        
+            if ($limit > 0) {
+                ($start > 0) || ($start = 0); # Check we have a real zero, not ''
+        
+                &Jarvis::Error::debug ($jconfig, "Limit = $limit, Offset = $start, Num Rows = $num_fetched.");
+        
+                if ($start > $#$rows_aref) {
+                    &Jarvis::Error::debug ($jconfig, "Page start over-run.  No data fetched perhaps.");
+                    @$rows_aref = ();
+        
+                } else {
+                    if (($start + ($limit - 1)) > $#$rows_aref) {
+                        &Jarvis::Error::debug ($jconfig, "Page finish over-run.  Partial page.");
+                        $limit = 1 + ($#$rows_aref - $start);
+                    }
+                    @$rows_aref = @$rows_aref[$start .. $start + ($limit - 1)];
+                }
+            }
+        
+            # Store the number of returned rows for the current dataset in the list.
+            $jconfig->{'out_nrows'} = scalar @$rows_aref;
+        
+            # What transformations should we use when sending out fetch data?
+            my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->{dataset}{transform}{fetch});
+            &Jarvis::Error::debug ($jconfig, "Fetch transformations = " . join (', ', keys %transforms) . " (applied to returned results)");
+        
+            # Apply any output transformations to remaining hashes.
+            if (scalar (keys %transforms)) {
+                foreach my $row_href (@$rows_aref) {
+                    &Jarvis::Dataset::transform (\%transforms, $row_href);
+                }
+            }
+        
+            # Delete null (undef) values, otherwise JSON/XML will represent them as ''.
+            #
+            # Note that this must happen AFTER the transform step, for two reasons:
+            # (a) any preceding "notnull" transform (if specified for "fetch" on
+            #     this dataset) will have turned NULLs into "" by this stage, meaning that
+            #     we won't be deleting them here.
+            #
+            # (b) any preceding "null" transform will have set whitespace values to
+            #     undef, meaning that we will now delete them here.
+            #
+            foreach my $row_href (@$rows_aref) {
+                foreach my $key (keys %$row_href) {
+                    (defined $$row_href{$key}) || delete $$row_href{$key};
+                }
+            }            
+            
+            # This final hook allows you to modify the data returned by SQL for one dataset.
+            # This hook may do one or both of:
+            #
+            #   - Completely modify the returned content (by modifying $rows_aref)
+            #   - Add additional per-dataset scalar parameters (by setting $extra_href)
+            #
+            my $extra_href = {};
+            &Jarvis::Hook::dataset_fetched ($jconfig, $dsxml, \%safe_params, $rows_aref, $column_names_aref, $extra_href);
                     
             # Store some additional info in jconfig for debugging/tracing.
             # These will refer to the most recent dataset being processed.
@@ -456,18 +550,45 @@ sub fetch {
                 $result_object->{$name} = $extra_href->{$name};
             }
         
-            $result_object->{'fetched'} = $num_fetched;                   # Fetched from database
+            $result_object->{'fetched'} = 1 * $num_fetched;                   # Fetched from database
             $result_object->{'returned'} = scalar @$rows_aref;         # Returned to client (after paging)
             
-            # Subtle difference in the structure of returned XML vs. JSON.
+            # XML encoding in its simplest form.  Column keys are attributes.
             if ($format eq "xml") {
                 $result_object->{'data'}{'row'} = $rows_aref;
                 
+            # XML array is a funny sort of mish-mash.
+            } elsif ($format eq "xml.array") {
+                my $i = 0;
+                my @column_objects = map { {'index' => $i++, 'name' => $_} } @$column_names_aref;
+                $result_object->{'columns'}{'header'} = \@column_objects;
+
+                # Convert the hashes into rows.
+                my @rows2;
+                foreach my $row (@$rows_aref) {
+                    my $i = 0;
+                    my @column_objects = map { (defined $row->{$_}) ? {'index' => $i++, 'value' => $row->{$_} } : {'index' => $i++, 'null' => '1' } } @$column_names_aref;
+                    push (@rows2, {'column' => \@column_objects});
+                }
+                $result_object->{'data'}{'row'} = \@rows2;
+                
+            # JSON array is array of arrays.                
+            } elsif ($format eq "json.array") {
+                $result_object->{'columns'} = $column_names_aref;
+                
+                # Convert the hashes into rows.
+                my @rows2;
+                foreach my $row (@$rows_aref) {
+                    my @row2 = map { (defined $row->{$_}) ? $row->{$_} : undef } @$column_names_aref;
+                    push (@rows2, \@row2);
+                }
+                $result_object->{'data'} = \@rows2;
+
+            # Note the JSON object is also temporary store for CSV and rows_aref. 
             } else {
                 $result_object->{'data'} = $rows_aref;
             }
-    
-
+            
         } else {
             die "No implementation for fetch format '$format', dataset '$subset_name'.";
         }
@@ -493,7 +614,7 @@ sub fetch {
         $return_value = $jconfig->{'rows_aref'};
         
     # JSON encoding is now simple.
-    } elsif ($format eq "json") {
+    } elsif (($format eq "json") || ($format eq "json.array")) {
         &Jarvis::Error::debug ($jconfig, "Encoding into JSON format.");
 
         $all_results_object->{'logged_in'} = $jconfig->{'logged_in'};
@@ -506,11 +627,11 @@ sub fetch {
             $all_results_object->{$name} = $extra_href->{$name};
         }
 
-        my $json = JSON::PP->new->pretty(1);
+        my $json = JSON::PP->new->pretty(1)->allow_blessed(1);
         $return_value = $json->encode ( $all_results_object );
 
     # XML is also simple.
-    } elsif ($format eq "xml") {
+    } elsif (($format eq "xml") || ($format eq "xml.array")) {
         &Jarvis::Error::debug ($jconfig, "Encoding into XML format.");
 
         $all_results_object->{'response'}{'logged_in'} = $jconfig->{'logged_in'};
@@ -597,7 +718,8 @@ sub fetch {
 #               cgi                 Contains data values for {{param}} in SQL
 #               username            Used for {{username}} in SQL
 #               group_list          Used for {{group_list}} in SQL
-#               format              Either "json" or "xml" (not "csv").
+#               format              Either "json", "json.array", or "xml".
+#                                   Not allowed "csv" or "rows_aref".
 #
 #       $rest_args_aref - A ref to our REST args (slash-separated after dataset)
 #
@@ -638,7 +760,13 @@ sub store {
     # Hand off to DBI code.  Maybe one day we will support different dataset
     # types for "store" operations, in which case some more of the common
     # pre-processing and results encoding code may move from the DBI module
-    # up into this one.  Until then, let's just let sleeping dogs lie.
+    # up into this one.  
+    # 
+    # See the "fetch" method above for a good example of how that should work.
+    # Most of the pre-processing and hook invocation should be here in 
+    # Dataset.pm, and only the DBI specific stuff should be in DBI.pm.
+    #
+    # But until then, let's just let sleeping dogs lie.
     return &Jarvis::Dataset::DBI::store ($jconfig, $subset_name, $dsxml, $dbh, $rest_args_aref);
 }
 

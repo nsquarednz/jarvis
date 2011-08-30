@@ -67,14 +67,14 @@ sub report {
         &Jarvis::Error::debug ($jconfig, "Return content determined by hook ::return_fetch");
         return $return_text;
 
-    } elsif ($jconfig->{'format'} eq "json") {
+    } elsif ($jconfig->{'format'} =~ m/^json/) {
         my $json = JSON::PP->new->pretty(1);
         my $json_string = $json->encode ( \%fields );
         &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($json_string));
         &Jarvis::Error::dump ($jconfig, $json_string);
         return $json_string;
 
-    } elsif ($jconfig->{'format'} eq "xml") {
+    } elsif ($jconfig->{'format'} =~ m/^xml/) {
         my $xml = XML::Smart->new ();
         $xml->{'response'} = \%fields;
 

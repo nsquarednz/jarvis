@@ -37,7 +37,7 @@
 #                 return_status ($jconfig, $hook_params_href, $extra_href, $return_text_aref)
 #                 CALLED: Just before returning result of a "__status" request.
 #
-#                 dataset_fetched ($jconfig, $hook_params_href, $dsxml, $sql_params_href, $rows_aref, $extra_href)
+#                 dataset_fetched ($jconfig, $hook_params_href, $dsxml, $sql_params_href, $rows_aref, $column_names_aref, $extra_href)
 #                 CALLED: Just after fetching all the rows for a single dataset within in a (possibly multi-dataset) "fetch" request.
 #
 #                 return_fetch ($jconfig, $hook_params_href, $sql_params_href, $return_object, $extra_href, $return_text_aref)
@@ -466,6 +466,8 @@ sub return_status {
 #
 #       $rows_aref      - The array of return objects to be encoded.
 #
+#       $column_names_aref - Array of names of all returned columns.
+#
 #       $extra_href     - Hash of extra parameters to add inside the per-dataset
 #                         object that we will return.
 #
@@ -475,7 +477,7 @@ sub return_status {
 #
 sub dataset_fetched {
 
-    my ($jconfig, $dsxml, $sql_params_href, $rows_aref, $extra_href) = @_;
+    my ($jconfig, $dsxml, $sql_params_href, $rows_aref, $column_names_aref, $extra_href) = @_;
 
     my @hooks = @{ $jconfig->{'hooks'} };
 
@@ -489,7 +491,7 @@ sub dataset_fetched {
         {
             no strict 'refs';
             exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
-            exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $sql_params_href, $rows_aref, $extra_href);
+            exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $sql_params_href, $rows_aref, $column_names_aref, $extra_href);
         }
     }
 

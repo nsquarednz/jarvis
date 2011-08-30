@@ -170,15 +170,9 @@ sub fetchall_arrayref {
     ($root->{'Axes'}->{'Axis'}[1]->{'name'}->content eq 'Axis1') || die "Inconsistent Axis0 Name";
     
     my @column_names = map { $_->{'Member'}->{'Caption'}->content } $root->{'Axes'}->{'Axis'}[0]->{'Tuples'}{'Tuple'}('@');
-    foreach my $column_name (@column_names) {
-        print STDERR "YEA $column_name!\n";
-    }
     my $num_columns = scalar @column_names;
     
     my @row_names = map { $_->{'Member'}->{'Caption'}->content } $root->{'Axes'}->{'Axis'}[1]->{'Tuples'}{'Tuple'}('@');
-    foreach my $row_name (@row_names) {
-        print STDERR "YO $row_name!\n";
-    }
     my $num_rows = scalar @row_names;    
     
     # Pre-fill the rows.
@@ -196,72 +190,17 @@ sub fetchall_arrayref {
     # Now the cell data
     foreach my $cell ($root->{'CellData'}->{'Cell'}('@')) {
         my $ordinal = $cell->{'CellOrdinal'}->content;
-        my $value = $cell->{'FmtValue'}->content || $cell->{'Value'}->content;
+        my $value = 1 * $cell->{'Value'}->content;
         my $column = $ordinal % $num_columns;
         my $row = ($ordinal - $column) / $num_columns;
         my $column_name = $column_names[$column];
         $rows[$row]->{$column_name} = $value; 
-        
-        print STDERR "$ordinal ... R,C $row,$column = $value!\n";
     }
 
     # Finally put the row label column at the start of the column list.
     if ($row_label) {
         @column_names = ($row_label, @column_names);
     }
-    
-    # Index it up.
-    
-    
-    # 
-               # <CellData>
-                  # <Cell CellOrdinal="13">    
-               # <Axes>
-                  # <Axis name="Axis0">
-                     # <Tuples>
-                        # <Tuple>
-                           # <Member Hierarchy="[Time Target Planning].[Month]">
-                              # <UName>[Time Target Planning].[Month].[All]</UName>
-                              # <Caption>All</Caption>
-                              # <LName>[Time Target Planning].[Month].[(All)]</LName>
-                              # <LNum>0</LNum>
-                              # <DisplayInfo>65716</DisplayInfo>
-                           # </Member>
-                        # </Tuple>
-                        # <Tuple>
-                           # <Member Hierarchy="[Time Target Planning].[Month]">
-                              # <UName>[Time Target Planning].[Month].&amp;[2010-01-01T00:00:00]</UName>
-                              # <Caption>January 2010</Caption>
-                              # <LName>[Time Target Planning].[Month].[Month]</LName>
-                              # <LNum>1</LNum>
-                              # <DisplayInfo>0</DisplayInfo>
-                           # </Member>
-                        # </Tuple>
-                        # <Tuple>
-    
-    # 
-    # print STDERR "Column
-                     # <AxisInfo name="Axis0">
-                        # <HierarchyInfo name="[Time Target Planning].[Month]">
-                           # <UName name="[Time Target Planning].[Month].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
-                           # <Caption name="[Time Target Planning].[Month].[MEMBER_CAPTION]" type="xsd:string"/>
-                           # <LName name="[Time Target Planning].[Month].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
-                           # <LNum name="[Time Target Planning].[Month].[LEVEL_NUMBER]" type="xsd:int"/>
-                           # <DisplayInfo name="[Time Target Planning].[Month].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
-                        # </HierarchyInfo>
-                     # </AxisInfo>
-                     # <AxisInfo name="Axis1">
-                        # <HierarchyInfo name="[Dw Target Planning].[Category]">
-                           # <UName name="[Dw Target Planning].[Category].[MEMBER_UNIQUE_NAME]" type="xsd:string"/>
-                           # <Caption name="[Dw Target Planning].[Category].[MEMBER_CAPTION]" type="xsd:string"/>
-                           # <LName name="[Dw Target Planning].[Category].[LEVEL_UNIQUE_NAME]" type="xsd:string"/>
-                           # <LNum name="[Dw Target Planning].[Category].[LEVEL_NUMBER]" type="xsd:int"/>
-                           # <DisplayInfo name="[Dw Target Planning].[Category].[DISPLAY_INFO]" type="xsd:unsignedInt"/>
-                        # </HierarchyInfo>
-                     # </AxisInfo>    
-    
-    # OK, we have two Axes.  What are the row and column names?
-    print STDERR &Dumper (@axis_names);
 
     return (\@rows, \@column_names);
 }
