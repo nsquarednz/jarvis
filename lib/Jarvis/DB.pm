@@ -31,6 +31,7 @@ use DBI;
 use Data::Dumper;
 
 use Jarvis::Error;
+use Jarvis::DB::SDP;
 
 ###############################################################################
 # PRIVATE VARIABLES
@@ -108,7 +109,7 @@ sub handle {
     # SDP is a SSAS DataPump pseudo-database.
     } elsif ($dbtype eq "sdp") {
         $dbconnect || die "Missing 'connect' parameter on SSAS DataPump database '$dbname'.";
-        $dbhs{$dbtype}{$dbname} = DB::SDP->new ($jconfig, $dbconnect, $dbusername, $dbpassword, \%parameters);
+        $dbhs{$dbtype}{$dbname} = Jarvis::DB::SDP->new ($jconfig, $dbconnect, $dbusername, $dbpassword, \%parameters);
         
     } else {
         die "Unsupported Database Type '$dbtype'.";

@@ -123,7 +123,7 @@ sub get_config_xml {
         my $prefix = $dsdir->{'prefix'}->content || '';
         
         # Non-empty prefix paths must end in a "." for matching purposes.
-        if ($prefix && ($prefix =~ m/\.$/)) {
+        if ($prefix && ($prefix !~ m/\.$/)) {
             $prefix .= ".";
         }
         my $prefix_len = length ($prefix);
@@ -131,11 +131,11 @@ sub get_config_xml {
         &Jarvis::Error::debug ($jconfig, "Dataset Directory: '$dir', type '$type', prefix '$prefix'.");
         if ($subset_name =~ m/^$prefix(.*)$/) {
             my $remainder = $1;
-            $subset_type = $type;
             
             &Jarvis::Error::dump ($jconfig, "Prefix '$prefix' matched, length = " . $prefix_len);
             if ($prefix_len > $best_prefix_len) {
                 $best_prefix_len = $prefix_len;
+                $subset_type = $type;
                 
                 # Now turn "." into "/" on the dataset name (with prefix stripped).
                 $remainder =~ s/\./\//g;
@@ -424,7 +424,7 @@ sub fetch {
         if ($subset_type eq 'dbi') {
             
             # Call to the DBI interface to fetch the tuples.
-            my ($num_fetched, $rows_aref, $field_names_aref, $extra_href) 
+            my ($num_fetched, $rows_aref, $column_names_aref, $extra_href) 
                 = &Jarvis::Dataset::DBI::fetch ($jconfig, $subset_name, $dsxml, $dbh, \%safe_params);
                 
             # Store some additional info in jconfig for debugging/tracing.
@@ -432,7 +432,41 @@ sub fetch {
             $jconfig->{'fetched'} = $num_fetched;
             $jconfig->{'returned'} = scalar @$rows_aref;
             $jconfig->{'rows_aref'} = $rows_aref;
-            $jconfig->{'field_names_aref'} = $field_names_aref;
+            $jconfig->{'column_names_aref'} = $column_names_aref;
+        
+            # Assemble the result object.
+            #
+            # NOTE: We always return a 'data' field, even if it is an empty array.
+            # That is because ExtJS and other libraries will flag an exception if we do not.
+            #
+            foreach my $name (sort (keys %$extra_href)) {
+                $result_object->{$name} = $extra_href->{$name};
+            }
+        
+            $result_object->{'fetched'} = $num_fetched;                   # Fetched from database
+            $result_object->{'returned'} = scalar @$rows_aref;         # Returned to client (after paging)
+            
+            # Subtle difference in the structure of returned XML vs. JSON.
+            if ($jconfig->{'format'} eq "xml") {
+                $result_object->{'data'}{'row'} = $rows_aref;
+                
+            } else {
+                $result_object->{'data'} = $rows_aref;
+            }
+    
+        # SSAS DataPump.
+        } elsif ($subset_type eq 'sdp') {
+            
+            # Call to the DBI interface to fetch the tuples.
+            my ($num_fetched, $rows_aref, $column_names_aref, $extra_href) 
+                = &Jarvis::Dataset::SDP::fetch ($jconfig, $subset_name, $dsxml, $dbh, \%safe_params);
+                
+            # Store some additional info in jconfig for debugging/tracing.
+            # These will refer to the most recent dataset being processed.
+            $jconfig->{'fetched'} = $num_fetched;
+            $jconfig->{'returned'} = scalar @$rows_aref;
+            $jconfig->{'rows_aref'} = $rows_aref;
+            $jconfig->{'column_names_aref'} = $column_names_aref;
         
             # Assemble the result object.
             #
@@ -529,18 +563,18 @@ sub fetch {
         &Jarvis::Error::debug ($jconfig, "Encoding into CSV format.");
 
         # Check we have the data we need.
-        my $field_names_aref = $jconfig->{'field_names_aref'};
+        my $column_names_aref = $jconfig->{'column_names_aref'};
         my $rows_aref = $jconfig->{'rows_aref'};
         
         if (! $rows_aref) {
             die "Data query did not include a return result.  Cannot convert to CSV.";
         }
-        if (! $field_names_aref || ! (scalar @$field_names_aref)) {
+        if (! $column_names_aref || ! (scalar @$column_names_aref)) {
             die "Data query did not return column names.  Cannot convert to CSV.";
         }
         
         my %field_index = ();
-        @field_index { @$field_names_aref } = (0 .. $#$field_names_aref);
+        @field_index { @$column_names_aref } = (0 .. $#$column_names_aref);
 
         # Create a string IO handle to print CSV into.
         my $csv_return_text = '';
@@ -548,12 +582,12 @@ sub fetch {
 
         # Create a CSV object and print the header line.
         my $csv = Text::CSV->new ( { binary => 1 } );
-        $csv->print ($io, $field_names_aref);
+        $csv->print ($io, $column_names_aref);
         print $io "\n";
 
         # Now print the data.
         foreach my $row_href (@$rows_aref) {
-            my @columns = map { $$row_href{$_} } @$field_names_aref;
+            my @columns = map { $$row_href{$_} } @$column_names_aref;
             $csv->print ($io, \@columns);
             print $io "\n";
         }

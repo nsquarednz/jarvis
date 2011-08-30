@@ -46,7 +46,7 @@ use sort 'stable';      # Don't mix up records when server-side sorting
 #
 # Params:
 #       $jconfig - Jarvis::Config object (NOT USED YET)
-#       $which   - SQL Type ("fetch", "insert", "update", "delete")
+#       $which   - SQL Type ("select", "insert", "update", "delete")
 #       $dsxml   - XML::Smart object for dataset configuration
 #
 # Returns:
@@ -66,9 +66,18 @@ sub get_sql {
 
 ################################################################################
 # Expand the SQL:
-#       - Replace {{args}} with ?
-#       - Replace [[args]] with text equivalent.
+#       - Replace {{$args}} with ?
+#       - Replace [[$args]] with text equivalent.
 #       - Return list of ? arg names only.
+#
+# Note for historical reasons (i.e. Aviarc compatibility) we have allowed
+# many different flavors of brackets.  E.g. the following are all supported:
+#   {{var}}, {var}, {$var}, {{$var}}
+#   [[var]], [$var]
+#
+# IN FUTURE WE WILL ATTEMPT TO MOVE TO A CONSISTENT FORMAT!
+#   {$var} - for bind variables
+#   [$var] - for textual substitution variables
 #
 # Note that for textual substitution, numeric values will not be quoted, while
 # string values will be quoted using $dbh->quote.
@@ -80,7 +89,9 @@ sub get_sql {
 # You can alternatively specify :quote.  That will always quote.
 #
 # Params:
-#       $sql       - SQL text.
+#       $jconfig - Jarvis config object.
+#       $dbh - DB handle for quoting function.
+#       $sql - SQL text.
 #       $args_href - Hash of Fetch and REST args.
 #
 # Returns:
@@ -93,17 +104,17 @@ sub sql_with_substitutions {
 
     # Parse the update SQL to get a prepared statement, pulling out the list
     # of names of {{variables}} we replaced by ?.
-    my $sql2 = "";
-    my @bits = split (/\{\{?\$?([^\}]+)\}\}?/i, $sql);
-    my @variable_names = ();
-
+    #
     # Parameters NAMES may contain only a-z, A-Z, 0-9, underscore(_), colon(:) and hyphen(-)
     # Note pipe(|) is also allowed at this point as it separates (try-else variable names)
-    # All other characters are silently discarded.
+    my $sql2 = "";
+    my @bits = split (/\{\{?\$?([a-zA-Z0-9_\-:\|]+)\}\}?/i, $sql);
+    my @variable_names = ();
+
     foreach my $idx (0 .. $#bits) {
         if ($idx % 2) {
             my $name = $bits[$idx];
-            $name =~ s/[^a-zA-Z0-9_\-:\|]//g;
+            $name =~ s///g;
             push (@variable_names, $name);
             $sql2 .= "?";
 
@@ -115,7 +126,11 @@ sub sql_with_substitutions {
     # Now perform any textual substitution of [[ ]] variables.  Note that
     # this really only makes sense with FETCH statements, and with rest
     # args in store statements.
-    @bits = split (/\[\[([^\]]+)\]\]/i, $sql2);
+    #
+    # Parameters NAMES may contain only a-z, A-Z, 0-9, underscore(_), colon(:) and hyphen(-)
+    # Note pipe(|) is also allowed at this point as it separates (try-else variable names)
+    #
+    @bits = split (/\[[\[\$]([a-zA-Z0-9_\-:\|]+)\]\]?/i, $sql2);
 
     my $sql3 = "";
     foreach my $idx (0 .. $#bits) {
@@ -123,10 +138,6 @@ sub sql_with_substitutions {
             my $name = $bits[$idx];
             my %flags = ();
 
-            # Parameters NAMES may contain only a-z, A-Z, 0-9, underscore(_), colon(:) and hyphen(-)
-            # All other characters are silently discarded.
-            # Note pipe(|) is also allowed at this point as it separates (try-else variable names)
-            #
             # Flags may be specified after the variable name with a colon separating the variable
             # name and the flag.  Multiple flags are permitted in theory, with a colon before
             # each flag.  Supported flags at this stage are:
@@ -140,7 +151,6 @@ sub sql_with_substitutions {
                 $flag =~ s/[^a-z]//g;
                 $flags {$flag} = 1;
             }
-            $name =~ s/[^a-zA-Z0-9_\-:\|]//g;
 
             # The name may be a pipe-separated sequence of "names to try".
             my $value = undef;
@@ -181,6 +191,7 @@ sub sql_with_substitutions {
 #       $dsxml - Dataset XML object
 #       $dbh - Database handle
 #       $ttype - Type of SQL to get.
+#       $args_href - Hash of Fetch and REST args.
 #
 # Returns:
 #       STM hash with keys
@@ -288,10 +299,11 @@ sub statement_execute {
 
 ################################################################################
 # Loads the data for the current dataset(s), and puts it into our return data
-# hash so that it can be presented to the client in JSON.
+# array so that it can be presented to the client in JSON or XML or whatever.
 #
-# If the dataset is a comma-separated metaset, we perform multiple fetches
-# and build the results into a larger object.
+# This function only processes a single dataset.  The parent method may invoke
+# us multiple times for a single request, and combine into a single return 
+# object.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -299,7 +311,6 @@ sub statement_execute {
 #               cgi                 Contains data values for {{param}} in SQL
 #               username            Used for {{username}} in SQL
 #               group_list          Used for {{group_list}} in SQL
-#               format              Either "json" or "xml" or "csv".
 #
 #       $subset_name - Name of single dataset we are fetching from.
 #       $dsxml - Dataset's XML configuration object.
@@ -307,8 +318,10 @@ sub statement_execute {
 #       $safe_params_href - All our safe parameters.
 #
 # Returns:
-#       Reference to Hash of returned data.  You may convert to JSON or XML.
-#       die on error (including permissions error)
+#       $num_fetched - Raw number of rows fetched from DB, for paging.
+#       $rows_aref - Array of tuple data returned.
+#       $column_names_aref - Array of tuple column names, if available.
+#       $extra_href - Hash of dataset-level parameters set by hooks. 
 ################################################################################
 #
 sub fetch {
@@ -323,15 +336,7 @@ sub fetch {
 
     # Execute Select, return on error
     &statement_execute($jconfig, $stm, \@arg_values);
-
-    # On error, log and track the error, then return it to be given back as plain
-    # text to the caller.  We don't wrap it in JSON or XML, since we don't want it
-    # to be interpreted as "valid" data at all.
-    #
-    if ($stm->{'error'}) {
-        $stm->{'sth'}->finish;
-        die $stm->{'error'};
-    }
+    $stm->{'error'} && die $stm->{'error'};
 
     # Fetch the data.
     my $rows_aref = $stm->{'sth'}->fetchall_arrayref({});
@@ -348,11 +353,11 @@ sub fetch {
     my $sort_field = $jconfig->{'cgi'}->param ($jconfig->{'sort_field_param'}) || '';
     my $sort_dir = $jconfig->{'cgi'}->param ($jconfig->{'sort_dir_param'}) || 'ASC';
 
-    my $field_names_aref = $stm->{'sth'}->{NAME};
+    my $column_names_aref = $stm->{'sth'}->{NAME};
     if ($sort_field) {
         &Jarvis::Error::debug ($jconfig, "Server Sort on '$sort_field', Dir = '$sort_dir'.");
 
-        if (! grep { /$sort_field/ } @$field_names_aref) {
+        if (! grep { /$sort_field/ } @$column_names_aref) {
             &Jarvis::Error::log ($jconfig, "Unknown sort field: '$sort_field'.");
 
         } elsif (uc (substr ($sort_dir, 0, 1)) eq 'D') {
@@ -424,7 +429,7 @@ sub fetch {
     my $extra_href = {};
     &Jarvis::Hook::dataset_fetched ($jconfig, $dsxml, $safe_params_href, $rows_aref, $extra_href);
                             
-    return ($num_fetched, $rows_aref, $field_names_aref, $extra_href); 
+    return ($num_fetched, $rows_aref, $column_names_aref, $extra_href); 
 }
 
 ################################################################################
