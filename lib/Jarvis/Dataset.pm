@@ -337,11 +337,13 @@ sub get_post_data {
 sub fetch {
     my ($jconfig, $rest_args_aref) = @_;
     
+    my $format = $jconfig->{'format'};
+    
     # Handle multiple subsets, possibly.
     my @subsets = split (',', $jconfig->{'dataset_name'});
     if ((scalar @subsets) > 1) {
-        if (($jconfig->{'format'} ne "json") && ($jconfig->{'format'} ne "xml")) {
-            die "Multiple comma-separated datasets not supported for format '" . $jconfig->{'format'} . "'\n";
+        if (($format ne "json") && ($format ne "xml")) {
+            die "Multiple comma-separated datasets not supported for format '" . $format . "'\n";
         }
     }
     
@@ -349,15 +351,15 @@ sub fetch {
     # to construct them piece by piece.
     my $all_results_object = undef;
 
-    if ($jconfig->{'format'} eq "json") {
+    if ($format eq "json") {
         $all_results_object = {};
 
-    } elsif ($jconfig->{'format'} eq "xml") {
+    } elsif ($format eq "xml") {
         $all_results_object = XML::Smart->new ();
     }
     
     # CSV files don't work with comma-separated datasets.
-    if (($jconfig->{'format'} eq "csv") && ((scalar @subsets) > 1)) {
+    if (($format eq "csv") && ((scalar @subsets) > 1)) {
         die "CSV format not supported with multiple dataset names.";
     }
 
@@ -382,11 +384,11 @@ sub fetch {
 
             # Multiple datasets.  Nest each dataset's results in a sub-structure.
             if ((scalar @subsets) > 1) {
-                if ($jconfig->{'format'} eq "xml") {
+                if ($format eq "xml") {
                     $result_object = { 'name' => $subset_name };
                     push (@{ $all_results_object->{'response'}{'dataset'} }, $result_object);
 
-                } elsif ($jconfig->{'format'} eq "json") {
+                } elsif ($format eq "json") {
                     $all_results_object->{'dataset'}{$subset_name} = {};
                     $result_object = $all_results_object->{'dataset'}{$subset_name};
                 }
@@ -394,10 +396,10 @@ sub fetch {
 
             # Single dataset.  This is backwards compatible with Jarvis 3.
             } else {
-                if ($jconfig->{'format'} eq "xml") {
+                if ($format eq "xml") {
                     $result_object = $all_results_object->{'response'}
 
-                } elsif ($jconfig->{'format'} eq "json") {
+                } elsif ($format eq "json") {
                     $result_object = $all_results_object;
                 }
             }
@@ -421,12 +423,23 @@ sub fetch {
         my $dbh = &Jarvis::DB::handle ($jconfig, $subset_dbname, $subset_type);
         
         # Get the data.        
-        if ($subset_type eq 'dbi') {
+        if (($format eq 'xml') || ($format eq 'json') || ($format eq 'csv') || ($format eq 'rows_aref')) {
             
             # Call to the DBI interface to fetch the tuples.
-            my ($num_fetched, $rows_aref, $column_names_aref, $extra_href) 
-                = &Jarvis::Dataset::DBI::fetch ($jconfig, $subset_name, $dsxml, $dbh, \%safe_params);
-                
+            my ($num_fetched, $rows_aref, $column_names_aref, $extra_href);
+            
+            if ($subset_type eq 'dbi') {
+                ($num_fetched, $rows_aref, $column_names_aref, $extra_href) 
+                    = &Jarvis::Dataset::DBI::fetch ($jconfig, $subset_name, $dsxml, $dbh, \%safe_params);
+                    
+            } elsif ($subset_type eq 'sdp') {
+                ($num_fetched, $rows_aref, $column_names_aref, $extra_href) 
+                    = &Jarvis::Dataset::SDP::fetch ($jconfig, $subset_name, $dsxml, $dbh, \%safe_params);
+                    
+            } else {
+                die "Unrecognised dataset type '$subset_type' in fetch of format '$format'.";
+            }
+                    
             # Store some additional info in jconfig for debugging/tracing.
             # These will refer to the most recent dataset being processed.
             $jconfig->{'fetched'} = $num_fetched;
@@ -447,49 +460,16 @@ sub fetch {
             $result_object->{'returned'} = scalar @$rows_aref;         # Returned to client (after paging)
             
             # Subtle difference in the structure of returned XML vs. JSON.
-            if ($jconfig->{'format'} eq "xml") {
+            if ($format eq "xml") {
                 $result_object->{'data'}{'row'} = $rows_aref;
                 
             } else {
                 $result_object->{'data'} = $rows_aref;
             }
     
-        # SSAS DataPump.
-        } elsif ($subset_type eq 'sdp') {
-            
-            # Call to the DBI interface to fetch the tuples.
-            my ($num_fetched, $rows_aref, $column_names_aref, $extra_href) 
-                = &Jarvis::Dataset::SDP::fetch ($jconfig, $subset_name, $dsxml, $dbh, \%safe_params);
-                
-            # Store some additional info in jconfig for debugging/tracing.
-            # These will refer to the most recent dataset being processed.
-            $jconfig->{'fetched'} = $num_fetched;
-            $jconfig->{'returned'} = scalar @$rows_aref;
-            $jconfig->{'rows_aref'} = $rows_aref;
-            $jconfig->{'column_names_aref'} = $column_names_aref;
-        
-            # Assemble the result object.
-            #
-            # NOTE: We always return a 'data' field, even if it is an empty array.
-            # That is because ExtJS and other libraries will flag an exception if we do not.
-            #
-            foreach my $name (sort (keys %$extra_href)) {
-                $result_object->{$name} = $extra_href->{$name};
-            }
-        
-            $result_object->{'fetched'} = $num_fetched;                   # Fetched from database
-            $result_object->{'returned'} = scalar @$rows_aref;         # Returned to client (after paging)
-            
-            # Subtle difference in the structure of returned XML vs. JSON.
-            if ($jconfig->{'format'} eq "xml") {
-                $result_object->{'data'}{'row'} = $rows_aref;
-                
-            } else {
-                $result_object->{'data'} = $rows_aref;
-            }
-    
+
         } else {
-            die "Unrecognized type '$subset_type' for dataset '$subset_name' on fetch.";
+            die "No implementation for fetch format '$format', dataset '$subset_name'.";
         }
     }
 
@@ -508,12 +488,12 @@ sub fetch {
     # if you try it with a comma-separated list of datasets, you'll simply get the rows_aref
     # for the LAST dataset in the list.
     #
-    } elsif ($jconfig->{'format'} eq "rows_aref") {
+    } elsif ($format eq "rows_aref") {
         &Jarvis::Error::debug ($jconfig, "Return rows_aref in raw format.");
         $return_value = $jconfig->{'rows_aref'};
         
     # JSON encoding is now simple.
-    } elsif ($jconfig->{'format'} eq "json") {
+    } elsif ($format eq "json") {
         &Jarvis::Error::debug ($jconfig, "Encoding into JSON format.");
 
         $all_results_object->{'logged_in'} = $jconfig->{'logged_in'};
@@ -530,7 +510,7 @@ sub fetch {
         $return_value = $json->encode ( $all_results_object );
 
     # XML is also simple.
-    } elsif ($jconfig->{'format'} eq "xml") {
+    } elsif ($format eq "xml") {
         &Jarvis::Error::debug ($jconfig, "Encoding into XML format.");
 
         $all_results_object->{'response'}{'logged_in'} = $jconfig->{'logged_in'};
@@ -559,7 +539,7 @@ sub fetch {
     # Or alternative, we could extend the dataset definition to allow you to
     # configure the column names.  Or a post-fetch hook could fake them up.
     #
-    } elsif ($jconfig->{'format'} eq "csv") {
+    } elsif ($format eq "csv") {
         &Jarvis::Error::debug ($jconfig, "Encoding into CSV format.");
 
         # Check we have the data we need.
@@ -595,7 +575,7 @@ sub fetch {
         $return_value = $csv_return_text;
         
     } else {
-        die "Unsupported format.  Cannot encode into '" . $jconfig->{'format'} ."' for Dataset::fetch return data.\n";
+        die "Unsupported format.  Cannot encode into '$format' for Dataset::fetch return data.\n";
     }
 
     # Debugging for "text" return values.

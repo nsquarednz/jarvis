@@ -205,8 +205,11 @@ sub fetch {
     my $mdx = &parse_mdx ($jconfig, $dsxml, $safe_params_href) ||
         die "Dataset '$subset_name' (type 'sdp') has no MDX query.";
 
+    # What key will we use to store the row labels?
+    my $row_label = $dsxml->{dataset}{mdx}{row_label} || 'row_label';
+        
     # Execute Fetch in 2D tuple format.
-    my ($rows_aref, $column_names_aref) = $dbh->fetchall_arrayref ($jconfig, $mdx);
+    my ($rows_aref, $column_names_aref) = $dbh->fetchall_arrayref ($jconfig, $mdx, $row_label);
     
     my $num_fetched = scalar @$rows_aref;
     &Jarvis::Error::debug ($jconfig, "Number of rows fetched = $num_fetched.");
