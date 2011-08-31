@@ -117,6 +117,9 @@ sub get_config_xml {
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
     $axml->{'dataset_dir'} || die "Missing configuration for mandatory element(s) 'dataset_dir'.";
     
+    # Check for duplicate prefixes.
+    my %prefix_seen = ();
+    
     foreach my $dsdir ($axml->{'dataset_dir'}('@')) {
         my $dir = $dsdir->content || die "Missing directory in 'dataset_dir' element.";
         my $type = $dsdir->{'type'}->content || 'dbi';            
@@ -127,6 +130,8 @@ sub get_config_xml {
             $prefix .= ".";
         }
         my $prefix_len = length ($prefix);
+
+        $prefix_seen{$prefix}++ && die "Duplicate dataset_dir entries for prefix '$prefix' are defined.";             
         
         &Jarvis::Error::debug ($jconfig, "Dataset Directory: '$dir', type '$type', prefix '$prefix'.");
         if ($subset_name =~ m/^$prefix(.*)$/) {
