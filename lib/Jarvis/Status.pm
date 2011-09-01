@@ -48,7 +48,7 @@ sub report {
     my ($jconfig) = @_;
 
     my %fields = ();
-    $fields{"logged_in"} = $jconfig->{'logged_in'};
+    $fields{"logged_in"} = $jconfig->{'logged_in'} ? 1 : 0;
     $fields{"username"} = $jconfig->{'username'};
     $fields{"error_string"} = $jconfig->{'error_string'};
     $fields{"group_list"} = $jconfig->{'group_list'};

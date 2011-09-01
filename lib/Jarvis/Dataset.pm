@@ -622,7 +622,7 @@ sub fetch {
     } elsif (($format eq "json") || ($format eq "json.array")) {
         &Jarvis::Error::debug ($jconfig, "Encoding into JSON format.");
 
-        $all_results_object->{'logged_in'} = $jconfig->{'logged_in'};
+        $all_results_object->{'logged_in'} = $jconfig->{'logged_in'} ? 1 : 0;
         $all_results_object->{'username'} = $jconfig->{'username'};
         $all_results_object->{'error_string'} = $jconfig->{'error_string'};
         $all_results_object->{'group_list'} = $jconfig->{'group_list'};
