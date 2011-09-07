@@ -355,12 +355,25 @@ sub do {
         # So, for CSV we suggest it as an attachment, with the filename of the dataset.
         #
         if ($jconfig->{'format'} eq "csv") {
+            my $filename = $jconfig->{'return_filename'} || $jconfig->{'dataset_name'} . ".csv";
+            $filename =~ s/"/\\"/g;
             print $cgi->header(
-                -type => "text/csv; charset=UTF-8",
-                'Content-Disposition' => 'attachment; filename=' . $jconfig->{'dataset_name'} . '.csv',
+                -type => 'text/csv; charset=UTF-8; name="' . $filename . '"',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
                 -cookie => $jconfig->{'cookie'},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             );
+            
+        } elsif ($jconfig->{'format'} eq "xlsx") {
+            my $filename = $jconfig->{'return_filename'} || $jconfig->{'dataset_name'} . ".xlsx";
+            $filename =~ s/"/\\"/g;
+            print $cgi->header(
+                -type => 'application/vnd.ms-excel; name="' . $filename . '"',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                -cookie => $jconfig->{'cookie'},
+                'Cache-Control' => 'no-store, no-cache, must-revalidate'
+            );
+            
         } else {
             print $cgi->header(
                 -type => "text/plain; charset=UTF-8",

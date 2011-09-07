@@ -156,8 +156,11 @@ sub fetchall_arrayref {
     &Jarvis::Error::debug ($jconfig, "Converting to Array of tuples.");
 
     # Now the fun bit.  Convert the deep complicated structure into 2D tuple array like DBI would.
-    my @axis_names = map { $_->{'name'}->content } $root->{'OlapInfo'}->{'AxesInfo'}->{'AxisInfo'}('@');
-    (scalar @axis_names == 3) || die "Require exactly two Axes for 2D tuple encoding.";
+    my @axis_names = grep { $_ ne 'SliceAxis' } map { $_->{'name'}->content } $root->{'OlapInfo'}->{'AxesInfo'}->{'AxisInfo'}('@');
+    foreach my $axis_name (@axis_names) {
+        &Jarvis::Error::debug ($jconfig, "Axis: $axis_name");        
+    }
+    (scalar @axis_names == 2) || die "Require exactly two (non-Slice) Axes for 2D tuple encoding.  Got " . (scalar @axis_names) . ".";
 
     # What are the names for the column/row axes?    
     my $column_axis_name = $root->{'OlapInfo'}->{'AxesInfo'}->{'AxisInfo'}[0]->{'HierarchyInfo'}->{'name'}->content || "Unknown Axis0 Name";
