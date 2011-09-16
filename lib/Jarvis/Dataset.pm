@@ -763,9 +763,11 @@ sub fetch {
     }
 
     # Debugging for "text" return values.
-    if (((ref $return_value) eq 'SCALAR') && ($format ne "xslx")) {
+    if ((ref \$return_value) eq 'SCALAR') {
         &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($return_value));
-        &Jarvis::Error::dump ($jconfig, $return_value);
+        &Jarvis::Error::dump ($jconfig, $return_value) unless ($format eq "xlsx");
+    } else {
+        &Jarvis::Error::debug ($jconfig, "type (return_value) = " . (ref \$return_value));
     }
     
     return $return_value;        
