@@ -107,6 +107,7 @@ sub get_config_xml {
     my $dsxml_filename = undef;
     my $subset_type = undef;
     my $best_prefix_len = -1;
+    my $default_dbname = undef;
         
     # Look at all our 'dataset_dir' entries.  They must all have a directory
     # as their inner content.  Also they may have a type (sdp or dbi), and
@@ -124,6 +125,7 @@ sub get_config_xml {
         my $dir = $dsdir->content || die "Missing directory in 'dataset_dir' element.";
         my $type = $dsdir->{'type'}->content || 'dbi';            
         my $prefix = $dsdir->{'prefix'}->content || '';
+        my $dbname = $dsdir->{'dbname'}->content || 'default';
         
         # Non-empty prefix paths must end in a "." for matching purposes.
         if ($prefix && ($prefix !~ m/\.$/)) {
@@ -133,7 +135,7 @@ sub get_config_xml {
 
         $prefix_seen{$prefix}++ && die "Duplicate dataset_dir entries for prefix '$prefix' are defined.";             
         
-        &Jarvis::Error::debug ($jconfig, "Dataset Directory: '$dir', type '$type', prefix '$prefix'.");
+        &Jarvis::Error::debug ($jconfig, "Dataset Directory: '$dir', type '$type', prefix '$prefix', dbname '$dbname'.");
         if ($subset_name =~ m/^$prefix(.*)$/) {
             my $remainder = $1;
             
@@ -145,7 +147,8 @@ sub get_config_xml {
                 # Now turn "." into "/" on the dataset name (with prefix stripped).
                 $remainder =~ s/\./\//g;
                 $dsxml_filename = "$dir/$remainder.xml";
-                &Jarvis::Error::debug ($jconfig, "Using dataset directory '$dir', type '$type'.");
+                $default_dbname = $dbname;
+                &Jarvis::Error::debug ($jconfig, "Using dataset directory '$dir', type '$type', default dbname '$dbname'.");
             }
         }
     }
@@ -166,7 +169,7 @@ sub get_config_xml {
     # Per-dataset DB name override default.
     $jconfig->{'subset_name'} = $subset_name;
     $jconfig->{'subset_type'} = $subset_type;
-    $jconfig->{'subset_dbname'} = $dsxml->{'dataset'}{'dbname'}->content || "default";
+    $jconfig->{'subset_dbname'} = $dsxml->{'dataset'}{'dbname'}->content || $default_dbname;
 
     # Enable per dataset dump/debug
     $jconfig->{'dump'} = $jconfig->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($dsxml->{'dataset'}{'dump'}->content || "no")});

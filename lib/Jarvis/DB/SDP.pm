@@ -156,7 +156,7 @@ sub fetchall_arrayref {
     &Jarvis::Error::debug ($jconfig, "Converting to Array of tuples.");
 
     # Now the fun bit.  Convert the deep complicated structure into 2D tuple array like DBI would.
-    my @axis_names = grep { $_ ne 'SliceAxis' } map { $_->{'name'}->content } $root->{'OlapInfo'}->{'AxesInfo'}->{'AxisInfo'}('@');
+    my @axis_names = grep { $_ ne 'SlicerAxis' } map { $_->{'name'}->content } $root->{'OlapInfo'}->{'AxesInfo'}->{'AxisInfo'}('@');
     foreach my $axis_name (@axis_names) {
         &Jarvis::Error::debug ($jconfig, "Axis: $axis_name");        
     }
