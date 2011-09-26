@@ -114,7 +114,6 @@ sub sql_with_substitutions {
     foreach my $idx (0 .. $#bits) {
         if ($idx % 2) {
             my $name = $bits[$idx];
-            $name =~ s///g;
             push (@variable_names, $name);
             $sql2 .= "?";
 
