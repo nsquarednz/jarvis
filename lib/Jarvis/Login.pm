@@ -215,7 +215,7 @@ sub check {
     my $session = $jconfig->{'session'};
     if ($session && $session->param('logged_in') && $session->param('username') && ! $force_relogin) {
         &Jarvis::Error::debug ($jconfig, "Already logged in for session '" . $jconfig->{'sid'} . "'.");
-        $logged_in = $session->param('logged_in') || 0;
+        $logged_in = $session->param('logged_in') ? 1 : 0;
         $username = $session->param('username') || '';
         $group_list = $session->param('group_list') || '';
         $already_logged_in = 1;

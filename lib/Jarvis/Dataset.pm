@@ -107,6 +107,7 @@ sub get_config_xml {
     my $dsxml_filename = undef;
     my $subset_type = undef;
     my $best_prefix_len = -1;
+    my $default_dbname = undef;
         
     # Look at all our 'dataset_dir' entries.  They must all have a directory
     # as their inner content.  Also they may have a type (sdp or dbi), and
@@ -117,18 +118,24 @@ sub get_config_xml {
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
     $axml->{'dataset_dir'} || die "Missing configuration for mandatory element(s) 'dataset_dir'.";
     
+    # Check for duplicate prefixes.
+    my %prefix_seen = ();
+    
     foreach my $dsdir ($axml->{'dataset_dir'}('@')) {
         my $dir = $dsdir->content || die "Missing directory in 'dataset_dir' element.";
         my $type = $dsdir->{'type'}->content || 'dbi';            
         my $prefix = $dsdir->{'prefix'}->content || '';
+        my $dbname = $dsdir->{'dbname'}->content || 'default';
         
         # Non-empty prefix paths must end in a "." for matching purposes.
         if ($prefix && ($prefix !~ m/\.$/)) {
             $prefix .= ".";
         }
         my $prefix_len = length ($prefix);
+
+        $prefix_seen{$prefix}++ && die "Duplicate dataset_dir entries for prefix '$prefix' are defined.";             
         
-        &Jarvis::Error::debug ($jconfig, "Dataset Directory: '$dir', type '$type', prefix '$prefix'.");
+        &Jarvis::Error::debug ($jconfig, "Dataset Directory: '$dir', type '$type', prefix '$prefix', dbname '$dbname'.");
         if ($subset_name =~ m/^$prefix(.*)$/) {
             my $remainder = $1;
             
@@ -140,7 +147,8 @@ sub get_config_xml {
                 # Now turn "." into "/" on the dataset name (with prefix stripped).
                 $remainder =~ s/\./\//g;
                 $dsxml_filename = "$dir/$remainder.xml";
-                &Jarvis::Error::debug ($jconfig, "Using dataset directory '$dir', type '$type'.");
+                $default_dbname = $dbname;
+                &Jarvis::Error::debug ($jconfig, "Using dataset directory '$dir', type '$type', default dbname '$dbname'.");
             }
         }
     }
@@ -161,7 +169,7 @@ sub get_config_xml {
     # Per-dataset DB name override default.
     $jconfig->{'subset_name'} = $subset_name;
     $jconfig->{'subset_type'} = $subset_type;
-    $jconfig->{'subset_dbname'} = $dsxml->{'dataset'}{'dbname'}->content || "default";
+    $jconfig->{'subset_dbname'} = $dsxml->{'dataset'}{'dbname'}->content || $default_dbname;
 
     # Enable per dataset dump/debug
     $jconfig->{'dump'} = $jconfig->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($dsxml->{'dataset'}{'dump'}->content || "no")});
@@ -326,7 +334,7 @@ sub get_post_data {
 #               username            Used for {{username}} in SQL
 #               group_list          Used for {{group_list}} in SQL
 #               format              Either "json", "json.array", "xml", "csv", 
-#                                   or "rows_aref".
+#                                   "xlsx", or "rows_aref".
 #
 #       $rest_args_aref - Optional ref to our REST args (slash-separated after dataset).
 #
@@ -359,9 +367,9 @@ sub fetch {
         $all_results_object = XML::Smart->new ();
     }
     
-    # CSV files don't work with comma-separated datasets.
-    if (($format eq "csv") && ((scalar @subsets) > 1)) {
-        die "CSV format not supported with multiple dataset names.";
+    # CSV (and other spreadsheet formats) no workee with comma-separated datasets.
+    if ((($format eq "csv") || ($format eq "xlsx")) && ((scalar @subsets) > 1)) {
+        die "Format '$format' not supported with multiple dataset names.";
     }
 
     # Handle our parameters.  Always with placeholders.  Note that our special variables
@@ -417,7 +425,13 @@ sub fetch {
             $jconfig->{'status'} = "401 Unauthorized";
             die "Insufficient privileges to read '$subset_name'. $failure\n";
         }    
- 
+
+        # What filename would this dataset use?
+        my $filename_parameter = $dsxml->{'dataset'}{'filename_parameter'}->content || 'filename';
+        &Jarvis::Error::debug ($jconfig, "Filename parameter = '$filename_parameter'.");        
+        $jconfig->{'return_filename'} = $safe_params {$filename_parameter} || '';        
+        &Jarvis::Error::debug ($jconfig, "Return filename = '" . $jconfig->{'return_filename'} . "'.");        
+        
         # Get a database handle.
         my $subset_type = $jconfig->{'subset_type'}; 
         my $subset_dbname = $jconfig->{'subset_dbname'}; 
@@ -430,7 +444,7 @@ sub fetch {
         #
         if (($format eq 'xml') || ($format eq 'xml.array') || 
             ($format eq 'json') || ($format eq 'json.array') || 
-            ($format eq 'csv') || ($format eq 'rows_aref')) {
+            ($format eq 'csv') || ($format eq 'xlsx') || ($format eq 'rows_aref')) {
             
             # Call to the DBI interface to fetch the tuples.
             my ($rows_aref, $column_names_aref);
@@ -617,7 +631,7 @@ sub fetch {
     } elsif (($format eq "json") || ($format eq "json.array")) {
         &Jarvis::Error::debug ($jconfig, "Encoding into JSON format.");
 
-        $all_results_object->{'logged_in'} = $jconfig->{'logged_in'};
+        $all_results_object->{'logged_in'} = $jconfig->{'logged_in'} ? 1 : 0;
         $all_results_object->{'username'} = $jconfig->{'username'};
         $all_results_object->{'error_string'} = $jconfig->{'error_string'};
         $all_results_object->{'group_list'} = $jconfig->{'group_list'};
@@ -646,7 +660,7 @@ sub fetch {
 
         $return_value = $all_results_object->data ();
 
-    # CSV format is the trickiest.  Note that it is dependent on the $sth->{NAME} data
+    # CSV format tricky.  Note that it is dependent on the $sth->{NAME} data
     # being available.  This field is absent in the following cases at least:
     #
     #  - Some (all?) stored procedures under MS SQL.
@@ -695,14 +709,65 @@ sub fetch {
 
         $return_value = $csv_return_text;
         
+    # XLSX is basically the same as CSV, but with different encoding.
+    #
+    } elsif ($format eq "xlsx") {
+        &Jarvis::Error::debug ($jconfig, "Encoding into XLSX format.");
+
+        # Dynamically load this module.
+        require Excel::Writer::XLSX;
+        
+        # Check we have the data we need.
+        my $column_names_aref = $jconfig->{'column_names_aref'};
+        my $rows_aref = $jconfig->{'rows_aref'};
+        
+        if (! $rows_aref) {
+            die "Data query did not include a return result.  Cannot convert to XLSX.";
+        }
+        if (! $column_names_aref || ! (scalar @$column_names_aref)) {
+            die "Data query did not return column names.  Cannot convert to XLSX.";
+        }
+        
+        my %field_index = ();
+        @field_index { @$column_names_aref } = (0 .. $#$column_names_aref);
+
+        # Create an IO buffer.
+        my $xlsx_return_text = '';
+        my $io = IO::String->new ($xlsx_return_text);
+
+        my $workbook = Excel::Writer::XLSX->new ($io);
+        my $size = 10;
+        my $default_format = $workbook->add_format (font => 'Arial', size => $size);
+        my $worksheet = $workbook->add_worksheet ();
+        
+        my ($row, $col) = (0, 0);
+        foreach my $column_name (@$column_names_aref) {
+            $worksheet->write ($row, $col++, $column_name, $default_format);
+        }
+        $row++;
+
+        foreach my $row_href (@$rows_aref) {
+            $col = 0;
+            my @columns = map { $$row_href{$_} } @$column_names_aref;
+            foreach my $value (@columns) {
+                $worksheet->write ($row, $col++, $value, $default_format);
+            }
+            $row++;
+        }        
+        $workbook->close(); 
+        
+        $return_value = $xlsx_return_text;
+
     } else {
         die "Unsupported format.  Cannot encode into '$format' for Dataset::fetch return data.\n";
     }
 
     # Debugging for "text" return values.
-    if ((ref $return_value) eq 'SCALAR') {
+    if ((ref \$return_value) eq 'SCALAR') {
         &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($return_value));
-        &Jarvis::Error::dump ($jconfig, $return_value);
+        &Jarvis::Error::dump ($jconfig, $return_value) unless ($format eq "xlsx");
+    } else {
+        &Jarvis::Error::debug ($jconfig, "type (return_value) = " . (ref \$return_value));
     }
     
     return $return_value;        

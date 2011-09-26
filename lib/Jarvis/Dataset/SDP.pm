@@ -124,7 +124,7 @@ sub mdx_with_substitutions {
             # not execute.
             #
             } else {
-                $value =~ s/[^a-z0-9_\-\s]//ig;
+                $value =~ s/[^0-9a-zA-Z _\-,]//ig;                
                 $mdx2 .= $value;
             }
 
