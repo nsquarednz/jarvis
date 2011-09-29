@@ -212,5 +212,51 @@ sub fetch {
     return ($rows_aref, $column_names_aref); 
 }
 
+################################################################################
+# Loads the data for the current dataset(s), and puts it into our return data
+# array so that it can be presented to the client in JSON or XML or whatever.
+#
+# This function only processes a single dataset.  The parent method may invoke
+# us multiple times for a single request, and combine into a single return 
+# object.
+#
+# This variant is for 3D MDX queries only.  I.e. those that specify ROW and
+# COLUMN and PAGE.
+#
+# Note that the result from this call is a HASH, not an ARRAY! This will 
+# probably confuse the heck out of any hook.
+#
+# Params:
+#       $jconfig - Jarvis::Config object
+#           READ
+#               cgi                 Contains data values for {{param}} in MDX
+#               username            Used for {{username}} in MDX
+#               group_list          Used for {{group_list}} in MDX
+#               format              Either "json" or "xml" or "csv".
+#
+#       $subset_name - Name of single dataset we are fetching from.
+#       $dsxml - Dataset's XML configuration object.
+#       $dbh - Database handle of the correct type to match the dataset.
+#       $safe_params_href - All our safe parameters.
+#
+# Returns:
+#       $data_href - Three Dimensional nested hash.
+################################################################################
+#
+sub fetch_3d {
+    my ($jconfig, $subset_name, $dsxml, $dbh, $safe_params_href) = @_;
+    
+    # Get our STM.  This has everything attached.
+    my $mdx = &parse_mdx ($jconfig, $dsxml, $safe_params_href) ||
+        die "Dataset '$subset_name' (type 'sdp') has no MDX query.";
+
+    # What key will we use to store the row labels?
+    my $row_label = $dsxml->{dataset}{mdx}{row_label}->content || 'row_label';
+        
+    # Execute Fetch in 2D tuple format.
+    my ($data_href) = $dbh->fetchall_hashref_3d ($jconfig, $mdx, $row_label);    
+
+    return ($data_href); 
+}
 
 1;

@@ -458,7 +458,7 @@ sub fetch {
                     = &Jarvis::Dataset::SDP::fetch ($jconfig, $subset_name, $dsxml, $dbh, \%safe_params);
                     
             } else {
-                die "Unrecognised dataset type '$subset_type' in fetch of format '$format'.";
+                die "Unsupported dataset type '$subset_type' in fetch of format '$format'.";
             }
             
             # Now we have an array of hash objects.
@@ -602,6 +602,54 @@ sub fetch {
             } else {
                 $result_object->{'data'} = $rows_aref;
             }
+
+        # 3D Data is a very, very special case.  It is only supported for MDX,
+        # and it uses a different return format so that hooks may not play
+        # nicely.
+        #
+            } elsif (($format eq 'json.3d') || ($format eq 'xml.3d')) {
+            
+            # Call to the DBI interface to fetch the nested hash..
+            my $data_href;
+            
+            if ($subset_type eq 'sdp') {
+                ($data_href) 
+                    = &Jarvis::Dataset::SDP::fetch_3d ($jconfig, $subset_name, $dsxml, $dbh, \%safe_params);
+                    
+            } else {
+                die "Unsupported dataset type '$subset_type' in fetch of format '$format'.";
+            }
+            
+            # This final hook allows you to modify the data returned by SQL for one dataset.
+            # This hook may do one or both of:
+            #
+            #   - Completely modify the returned content (by modifying $rows_aref)
+            #   - Add additional per-dataset scalar parameters (by setting $extra_href)
+            #
+            my $extra_href = {};
+            &Jarvis::Hook::dataset_fetched ($jconfig, $dsxml, \%safe_params, $data_href, undef, $extra_href);
+                    
+            # Store some additional info in jconfig for debugging/tracing.
+            # These will refer to the most recent dataset being processed.
+            $jconfig->{'data_href'} = $data_href;
+        
+            # Assemble the result object.
+            #
+            # NOTE: We always return a 'data' field, even if it is an empty array.
+            # That is because ExtJS and other libraries will flag an exception if we do not.
+            #
+            foreach my $name (sort (keys %$extra_href)) {
+                $result_object->{$name} = $extra_href->{$name};
+            }
+        
+            # XML encoding in its simplest form.
+            if ($format eq "xml.3d") {
+                $result_object->{'data'} = $data_href;
+                
+            # JSON encoding. 
+            } else {
+                $result_object->{'data'} = $data_href;
+            }
             
         } else {
             die "No implementation for fetch format '$format', dataset '$subset_name'.";
@@ -628,7 +676,7 @@ sub fetch {
         $return_value = $jconfig->{'rows_aref'};
         
     # JSON encoding is now simple.
-    } elsif (($format eq "json") || ($format eq "json.array")) {
+    } elsif (($format eq "json") || ($format =~ m/^json\./)) {
         &Jarvis::Error::debug ($jconfig, "Encoding into JSON format.");
 
         $all_results_object->{'logged_in'} = $jconfig->{'logged_in'} ? 1 : 0;
@@ -645,7 +693,7 @@ sub fetch {
         $return_value = $json->encode ( $all_results_object );
 
     # XML is also simple.
-    } elsif (($format eq "xml") || ($format eq "xml.array")) {
+    } elsif (($format eq "xml") || ($format =~ m/^xml\./)) {
         &Jarvis::Error::debug ($jconfig, "Encoding into XML format.");
 
         $all_results_object->{'response'}{'logged_in'} = $jconfig->{'logged_in'};
