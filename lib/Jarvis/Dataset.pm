@@ -312,11 +312,27 @@ sub get_post_data {
     }
 
     # This works for DELETE (delete) and PUT (update) on any content.
+    #
+    # PUT/DELETE data appear to come through in a special 'keywords' method.
+    # ... unless application/json is used, in which case they have a special
+    # PUTDATA param.
+    # Weird huh!
     if (! $jconfig->{'post_data'}) {
+        $jconfig->{'post_data'} = $jconfig->{'cgi'}->keywords();
+    }
+
+    if (! $jconfig->{'post_data'}) {
+        $jconfig->{'post_data'} = $jconfig->{'cgi'}->param('PUTDATA');
+    }
+
+    # Last ditch effort - read STDIN.
+    if (! $jconfig->{'post_data'}) {
+        $jconfig->{'post_data'} = "";
         while (<STDIN>) {
             $jconfig->{'post_data'} .= $_;
         }
     }
+
     return $jconfig->{'post_data'};
 }
 
