@@ -193,7 +193,7 @@ sub fetchall_arrayref {
     # Now the cell data
     foreach my $cell ($root->{'CellData'}->{'Cell'}('@')) {
         my $ordinal = $cell->{'CellOrdinal'}->content;
-        my $value = 1 * $cell->{'Value'}->content;
+        my $value = $cell->{'Value'}->content;
         my $column = $ordinal % $num_columns;
         my $row = ($ordinal - $column) / $num_columns;
         my $column_name = $column_names[$column];
@@ -278,7 +278,7 @@ sub fetchall_hashref_3d {
     my %data = ();
     foreach my $cell ($root->{'CellData'}->{'Cell'}('@')) {
         my $ordinal = $cell->{'CellOrdinal'}->content;
-        my $value = 1 * $cell->{'Value'}->content;
+        my $value = $cell->{'Value'}->content;
         my $column = $ordinal % $num_columns;
         $ordinal = ($ordinal - $column) / $num_columns;
 
