@@ -33,6 +33,7 @@ package Jarvis::Dataset::DBI;
 use DBI;
 use JSON::PP; 
 use XML::Smart;
+use Data::Dumper;
 
 use Jarvis::Text;
 use Jarvis::Error;
@@ -232,11 +233,20 @@ sub parse_statement {
 
     &Jarvis::Error::dump ($jconfig, "SQL after substition = " . $sql_with_substitutions);
 
+    # Use special prepare parameters
+    my $prepare_str = $dsxml->{dataset}{$ttype}{'prepare'};
+    &Jarvis::Error::debug ($jconfig, "Prepare = '$prepare_str'");
+    # split, trim and convert to hash (format: "pg_server_prepare => 0, something_else => 1")
+    my %prepare_attr = map { $_ =~ /^\s*(.*\S)\s*$/ ? $1 : $_ } map { split(/=>/, $_) } split(/,/, $prepare_str);
+    if (defined $prepare_str and length($prepare_str) > 0) {
+        &Jarvis::Error::dump ($jconfig, "Prepare after parsing =\n" . Dumper(%prepare_attr));
+    }
+
     # Do the prepare, with RaiseError & PrintError disabled.
     {
         local $dbh->{RaiseError};
         local $dbh->{PrintError};
-        $obj->{'sth'} = $dbh->prepare ($sql_with_substitutions) ||
+        $obj->{'sth'} = $dbh->prepare ($sql_with_substitutions, \%prepare_attr) ||
             die "Couldn't prepare statement for $ttype on '" . $jconfig->{'dataset_name'} . "'.\nSQL ERROR = '" . $dbh->errstr . "'.";
     }
 
