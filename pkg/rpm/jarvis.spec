@@ -6,6 +6,7 @@ Group: Application/Enterprise
 License: LGPL v3
 URL: http://gitorious.org/jarvis/jarvis
 Source0: jarvis.tar
+BuildArch: noarch
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 %global Root /opt/jarvis
