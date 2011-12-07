@@ -64,6 +64,10 @@ sub mdx_with_substitutions {
 
     my ($jconfig, $mdx, $args_href) = @_;
 
+    foreach my $k (keys %{$args_href}) {
+        &Jarvis::Error::debug ($jconfig, "MDX substitution: $k -> $args_href->{$k}.");
+    }
+
     # Parameters NAMES may contain only a-z, A-Z, 0-9, underscore(_), colon(:) and hyphen(-)
     # Note pipe(|) is also allowed at this point as it separates (try-else variable names)
     #

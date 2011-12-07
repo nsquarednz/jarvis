@@ -93,7 +93,7 @@ sub statement_execute {
 ################################################################################
 #
 sub get_config_xml {
-    my ($jconfig, $subset_name) = @_;
+    my ($jconfig, $subset_name, $safe_params_href) = @_;
 
     my $cgi = $jconfig->{"cgi"};
 
@@ -182,7 +182,7 @@ sub get_config_xml {
     $jconfig->{'sort_dir_param'} = $axml->{'sort_dir_param'}->content || 'sort_dir';
 
     # Load/Start dataset specific hooks.
-    &Jarvis::Hook::start_dataset ($jconfig, $dsxml);
+    &Jarvis::Hook::start_dataset ($jconfig, $dsxml, $safe_params_href);
 
     return $dsxml;
 }
@@ -431,7 +431,7 @@ sub fetch {
         }
 
         # Load dataset definition.
-        my $dsxml = &get_config_xml ($jconfig, $subset_name) || die "Cannot load configuration for dataset '$subset_name'.\n";
+        my $dsxml = &get_config_xml ($jconfig, $subset_name, \%safe_params) || die "Cannot load configuration for dataset '$subset_name'.\n";
 
         # Check the allowed groups.
         my $allowed_groups = $dsxml->{dataset}{"read"};
