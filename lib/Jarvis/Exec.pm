@@ -37,7 +37,7 @@ use Jarvis::Error;
 use Jarvis::Text;
 
 ################################################################################
-# Shows our current connection status.
+# Runs a command.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -56,7 +56,7 @@ use Jarvis::Text;
 ################################################################################
 #
 sub do {
-    my ($jconfig, $dataset, $rest_args_aref) = @_;
+    my ($jconfig, $dataset, $rest_args_aref, $return_result_ref) = @_;
 
     ###############################################################################
     # See if we have any extra "exec" dataset for this application.
@@ -143,7 +143,7 @@ sub do {
     # Now pull out only the safe variables.  Add our rest args too.
     my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%param_values, $rest_args_aref, 'p');
 
-    my $tmpFile = undef;
+    my $tmp_file = undef;
     if ($use_tmpfile) {
         if ($tmp_directory) {
             if (-d $tmp_directory) {
@@ -169,14 +169,14 @@ sub do {
         # security weakness.  Just add a random component.
         $template .= "-XXXXXXXXXX";
 
-        $tmpFile = new File::Temp (
+        $tmp_file = new File::Temp (
             TEMPLATE => $template,
             SUFFIX => $suffix,
             DIR => $tmp_directory,
-            UNLINK => (! $tmp_http_path)
+            UNLINK => 0 #(! $tmp_http_path)
         );
-        $safe_params{'__tmpfile'} = $tmpFile->filename;
-        &Jarvis::Error::debug ($jconfig, "TMP filename = " . $tmpFile->filename);
+        $safe_params{'__tmpfile'} = $tmp_file->filename;
+        &Jarvis::Error::debug ($jconfig, "TMP filename = " . $tmp_file->filename);
     }
 
     # Add the dataset as a safe variable too.
@@ -216,9 +216,18 @@ sub do {
     # Execute the command
     &Jarvis::Error::debug ($jconfig, "Executing Command: $command");
     my $output =`$command`;
+    my $status = $?; # Failure?
 
-    # Failure?
-    my $status = $?;
+    if ($return_result_ref) {
+        $return_result_ref->{'status'} = $status;
+        $return_result_ref->{'stdout'} = $output;
+        $return_result_ref->{'filename'} = $tmp_file->filename if $use_tmpfile;
+
+        # No further activity - the caller is now responsibly
+        # for doing something with the results.
+        return 1;
+    }
+
     if ($status != 0) {
         die "Command failed with status $status.\n$output";
     }
@@ -233,7 +242,7 @@ sub do {
 
         if ($filename) {
             if ($use_tmpfile) {
-                my $length = -s $tmpFile->filename;
+                my $length = -s $tmp_file->filename;
                 print $jconfig->{'cgi'}->header(
                     -type                   => $mime_type->type,
                     'Content-Disposition'   => "attachment; filename=$filename",
@@ -272,7 +281,7 @@ sub do {
     #
     if ($use_tmpfile && ! $tmp_redirect) {
         &Jarvis::Error::debug ($jconfig, "Streaming temporary file content back to client.");
-        open(F, $tmpFile->filename) || die "Unable to open '" . $tmpFile->filename . "' to return output to the client.";
+        open(F, $tmp_file->filename) || die "Unable to open '" . $tmp_file->filename . "' to return output to the client.";
         binmode(F);
         my $buff;
         while (read(F, $buff, 8 * 2**10)) {
@@ -288,9 +297,9 @@ sub do {
     # cleans up old temporary files.
     #
     } elsif ($tmp_redirect) {
-        (-f $tmpFile->filename) || die "Report output failed, no file created.";
+        (-f $tmp_file->filename) || die "Report output failed, no file created.";
 
-        my $url = "http://" . $ENV{"HTTP_HOST"} . "/" . $tmp_http_path . (($tmp_http_path =~ m|\/$|) ? "" : "/") . &File::Basename::basename ($tmpFile->filename);
+        my $url = "http://" . $ENV{"HTTP_HOST"} . "/" . $tmp_http_path . (($tmp_http_path =~ m|\/$|) ? "" : "/") . &File::Basename::basename ($tmp_file->filename);
         &Jarvis::Error::debug ($jconfig, "Redirect to: $url");
         print $jconfig->{'cgi'}->redirect( -URL => $url);
 
