@@ -132,7 +132,7 @@ sub start_global {
 ################################################################################
 #
 sub start_dataset {
-    my ($jconfig, $dsxml) = @_;
+    my ($jconfig, $dsxml, $safe_params_href) = @_;
 
     (defined $jconfig->{'hooks'}) || ($jconfig->{'hooks'} = []);
 
@@ -151,7 +151,13 @@ sub start_dataset {
                 }
             }
 
-            my %hook_def = ('module' => $module, 'lib' => $lib, 'parameters' => \%hook_parameter);
+            my %hook_def = (
+                'module' => $module
+                , 'lib' => $lib
+                , 'parameters' => \%hook_parameter
+                , 'dsxml' => $dsxml
+                , 'safe_params' => $safe_params_href
+            );
             push (@{ $jconfig->{'hooks'} }, \%hook_def);
             &start_one ($jconfig, \%hook_def);
         }
@@ -195,7 +201,7 @@ sub start_one {
     {
         no strict 'refs';
         exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
-        exists &$method && &$method ($jconfig, $hook_parameters_href);
+        exists &$method && &$method ($jconfig, $hook_parameters_href, $hook->{'dsxml'}, $hook->{'safe_params'});
     }
 
     return 1;

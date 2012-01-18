@@ -103,7 +103,7 @@ sub fetchall {
     my $rxml = $soap->call('Execute',         
         SOAP::Data->name('Command')->value(
             \SOAP::Data->value(
-                SOAP::Data->name('Statement')->value($mdx)
+                SOAP::Data->name('Statement')->type('string')->value($mdx)
             )
         ),
         SOAP::Data->name('Properties')->value(
