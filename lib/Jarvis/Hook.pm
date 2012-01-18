@@ -481,7 +481,7 @@ sub dataset_fetched {
 
     my @hooks = @{ $jconfig->{'hooks'} };
 
-    # Now invoke "return_fetch" on all the hooks we found.
+    # Now invoke "dataset_fetched" on all the hooks we found.
     foreach my $hook (@hooks) {
         my $lib = $hook->{'lib'};
         my $module = $hook->{'module'};

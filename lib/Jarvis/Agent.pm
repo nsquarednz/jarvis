@@ -37,9 +37,9 @@ use Jarvis::Main;
 ###############################################################################
 #
 sub handler {
-    my $r = shift;
+    my $io = shift;
 
-    &Jarvis::Main::do ($r);
+    &Jarvis::Main::do ({ mod_perl_io => $io });
 
     return Apache2::Const::OK;
 }

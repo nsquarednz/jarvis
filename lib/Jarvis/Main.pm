@@ -75,9 +75,10 @@ sub error_handler {
     $msg =~ s/\x00.*$//;
     $msg =~ s/\s*$/\n/;
 
-    # Return error.  Note that we do not print stack trace to user, since
-    # that is a potential security weakness.
-    my $status = $jconfig->{'status'} || "500 Internal Server Error";
+    # Return error to client.  Note that we do not print stack trace to user, 
+    # since that is a potential security weakness.
+    $jconfig->{'status'} = $jconfig->{'status'} || "500 Internal Server Error"; 
+    my $status = $jconfig->{'status'};
     print $cgi->header(-status => $status, -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt");
     print $msg;
 
@@ -91,13 +92,18 @@ sub error_handler {
     # Let's be tidy and free the database handles.
     &Jarvis::DB::disconnect ($jconfig);
     &Jarvis::Tracker::disconnect ($jconfig);
+    
+    # Perhaps we need more clean-up in here, since we may also be serving  
+    # Jarvis from a perl HTTPD in some cases.  Need to keep an eye out for
+    # any other resource leaks.
+}
 
-    # Under mod_perl we might actually wish to do something else here to
-    # indicate that we are done.  I suspect that "exit 0" will shut down the
-    # child processes, which perhaps is a little extreme.  Potential
-    # performance enhancement here.
-    #
-    exit 0;
+###############################################################################
+# Get $jconfig singleton.  Not designed for internal use.
+###############################################################################
+#
+sub jconfig {
+    return $jconfig;
 }
 
 ###############################################################################
@@ -105,15 +111,18 @@ sub error_handler {
 ###############################################################################
 #
 sub do {
-    my $mod_perl_io = shift; # possibly get our mod-perl stream output variable
-
+    my $options = shift;
+    
     $SIG{__WARN__} = sub { die shift };
     $SIG{__DIE__} = \&Jarvis::Main::error_handler;
 
-    # Jarvis root.  Look through our @INC and find out where "lib" is, then
-    # go up one directory from there to find JARVIS_ROOT.  We provide the
-    # JARVIS_ROOT as an override.  It should never be needed.
-    #
+    # Optional mod-perl stream output variable
+    my $mod_perl_io = $options && $options->{mod_perl_io};
+    
+    # CGI object for all sorts of things.
+    $cgi = ($options && $options->{cgi}) || new CGI;
+
+    # Environment variables.
     my $jarvis_root = $ENV {'JARVIS_ROOT'};
     foreach my $inc (@INC) {
         last if $jarvis_root;
@@ -123,8 +132,6 @@ sub do {
     }
     $jarvis_root || die "Cannot determine JARVIS_ROOT.";
 
-    # Jarvis etc.  This is where our application configuration XML files are.
-    #
     my $jarvis_etc = $ENV {'JARVIS_ETC'};
     foreach my $etc (@etc) {
         last if $jarvis_etc;
@@ -132,10 +139,7 @@ sub do {
             $jarvis_etc = $etc;
         }
     }
-    $jarvis_etc || die "Cannot determine JARVIS_ETC.";
-
-    # Get a new CGI object.
-    $cgi = new CGI;
+    $jarvis_etc || die "Cannot determine JARVIS_ETC.";    
 
     ###############################################################################
     # Determine app name (and possibly data-set).
