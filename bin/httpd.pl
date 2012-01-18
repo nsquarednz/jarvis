@@ -32,6 +32,7 @@ use base qw (HTTP::Server::Simple::CGI);
 use Carp;
 use CGI; 
 use Getopt::Long;
+use Pod::Usage;
 use Cwd qw (abs_path);
 use Net::Server::Fork;
 use MIME::Types;
@@ -52,19 +53,39 @@ use Jarvis::Error;
 # Also, we probably want to support aliaii as well.
 #
 
-my $port = 8080;
+my $port = 8448;
+my $host = "0.0.0.0";
 my $agent_prefix = "/jarvis-agent/";
-my $root_dir = "/home/jcouper/dev/exoviz/htdocs/";
+my $root_dir = undef;
 my $access_log = undef;
+my $error_log = undef;
+my $help = 0;
+my $man = 0;
 
 # Get comand line settings.
+#
+# Please remember to update the POD at the bottom of this file if you add
+# new command line options.
+#
 &Getopt::Long::GetOptions (
     "agent-prefix=s" => \$agent_prefix,
     "root-dir=s" => \$root_dir,
     "port=i" => \$port,
-    "access_log=s" => \$access_log
-)
-|| die "Cannot parse command line options.";
+    "host=s" => \$host,
+    "access-log=s" => \$access_log,
+    "error-log=s" => \$error_log,
+    'help|?' => \$help,
+    'man' => \$man
+) || pod2usage(2);
+
+# Help and Manpage options.
+pod2usage(1) if $help;
+pod2usage(-exitstatus => 0, -verbose => 2) if $man;
+
+# Redirect stderr if requested.
+if ($error_log) {
+    open STDERR, ">>$error_log" || die "Cannot redirect STDERR: $!\n";
+}
 
 # Sanity check.
 if ($root_dir) {
@@ -73,6 +94,7 @@ if ($root_dir) {
     print STDERR "Using '$root_dir' as htdocs root directory.\n";
 }
 
+my $mime_types = MIME::Types->new;
 
 ###############################################################################
 # Utility functions.
@@ -99,7 +121,6 @@ sub log_access {
         my $method = $cgi->request_method ();
         
         my $line = sprintf "%d.%03d %s %s %s\n", $$start[0], ($$start[1] / 1000), $method, $elapsed, $resource;      
-        # die $line;
         print $alf $line;
         close ($alf);
     }
@@ -109,6 +130,10 @@ sub log_access {
 # Main Handlers
 ###############################################################################
 #
+sub net_server {
+    return 'Net::Server::Fork';
+}
+
 sub handle_request {
     my ($self, $cgi) = @_;
 
@@ -145,7 +170,7 @@ sub handle_request {
 
         
     # These are static document requests within htdocs.
-    } else {
+    } elsif ($root_dir) {
         my $file_path = $path;
         $file_path =~ s|^/||;
         $file_path = $root_dir . $file_path;
@@ -192,9 +217,10 @@ sub handle_request {
         }
 
         # Get the MIME type.        
-        my $mime_types = MIME::Types->new;
         my $filename_type = $mime_types->mimeTypeOf ($file_path);
         my $mime_type = $filename_type ? $filename_type->type : 'text/plain';
+        
+        print STDERR "MIME Type for '$file_path' is '$mime_type'\n";
                 
         # Get the file stats.
         my @stat = stat ($file_path);
@@ -222,11 +248,102 @@ sub handle_request {
     }
 }
 
-my $net_server = Net::Server::Fork->new ();;
-
+# Prepare the Server.
 my $server = Jarvis::WebServer->new () || die "Cannot start HTTP server: $!";
-$server->net_server ($net_server);
 $server->port ($port);
-$server->run ();
+$server->run (host => $host);
+
+# We should never get here, unless we failed to run.  In which case maybe there
+# is useful info in the error log.
+if ($error_log) {
+    print "HTTP server could not run.  Check the error log for more information.\n";
+    print "  $error_log\n"; 
+}
 
 1;
+
+ __END__
+
+=head1 NAME
+
+httpd - Standalone Jarvis HTTPD server, for when Apache or IIS aren't wanted.
+
+=head1 SYNOPSIS
+
+perl httpd.pl [options]
+
+Options:
+  --agent-prefix    prefix
+  --root-dir        directory
+  --port            number
+  --host            address
+  --access-log      file
+  --error-log       file
+  --help            (brief help message)
+  --man             (full documentation)
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<--agent-prefix>
+
+This prefix at the start of request URLs indicates that the remainder of the
+request should be passed to Jarvis for processing.  The default prefix is
+"/jarvis-agent/".
+
+=item B<--root-dir>
+
+This specifies the root directory from which static files should be served 
+in the case where the requested URL does not match the agent prefix.  This 
+parameter is optional and has no default.  If no root directory is specified,
+then static documents will not be served.
+
+=item B<--port>
+
+This specifes an alternate listening port number.  The default is "8448".
+
+=item B<--host>
+
+This specifies a default listening host address.  The default is "0.0.0.0".
+
+=item B<--access-log>
+
+This file is the name of the access log.  One line will be appended to this
+file for each incoming request.  The format of the access log file is:  
+
+  <epoch> <method> <elapsed-ms> <request-type>:<path>
+
+e.g.
+
+  1326924314.984 GET 1474 jarvis:/exoviz/mdx.pnl_summary
+  
+This parameter has no default.  If not specified, then access logs will not
+be written.
+
+=item B<--error-log>
+
+This file specifies an alternate destination for redirecting STDERR output.
+By default, error and debug (including Jarvis debug) is written to STDERR.
+
+=item B<--help>
+
+Print a brief help message and exits.
+
+=item B<--man>
+
+Prints the manual page and exits.
+
+=back
+
+=head1 DESCRIPTION
+
+B<httpd.pl> is a standalone HTTP web-server, designed to be run on simple 
+installations where Jarvis functionality is required, along with very basic
+serving of static documents.  In such cases, the installation overhead 
+associated with Apache, IIS or other full-featured web servers is not required.
+
+It does not detach from the command line.
+
+=cut
+
