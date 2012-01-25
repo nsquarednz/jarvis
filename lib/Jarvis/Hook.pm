@@ -11,12 +11,10 @@
 #               (b) Change the Jarvis behaviour, e.g. custom formatting, or
 #                   security checking.
 #
-#               The hook points are as follows.  Your hook module MUST provide
-#               all of these methods, even if they are empty functions.
-#               Your hook functions must return "1" in all cases.  If you
-#               wish to abort processing then call "die".
+#               The hook points are as follows.  Each hook is optional.  
+#               If you wish to abort processing then call "die".
 #
-#                 start ($jconfig, $hook_params_href)
+#                 start ($jconfig, $hook_params_href [, $dsxml, $safe_params])
 #                 CALLED: After all Jarvis setup is complete.
 #
 #                 after_login ($jconfig, $hook_params_href, $additional_safe_href)
@@ -151,15 +149,11 @@ sub start_dataset {
                 }
             }
 
-            my %hook_def = (
-                'module' => $module
-                , 'lib' => $lib
-                , 'parameters' => \%hook_parameter
-                , 'dsxml' => $dsxml
-                , 'safe_params' => $safe_params_href
-            );
+            # Note that you can NOT add $dsxml to the hook_def object.  You cannot
+            # ever take a copy of an XML::Smart object, because the cleanup fails. 
+            my %hook_def = ('module' => $module, 'lib' => $lib, 'parameters' => \%hook_parameter);
             push (@{ $jconfig->{'hooks'} }, \%hook_def);
-            &start_one ($jconfig, \%hook_def);
+            &start_one ($jconfig, \%hook_def, $dsxml, $safe_params_href);
         }
     }
 
@@ -177,7 +171,7 @@ sub start_dataset {
 ################################################################################
 #
 sub start_one {
-    my ($jconfig, $hook) = @_;
+    my ($jconfig, $hook, $dsxml, $safe_params_href) = @_;
 
     my $lib = $hook->{'lib'};
     my $module = $hook->{'module'};
@@ -201,7 +195,7 @@ sub start_one {
     {
         no strict 'refs';
         exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
-        exists &$method && &$method ($jconfig, $hook_parameters_href, $hook->{'dsxml'}, $hook->{'safe_params'});
+        exists &$method && &$method ($jconfig, $hook_parameters_href, $dsxml, $safe_params_href);
     }
 
     return 1;
@@ -216,7 +210,7 @@ sub start_one {
 # Params:
 #       $jconfig        - Jarvis::Config object
 #
-#       $additional_safe_href - Reference to the has of additional safe
+#       $additional_safe_href - Reference to the hash of additional safe
 #                               parameters.  Hook module may add new ones.
 #
 # Returns:

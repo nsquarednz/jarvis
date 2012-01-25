@@ -76,7 +76,7 @@ sub get_sql {
 #   {{var}}, {var}, {$var}, {{$var}}
 #   [[var]], [$var]
 #
-# IN FUTURE WE WILL ATTEMPT TO MOVE TO A CONSISTENT FORMAT!
+# IN FUTURE WE WILL ATTEMPT TO CONSTRAIN TO A SINGLE FORMAT!
 #   {$var} - for bind variables
 #   [$var] - for textual substitution variables
 #

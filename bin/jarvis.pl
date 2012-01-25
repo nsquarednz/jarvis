@@ -59,6 +59,7 @@ my $agent_prefix = "/jarvis-agent/";
 my $root_dir = undef;
 my $access_log = undef;
 my $error_log = undef;
+my $etc_dir = undef;
 my $help = 0;
 my $man = 0;
 
@@ -74,6 +75,7 @@ my $man = 0;
     "host=s" => \$host,
     "access-log=s" => \$access_log,
     "error-log=s" => \$error_log,
+    "etc-dir=s" => \$etc_dir,
     'help|?' => \$help,
     'man' => \$man
 ) || pod2usage(2);

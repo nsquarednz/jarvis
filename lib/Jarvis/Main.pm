@@ -38,6 +38,7 @@ package Jarvis::Main;
 
 use CGI;
 use File::Basename;
+use Data::Dumper;
 
 use Jarvis::Error;
 use Jarvis::Config;
@@ -61,6 +62,19 @@ my $jconfig = undef;
 
 # This is where we might look for etc directories.
 my @etc = ('/etc/jarvis', '/opt/jarvis/etc');
+
+###############################################################################
+# Debugging for our old friend XML::Smart and its beloved clean errors.
+###############################################################################
+#
+use XML::Smart; 
+sub XML::Smart::DESTROY {
+  my $this = shift ;
+  # print STDERR "In XML::Smart::DESTROY.\n";
+  # print STDERR "  (object) is a " . ref ($this) . "\n";
+  # print STDERR ($$this ? "  and is defined.\n" : "  but is null.\n");
+  $$this && $$this->clean ;    
+}
 
 ###############################################################################
 # Setup error handler.
@@ -172,41 +186,20 @@ sub do {
     $app_name || die "Missing app name.  Send $script_name/<app>[/<dataset>[/<arg1>...]] in URI!\n";
     $app_name =~ m|^[\w\-]+$| || die "Invalid app_name '$app_name'!\n";
 
-    # Dataset name can't be empty, and can only be normal characters with "-", and "."
-    # for directory separator.  Note that we don't check yet for leading and trailing
-    # dot and other file security stuff.  We'll do that when we actually go to open
-    # the file, because maybe some execs/plugins might allow it, and we don't want
+    # Dataset name can't be empty.  Also, it can only be normal characters 
+    # with "-", and "." for directory separator.
+    #
+    # Note that we don't check yet for leading and trailing dot and other file 
+    # security stuff.  We'll do that when we actually go to open the file, 
+    # because maybe some execs/plugins might allow it, and we don't want
     # to restrict them.
     #
     # A "metaset" will allow multiple comma-separated dataset names.  This is allowed
     # only for "fetch" and only for XML or JSON formats.  There will be additional 
     # checks to follow to ensure that "," datasets are used only in specific cases.
     #
-    ($dataset_name eq '') || ($dataset_name =~ m|^[\w\-\.,]+$|) || die "Invalid dataset_name '$dataset_name'!\n";
-
-    # Now we can create our $jconfig at last!
-    $jconfig = new Jarvis::Config ($app_name, ('etc_dir' => "$jarvis_etc", 'cgi' => $cgi, 'mod_perl_io' => $mod_perl_io ) );
-    $dataset_name && ($jconfig->{'dataset_name'} = $dataset_name);
-
-    # Determine client's IP.
-    $jconfig->{'client_ip'} = $ENV{"HTTP_X_FORWARDED_FOR"} || $ENV{"HTTP_CLIENT_IP"} || $ENV{"REMOTE_ADDR"} || '';
-
-    # Start tracking now.  Hopefully, not too much time has passed.
-    &Jarvis::Tracker::start ($jconfig);
-
-    # Debug can now occur, since we have called Config!
-    &Jarvis::Error::debug ($jconfig, "URI = $ENV{REQUEST_URI}");
-    &Jarvis::Error::debug ($jconfig, "Base Path = $path");
-    &Jarvis::Error::debug ($jconfig, "App Name = $app_name");
-    &Jarvis::Error::debug ($jconfig, "Dataset Name = $dataset_name");
-
-    foreach my $i (0 .. $#rest_args) {
-        &Jarvis::Error::debug ($jconfig, "Rest Arg " . ($i + 1) . " = " . $rest_args[$i]);
-    }
-
-    # foreach my $env (keys %ENV) {
-    #     &Jarvis::Error::debug ($jconfig, "$env = $ENV{$env}");
-    # }
+    ($dataset_name eq '') && die "All requests require $script_name/$app_name/<dataset-or-special>[/<arg1>...] in URI!\n";
+    ($dataset_name =~ m|^[\w\-\.,]+$|) || die "Invalid dataset_name '$dataset_name'!\n";    
 
     ###############################################################################
     # Some additional parameter parsing code, because of CGI.pm oddness.
@@ -242,6 +235,36 @@ sub do {
             }
         }
     }
+    
+    ###############################################################################
+    # Now we can create our $jconfig at last!  Debug can start too.
+    ###############################################################################
+
+    # Create $jconfig object.  This is used everywhere in Jarvis.
+    $jconfig = new Jarvis::Config ($app_name, ('etc_dir' => "$jarvis_etc", 'cgi' => $cgi, 'mod_perl_io' => $mod_perl_io ) );
+    
+    # Store the dataset name.
+    $jconfig->{'dataset_name'} = $dataset_name;
+
+    # Determine client's IP.
+    $jconfig->{'client_ip'} = $ENV{"HTTP_X_FORWARDED_FOR"} || $ENV{"HTTP_CLIENT_IP"} || $ENV{"REMOTE_ADDR"} || '';
+
+    # Start tracking now.  Hopefully, not too much time has passed.
+    &Jarvis::Tracker::start ($jconfig);
+
+    # Debug can now occur, since we have called Config!
+    &Jarvis::Error::debug ($jconfig, "URI = $ENV{REQUEST_URI}");
+    &Jarvis::Error::debug ($jconfig, "Base Path = $path");
+    &Jarvis::Error::debug ($jconfig, "App Name = $app_name");
+    &Jarvis::Error::debug ($jconfig, "Dataset Name = $dataset_name");
+
+    foreach my $i (0 .. $#rest_args) {
+        &Jarvis::Error::debug ($jconfig, "Rest Arg " . ($i + 1) . " = " . $rest_args[$i]);
+    }
+
+    # foreach my $env (keys %ENV) {
+    #     &Jarvis::Error::debug ($jconfig, "$env = $ENV{$env}");
+    # }
 
     # my @names = $cgi->param;
     # foreach my $name (@names) {
@@ -286,9 +309,6 @@ sub do {
     &Jarvis::Error::debug ($jconfig, "Error String = '" . $jconfig->{'error_string'} . "'");
     &Jarvis::Error::debug ($jconfig, "Method = '" . $method . "'");
     &Jarvis::Error::debug ($jconfig, "Action = '" . $action . "'");
-
-    # Check we have a dataset.
-    $dataset_name || die "All requests require $script_name/$app_name/<dataset-or-special>[/<arg1>...] in URI!\n";
 
     # What kind of dataset?
     # 's' = sql, 'i' = internal, 'p' = plugin, 'e' = exec, undef for undetermined.

@@ -81,6 +81,8 @@ sub statement_execute {
 #
 #       $subset_name - Name of single dataset file to load (may be a subset).
 #
+#       $safe_params_href - Hash of variables we intend to substitute.
+#
 #   Note that a "." in a dataset name is a directory path.  Note that the
 #   caller should NOT ever specify the ".xml" suffix, since we would confuse
 #   "test.xml" for "<dataset_dir>/test/xml.xml".  And that would be bad.
@@ -693,7 +695,7 @@ sub fetch {
         
     # JSON encoding is now simple.
     } elsif (($format eq "json") || ($format =~ m/^json\./)) {
-        &Jarvis::Error::debug ($jconfig, "Encoding into JSON format.");
+        &Jarvis::Error::debug ($jconfig, "Encoding into JSON format ($format).");
 
         $all_results_object->{'logged_in'} = $jconfig->{'logged_in'} ? 1 : 0;
         $all_results_object->{'username'} = $jconfig->{'username'};
@@ -710,7 +712,7 @@ sub fetch {
 
     # XML is also simple.
     } elsif (($format eq "xml") || ($format =~ m/^xml\./)) {
-        &Jarvis::Error::debug ($jconfig, "Encoding into XML format.");
+        &Jarvis::Error::debug ($jconfig, "Encoding into XML format ($format).");
 
         $all_results_object->{'response'}{'logged_in'} = $jconfig->{'logged_in'};
         $all_results_object->{'response'}{'username'} = $jconfig->{'username'};
@@ -739,7 +741,7 @@ sub fetch {
     # configure the column names.  Or a post-fetch hook could fake them up.
     #
     } elsif ($format eq "csv") {
-        &Jarvis::Error::debug ($jconfig, "Encoding into CSV format.");
+        &Jarvis::Error::debug ($jconfig, "Encoding into CSV format ($format).");
 
         # Check we have the data we need.
         my $column_names_aref = $jconfig->{'column_names_aref'};
@@ -776,7 +778,7 @@ sub fetch {
     # XLSX is basically the same as CSV, but with different encoding.
     #
     } elsif ($format eq "xlsx") {
-        &Jarvis::Error::debug ($jconfig, "Encoding into XLSX format.");
+        &Jarvis::Error::debug ($jconfig, "Encoding into XLSX format ($format).");
 
         # Dynamically load this module.
         require Excel::Writer::XLSX;

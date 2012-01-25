@@ -57,7 +57,7 @@ use sort 'stable';      # Don't mix up records when server-side sorting
 #       $args_href - Hash of Fetch and REST args.
 #
 # Returns:
-#       ($mdx_with_substitutions, @variable_names).
+#       $mdx_with_substitutions
 ################################################################################
 #
 sub mdx_with_substitutions {
