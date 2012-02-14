@@ -103,6 +103,11 @@ sub sql_with_substitutions {
 
     my ($jconfig, $dbh, $sql, $args_href) = @_;
 
+    # Dump the available arguments at this stage.
+    foreach my $k (keys %{$args_href}) {
+        &Jarvis::Error::dump ($jconfig, "SQL available args: '$k' -> '$args_href->{$k}'.");
+    }
+    
     # Parse the update SQL to get a prepared statement, pulling out the list
     # of names of {{variables}} we replaced by ?.
     #
@@ -130,7 +135,7 @@ sub sql_with_substitutions {
     # Parameters NAMES may contain only a-z, A-Z, 0-9, underscore(_), colon(:) and hyphen(-)
     # Note pipe(|) is also allowed at this point as it separates (try-else variable names)
     #
-    @bits = split (/\[[\[\$]([a-zA-Z0-9_\-:\|]+)\]\]?/i, $sql2);
+    @bits = split (/\[[\[\$]([a-zA-Z0-9_\-:\|]+(?:\![a-z]+)*)\]\]?/i, $sql2);
 
     my $sql3 = "";
     foreach my $idx (0 .. $#bits) {
@@ -142,10 +147,10 @@ sub sql_with_substitutions {
             # name and the flag.  Multiple flags are permitted in theory, with a colon before
             # each flag.  Supported flags at this stage are:
             #
-            #   :noquote        Don't wrap strings with quotes, instead just restrict content.
-            #   :quote          Always quote, even for numbers.
+            #   !noquote        Don't wrap strings with quotes, instead just restrict content.
+            #   !quote          Always quote, even for numbers.
             #
-            while ($name =~ m/^(.*)\:([^\:]+)$/) {
+            while ($name =~ m/^(.*)(\![a-z]+)$/) {
                 $name = $1;
                 my $flag = lc ($2);
                 $flag =~ s/[^a-z]//g;
@@ -160,19 +165,22 @@ sub sql_with_substitutions {
             }
             (defined $value) || ($value = '');
 
+            # Tweak according to flags.
             if ($flags{'noquote'}) {
                 $value =~ s/[^0-9a-zA-Z _\-,]//g;
             }
 
             if ($value =~ m/^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$/ && ! $flags{'quote'}) {
-                $sql3 .= $value;
+                # No change.
 
             } elsif ($flags{'noquote'} && ! $flags{'quote'}) {
-                $sql3 .= $value;
+                # No change.
 
             } else {
-                $sql3 .= $dbh->quote($value);
+                $value = $dbh->quote($value);
             }
+            &Jarvis::Error::debug ($jconfig, "Expanding: '$name' " . (scalar %flags ? ("[" . join (",", keys %flags) . "] ") : "") . "-> '$value'.");            
+            $sql3 .= $value;
 
         } else {
             $sql3 .= $bits[$idx];

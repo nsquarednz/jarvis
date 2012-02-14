@@ -153,6 +153,15 @@ sub fetchall_arrayref {
     # Get the raw data.
     my $root = $self->fetchall ($jconfig, $mdx);
     
+    # Check for errors.
+    &Jarvis::Error::dump ($jconfig, $root->data); 
+    if ($root->{'Exception'}) {
+        my $code = $root->{'Messages'}->{'Error'}->{'ErrorCode'} || '???';
+        my $description  = $root->{'Messages'}->{'Error'}->{'Description'} || '???';
+        die "An MDX error $code occured: $description";
+    }
+    
+    # Otherwise, assume we have data.
     &Jarvis::Error::debug ($jconfig, "Converting 2D MDX result to Array of tuples.");
 
     # Now the fun bit.  Convert the deep complicated structure into 2D tuple array like DBI would.

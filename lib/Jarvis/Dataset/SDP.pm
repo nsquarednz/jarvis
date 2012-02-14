@@ -64,14 +64,15 @@ sub mdx_with_substitutions {
 
     my ($jconfig, $mdx, $args_href) = @_;
 
+    # Dump the available arguments at this stage.
     foreach my $k (keys %{$args_href}) {
-        &Jarvis::Error::debug ($jconfig, "MDX substitution: $k -> $args_href->{$k}.");
+        &Jarvis::Error::dump ($jconfig, "MDX available args: '$k' -> '$args_href->{$k}'.");
     }
 
     # Parameters NAMES may contain only a-z, A-Z, 0-9, underscore(_), colon(:) and hyphen(-)
     # Note pipe(|) is also allowed at this point as it separates (try-else variable names)
     #
-    my @bits = split (/\{\$([a-zA-Z0-9_\-:\|]+)\}/i, $mdx);
+    my @bits = split (/\{\$([a-zA-Z0-9_\-:\|]+(?:\![a-z]+))*\}/i, $mdx);
 
     my $mdx2 = "";
     foreach my $idx (0 .. $#bits) {
@@ -84,8 +85,8 @@ sub mdx_with_substitutions {
             # each flag.  Supported flags at this stage are:
             #
             #   <none> - Allow only specific safe characters.
-            #   :string - Escape suitable for use in StrToMbr(" ")
-            #   :bracket - Use ]] for ].  Allow most others.
+            #   !string - Escape suitable for use in StrToMbr(" ")
+            #   !bracket - Use ]] for ].  Allow most others.
             #
             # Note, I sat for quite a while here wondering if we should make the
             # system a bit "smarter", i.e. allow it to examine the surrounding
@@ -95,7 +96,7 @@ sub mdx_with_substitutions {
             # 100% safe or reliable.  So let's leave it in the query designer's
             # hands, and just default to "safe" mode. 
             #
-            while ($name =~ m/^(.*)\:([^\:]+)$/) {
+            while ($name =~ m/^(.*)(\![a-z]+)$/) {
                 $name = $1;
                 my $flag = lc ($2);
                 $flag =~ s/[^a-z]//g;
@@ -110,17 +111,19 @@ sub mdx_with_substitutions {
             }
             (defined $value) || ($value = '');
 
-            # With the :string flag, or if the preceding character was a string, 
+            # With the !string flag, or if the preceding character was a string, 
             # then escape for use in StrToMbr(" ")
             if ($flags{'string'}) {
                 $value =~ s/\\/\\\\/g;
                 $value =~ s/"/\\"/g;
-                $mdx2 .= $value;
                 
             # We can allow brackets. 
             } elsif ($flags{'bracket'}) {
                 $value =~ s/\]/\]\]/g;
-                $mdx2 .= $value;
+                
+            # Else we go raw.  Only allowed for SAFE variables (not client-supplied). 
+            } elsif ($flags{'raw'} && ($name =~ m/^__/)) {
+                # No change.
                 
             # Or else we will just use plain identifiers.  Characters and spaces
             # can go through unchanged.  Note that if you use space identifiers
@@ -129,8 +132,9 @@ sub mdx_with_substitutions {
             #
             } else {
                 $value =~ s/[^0-9a-zA-Z _\-,]//ig;                
-                $mdx2 .= $value;
             }
+            &Jarvis::Error::debug ($jconfig, "Expanding: '$name' " . (scalar %flags ? ("[" . join (",", keys %flags) . "] ") : "") . "-> '$value'.");            
+            $mdx2 .= $value;
 
         } else {
             $mdx2 .= $bits[$idx];
