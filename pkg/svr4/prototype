@@ -1,10 +1,120 @@
-!search ../..
+i pkginfo=./pkginfo
 
-i pkginfo=pkginfo
-
-d jarvis /etc/jarvis 1777 bin bin
-f jarvis /etc/jarvis/demo.xml=demo/etc/demo.xml 644 bin bin
-
+#########################################################################################
 d jarvis /opt/jarvis 1777 bin bin
+
+d jarvis /opt/jarvis/docs 1777 bin bin
+f jarvis /opt/jarvis/docs/jarvis_guide.pdf=../../docs/jarvis_guide.pdf 644 bin bin
+f jarvis /opt/jarvis/docs/COPYING.LESSER=../../docs/COPYING.LESSER 644 bin bin
+f jarvis /opt/jarvis/docs/jarvis.8=../../docs/jarvis.8 644 bin bin
+
 d jarvis /opt/jarvis/lib 1777 bin bin
-f jarvis /opt/jarvis/lib/Jarvis/Agent.pm=lib/Jarvis/Agent.pm 644 bin bin
+d jarvis /opt/jarvis/lib/Jarvis 1777 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/Agent.pm=../../lib/Jarvis/Agent.pm 644 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/Config.pm=../../lib/Jarvis/Config.pm 644 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/DB.pm=../../lib/Jarvis/DB.pm 644 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/Dataset.pm=../../lib/Jarvis/Dataset.pm 644 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/Error.pm=../../lib/Jarvis/Error.pm 644 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/Exec.pm=../../lib/Jarvis/Exec.pm 644 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/Habitat.pm=../../lib/Jarvis/Habitat.pm 644 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/Hook.pm=../../lib/Jarvis/Hook.pm 644 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/Login.pm=../../lib/Jarvis/Login.pm 644 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/Main.pm=../../lib/Jarvis/Main.pm 644 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/Plugin.pm=../../lib/Jarvis/Plugin.pm 644 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/Status.pm=../../lib/Jarvis/Status.pm 644 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/Text.pm=../../lib/Jarvis/Text.pm 644 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/Tracker.pm=../../lib/Jarvis/Tracker.pm 644 bin bin
+
+d jarvis /opt/jarvis/lib/Jarvis/DB 1777 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/DB/SDP.pm=../../lib/Jarvis/DB/SDP.pm 644 bin bin
+
+d jarvis /opt/jarvis/lib/Jarvis/Login 1777 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/Login/ActiveDirectory.pm=../../lib/Jarvis/Login/ActiveDirectory.pm 644 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/Login/Adempiere.pm=../../lib/Jarvis/Login/Adempiere.pm 644 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/Login/BasicAuth.pm=../../lib/Jarvis/Login/BasicAuth.pm 644 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/Login/Database.pm=../../lib/Jarvis/Login/Database.pm 644 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/Login/Drupal6.pm=../../lib/Jarvis/Login/Drupal6.pm 644 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/Login/None.pm=../../lib/Jarvis/Login/None.pm 644 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/Login/Single.pm=../../lib/Jarvis/Login/Single.pm 644 bin bin
+
+d jarvis /opt/jarvis/cgi-bin 1777 bin bin
+f jarvis /opt/jarvis/cgi-bin/agent.pl=../../cgi-bin/agent.pl 755 bin bin
+
+d jarvis /opt/jarvis/htdocs 1777 bin bin
+d jarvis /opt/jarvis/htdocs/js 1777 bin bin
+f jarvis /opt/jarvis/htdocs/js/jarvis-extjs.js=../../htdocs/js/jarvis-extjs.js 755 bin bin
+
+d jarvis /opt/jarvis/etc 1777 bin bin
+d jarvis /opt/jarvis/etc/apache 1777 bin bin
+f jarvis /opt/jarvis/etc/apache/jarvis.conf=../../etc/apache/jarvis-svr4.conf 644 bin bin
+f jarvis /opt/jarvis/etc/apache/jarvis-mod-perl.conf=../../etc/apache/jarvis-mod-perl-svr4.conf 644 bin bin
+f jarvis /opt/jarvis/etc/apache/startup.pl=../../etc/apache/startup.pl 755 bin bin
+
+#########################################################################################
+d jarvis /opt/jarvis/demo 1777 bin bin
+
+d jarvis /opt/jarvis/demo/dataset 1777 bin bin
+f jarvis /opt/jarvis/demo/dataset/boat.xml=../../demo/dataset/boat.xml 755 bin bin
+f jarvis /opt/jarvis/demo/dataset/boat_class.xml=../../demo/dataset/boat_class.xml 755 bin bin
+f jarvis /opt/jarvis/demo/dataset/boat_detail.xml=../../demo/dataset/boat_detail.xml 755 bin bin
+f jarvis /opt/jarvis/demo/dataset/boat_filter.xml=../../demo/dataset/boat_filter.xml 755 bin bin
+f jarvis /opt/jarvis/demo/dataset/user_names.xml=../../demo/dataset/user_names.xml 755 bin bin
+f jarvis /opt/jarvis/demo/dataset/users.xml=../../demo/dataset/users.xml 755 bin bin
+
+d jarvis /opt/jarvis/demo/db 1777 bin bin
+f jarvis /opt/jarvis/demo/db/demo.db=../../demo/db/demo-empty.db 755 bin bin
+f jarvis /opt/jarvis/demo/db/schema.sql=../../demo/db/schema.sql 755 bin bin
+
+d jarvis /opt/jarvis/demo/etc 1777 bin bin
+f jarvis /opt/jarvis/demo/etc/demo.xml=../../demo/etc/demo.xml 755 bin bin
+
+d jarvis /opt/jarvis/demo/htdocs 1777 bin bin
+f jarvis /opt/jarvis/demo/htdocs/boat.html=../../demo/htdocs/boat.html 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/boat.js=../../demo/htdocs/boat.js 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/boat_class.html=../../demo/htdocs/boat_class.html 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/boat_class.js=../../demo/htdocs/boat_class.js 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/boat_detail.html=../../demo/htdocs/boat_detail.html 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/boat_detail.js=../../demo/htdocs/boat_detail.js 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/index.html=../../demo/htdocs/index.html 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/login.html=../../demo/htdocs/login.html 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/login.js=../../demo/htdocs/login.js 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/logout.html=../../demo/htdocs/logout.html 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/logout.js=../../demo/htdocs/logout.js 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/template-licence.txt=../../demo/htdocs/template-licence.txt 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/users.html=../../demo/htdocs/users.html 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/users.js=../../demo/htdocs/users.js 755 bin bin
+
+d jarvis /opt/jarvis/demo/htdocs/css 1777 bin bin
+f jarvis /opt/jarvis/demo/htdocs/css/demo.css=../../demo/htdocs/css/demo.css 755 bin bin
+
+d jarvis /opt/jarvis/demo/htdocs/help 1777 bin bin
+f jarvis /opt/jarvis/demo/htdocs/help/boat.html=../../demo/htdocs/help/boat.html 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/help/boat_class.html=../../demo/htdocs/help/boat_class.html 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/help/boat_detail.html=../../demo/htdocs/help/boat_detail.html 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/help/users.html=../../demo/htdocs/help/users.html 755 bin bin
+
+d jarvis /opt/jarvis/demo/htdocs/images 1777 bin bin
+f jarvis /opt/jarvis/demo/htdocs/images/add.png=../../demo/htdocs/images/add.png 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/images/boat.jpg=../../demo/htdocs/images/boat.jpg 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/images/cancel.png=../../demo/htdocs/images/cancel.png 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/images/detail.png=../../demo/htdocs/images/detail.png 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/images/edit.png=../../demo/htdocs/images/edit.png 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/images/help.png=../../demo/htdocs/images/help.png 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/images/next.png=../../demo/htdocs/images/next.png 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/images/prev.png=../../demo/htdocs/images/prev.png 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/images/reload.png=../../demo/htdocs/images/reload.png 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/images/remove.png=../../demo/htdocs/images/remove.png 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/images/s.gif=../../demo/htdocs/images/s.gif 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/images/save.png=../../demo/htdocs/images/save.png 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/images/water.jpg=../../demo/htdocs/images/water.jpg 755 bin bin
+
+d jarvis /opt/jarvis/demo/htdocs/include 1777 bin bin
+f jarvis /opt/jarvis/demo/htdocs/include/RowExpander.js=../../demo/htdocs/include/RowExpander.js 755 bin bin
+f jarvis /opt/jarvis/demo/htdocs/include/common.js=../../demo/htdocs/include/common.js 755 bin bin
+
+d jarvis /opt/jarvis/demo/plugin 1777 bin bin
+f jarvis /opt/jarvis/demo/plugin/SetPassword.pm=../../demo/plugin/SetPassword.pm 755 bin bin
+
+#########################################################################################
+d jarvis /etc/jarvis 1777 bin bin
+f jarvis /etc/jarvis/README.txt=../../etc/README.txt 644 bin bin

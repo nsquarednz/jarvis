@@ -30,4 +30,15 @@ cat pkginfo.tpl \
   | sed -e "s/__DATE/$DATE/" \
   > pkginfo
 
-pkgmk -d /tmp -f /home/myuser/example/pkgmk/prototype
+# Prepare the output directory.
+PKGNAME=jarvis-$VERSION-$RELEASE.svr4
+rm -rf $PKGNAME
+rm -rf $PKGNAME.tar
+rm -rf $PKGNAME.tar.gz
+mkdir ./$PKGNAME
+
+# Build and gzip.
+pkgmk -d /tmp -d ./$PKGNAME
+
+tar cvf $PKGNAME.tar $PKGNAME
+gzip $PKGNAME.tar
