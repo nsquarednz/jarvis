@@ -1,0 +1,7 @@
+PKG="jarvis"
+NAME="Jarvis Agent"
+ARCH=any
+CATEGORY=utility
+RELEASE=__RELEASE
+VERSION=__VERSION
+PSTAMP="__DATE"

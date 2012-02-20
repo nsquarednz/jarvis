@@ -1,0 +1,10 @@
+!search ../..
+
+i pkginfo=pkginfo
+
+d jarvis /etc/jarvis 1777 bin bin
+f jarvis /etc/jarvis/demo.xml=demo/etc/demo.xml 644 bin bin
+
+d jarvis /opt/jarvis 1777 bin bin
+d jarvis /opt/jarvis/lib 1777 bin bin
+f jarvis /opt/jarvis/lib/Jarvis/Agent.pm=lib/Jarvis/Agent.pm 644 bin bin
