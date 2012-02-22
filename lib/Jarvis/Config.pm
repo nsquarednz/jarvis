@@ -43,13 +43,6 @@ use Jarvis::Error;
 
 %Jarvis::Config::yes_value = ('yes' => 1, 'true' => 1, 'on' => 1, '1' => 1);
 
-###############################################################################
-# LOCAL VARIABLES
-###############################################################################
-#
-my $default_parameters_loaded = 0;
-my %default_parameters_cache = ();
-
 ################################################################################
 # Setup our entire jarvis config, based on the application name provided, which
 # directs us to our application xml file.
@@ -166,7 +159,7 @@ sub new {
 
 
 ################################################################################
-# Returns a cached list of our default parameters.  Could be handy to some.
+# Returns a list of our default parameters.  Could be handy to some.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -179,19 +172,16 @@ sub default_parameters () {
     my ($jconfig) = @_;
 
     $jconfig || die;
-    if ($default_parameters_loaded) {
-        return %default_parameters_cache;
-    }
 
-    # First set the default parameters configured in the config file.
+    my %default_parameters = ();
+    
     my $pxml = $jconfig->{'xml'}{'jarvis'}{'app'}{'default_parameters'};
     if ($pxml && $pxml->{'parameter'}) {
         foreach my $parameter ($pxml->{'parameter'}('@')) {
-            $default_parameters_cache {$parameter->{'name'}->content} = $parameter->{'value'}->content;
+            $default_parameters {$parameter->{'name'}->content} = $parameter->{'value'}->content;
         }
     }
-    $default_parameters_loaded = 1;
-    return %default_parameters_cache;
+    return %default_parameters;
 }
 
 

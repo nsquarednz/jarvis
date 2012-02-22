@@ -52,15 +52,34 @@ use Jarvis::Hook;
 use Jarvis::DB;
 use Jarvis::Tracker;
 
-# This is our CGI object.  We pass it into our Jasper::Config, but we also
-# use it in our "die" error handler.
+###############################################################################
+# Global variables.
+###############################################################################
+#
+# Note that global variables under mod_perl require careful consideration!
+#
+# Specifically, you must ensure that all variables which require 
+# re-initialisation for each invocation will receive it.
+#
+
+# This is our CGI object.  
+# We pass it into our Jasper::Config, and also use it in our "die" error handler.
+#
+# It is safe because it is re-initialised in Main::do.
+#
 my $cgi = undef;
 
 # This is our Jasper Config object which is passed around everywhere, and is
 # used in our "die" error handler so it needs to be module wide.
+#
+# It is safe because it is re-initialised in Main::do.
+#
 my $jconfig = undef;
 
 # This is where we might look for etc directories.
+#
+# It is safe because it is never modified so does not need re-initialisation.
+#
 my @etc = ('/etc/jarvis', '/opt/jarvis/etc');
 
 ###############################################################################
@@ -68,12 +87,15 @@ my @etc = ('/etc/jarvis', '/opt/jarvis/etc');
 ###############################################################################
 #
 use XML::Smart; 
-sub XML::Smart::DESTROY {
-  my $this = shift ;
-  # print STDERR "In XML::Smart::DESTROY.\n";
-  # print STDERR "  (object) is a " . ref ($this) . "\n";
-  # print STDERR ($$this ? "  and is defined.\n" : "  but is null.\n");
-  $$this && $$this->clean ;    
+{
+    no warnings 'redefine';
+    sub XML::Smart::DESTROY {
+      my $this = shift ;
+      print STDERR "In XML::Smart::DESTROY.\n";
+      print STDERR "  (object) is a " . ref ($this) . "\n";
+      print STDERR ($$this ? "  and is defined.\n" : "  but is null.\n");
+      $$this && $$this->clean ;    
+    }
 }
 
 ###############################################################################
@@ -103,7 +125,8 @@ sub error_handler {
     # Track this error, if we got far enough to have enough info.
     $jconfig && &Jarvis::Tracker::error ($jconfig, $status, Carp::longmess $long_msg);
 
-    # Let's be tidy and free the database handles.
+    # We MUST ensure that ALL the cached database handles are removed.
+    # Otherwise, under mod_perl, the next application would get OUR database handles!
     &Jarvis::DB::disconnect ($jconfig);
     &Jarvis::Tracker::disconnect ($jconfig);
     
@@ -431,10 +454,16 @@ sub do {
     # Invoke application-specific finish hook(s).
     &Jarvis::Hook::finish ($jconfig);
 
-    # Close database connection.  Under mod_perl with Apache::DBI, this will actually do nothing.
+    # We MUST ensure that ALL the cached database handles are removed.
+    # Otherwise, under mod_perl, the next application would get OUR database handles!
+    #
+    # Note that deep in the internals of mod_perl, the underlying handle may be 
+    # cached for potential re-use by DBI.  But that will ensure that the password
+    # and other information matches before allowing it.
     &Jarvis::DB::disconnect ($jconfig);
 
     # Track the request end, and then disconnect from tracker DB.
+    # Again, required under mod_perl to avoid the next app from using our tracker DB handle.
     &Jarvis::Tracker::finish ($jconfig, \@rest_args);
     &Jarvis::Tracker::disconnect ($jconfig);
 }

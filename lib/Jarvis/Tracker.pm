@@ -34,7 +34,20 @@ package Jarvis::Tracker;
 use Jarvis::Text;
 use Jarvis::Error;
 
-# Tracker DB handle.
+###############################################################################
+# Global variables.
+###############################################################################
+#
+# Note that global variables under mod_perl require careful consideration!
+#
+# Specifically, you must ensure that all variables which require 
+# re-initialisation for each invocation will receive it.
+#
+# Tracker DB handle.  Cached for efficiency.
+#
+# It is safe because it is set to undef by the disconnect method, which is
+# invoked whenever each Jarvis request finishes (either success or fail).
+#
 my $tdbh = undef;
 
 ################################################################################

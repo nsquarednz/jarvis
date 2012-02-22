@@ -34,11 +34,20 @@ use Jarvis::Error;
 use Jarvis::DB::SDP;
 
 ###############################################################################
-# PRIVATE VARIABLES
+# Global variables.
 ###############################################################################
 #
-
+# Note that global variables under mod_perl require careful consideration!
+#
+# Specifically, you must ensure that all variables which require 
+# re-initialisation for each invocation will receive it.
+#
+# Cached database handles.  
 # Hash {type}{name}
+#
+# They is safe because they are set to undef by the disconnect method, which is
+# invoked whenever each Jarvis request finishes (either success or fail).
+#
 my %dbhs = ();
 
 ################################################################################
