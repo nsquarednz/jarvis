@@ -91,9 +91,9 @@ use XML::Smart;
     no warnings 'redefine';
     sub XML::Smart::DESTROY {
       my $this = shift ;
-      print STDERR "In XML::Smart::DESTROY.\n";
-      print STDERR "  (object) is a " . ref ($this) . "\n";
-      print STDERR ($$this ? "  and is defined.\n" : "  but is null.\n");
+      # print STDERR "In XML::Smart::DESTROY.\n";
+      # print STDERR "  (object) is a " . ref ($this) . "\n";
+      # print STDERR ($$this ? "  and is defined.\n" : "  but is null.\n");
       $$this && $$this->clean ;    
     }
 }
