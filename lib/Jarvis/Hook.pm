@@ -20,6 +20,9 @@
 #                 after_login ($jconfig, $hook_params_href, $additional_safe_href)
 #                 CALLED: After first login for the session.
 #
+#                 pre_connect ($jconfig, $dbname, $dbtype, $dbconnect_ref, $dbusername_ref, $dbpassword_ref, $parameters_href)
+#                 CALLED: Before first connecting to each database.
+#
 #                 before_all ($jconfig, $hook_params_href, $dsxml, $rest_args_href, $fields_aref)
 #                 CALLED: After transaction begins.  Just before any "before" SQL.
 #
@@ -233,6 +236,53 @@ sub after_login {
             no strict 'refs';
             exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
             exists &$method && &$method ($jconfig, $hook_parameters_href, $additional_safe_href);
+        }
+    }
+
+    return 1;
+}
+
+################################################################################
+# Invoke the "pre_connect" method on each hook.
+#
+# This hook is invoked before attempting to connect to any database.  It allows
+# the hook to possibly modify the connection parameters.
+#
+# Params:
+#       $jconfig        - Jarvis::Config object
+#
+#       $dbname         - The requested Jarvis dbname (e.g. "default").
+#
+#       $dbtype         - The requested Jarvis dbtype (e.g. "dbi").
+#
+#       $dbconnect_ref  - The DBI connection string.  Hook may modify.
+#
+#       $dbusername_ref - The DBI username string.  Hook may modify.
+#
+#       $dbpassword_ref - The DBI password string.  Hook may modify.
+#
+#       $parameters_href - The configured parameters.  Hook may modify.
+#
+# Returns:
+#       1
+################################################################################
+#
+sub pre_connect {
+    my ($jconfig, $dbname, $dbtype, $dbconnect_ref, $dbusername_ref, $dbpassword_ref, $parameters_href) = @_;
+
+    my @hooks = @{ $jconfig->{'hooks'} };
+
+    # Now invoke "pre_connect" on all the hooks we found.
+    foreach my $hook (@hooks) {
+        my $lib = $hook->{'lib'};
+        my $module = $hook->{'module'};
+        my $hook_parameters_href = $hook->{'parameters'};
+
+        my $method = $module . "::pre_connect";
+        {
+            no strict 'refs';
+            exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
+            exists &$method && &$method ($jconfig, $hook_parameters_href, $dbname, $dbtype, $dbconnect_ref, $dbusername_ref, $dbpassword_ref, $parameters_href);
         }
     }
 

@@ -31,6 +31,7 @@ use DBI;
 use Data::Dumper;
 
 use Jarvis::Error;
+use Jarvis::Hook;
 use Jarvis::DB::SDP;
 
 ###############################################################################
@@ -92,10 +93,6 @@ sub handle {
     my $dbusername = $dbxml->{'username'}->content || '';
     my $dbpassword = $dbxml->{'password'}->content || '';
     
-    &Jarvis::Error::debug ($jconfig, "DB Connect = '$dbconnect'");
-    &Jarvis::Error::debug ($jconfig, "DB Username = '$dbusername'");
-    &Jarvis::Error::debug ($jconfig, "DB Password = '$dbpassword'");
-
     # Optional parameters, handled per-database type.
     my %parameters = ();
     if ($dbxml->{'parameter'}) {
@@ -104,6 +101,13 @@ sub handle {
             $parameters {$parameter->{'name'}->content} = $parameter->{'value'}->content;
         }
     }        
+    
+    # Allow the hook to potentially modify some of these attributes.
+    &Jarvis::Hook::pre_connect ($jconfig, $dbname, $dbtype, \$dbconnect, \$dbusername, \$dbpassword, \%parameters);
+
+    &Jarvis::Error::debug ($jconfig, "DB Connect = '$dbconnect'");
+    &Jarvis::Error::debug ($jconfig, "DB Username = '$dbusername'");
+    &Jarvis::Error::debug ($jconfig, "DB Password = '$dbpassword'");
     
     # DBI is our "standard" type.
     &Jarvis::Error::debug ($jconfig, "Connecting to '$dbtype' database with handle named '$dbname'");
