@@ -78,6 +78,27 @@ package Jarvis::Login::Adempiere;
 use Jarvis::Error;
 
 ###############################################################################
+# Utility Functions
+###############################################################################
+
+# converts a list of strings with * wildcard into a single perl regular expression string
+sub list_regexp {
+    my @list = @_;
+    my $regexp = '';
+    foreach my $match (@list) {
+        # escape all potential meta-characters
+        $match =~ s/([^\w\s\*])/\\$1/g;
+        # any whitespace sequence will match any other
+        $match =~ s/\s+/\\s+/g;
+        # translate * wildcard
+        $match =~ s/\*/.*/g;
+        # append to regexp
+        $regexp .= (length($regexp) > 0 ? "|$match" : $match);
+    }
+    return $regexp;
+}
+
+###############################################################################
 # Public Functions
 ###############################################################################
 
@@ -216,13 +237,13 @@ WHERE
 
     # If we're given a relevant_groups parameter, restrict our groups to the intersection of the two lists.
     if ($login_parameters{'relevant_groups'}) {
-        my %relevant_groups;
-        map { $relevant_groups{$_} = 1; } (split ',', $login_parameters{'relevant_groups'});
-
+        my $relevant_groups_regexp = list_regexp(split(',', $login_parameters{'relevant_groups'}));
+        &Jarvis::Error::debug ($jconfig, "relevant_groups_regexp=$relevant_groups_regexp");
         my @all_groups = (@role_array, @access_array, @process_access_array);
+        &Jarvis::Error::dump ($jconfig, "original_group_list=" . join(',',@all_groups));
         my @intersection;
         foreach my $element (@all_groups) {
-            push @intersection, $element if $relevant_groups{$element};
+            push @intersection, $element if $element =~ /$relevant_groups_regexp/;
         }
         $group_list = join (",", @intersection);
     } else {
