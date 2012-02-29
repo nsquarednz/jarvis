@@ -98,6 +98,21 @@ sub list_regexp {
     return $regexp;
 }
 
+# prints a long list of strings by splitting it into groups
+# individual values are separated by $sep, groups by \n
+sub list_print($$@) {
+    my ($group_size, $sep, @list) = @_;
+
+    my @groups = ();
+    for (my $i=0; $i < scalar(@list); $i += $group_size) {
+        my $last = $i + $group_size - 1;
+        $last = scalar(@list) - 1 unless $last < scalar(@list);
+        my @group = @list[$i .. $last];
+        push @groups, \@group;
+    }
+    return join("\n", map { join($sep, @$_) } @groups);
+}
+
 ###############################################################################
 # Public Functions
 ###############################################################################
@@ -174,13 +189,13 @@ sub Jarvis::Login::Adempiere::check {
     }
     $result_href = $$result_aref[0];
     my $ad_user_id = $$result_href{'ad_user_id'} || '';
+    &Jarvis::Error::debug ($jconfig, "User ID = '$ad_user_id'.");
     my $stored_password = $$result_href{'password'} || '';
 
     if ($stored_password eq '') {
         return ("Account has no password.");
     }
     $ad_user_id || die "No ad_user_id for user '$username'!";
-
 
     # Check the password.  Adempiere uses plain text.  No, seriously.
     if ($stored_password ne $password) {
@@ -240,7 +255,9 @@ WHERE
         my $relevant_groups_regexp = list_regexp(split(',', $login_parameters{'relevant_groups'}));
         &Jarvis::Error::debug ($jconfig, "relevant_groups_regexp=$relevant_groups_regexp");
         my @all_groups = (@role_array, @access_array, @process_access_array);
-        &Jarvis::Error::dump ($jconfig, "original_group_list=" . join(',',@all_groups));
+        &Jarvis::Error::dump ($jconfig, "role_array=\n" . list_print(100, ',', @role_array));
+        &Jarvis::Error::dump ($jconfig, "access_array=\n" . list_print(100, ',', @access_array));
+        &Jarvis::Error::dump ($jconfig, "process_access_array=\n" . list_print(100, ',', @process_access_array));
         my @intersection;
         foreach my $element (@all_groups) {
             push @intersection, $element if $element =~ /$relevant_groups_regexp/;
