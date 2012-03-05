@@ -105,7 +105,7 @@ sub sql_with_substitutions {
 
     # Dump the available arguments at this stage.
     foreach my $k (keys %{$args_href}) {
-        &Jarvis::Error::dump ($jconfig, "SQL available args: '$k' -> '$args_href->{$k}'.");
+        &Jarvis::Error::dump ($jconfig, "SQL available args: '$k' -> " . (defined $args_href->{$k} ? '"' . $args_href->{$k} . '"' : '<NULL>') . ".");
     }
     
     # Parse the update SQL to get a prepared statement, pulling out the list
