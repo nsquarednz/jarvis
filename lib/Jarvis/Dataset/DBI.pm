@@ -165,16 +165,16 @@ sub sql_with_substitutions {
             }
             (defined $value) || ($value = '');
 
-            # Tweak according to flags.
-            if ($flags{'noquote'}) {
-                $value =~ s/[^0-9a-zA-Z _\-,]//g;
-            }
-
+            # Numeric values by default are NOT quoted, unless requested.
             if ($value =~ m/^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$/ && ! $flags{'quote'}) {
                 # No change.
 
-            } elsif ($flags{'noquote'} && ! $flags{'quote'}) {
+            # Raw flag performs NO changes ever!  Only allowed for SAFE variables (not client-supplied). 
+            } elsif ($flags{'raw'} && ($name =~ m/^__/)) {
                 # No change.
+                
+            } elsif ($flags{'noquote'}) {
+                $value =~ s/[^0-9a-zA-Z _\-,]//g;
 
             } else {
                 $value = $dbh->quote($value);
