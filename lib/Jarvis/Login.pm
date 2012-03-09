@@ -514,6 +514,9 @@ sub logout {
             $jconfig->{'error_string'} = "Logged out at client request.";
             $jconfig->{'username'} = '';
             $jconfig->{'group_list'} = '';
+            
+        } else {
+            $jconfig->{'error_string'} = "Logout not required (no existing session).";
         }
 
         $session->delete();
