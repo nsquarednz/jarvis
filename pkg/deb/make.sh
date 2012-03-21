@@ -39,11 +39,11 @@ rm -f jarvis_*.changes
 # BUILD THE SOURCE TARBALL.
 tar zcf $TAR_ORIG "../../../$BASEDIR" \
     --exclude="$BASEDIR/pkg" \
+    --exclude="$BASEDIR/BUILDROOT" \
     --exclude=CVS \
-    --exclude=CVS/* \
     --exclude=.hg \
-    --exclude=.hg/* \
-    --exclude=.hgtags \
+    --exclude=rpms \
+    --exclude=jarvis.tar \
     --transform "s/^$BASEDIR/jarvis-$VERSION/"
 
 # COPY THE DEBIAN PACKAGE TEMPLATE.

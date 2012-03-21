@@ -16,7 +16,7 @@ uninstall_rpms: clean
 	-rpm -e ${PACKAGE}
 
 sdist: clean
-	tar cf ${PACKAGE}.tar --exclude=CVS *
+	tar cf ${PACKAGE}.tar --exclude=CVS --exclude=.hg --exclude=pkg --exclude=BUILDROOT *
 
 rpms: sdist
 	mkdir -p rpms
