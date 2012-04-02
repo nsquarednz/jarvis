@@ -7,9 +7,8 @@
             <lib path="/usr/share/jarvis/tracker/plugin/"/>
         </default_libs>
 
-        <tracker requests="yes" errors="yes" logins="yes">
-            <dbfile>/var/lib/jarvis/tracker/tracker.db</dbfile>
-        </tracker>
+        <tracker requests="yes" errors="yes" logins="yes"/>
+        <database name="tracker" connect="dbi:Pg:dbname=tracker;host=localhost" username="tracker_owner" password="tracker_owner"/>
 
         <login module="Jarvis::Login::None">
             <parameter name="username" value="x"/>

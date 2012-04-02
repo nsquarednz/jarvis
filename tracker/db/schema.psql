@@ -17,7 +17,7 @@ CREATE TABLE request (
     params TEXT,
     in_nrows INTEGER,
     out_nrows INTEGER,
-    start_time DATE,
+    start_time TIMESTAMP,
     duration_ms INTEGER
 );
 
@@ -31,7 +31,7 @@ CREATE TABLE login (
     error_string TEXT,
     group_list TEXT,
     address TEXT,
-    start_time DATE
+    start_time TIMESTAMP
 );
 
 DROP TABLE error;
@@ -46,7 +46,7 @@ CREATE TABLE error (
     params TEXT,
     post_body TEXT,
     message TEXT,
-    start_time DATE,
+    start_time TIMESTAMP,
     http_response_code INTEGER
 );
 

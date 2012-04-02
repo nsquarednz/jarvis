@@ -69,19 +69,12 @@ sub handle {
 
     my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
     my $tracker = $axml->{'tracker'};
-    if (! $tracker) {
-        &Jarvis::Error::log ($jconfig, "No 'tracker' config present.  Cannot connect to tracker DB.");
+    if (!$tracker) {
+        &Jarvis::Error::log ($jconfig, "No 'tracker' config present. Won't connect to tracker DB.");
         return;
     }
 
-    my $dbfile = $tracker->{'dbfile'}->content || "/var/lib/jarvis/tracker/tracker.db";
-    &Jarvis::Error::debug ($jconfig, "Tracker DB File = '$dbfile'");
-
-    $tdbh = DBI->connect ("dbi:SQLite:dbname=$dbfile", '', '', { RaiseError => 0, PrintError => 0, AutoCommit => 1 });
-    if (! $tdbh) {
-        &Jarvis::Error::log ($jconfig, "Cannot connect to tracker database. " . DBI::errstr);
-        return undef;
-    }
+    $tdbh = &Jarvis::DB::handle ($jconfig, 'tracker');
 
     return $tdbh;
 }
@@ -121,6 +114,20 @@ sub start {
 
     # Start time.
     $jconfig->{'tstart'} = [Time::HiRes::gettimeofday];
+}
+
+# format time as Unix Epoch time in Julian date format
+sub timestamp_julian($) {
+    my ($time) = @_;
+    return (($$time[0] + $$time[1] / 1000000) / 86400.0 ) + 2440587.5;
+}
+
+# format time as sql timestamp
+sub timestamp_sql($) {
+    my ($time) = @_;
+    my ($sec,$min,$hour,$mday,$mon,$year) = localtime($time);
+    my $timestamp_sql = sprintf('%04d-%02d-%02d %02d:%02d:%02d', $year + 1900, $mon + 1, $mday, $hour, $min, $sec);
+    return $timestamp_sql;
 }
 
 ################################################################################
@@ -175,7 +182,7 @@ sub finish {
 
     # Julian time of request start.
     my $tstart = $jconfig->{'tstart'};
-    my $start_time = (($$tstart[0] + $$tstart[1] / 1000000) / 86400.0 ) + 2440587.5; # 2440587.5 is Unix Epoch time in Julian date format.
+    my $start_time = timestamp_sql($tstart);
     my $duration_ms = int (Time::HiRes::tv_interval ($tstart) * 1000);
 
     # Perform the database insert.
@@ -259,7 +266,7 @@ sub error {
 
     # Julian time of request start.
     my $tstart = $jconfig->{'tstart'};
-    my $start_time = (($$tstart[0] + $$tstart[1] / 1000000) / 86400.0 ) + 2440587.5; # 2440587.5 is Unix Epoch time in Julian date format.
+    my $start_time = timestamp_sql($tstart);
 
     # Get error number
     $http_response_code =~ s/^([0-9]+).*$/$1/;
@@ -328,7 +335,7 @@ sub login {
 
     # Julian time of request start.
     my $tstart = $jconfig->{'tstart'};
-    my $start_time = (($$tstart[0] + $$tstart[1] / 1000000) / 86400.0 ) + 2440587.5; # 2440587.5 is Unix Epoch time in Julian date format.
+    my $start_time = timestamp_sql($tstart);
 
     # Perform the database insert.
     my $sth = $tdbh->prepare (
