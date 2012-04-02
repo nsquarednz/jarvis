@@ -41,7 +41,8 @@
             <parameter name="Directory" value="/tmp/tracker"/>
         </sessiondb>
 
-        <database connect="dbi:SQLite:dbname=/var/lib/jarvis/tracker/tracker.db" username="" password=""/>
+        <!--database connect="dbi:SQLite:dbname=/var/lib/jarvis/tracker/tracker.db" username="" password=""/-->
+        <database connect="dbi:Pg:dbname=tracker;host=localhost" username="tracker_owner" password="tracker_owner"/>
     </app>
 </jarvis>
 
