@@ -35,7 +35,6 @@ my @startDate = ( 2008, 1, 1 );
 my $daysToInclude = Delta_Days (@startDate,
                                 2020, 1, 1);
 
-#my $dbh = DBI->connect ("dbi:SQLite:dbname=/var/lib/jarvis/tracker/tracker.db", "", "" ) || die "Unable to open tracker database: " .DBI::errstr;
 my $dbh = DBI->connect ("dbi:Pg:dbname=tracker;host=localhost", "tracker_owner", "tracker_owner" ) || die "Unable to open tracker database: " .DBI::errstr;
 
 $dbh->begin_work() || die;
@@ -57,7 +56,6 @@ while ($c <= $daysToInclude) {
     $c++;
 
     my @bindVars = (
-        #Date_to_Time (@day, 0, 0, 0) / 86400.0 + 2440587.5
         join('-', @day)
         , (Day_of_Week (@day) < 6 ? 1 : 0)
         , $day[0]
