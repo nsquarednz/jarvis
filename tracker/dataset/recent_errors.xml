@@ -23,12 +23,12 @@
             app_name,
             username,
             message,
-            strftime('%Y-%m-%dT%H:%M:%S', start_time, 'localtime')  AS start_time
+            to_char(start_time, 'YYYY-MM-DD HH24:MI:SS') AS start_time
         FROM
             error
         WHERE
-            ({$1} IS NULL OR lower(app_name) = lower({$1}))
-            AND ({$2} IS NULL OR lower(username) = lower({$2}))
+            ({$1}::text IS NULL OR lower(app_name) = lower({$1}))
+            AND ({$2}::text IS NULL OR lower(username) = lower({$2}))
             AND NOT (http_response_code = 401 AND (username = '' OR username IS NULL))
         ORDER BY
             start_time DESC

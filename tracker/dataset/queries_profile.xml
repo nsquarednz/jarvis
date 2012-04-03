@@ -20,12 +20,13 @@
         FROM
             request
         WHERE
-            (app_name = {$1} OR {$1} IS NULL)
-            AND ({$2} IS NULL OR dataset LIKE {$2} || '%')
-            AND ({$from} IS NULL OR start_time >= CAST({$from} AS FLOAT))
-            AND ({$to} IS NULL OR start_time <= CAST({$to} AS FLOAT))
+            (app_name = {$1} OR {$1}::text IS NULL)
+            AND ({$2}::text IS NULL OR dataset LIKE {$2} || '%')
+            AND ({$from}::timestamp IS NULL OR start_time >= {$from})
+            AND ({$to}::timestamp IS NULL OR start_time <= {$to})
         GROUP BY
             dataset
+            , action
         ORDER BY
             dataset
         ]]>

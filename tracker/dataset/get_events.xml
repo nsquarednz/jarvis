@@ -1,9 +1,12 @@
+<!--
+NOTE: The {$from} and {$to} parameters for this dataset are given in julian format (days since 4713-01-01 12:00:00 BC)
+-->
 <dataset read="*">
     <select>
-        SELECT 
-            start_time AS start_time_raw,
-            strftime('%Y-%m-%d %H:%M:%fZ',start_time) AS start_time, 
-            strftime('%Y-%m-%d %H:%M:%fZ',start_time + duration_ms * (1.0 / (1000 * 60 * 60 * 24))) AS end_time, 
+        SELECT
+            julian(start_time) AS start_time_raw,
+            to_char(start_time, 'YYYY-MM-DD HH24:MI:SS.MS') AS start_time,
+            to_char(start_time + '1 millisecond'::interval * duration_ms, 'YYYY-MM-DD HH24:MI:SS.MS') AS end_time,
             (CASE WHEN duration_ms &lt; 1000 THEN '1' ELSE '0' END) as instant,
             app_name, 
             username, 
@@ -15,18 +18,18 @@
         FROM 
             request 
         WHERE 
-            ({$sid} IS NULL OR sid = {$sid})
-            AND ({$user} IS NULL OR username = {$user})
-            AND ({$app_name} IS NULL OR app_name = {$app_name})
-            AND ({$dataset} IS NULL OR dataset = {$dataset})
-            AND ({$from} IS NULL OR start_time >= {$from})
-            AND ({$to} IS NULL OR start_time &lt;= {$to})
-            AND ({$text} IS NULL OR params like '%' || {$text} || '%')
+            ({$sid}::integer IS NULL OR sid = {$sid})
+            AND ({$user}::text IS NULL OR username = {$user})
+            AND ({$app_name}::text IS NULL OR app_name = {$app_name})
+            AND ({$dataset}::text IS NULL OR dataset = {$dataset})
+            AND ({$from}::double precision IS NULL OR julian(start_time) >= {$from})
+            AND ({$to}::double precision IS NULL OR julian(start_time) &lt;= {$to})
+            AND ({$text}::text IS NULL OR params like '%' || {$text} || '%')
         UNION
         SELECT 
-            start_time AS start_time_raw,
-            strftime('%Y-%m-%d %H:%M:%fZ',start_time) AS start_time, 
-            strftime('%Y-%m-%d %H:%M:%fZ',start_time) AS end_time, 
+            julian(start_time) AS start_time_raw,
+            to_char(start_time, 'YYYY-MM-DD HH24:MI:SS.MS') AS start_time,
+            to_char(start_time, 'YYYY-MM-DD HH24:MI:SS.MS') AS end_time,
             '1' as instant,
             app_name, 
             username, 
@@ -38,13 +41,13 @@
         FROM 
             error 
         WHERE 
-            ({$sid} IS NULL OR sid = {$sid})
-            AND ({$user} IS NULL OR username = {$user})
-            AND ({$app_name} IS NULL OR app_name = {$app_name})
-            AND ({$dataset} IS NULL OR dataset = {$dataset})
-            AND ({$from} IS NULL OR start_time >= {$from})
-            AND ({$to} IS NULL OR start_time &lt;= {$to})
-            AND ({$text} IS NULL OR params like '%' || {$text} || '%' OR post_body like '%' || {$text} || '%' OR message like '%' || {$text} || '%')
+            ({$sid}::integer IS NULL OR sid = {$sid})
+            AND ({$user}::text IS NULL OR username = {$user})
+            AND ({$app_name}::text IS NULL OR app_name = {$app_name})
+            AND ({$dataset}::text IS NULL OR dataset = {$dataset})
+            AND ({$from}::double precision IS NULL OR julian(start_time) >= {$from})
+            AND ({$to}::double precision IS NULL OR julian(start_time) &lt;= {$to})
+            AND ({$text}::text IS NULL OR params like '%' || {$text} || '%' OR post_body like '%' || {$text} || '%' OR message like '%' || {$text} || '%')
         ORDER BY
             start_time_raw
     </select>

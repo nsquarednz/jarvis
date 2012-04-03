@@ -116,7 +116,7 @@ sub start {
     $jconfig->{'tstart'} = [Time::HiRes::gettimeofday];
 }
 
-# format time as Unix Epoch time in Julian date format
+# format time in Julian date format (days since 4713-01-01 12:00:00 BC)
 sub timestamp_julian($) {
     my ($time) = @_;
     return (($$time[0] + $$time[1] / 1000000) / 86400.0 ) + 2440587.5;
@@ -125,7 +125,7 @@ sub timestamp_julian($) {
 # format time as sql timestamp
 sub timestamp_sql($) {
     my ($time) = @_;
-    my ($sec,$min,$hour,$mday,$mon,$year) = localtime($time);
+    my ($sec,$min,$hour,$mday,$mon,$year) = localtime($$time[0]);
     my $timestamp_sql = sprintf('%04d-%02d-%02d %02d:%02d:%02d', $year + 1900, $mon + 1, $mday, $hour, $min, $sec);
     return $timestamp_sql;
 }

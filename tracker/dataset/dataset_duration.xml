@@ -13,8 +13,8 @@
         FROM 
             request 
         WHERE
-            ({$1} IS NULL OR {$1} = app_name)
-            AND ({$2} IS NULL OR {$2} = dataset)
+            ({$1}::text IS NULL OR {$1} = app_name)
+            AND ({$2}::text IS NULL OR {$2} = dataset)
         LIMIT 1000
     ]]>
     </select>

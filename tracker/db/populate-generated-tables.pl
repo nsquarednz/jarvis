@@ -92,7 +92,7 @@ my $totalIntervals = 60 * 24 - 1;
 $c = 0;
 while ($c <= $totalIntervals) {
     my @bindVars = (
-        $c * 1.0 / (24 * 60.0),
+        "$c minutes",
         , int($c / 60)
         , $c % 60
         , 1

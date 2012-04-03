@@ -60,7 +60,10 @@ Date.fromJulian = function (jt) {
  *                that represents the input Date object time.
  */
 Date.prototype.formatForServer = function () {
-    return this.getJulian();
+    // ExtJS Date.format function
+    var result = this.format('Y-m-d H:i:s');
+    console.log('formatForServer', this, result);
+    return result;
 }
 
 /**
