@@ -35,7 +35,7 @@ my @startDate = ( 2008, 1, 1 );
 my $daysToInclude = Delta_Days (@startDate,
                                 2020, 1, 1);
 
-my $dbh = DBI->connect ("dbi:SQLite:dbname=tracker.db", "", "" ) || die "Unable to open tracker database 'tracker.db': " .DBI::errstr;
+my $dbh = DBI->connect ("dbi:Pg:dbname=tracker;host=localhost", "tracker_owner", "tracker_owner" ) || die "Unable to open tracker database: " .DBI::errstr;
 
 $dbh->begin_work() || die;
 
@@ -56,7 +56,7 @@ while ($c <= $daysToInclude) {
     $c++;
 
     my @bindVars = (
-        Date_to_Time (@day, 0, 0, 0) / 86400.0 + 2440587.5
+        join('-', @day)
         , (Day_of_Week (@day) < 6 ? 1 : 0)
         , $day[0]
         , ($day[1] < 4 ? 1 : ($day[1] < 7 ? 2 : ($day[1] < 10 ? 3 : 4)))
@@ -90,7 +90,7 @@ my $totalIntervals = 60 * 24 - 1;
 $c = 0;
 while ($c <= $totalIntervals) {
     my @bindVars = (
-        $c * 1.0 / (24 * 60.0),
+        "$c minutes",
         , int($c / 60)
         , $c % 60
         , 1

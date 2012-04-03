@@ -11,7 +11,7 @@
         FROM
             request
         WHERE
-            ({$1} IS NULL OR app_name LIKE '%' || {$1} || '%')
+            ({$1}::text IS NULL OR app_name LIKE '%' || {$1} || '%')
         ORDER BY
             username ASC
     </select>

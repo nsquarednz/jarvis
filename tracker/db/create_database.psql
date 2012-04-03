@@ -1,0 +1,14 @@
+/**
+ * Create a tracker database (postgres)
+ * sudo -u postgres psql -f create_database.psql
+ */
+
+DROP DATABASE tracker;
+CREATE DATABASE tracker;
+
+\connect tracker
+
+DROP USER tracker_owner;
+CREATE USER tracker_owner WITH password 'tracker_owner';
+
+ALTER DATABASE tracker OWNER TO tracker_owner;
