@@ -131,7 +131,6 @@ sub error_handler {
     # We MUST ensure that ALL the cached database handles are removed.
     # Otherwise, under mod_perl, the next application would get OUR database handles!
     &Jarvis::DB::disconnect ($jconfig);
-    &Jarvis::Tracker::disconnect ($jconfig);
     
     # Perhaps we need more clean-up in here, since we may also be serving  
     # Jarvis from a perl HTTPD in some cases.  Need to keep an eye out for
