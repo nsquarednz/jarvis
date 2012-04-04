@@ -34,22 +34,6 @@ package Jarvis::Tracker;
 use Jarvis::Text;
 use Jarvis::Error;
 
-###############################################################################
-# Global variables.
-###############################################################################
-#
-# Note that global variables under mod_perl require careful consideration!
-#
-# Specifically, you must ensure that all variables which require 
-# re-initialisation for each invocation will receive it.
-#
-# Tracker DB handle.  Cached for efficiency.
-#
-# It is safe because it is set to undef by the disconnect method, which is
-# invoked whenever each Jarvis request finishes (either success or fail).
-#
-my $tdbh = undef;
-
 ################################################################################
 # Connect to tracker DB (if required) and return DBH.
 #
@@ -65,37 +49,8 @@ my $tdbh = undef;
 sub handle {
     my ($jconfig) = @_;
 
-    $tdbh && return $tdbh;
-
-    my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
-    my $tracker = $axml->{'tracker'};
-    if (!$tracker) {
-        &Jarvis::Error::log ($jconfig, "No 'tracker' config present. Won't connect to tracker DB.");
-        return;
-    }
-
-    $tdbh = &Jarvis::DB::handle ($jconfig, 'tracker');
-
-    return $tdbh;
-}
-
-################################################################################
-# Disconnect from tracker DB (if required).  Under mod_perl we need to unassign
-# the dbh, so that we get a fresh one next time, because our next request may be
-# for a different application.
-#
-# Params:
-#       $jconfig - Jarvis::Config object (not used)
-#
-# Returns:
-#       1
-################################################################################
-#
-sub disconnect {
-    my ($jconfig) = @_;
-
-    $tdbh && $tdbh->disconnect();
-    $tdbh = undef;
+    # we store the tracker dbh along with other handles, using the reserved name 'tracker'
+    return &Jarvis::DB::handle ($jconfig, 'tracker');
 }
 
 ################################################################################

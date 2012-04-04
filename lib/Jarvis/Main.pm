@@ -456,6 +456,8 @@ sub do {
 
     # Invoke application-specific finish hook(s).
     &Jarvis::Hook::finish ($jconfig);
+    # Track the request end.
+    &Jarvis::Tracker::finish ($jconfig, \@rest_args);
 
     # We MUST ensure that ALL the cached database handles are removed.
     # Otherwise, under mod_perl, the next application would get OUR database handles!
@@ -464,11 +466,6 @@ sub do {
     # cached for potential re-use by DBI.  But that will ensure that the password
     # and other information matches before allowing it.
     &Jarvis::DB::disconnect ($jconfig);
-
-    # Track the request end, and then disconnect from tracker DB.
-    # Again, required under mod_perl to avoid the next app from using our tracker DB handle.
-    &Jarvis::Tracker::finish ($jconfig, \@rest_args);
-    &Jarvis::Tracker::disconnect ($jconfig);
 }
 
 1;
