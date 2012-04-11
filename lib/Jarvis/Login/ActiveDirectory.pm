@@ -56,6 +56,7 @@ use Jarvis::Error;
 #  	     <parameter name="bind_username" value="<bind-username>"/>
 #  	     <parameter name="bind_password" value="<bind-password>"/>
 #            <parameter name="base_object" value="OU=PORSENZ,DC=PORSENZ,DC=LOCAL"/>
+#            <parameter name="allowed_groups" value="SuperUser,Admin"/>
 #        </login>
 #        ...
 #    </app>
@@ -66,6 +67,7 @@ use Jarvis::Error;
 #       bind_password:  Password to bind to server for search.
 #       base_object:    Root of the search tree for user lookup.
 #       no_password:    Don't validate the password.  Only check user details.
+#       allowed_groups: Only allow login for users belonging to one of these groups. Optional.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -91,6 +93,7 @@ sub Jarvis::Login::ActiveDirectory::check {
     my $bind_password = $login_parameters{'bind_password'} || '';
     my $base_object = $login_parameters{'base_object'} || '';
     my $no_password = $login_parameters{'no_password'} || 0;
+    my $allowed_groups = $login_parameters{'allowed_groups'} || '';
 
     # No info?
     $username || return ("No username supplied.");
@@ -161,6 +164,15 @@ sub Jarvis::Login::ActiveDirectory::check {
 
     }
     $ldap->unbind ();
+
+    # we got the group list, check if user is allowed
+    if ($allowed_groups) {
+        my $allowed_groups_regexp = Jarvis::Adempiere::list_regexp($allowed_groups);
+        unless ( scalar(grep { $_ =~ /$allowed_groups_regexp/ } split(',', $group_list)) ) {
+            &Jarvis::Error::debug ($jconfig, "No allowed group for user '$username'.");
+            return ("Login Denied.");
+        }
+    }
 
     # Did we get an email address?  Store it if we did.
     $jconfig->{'email'} = $entry->get_value ('mail');

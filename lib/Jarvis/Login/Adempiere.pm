@@ -18,6 +18,7 @@
 #        <login module="Jarvis::Login::Adempiere">
 #            <parameter name="client_name" value="MyCompany"/>
 #            <parameter name="org_name" value="MyCompany"/>
+#            <parameter name="allowed_groups" value="SuperUser,Admin"/>
 #        </login>
 #        ...
 #    </app>
@@ -146,10 +147,11 @@ sub Jarvis::Login::Adempiere::check {
     $username || return ("No username supplied.");
     $password || return ("No password supplied.");
 
-    # Client & Org Name
+    # login parameters
     my $client_name = $login_parameters{'client_name'};
     my $org_name = $login_parameters{'org_name'};
     my $dbname = $login_parameters{'dbname'} || 'default';
+    my $allowed_groups = $login_parameters{'allowed_groups'} || '';
 
     my $dbh = &Jarvis::DB::handle ($jconfig, $dbname);
 
@@ -266,6 +268,15 @@ WHERE
     } else {
         # Otherwise combine role and table access.
         $group_list = join (",", @role_array, @access_array, @process_access_array);
+    }
+
+    # we got the group list, check if user is allowed
+    if ($allowed_groups) {
+        my $allowed_groups_regexp = list_regexp($allowed_groups);
+        unless ( scalar(grep { $_ =~ /$allowed_groups_regexp/ } split(',', $group_list)) ) {
+            &Jarvis::Error::debug ($jconfig, "No allowed group for user '$username'.");
+            return ("Login Denied.");
+        }
     }
 
     # Find the IP address and name.  Note that reverse DNS lookup can sometimes take
