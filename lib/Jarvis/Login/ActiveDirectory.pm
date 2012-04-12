@@ -35,6 +35,7 @@ package Jarvis::Login::ActiveDirectory;
 use Net::LDAP;
 
 use Jarvis::Error;
+use Jarvis::Login::Adempiere;
 
 ###############################################################################
 # Public Functions
@@ -167,7 +168,7 @@ sub Jarvis::Login::ActiveDirectory::check {
 
     # we got the group list, check if user is allowed
     if ($allowed_groups) {
-        my $allowed_groups_regexp = Jarvis::Adempiere::list_regexp($allowed_groups);
+        my $allowed_groups_regexp = Jarvis::Login::Adempiere::list_regexp($allowed_groups);
         unless ( scalar(grep { $_ =~ /$allowed_groups_regexp/ } split(',', $group_list)) ) {
             &Jarvis::Error::debug ($jconfig, "No allowed group for user '$username'.");
             return ("Login Denied.");
