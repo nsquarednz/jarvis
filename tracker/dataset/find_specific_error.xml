@@ -40,9 +40,7 @@
                 id IN (SELECT id FROM error WHERE post_body LIKE '%' || {$filter} || '%')
             )
             AND ({$id}::integer IS NULL OR id > {$id})
-            AND ({$date}::timestamp IS NULL OR start_time > ({$date} + '1 day'))
-        ORDER BY
-            start_time DESC
+            AND ({$date}::timestamp IS NULL OR start_time > ({$date}::timestamp + '1 day'))
     </select>
 </dataset>
 
