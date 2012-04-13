@@ -62,7 +62,7 @@ Date.fromJulian = function (jt) {
 Date.prototype.formatForServer = function () {
     // ExtJS Date.format function
     var result = this.format('Y-m-d H:i:s');
-    console.log('formatForServer', this, result);
+    //console.log('formatForServer', this, result);
     return result;
 }
 

@@ -12,7 +12,7 @@
     <![CDATA[
         SELECT 
             julian(cal.time) AS t -- Parsing of julian date is much faster than parsing a date string.
-            , SUM (CASE WHEN r.start_time IS NOT NULL THEN 1 ELSE 0 END) / 15.0 AS c
+            , coalesce(r.transaction_count,0) / 15.0 AS c
         FROM 
             (SELECT the_date + i.interval as time FROM
                 (
@@ -23,25 +23,25 @@
                 ) i
             ) cal
             LEFT JOIN (
-                SELECT start_time, username
+                SELECT
+                    date_trunc_interval('15 minutes', start_time) AS start_time
+                    , count(*) as transaction_count
                 FROM (
                     SELECT start_time, username, app_name, dataset FROM request 
-                    WHERE 
-                        start_time >= {$from} AND start_time <= {$to}
+                    WHERE start_time >= {$from} AND start_time <= {$to}
                     UNION ALL 
                     SELECT start_time, username, app_name, dataset  FROM error
-                    WHERE 
-                        start_time >= {$from} AND start_time <= {$to}
+                    WHERE start_time >= {$from} AND start_time <= {$to}
                 ) d
                 WHERE (app_name IS NULL OR {$1}::text IS NULL OR {$1} = app_name)
                     AND (dataset IS NULL OR {$2}::text IS NULL OR {$2} like dataset || '%')
-            ) r ON 
-                cal.time <= r.start_time AND cal.time + '15 minutes' > r.start_time
+                    AND (username IS NULL OR {$user}::text IS NULL OR username = {$user})
+                GROUP BY
+                    date_trunc_interval('15 minutes', start_time)
+            ) r ON
+                cal.time = r.start_time
         WHERE
-            time >= {$from} AND time <= {$to}
-            AND (r.username IS NULL OR {$user}::text IS NULL OR r.username = {$user})
-        GROUP BY 
-            cal.time
+            cal.time >= {$from} AND cal.time <= {$to}
         ORDER BY
             cal.time
     ]]>
