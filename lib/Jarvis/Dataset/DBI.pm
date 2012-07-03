@@ -190,6 +190,16 @@ sub sql_with_substitutions {
     return ($sql3, @variable_names);
 }
 
+# parses an attribute parameter string into a hash
+sub parse_attr {
+    my ($attribute_string) = @_;
+
+    # split, trim and convert to hash (format: "pg_server_prepare => 0, something_else => 1")
+    my %attributes = map { $_ =~ /^\s*(.*\S)\s*$/ ? $1 : $_ } map { split(/=>/, $_) } split(/,/, $attribute_string);
+
+    return %attributes;
+}
+
 ################################################################################
 # Loads a specified SQL statement from the datasets, transforms the SQL into
 # placeholder, pulls out the variable names, and prepares a statement.
@@ -241,12 +251,16 @@ sub parse_statement {
 
     &Jarvis::Error::dump ($jconfig, "SQL after substition = " . $sql_with_substitutions);
 
+    # get db-specific parameters
+    my $dbxml = &Jarvis::DB::db_config($jconfig, $dsxml->{dataset}{'dbname'}, $dsxml->{dataset}{'dbtype'});
+
     # Use special prepare parameters
-    my $prepare_str = $dsxml->{dataset}{$ttype}{'prepare'};
-    &Jarvis::Error::debug ($jconfig, "Prepare = '$prepare_str'");
-    # split, trim and convert to hash (format: "pg_server_prepare => 0, something_else => 1")
-    my %prepare_attr = map { $_ =~ /^\s*(.*\S)\s*$/ ? $1 : $_ } map { split(/=>/, $_) } split(/,/, $prepare_str);
-    if (defined $prepare_str and length($prepare_str) > 0) {
+    my $db_prepare_str = $dbxml->{'prepare'};
+    my $ds_prepare_str = $dsxml->{dataset}{$ttype}{'prepare'};
+    my %prepare_attr = ();
+    foreach my $prepare_str (grep { $_ } ($db_prepare_str, $ds_prepare_str)) {
+        &Jarvis::Error::debug ($jconfig, "Prepare += '$prepare_str'");
+        %prepare_attr = (%prepare_attr, parse_attr($prepare_str));
         &Jarvis::Error::dump ($jconfig, "Prepare after parsing =\n" . Dumper(%prepare_attr));
     }
 
