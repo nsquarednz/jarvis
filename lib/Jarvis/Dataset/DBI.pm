@@ -272,6 +272,9 @@ sub parse_statement {
             die "Couldn't prepare statement for $ttype on '" . $jconfig->{'dataset_name'} . "'.\nSQL ERROR = '" . $dbh->errstr . "'.";
     }
 
+    # Log supression pattern
+    $obj->{'nolog'} = ($dsxml->{dataset}{$ttype}{'nolog'}||'');
+
     return $obj;
 }
 
@@ -314,10 +317,15 @@ sub statement_execute {
         my $error_message = $stm->{'sth'}->errstr || $@ || 'Unknown error SQL execution error.';
         $error_message =~ s/\s+$//;
 
-        &Jarvis::Error::log ($jconfig, "Failure executing SQL for '" . $stm->{'ttype'} . "'.  Details follow.");
-        &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
-        &Jarvis::Error::log ($jconfig, $error_message);
-        &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @$arg_values_aref) || 'NONE'));
+        my $nolog = $stm->{'nolog'};
+        if ($nolog && $error_message =~ /$nolog/) {
+            &Jarvis::Error::debug ($jconfig, "Failure executing SQL. Log disabled.");
+        } else {
+            &Jarvis::Error::log ($jconfig, "Failure executing SQL for '" . $stm->{'ttype'} . "'.  Details follow.");
+            &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
+            &Jarvis::Error::log ($jconfig, $error_message);
+            &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @$arg_values_aref) || 'NONE'));
+        }
 
         $stm->{'sth'}->finish;
         $stm->{'error'} = $error_message;
@@ -610,10 +618,15 @@ sub store {
                         my $error_message = $DBI::errstr;
                         $error_message =~ s/\s+$//;
 
-                        &Jarvis::Error::log ($jconfig, "Failure fetching first return result set for '" . $stm->{'ttype'} . "'.  Details follow.");
-                        &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
-                        &Jarvis::Error::log ($jconfig, $error_message);
-                        &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) || 'NONE'));
+                        my $nolog = $stm->{'nolog'};
+                        if ($nolog && $error_message =~ /$nolog/) {
+                            &Jarvis::Error::debug ($jconfig, "Failure fetching first return result set. Log disabled.");
+                        } else {
+                            &Jarvis::Error::log ($jconfig, "Failure fetching first return result set for '" . $stm->{'ttype'} . "'.  Details follow.");
+                            &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
+                            &Jarvis::Error::log ($jconfig, $error_message);
+                            &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) || 'NONE'));
+                        }
 
                         $stm->{'sth'}->finish;
                         $stm->{'error'} = $error_message;
@@ -672,10 +685,15 @@ sub store {
                         my $error_message = $DBI::errstr;
                         $error_message =~ s/\s+$//;
 
-                        &Jarvis::Error::log ($jconfig, "Failure fetching additional result sets for '" . $stm->{'ttype'} . "'.  Details follow.");
-                        &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
-                        &Jarvis::Error::log ($jconfig, $error_message);
-                        &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) || 'NONE'));
+                        my $nolog = $stm->{'nolog'};
+                        if ($nolog && $error_message =~ /$nolog/) {
+                            &Jarvis::Error::debug ($jconfig, "Failure fetching additional result sets. Log disabled.");
+                        } else {
+                            &Jarvis::Error::log ($jconfig, "Failure fetching additional result sets for '" . $stm->{'ttype'} . "'.  Details follow.");
+                            &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
+                            &Jarvis::Error::log ($jconfig, $error_message);
+                            &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) || 'NONE'));
+                        }
 
                         $stm->{'sth'}->finish;
                         $stm->{'error'} = $error_message;
