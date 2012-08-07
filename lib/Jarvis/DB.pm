@@ -124,7 +124,13 @@ sub handle {
             &Jarvis::Error::debug ($jconfig, "DB Parameter: " . $parameter->{'name'}->content . " -> " . $parameter->{'value'}->content);
             $parameters {$parameter->{'name'}->content} = $parameter->{'value'}->content;
         }
-    }        
+    }
+    my $post_connect = $dbxml->{'post_connect'};
+    if ($post_connect) {
+        # trim post_connect string
+        $post_connect =~ s/^\s*//;
+        $post_connect =~ s/\s*$//;
+    }
     
     # Allow the hook to potentially modify some of these attributes.
     &Jarvis::Hook::pre_connect ($jconfig, $dbname, $dbtype, \$dbconnect, \$dbusername, \$dbpassword, \%parameters);
@@ -139,10 +145,13 @@ sub handle {
         if (! $dbconnect) {
             $dbconnect = "dbi:Pg:dbname=" . $jconfig->{'app_name'};
             &Jarvis::Error::debug ($jconfig, "DB Connect = '$dbconnect' (default)");
-        }            
-        $dbhs{$dbtype}{$dbname} = DBI->connect ($dbconnect, $dbusername, $dbpassword, { RaiseError => 1, PrintError => 1, AutoCommit => 1 }) ||
+        }
+        my $dbh = $dbhs{$dbtype}{$dbname} = DBI->connect ($dbconnect, $dbusername, $dbpassword, { RaiseError => 1, PrintError => 1, AutoCommit => 1 }) ||
             die "Cannot connect to DBI database '$dbname': " . DBI::errstr;
-        
+        if ($post_connect) {
+            &Jarvis::Error::debug ($jconfig, "DB PostConnect = '$post_connect'");
+            $dbh->do($post_connect) or die "Error Executing PostConnect: " . DBI::errstr;
+        }
     # SDP is a SSAS DataPump pseudo-database.
     } elsif ($dbtype eq "sdp") {
         $dbconnect || die "Missing 'connect' parameter on SSAS DataPump database '$dbname'.";
