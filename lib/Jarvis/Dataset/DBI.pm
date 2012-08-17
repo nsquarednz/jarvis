@@ -274,6 +274,8 @@ sub parse_statement {
 
     # Log suppression pattern
     $obj->{'nolog'} = ($dsxml->{dataset}{$ttype}{'nolog'}||'');
+    # Warning/error suppression pattern
+    $obj->{'ignore'} = ($dsxml->{dataset}{$ttype}{'ignore'}||'');
 
     return $obj;
 }
@@ -294,6 +296,28 @@ sub nolog {
 
     my $nolog = $stm->{'nolog'};
     if ($nolog && $message =~ /$nolog/) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+################################################################################
+# check if error message should be supressed due to ignore flag
+# 
+# Params:
+#       stm - statement object as returned by parse_statement
+#       message - error message to match against ignore flag
+#
+# Returns:
+#       1 if message matches ignore flag
+#       0 otherwise
+################################################################################
+sub ignore {
+    my ($stm, $message) = @_;
+
+    my $ignore = $stm->{'ignore'};
+    if ($ignore && $message =~ /$ignore/) {
         return 1;
     } else {
         return 0;
@@ -335,8 +359,10 @@ sub statement_execute {
     };
     $SIG{__DIE__} = $err_handler;
 
-    if ($@ || $DBI::errstr || (! defined $stm->{'retval'})) {
-        my $error_message = $stm->{'sth'}->errstr || $@ || 'Unknown error SQL execution error.';
+    my $error_message = $stm->{'sth'}->errstr || $@ || $DBI::errstr;
+    if (($error_message && !ignore($stm, $error_message)) || (!defined $stm->{'retval'})) {
+        # ensure we have an error message to return
+        $error_message = $error_message || 'Unknown error SQL execution error.';
         $error_message =~ s/\s+$//;
 
         if (&nolog($stm, $error_message)) {
