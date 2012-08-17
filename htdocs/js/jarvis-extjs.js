@@ -156,13 +156,13 @@ function jarvisSendChange (transaction_type, store, dataset_name, records, mixed
             for (var i = 0; i < records.length; i++) {
                 var rd = records[i].data;
                 if (rd._type == null) {
-                    rd._ttype = rd._deleted ? 'delete' : (((rd[mixed_id_field] == null) || (rd[mixed_id_field] == 0)) ? 'insert' : 'update');
+                    rd._ttype = rd._deleted ? 'delete' : (((rd[mixed_id_field] == null) || (rd[mixed_id_field] <= 0)) ? 'insert' : 'update');
                 }
             }
         } else {
             var rd = records.data;
             if (rd._type == null) {
-                rd._ttype = rd._deleted ? 'delete' : (((rd[mixed_id_field] == null) || (rd[mixed_id_field] == 0)) ? 'insert' : 'update');
+                rd._ttype = rd._deleted ? 'delete' : (((rd[mixed_id_field] == null) || (rd[mixed_id_field] <= 0)) ? 'insert' : 'update');
             }
         }
     }
