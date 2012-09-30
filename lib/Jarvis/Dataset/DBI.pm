@@ -680,6 +680,11 @@ sub store {
                         $stm->{'error'} = $error_message;
                         $success = 0;
                         $message = $error_message;
+
+                        # Log the error in our tracker database.
+                        unless (&nolog($stm, $error_message)) {
+                            &Jarvis::Tracker::error ($jconfig, '200', $error_message);
+                        }
                     }
 
                     $row_result{'returning'} = $returning_aref;
