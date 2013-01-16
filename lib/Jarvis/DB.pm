@@ -146,7 +146,20 @@ sub handle {
             $dbconnect = "dbi:Pg:dbname=" . $jconfig->{'app_name'};
             &Jarvis::Error::debug ($jconfig, "DB Connect = '$dbconnect' (default)");
         }
-        my $dbh = $dbhs{$dbtype}{$dbname} = DBI->connect ($dbconnect, $dbusername, $dbpassword, { RaiseError => 1, PrintError => 1, AutoCommit => 1 }) ||
+        my $dbh_attributes = {
+            RaiseError => 1, 
+            PrintError => 1, 
+            AutoCommit => 1 
+        };
+        # Optional DBI connect attribute parameters, handled per-database type.
+        if ($dbxml->{'dbh_attributes'}) {
+            foreach my $attr ($dbxml->{'dbh_attributes'}->{'attribute'}('@')) {
+                &Jarvis::Error::debug ($jconfig, "DBH custom attribute: " . $attr->{'name'}->content . " -> " . $attr->{'value'}->content);
+                $dbh_attributes->{$attr->{'name'}->content} = $attr->{'value'}->content;
+            }
+        }
+
+        my $dbh = $dbhs{$dbtype}{$dbname} = DBI->connect ($dbconnect, $dbusername, $dbpassword, $dbh_attributes) ||
             die "Cannot connect to DBI database '$dbname': " . DBI::errstr;
         if ($post_connect) {
             &Jarvis::Error::debug ($jconfig, "DB PostConnect = '$post_connect'");
