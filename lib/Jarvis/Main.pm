@@ -118,6 +118,9 @@ sub error_handler {
     print $cgi->header(-status => $status, -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt");
     print $msg;
 
+    # Print URI to log if not done already.
+    &Jarvis::Error::log ($jconfig, "processed URI = $ENV{REQUEST_URI}") unless ($jconfig->{'debug'});
+
     # Print to error log.  Include stack trace if debug is enabled.
     my $long_msg = &Jarvis::Error::print_message ($jconfig, 'fatal', $msg);
     print STDERR ($jconfig->{'debug'} ? Carp::longmess $long_msg : Carp::shortmess $long_msg);
@@ -128,7 +131,6 @@ sub error_handler {
     # We MUST ensure that ALL the cached database handles are removed.
     # Otherwise, under mod_perl, the next application would get OUR database handles!
     &Jarvis::DB::disconnect ($jconfig);
-    &Jarvis::Tracker::disconnect ($jconfig);
     
     # Perhaps we need more clean-up in here, since we may also be serving  
     # Jarvis from a perl HTTPD in some cases.  Need to keep an eye out for
@@ -454,6 +456,8 @@ sub do {
 
     # Invoke application-specific finish hook(s).
     &Jarvis::Hook::finish ($jconfig);
+    # Track the request end.
+    &Jarvis::Tracker::finish ($jconfig, \@rest_args);
 
     # We MUST ensure that ALL the cached database handles are removed.
     # Otherwise, under mod_perl, the next application would get OUR database handles!
@@ -462,11 +466,6 @@ sub do {
     # cached for potential re-use by DBI.  But that will ensure that the password
     # and other information matches before allowing it.
     &Jarvis::DB::disconnect ($jconfig);
-
-    # Track the request end, and then disconnect from tracker DB.
-    # Again, required under mod_perl to avoid the next app from using our tracker DB handle.
-    &Jarvis::Tracker::finish ($jconfig, \@rest_args);
-    &Jarvis::Tracker::disconnect ($jconfig);
 }
 
 1;

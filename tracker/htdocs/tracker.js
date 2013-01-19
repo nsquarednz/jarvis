@@ -24,7 +24,7 @@
 
 Ext.ns('jarvis.tracker');
 
-Ext.BLANK_IMAGE_URL = '/ext-2.3/resources/images/default/s.gif';
+Ext.BLANK_IMAGE_URL = '/ext-3.3/resources/images/default/s.gif';
 
 /**
  * The main UI Tab that new tabs are added to.

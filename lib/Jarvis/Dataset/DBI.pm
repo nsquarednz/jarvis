@@ -190,6 +190,16 @@ sub sql_with_substitutions {
     return ($sql3, @variable_names);
 }
 
+# parses an attribute parameter string into a hash
+sub parse_attr {
+    my ($attribute_string) = @_;
+
+    # split, trim and convert to hash (format: "pg_server_prepare => 0, something_else => 1")
+    my %attributes = map { $_ =~ /^\s*(.*\S)\s*$/ ? $1 : $_ } map { split(/=>/, $_) } split(/,/, $attribute_string);
+
+    return %attributes;
+}
+
 ################################################################################
 # Loads a specified SQL statement from the datasets, transforms the SQL into
 # placeholder, pulls out the variable names, and prepares a statement.
@@ -241,12 +251,16 @@ sub parse_statement {
 
     &Jarvis::Error::dump ($jconfig, "SQL after substition = " . $sql_with_substitutions);
 
+    # get db-specific parameters
+    my $dbxml = &Jarvis::DB::db_config($jconfig, $dsxml->{dataset}{'dbname'}, $dsxml->{dataset}{'dbtype'});
+
     # Use special prepare parameters
-    my $prepare_str = $dsxml->{dataset}{$ttype}{'prepare'};
-    &Jarvis::Error::debug ($jconfig, "Prepare = '$prepare_str'");
-    # split, trim and convert to hash (format: "pg_server_prepare => 0, something_else => 1")
-    my %prepare_attr = map { $_ =~ /^\s*(.*\S)\s*$/ ? $1 : $_ } map { split(/=>/, $_) } split(/,/, $prepare_str);
-    if (defined $prepare_str and length($prepare_str) > 0) {
+    my $db_prepare_str = $dbxml->{'prepare'};
+    my $ds_prepare_str = $dsxml->{dataset}{$ttype}{'prepare'};
+    my %prepare_attr = ();
+    foreach my $prepare_str (grep { $_ } ($db_prepare_str, $ds_prepare_str)) {
+        &Jarvis::Error::debug ($jconfig, "Prepare += '$prepare_str'");
+        %prepare_attr = (%prepare_attr, parse_attr($prepare_str));
         &Jarvis::Error::dump ($jconfig, "Prepare after parsing =\n" . Dumper(%prepare_attr));
     }
 
@@ -258,7 +272,56 @@ sub parse_statement {
             die "Couldn't prepare statement for $ttype on '" . $jconfig->{'dataset_name'} . "'.\nSQL ERROR = '" . $dbh->errstr . "'.";
     }
 
+    # Log suppression pattern
+    $obj->{'nolog'} = ($dsxml->{dataset}{$ttype}{'nolog'}||'');
+    # Warning/error suppression pattern
+    $obj->{'ignore'} = ($dsxml->{dataset}{$ttype}{'ignore'}||'');
+
     return $obj;
+}
+
+################################################################################
+# check if error message should be supressed due to nolog flag
+# 
+# Params:
+#       stm - statement object as returned by parse_statement
+#       message - error message to match against nolog flag
+#
+# Returns:
+#       1 if message matches nolog flag
+#       0 otherwise
+################################################################################
+sub nolog {
+    my ($stm, $message) = @_;
+
+    my $nolog = $stm->{'nolog'};
+    if ($nolog && $message =~ /$nolog/) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+################################################################################
+# check if error message should be supressed due to ignore flag
+# 
+# Params:
+#       stm - statement object as returned by parse_statement
+#       message - error message to match against ignore flag
+#
+# Returns:
+#       1 if message matches ignore flag
+#       0 otherwise
+################################################################################
+sub ignore {
+    my ($stm, $message) = @_;
+
+    my $ignore = $stm->{'ignore'};
+    if ($ignore && $message =~ /$ignore/) {
+        return 1;
+    } else {
+        return 0;
+    }
 }
 
 ################################################################################
@@ -296,14 +359,20 @@ sub statement_execute {
     };
     $SIG{__DIE__} = $err_handler;
 
-    if ($@ || $DBI::errstr || (! defined $stm->{'retval'})) {
-        my $error_message = $stm->{'sth'}->errstr || $@ || 'Unknown error SQL execution error.';
+    my $error_message = $stm->{'sth'}->errstr || $@ || $DBI::errstr;
+    if (($error_message && !ignore($stm, $error_message)) || (!defined $stm->{'retval'})) {
+        # ensure we have an error message to return
+        $error_message = $error_message || 'Unknown error SQL execution error.';
         $error_message =~ s/\s+$//;
 
-        &Jarvis::Error::log ($jconfig, "Failure executing SQL for '" . $stm->{'ttype'} . "'.  Details follow.");
-        &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
-        &Jarvis::Error::log ($jconfig, $error_message);
-        &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @$arg_values_aref) || 'NONE'));
+        if (&nolog($stm, $error_message)) {
+            &Jarvis::Error::debug ($jconfig, "Failure executing SQL. Log disabled.");
+        } else {
+            &Jarvis::Error::log ($jconfig, "Failure executing SQL for '" . $stm->{'ttype'} . "'.  Details follow.");
+            &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
+            &Jarvis::Error::log ($jconfig, $error_message);
+            &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @$arg_values_aref) || 'NONE'));
+        }
 
         $stm->{'sth'}->finish;
         $stm->{'error'} = $error_message;
@@ -570,7 +639,9 @@ sub store {
             $message || ($message = $stm->{'error'});
 
             # Log the error in our tracker database.
-            &Jarvis::Tracker::error ($jconfig, '200', $stm->{'error'});
+            unless (&nolog($stm, $stm->{'error'})) {
+                &Jarvis::Tracker::error ($jconfig, '200', $stm->{'error'});
+            }
 
         # Suceeded.  Set per-row status, and fetch the returned results, if this
         # operation indicates that it returns values.
@@ -596,15 +667,24 @@ sub store {
                         my $error_message = $DBI::errstr;
                         $error_message =~ s/\s+$//;
 
-                        &Jarvis::Error::log ($jconfig, "Failure fetching first return result set for '" . $stm->{'ttype'} . "'.  Details follow.");
-                        &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
-                        &Jarvis::Error::log ($jconfig, $error_message);
-                        &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) || 'NONE'));
+                        if (&nolog($stm, $error_message)) {
+                            &Jarvis::Error::debug ($jconfig, "Failure fetching first return result set. Log disabled.");
+                        } else {
+                            &Jarvis::Error::log ($jconfig, "Failure fetching first return result set for '" . $stm->{'ttype'} . "'.  Details follow.");
+                            &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
+                            &Jarvis::Error::log ($jconfig, $error_message);
+                            &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) || 'NONE'));
+                        }
 
                         $stm->{'sth'}->finish;
                         $stm->{'error'} = $error_message;
                         $success = 0;
                         $message = $error_message;
+
+                        # Log the error in our tracker database.
+                        unless (&nolog($stm, $error_message)) {
+                            &Jarvis::Tracker::error ($jconfig, '200', $error_message);
+                        }
                     }
 
                     $row_result{'returning'} = $returning_aref;
@@ -658,10 +738,14 @@ sub store {
                         my $error_message = $DBI::errstr;
                         $error_message =~ s/\s+$//;
 
-                        &Jarvis::Error::log ($jconfig, "Failure fetching additional result sets for '" . $stm->{'ttype'} . "'.  Details follow.");
-                        &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
-                        &Jarvis::Error::log ($jconfig, $error_message);
-                        &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) || 'NONE'));
+                        if (&nolog($stm, $error_message)) {
+                            &Jarvis::Error::debug ($jconfig, "Failure fetching additional result sets. Log disabled.");
+                        } else {
+                            &Jarvis::Error::log ($jconfig, "Failure fetching additional result sets for '" . $stm->{'ttype'} . "'.  Details follow.");
+                            &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
+                            &Jarvis::Error::log ($jconfig, $error_message);
+                            &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) || 'NONE'));
+                        }
 
                         $stm->{'sth'}->finish;
                         $stm->{'error'} = $error_message;

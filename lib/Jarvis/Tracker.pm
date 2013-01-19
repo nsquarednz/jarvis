@@ -34,22 +34,6 @@ package Jarvis::Tracker;
 use Jarvis::Text;
 use Jarvis::Error;
 
-###############################################################################
-# Global variables.
-###############################################################################
-#
-# Note that global variables under mod_perl require careful consideration!
-#
-# Specifically, you must ensure that all variables which require 
-# re-initialisation for each invocation will receive it.
-#
-# Tracker DB handle.  Cached for efficiency.
-#
-# It is safe because it is set to undef by the disconnect method, which is
-# invoked whenever each Jarvis request finishes (either success or fail).
-#
-my $tdbh = undef;
-
 ################################################################################
 # Connect to tracker DB (if required) and return DBH.
 #
@@ -65,44 +49,8 @@ my $tdbh = undef;
 sub handle {
     my ($jconfig) = @_;
 
-    $tdbh && return $tdbh;
-
-    my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
-    my $tracker = $axml->{'tracker'};
-    if (! $tracker) {
-        &Jarvis::Error::log ($jconfig, "No 'tracker' config present.  Cannot connect to tracker DB.");
-        return;
-    }
-
-    my $dbfile = $tracker->{'dbfile'}->content || "/var/lib/jarvis/tracker/tracker.db";
-    &Jarvis::Error::debug ($jconfig, "Tracker DB File = '$dbfile'");
-
-    $tdbh = DBI->connect ("dbi:SQLite:dbname=$dbfile", '', '', { RaiseError => 0, PrintError => 0, AutoCommit => 1 });
-    if (! $tdbh) {
-        &Jarvis::Error::log ($jconfig, "Cannot connect to tracker database. " . DBI::errstr);
-        return undef;
-    }
-
-    return $tdbh;
-}
-
-################################################################################
-# Disconnect from tracker DB (if required).  Under mod_perl we need to unassign
-# the dbh, so that we get a fresh one next time, because our next request may be
-# for a different application.
-#
-# Params:
-#       $jconfig - Jarvis::Config object (not used)
-#
-# Returns:
-#       1
-################################################################################
-#
-sub disconnect {
-    my ($jconfig) = @_;
-
-    $tdbh && $tdbh->disconnect();
-    $tdbh = undef;
+    # we store the tracker dbh along with other handles, using the reserved name 'tracker'
+    return &Jarvis::DB::handle ($jconfig, 'tracker');
 }
 
 ################################################################################
@@ -121,6 +69,20 @@ sub start {
 
     # Start time.
     $jconfig->{'tstart'} = [Time::HiRes::gettimeofday];
+}
+
+# format time in Julian date format (days since 4713-01-01 12:00:00 BC)
+sub timestamp_julian($) {
+    my ($time) = @_;
+    return (($$time[0] + $$time[1] / 1000000) / 86400.0 ) + 2440587.5;
+}
+
+# format time as sql timestamp
+sub timestamp_sql($) {
+    my ($time) = @_;
+    my ($sec,$min,$hour,$mday,$mon,$year) = localtime($$time[0]);
+    my $timestamp_sql = sprintf('%04d-%02d-%02d %02d:%02d:%02d', $year + 1900, $mon + 1, $mday, $hour, $min, $sec);
+    return $timestamp_sql;
 }
 
 ################################################################################
@@ -175,7 +137,7 @@ sub finish {
 
     # Julian time of request start.
     my $tstart = $jconfig->{'tstart'};
-    my $start_time = (($$tstart[0] + $$tstart[1] / 1000000) / 86400.0 ) + 2440587.5; # 2440587.5 is Unix Epoch time in Julian date format.
+    my $start_time = timestamp_sql($tstart);
     my $duration_ms = int (Time::HiRes::tv_interval ($tstart) * 1000);
 
     # Perform the database insert.
@@ -259,7 +221,7 @@ sub error {
 
     # Julian time of request start.
     my $tstart = $jconfig->{'tstart'};
-    my $start_time = (($$tstart[0] + $$tstart[1] / 1000000) / 86400.0 ) + 2440587.5; # 2440587.5 is Unix Epoch time in Julian date format.
+    my $start_time = timestamp_sql($tstart);
 
     # Get error number
     $http_response_code =~ s/^([0-9]+).*$/$1/;
@@ -328,7 +290,7 @@ sub login {
 
     # Julian time of request start.
     my $tstart = $jconfig->{'tstart'};
-    my $start_time = (($$tstart[0] + $$tstart[1] / 1000000) / 86400.0 ) + 2440587.5; # 2440587.5 is Unix Epoch time in Julian date format.
+    my $start_time = timestamp_sql($tstart);
 
     # Perform the database insert.
     my $sth = $tdbh->prepare (

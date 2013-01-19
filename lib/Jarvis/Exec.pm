@@ -229,6 +229,8 @@ sub do {
     }
 
     if ($status != 0) {
+        # log command in case we haven't done so already
+        &Jarvis::Error::log ($jconfig, "Executed Command: $command") unless ($jconfig->{'debug'});
         die "Command failed with status $status.\n$output";
     }
 

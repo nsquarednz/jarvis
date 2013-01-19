@@ -223,7 +223,7 @@ Ext.extend (Ext.ux.albeva.LoginDialog, Ext.util.Observable, {
      * 
      * @type {String}
      */
-    usernameVtype :'alphanum',
+    //usernameVtype :'alphanum',
     
     /**
      * Password field label
@@ -251,7 +251,7 @@ Ext.extend (Ext.ux.albeva.LoginDialog, Ext.util.Observable, {
      * 
      * @type {String}
      */
-    passwordVtype : 'alphanum',
+    //passwordVtype : 'alphanum',
     
     /**
      * Request url
