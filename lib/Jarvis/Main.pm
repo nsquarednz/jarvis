@@ -444,7 +444,8 @@ sub do {
 
     # It's the end of the world as we know it.
     } else {
-        die "Unsupported action '" . $action . "' ($method)!\n";
+        print $cgi->header(-status => '501 Not Implemented', -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt");
+        print "The $method method (action $action) is not recognised by Jarvis.";
     }
 
     ###############################################################################
