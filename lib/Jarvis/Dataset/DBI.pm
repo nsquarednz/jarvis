@@ -465,6 +465,7 @@ sub fetch {
 #
 sub store {
     my ($jconfig, $subset_name, $dsxml, $dbh, $rest_args_aref) = @_;
+    my $num_of_rest_args = scalar @{$rest_args_aref} ;
 
     # What transforms should we use when processing store data?
     my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->{dataset}{transform}{store});
@@ -472,7 +473,7 @@ sub store {
 
     # Get our submitted content
     my $content = &Jarvis::Dataset::get_post_data ($jconfig);
-    $content || die "No content body to store";
+    ($content || $num_of_rest_args > 0) || die "No content body to store";
     &Jarvis::Error::debug ($jconfig, "Request Content Length = " . length ($content));
     &Jarvis::Error::dump ($jconfig, $content);
 
@@ -527,12 +528,16 @@ sub store {
         $fields_aref = \@rows;
 
     # Unsupported format.
-    } else {
+    } elsif ($num_of_rest_args < 1) {
         die "Unsupported content type for changes: '$content_type'\n";
     }
 
     # Store this for tracking
-    $jconfig->{'in_nrows'} = scalar @$fields_aref;
+    if ($fields_aref){
+        $jconfig->{'in_nrows'} = scalar @$fields_aref;
+    } else {
+        $jconfig->{'in_nrows'} = $num_of_rest_args;
+    }
 
     # Choose our statement and find the SQL and variable names.
     my $ttype = $jconfig->{'action'};
