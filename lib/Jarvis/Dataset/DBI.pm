@@ -537,6 +537,7 @@ sub store {
         $jconfig->{'in_nrows'} = scalar @$fields_aref;
     } else {
         $jconfig->{'in_nrows'} = $num_of_rest_args;
+        $fields_aref = [{}]; # This will cause the loop to execute once with no params (requires rest params)
     }
 
     # Choose our statement and find the SQL and variable names.
