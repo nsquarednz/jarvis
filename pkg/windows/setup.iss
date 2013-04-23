@@ -56,9 +56,9 @@ begin
 end;
 
 //Fetches application version decription from version file
-function GetAppVersion(default: String): String;
+function GetAppVersion(default: AnsiString): AnsiString;
 var
-  AppVersion: String;
+  AppVersion: AnsiString;
 begin
   ExtractTemporaryFile('build-version.txt');
   LoadStringFromFile(ExpandConstant('{tmp}/build-version.txt'), AppVersion);
@@ -76,11 +76,28 @@ begin
 	Result := outString;
 end;
 
+//convert Ansi String to String
+function ConvertToString(AString:AnsiString):String;
+var
+ i : Integer;
+ iChar : Integer;
+ outString : String;
+begin
+ outString :='';
+ for i := 1 to Length(AString) do
+ begin
+  iChar := Ord(AString[i]); //get int value
+  outString := outString + Chr(iChar);
+ end;
+
+ Result := outString;
+end;
+
 //Set Jarvis locations:
 // - location of Perl installation
 procedure SetJarvisAgentLocations();
 var
-	jarvisScript: String;
+	jarvisScript: AnsiString;
 begin
 	if wpPerlLocation.Values[0] = '' then
 		wpPerlLocation.Values[0] := defaultPerlLoc;
@@ -88,7 +105,7 @@ begin
 	LoadStringFromFile(ExpandConstant('{app}/cgi-bin/agent.pl'), jarvisScript);
 
 	//Change Perl location
-	StringChange(jarvisScript,'#!/usr/bin/perl', '#!' + ConvertBackSlashes(wpPerlLocation.Values[0]));
+	StringChange(ConvertToString(jarvisScript),'#!/usr/bin/perl', '#!' + ConvertBackSlashes(wpPerlLocation.Values[0]));
 
 	//Replace original file
 	SaveStringToFile(ExpandConstant('{app}/cgi-bin/agent.pl'), jarvisScript, false);
