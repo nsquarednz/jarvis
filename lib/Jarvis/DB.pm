@@ -165,6 +165,7 @@ sub handle {
             &Jarvis::Error::debug ($jconfig, "DB PostConnect = '$post_connect'");
             $dbh->do($post_connect) or die "Error Executing PostConnect: " . DBI::errstr;
         }
+        
     # SDP is a SSAS DataPump pseudo-database.
     } elsif ($dbtype eq "sdp") {
         $dbconnect || die "Missing 'connect' parameter on SSAS DataPump database '$dbname'.";

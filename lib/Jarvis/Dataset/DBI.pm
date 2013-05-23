@@ -219,6 +219,10 @@ sub parse_attr {
 #               {'returning'}
 #               {'sth'}
 #               {'vnames_aref'}
+#               {'nolog_dataset'}
+#               {'nolog_dbh'}
+#               {'noerr_dataset'}
+#               {'noerr_dbh'}
 #               {'error'}      (Set later, to error message from latest action)
 #               {'retval'}     (Set later, return value of latest action)
 #
@@ -252,7 +256,7 @@ sub parse_statement {
     &Jarvis::Error::dump ($jconfig, "SQL after substition = " . $sql_with_substitutions);
 
     # get db-specific parameters
-    my $dbxml = &Jarvis::DB::db_config($jconfig, $dsxml->{dataset}{'dbname'}, $dsxml->{dataset}{'dbtype'});
+    my $dbxml = &Jarvis::DB::db_config ($jconfig, $dsxml->{dataset}{'dbname'}, $dsxml->{dataset}{'dbtype'});
 
     # Use special prepare parameters
     my $db_prepare_str = $dbxml->{'prepare'};
@@ -272,16 +276,31 @@ sub parse_statement {
             die "Couldn't prepare statement for $ttype on '" . $jconfig->{'dataset_name'} . "'.\nSQL ERROR = '" . $dbh->errstr . "'.";
     }
 
-    # Log suppression pattern
-    $obj->{'nolog'} = ($dsxml->{dataset}{$ttype}{'nolog'}||'');
+    # NOTE: "nolog" : Report back to client.  Do not log. 
+    #       "noerr" : Do NOT report back to client.  Do not log. 
+    
+    # Log and error suppression patterns (dataset)
+    $obj->{nolog_dataset} = ($dsxml->{dataset}{$ttype}{nolog} ? $dsxml->{dataset}{$ttype}{nolog}->content : '');
+    $obj->{noerr_dataset} = ($dsxml->{dataset}{$ttype}{noerr} ? $dsxml->{dataset}{$ttype}{noerr}->content : '');
+    
+    # Log and error suppression patterns (database global)
+    $obj->{nolog_dbh} = ($dbxml->{nolog} ? $dbxml->{nolog}->content : '');
+    $obj->{noerr_dbh} = ($dbxml->{noerr} ? $dbxml->{noerr}->content : '');
+    
     # Warning/error suppression pattern
-    $obj->{'ignore'} = ($dsxml->{dataset}{$ttype}{'ignore'}||'');
+    $obj->{ignore} = ($dsxml->{dataset}{$ttype}{ignore} ? $dsxml->{dataset}{$ttype}{ignore}->content : '');
 
     return $obj;
 }
 
 ################################################################################
-# check if error message should be supressed due to nolog flag
+# Check if error message should be supressed by a "nolog" or "noerr" pattern.
+#
+# A nolog and/or noerr pattern can be specified either:
+#   a) In a dataset, e.g.
+#         <update nolog="uq_EducatorPoliceChecks_PoliceCheckDate">
+#
+#   b) Globally in the <database><nolog>...</nolog></database> field.
 # 
 # Params:
 #       stm - statement object as returned by parse_statement
@@ -294,12 +313,32 @@ sub parse_statement {
 sub nolog {
     my ($stm, $message) = @_;
 
-    my $nolog = $stm->{'nolog'};
+    # "noerr" always implies "nolog".
+    if (&noerr ($stm, $message)) {
+        return 1;
+    }
+    my $nolog = $stm->{nolog_dataset};
     if ($nolog && $message =~ /$nolog/) {
         return 1;
-    } else {
-        return 0;
     }
+    $nolog = $stm->{nolog_dbh};
+    if ($nolog && $message =~ /$nolog/) {
+        return 1;
+    }
+    return 0;
+}
+sub noerr {
+    my ($stm, $message) = @_;
+
+    my $noerr = $stm->{noerr_dataset};
+    if ($noerr && $message =~ /$noerr/) {
+        return 1;
+    }
+    $noerr = $stm->{noerr_dbh};
+    if ($noerr && $message =~ /$noerr/) {
+        return 1;
+    }
+    return 0;
 }
 
 ################################################################################
@@ -365,8 +404,9 @@ sub statement_execute {
         $error_message = $error_message || 'Unknown error SQL execution error.';
         $error_message =~ s/\s+$//;
 
-        if (&nolog($stm, $error_message)) {
+        if (&nolog ($stm, $error_message)) {
             &Jarvis::Error::debug ($jconfig, "Failure executing SQL. Log disabled.");
+            
         } else {
             &Jarvis::Error::log ($jconfig, "Failure executing SQL for '" . $stm->{'ttype'} . "'.  Details follow.");
             &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
@@ -419,8 +459,12 @@ sub fetch {
     my @arg_values = &Jarvis::Dataset::names_to_values ($jconfig, $stm->{'vnames_aref'}, $safe_params_href);
 
     # Execute Select, return on error
-    &statement_execute($jconfig, $stm, \@arg_values);
-    $stm->{'error'} && die $stm->{'error'};
+    &statement_execute ($jconfig, $stm, \@arg_values);
+    if ($stm->{'error'}) {
+        if (! &noerr ($stm, $stm->{'error'})) {
+            die $stm->{'error'};
+        }
+    }
 
     # Fetch the data.
     my $rows_aref = $stm->{'sth'}->fetchall_arrayref({});
@@ -645,7 +689,7 @@ sub store {
             $message || ($message = $stm->{'error'});
 
             # Log the error in our tracker database.
-            unless (&nolog($stm, $stm->{'error'})) {
+            unless (&nolog ($stm, $stm->{'error'})) {
                 &Jarvis::Tracker::error ($jconfig, '200', $stm->{'error'});
             }
 
@@ -673,7 +717,7 @@ sub store {
                         my $error_message = $DBI::errstr;
                         $error_message =~ s/\s+$//;
 
-                        if (&nolog($stm, $error_message)) {
+                        if (&nolog ($stm, $error_message)) {
                             &Jarvis::Error::debug ($jconfig, "Failure fetching first return result set. Log disabled.");
                         } else {
                             &Jarvis::Error::log ($jconfig, "Failure fetching first return result set for '" . $stm->{'ttype'} . "'.  Details follow.");
@@ -688,7 +732,7 @@ sub store {
                         $message = $error_message;
 
                         # Log the error in our tracker database.
-                        unless (&nolog($stm, $error_message)) {
+                        unless (&nolog ($stm, $error_message)) {
                             &Jarvis::Tracker::error ($jconfig, '200', $error_message);
                         }
                     }
@@ -744,7 +788,7 @@ sub store {
                         my $error_message = $DBI::errstr;
                         $error_message =~ s/\s+$//;
 
-                        if (&nolog($stm, $error_message)) {
+                        if (&nolog ($stm, $error_message)) {
                             &Jarvis::Error::debug ($jconfig, "Failure fetching additional result sets. Log disabled.");
                         } else {
                             &Jarvis::Error::log ($jconfig, "Failure fetching additional result sets for '" . $stm->{'ttype'} . "'.  Details follow.");
