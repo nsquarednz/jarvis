@@ -415,7 +415,10 @@ sub statement_execute {
         }
 
         $stm->{'sth'}->finish;
-        $stm->{'error'} = $error_message;
+        
+        if (! &noerr ($stm, $error_message)) {        
+            $stm->{'error'} = $error_message;
+        }
         return 0;
     }
 
@@ -460,11 +463,7 @@ sub fetch {
 
     # Execute Select, return on error
     &statement_execute ($jconfig, $stm, \@arg_values);
-    if ($stm->{'error'}) {
-        if (! &noerr ($stm, $stm->{'error'})) {
-            die $stm->{'error'};
-        }
-    }
+    $stm->{'error'} && die $stm->{'error'};
 
     # Fetch the data.
     my $rows_aref = $stm->{'sth'}->fetchall_arrayref({});
