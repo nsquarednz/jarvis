@@ -58,7 +58,7 @@ use Time::HiRes;
 ################################################################################
 #
 sub print_message {
-    my ($jconfig, $level, $msg) = @_;
+    my ($jconfig, $level, $msg, @params) = @_;
 
     use integer;
     my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime();
@@ -96,7 +96,7 @@ sub print_message {
                 $output .= $$;
 
             } elsif ($bits[$idx] eq 'M') {
-                $output .= $msg;
+                $output .= sprintf $msg, @params;
             }
 
         } else {
@@ -119,11 +119,11 @@ sub print_message {
 ################################################################################
 #
 sub debug {
-    my ($jconfig, $msg) = @_;
+    my ($jconfig, $msg, @params) = @_;
 
     $jconfig->{'debug'} || return;
 
-    print STDERR &print_message ($jconfig, 'debug', $msg);
+    print STDERR &print_message ($jconfig, 'debug', $msg, @params);
 }
 
 ################################################################################
@@ -139,10 +139,10 @@ sub debug {
 ################################################################################
 #
 sub dump {
-    my ($jconfig, $msg) = @_;
+    my ($jconfig, $msg, @params) = @_;
 
     $jconfig->{'dump'} || return;
-    print STDERR &print_message ($jconfig, 'dump', $msg);
+    print STDERR &print_message ($jconfig, 'dump', $msg, @params);
 }
 
 ################################################################################
@@ -155,9 +155,9 @@ sub dump {
 ################################################################################
 #
 sub log {
-    my ($jconfig, $msg) = @_;
+    my ($jconfig, $msg, @params) = @_;
 
-    print STDERR &print_message ($jconfig, 'log', $msg);
+    print STDERR &print_message ($jconfig, 'log', $msg, @params);
 }
 
 1;
