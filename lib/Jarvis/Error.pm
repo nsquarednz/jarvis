@@ -26,12 +26,55 @@ use warnings;
 
 package Jarvis::Error;
 
-use Jarvis::Text;
+use Data::Dumper;
 use Time::HiRes;
 
+use Jarvis::Text;
+
+# I don't like the way that Data::Dumper decides to print its non-printable
+# strings.  It uses octet for bytes that it doesn't like.  But in telephony
+# we prefer hex.  Also if one byte in a string is hex, it's a pretty good 
+# indicator that all the other bytes are probably hex as well, and should
+# be reported as such.
+{
+    no warnings 'redefine';
+    sub Data::Dumper::qquote {
+        return "'" . &Jarvis::Error::printable (shift) . "'";
+    }
+}
+
 ###############################################################################
-# Public Functions
+# PRINTABLE
+#       Return a nice debug printable version of a string.
+#
+# Parameters:
+#       $value - Value to make printable.
+#
+# Returns:
+#       $printable - Version that won't mess up your terminal.
 ###############################################################################
+sub printable {
+    my ($value) = @_;
+    
+    if (! defined $value) {
+        return '<undef>';
+    }
+    
+    # If it contains any 'odd' characters, print as HEX.  Maybe truncated.    
+    if ($value =~ m/[^\x20-\x7e]/s) {       
+        my $hex = $value;
+        utf8::downgrade ($hex);
+        $hex =~ s/(.)/'\x'.sprintf("%02x", ord ($1))/egs;
+        return $hex;
+        
+    # Otherwise just plain, maybe truncated.
+    } else {
+        my $len = length ($value);
+        $value =~ s/\\/\\\\/;
+        $value =~ s/'/\\'/;
+        return $value;
+    }
+}
 
 ################################################################################
 # Makes a standard message to print out.
@@ -41,6 +84,7 @@ use Time::HiRes;
 #           READ: username, app_name, dataset_name, dbgfmt
 #       $msg - User message string. We will extend with extra info from $jconfig.
 #       $level - "log", "error", etc.
+#       @params - Optional params to be "sprintf" written into $msg.
 #
 #       dbgmask contains specifies the headers to include:
 #           '%T' -> Timestamp
@@ -67,6 +111,11 @@ sub print_message {
     my @months = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec');
     my $timestamp = sprintf "%s %s %d %02d:%02d:%02d %04d", $days[$wday], $months[$mon], $mday, $hour, $min, $sec, $year + 1900;
     my $hires_timestamp = sprintf "%s %s %d %02d:%02d:%02d.%06d %04d", $days[$wday], $months[$mon], $mday, $hour, $min, $sec, $micsec, $year + 1900;
+
+    if (scalar @params) {
+        @params = map { &printable($_); } @params; 
+        $msg = sprintf ($msg, @params);
+    }
     $msg =~ s/\s*$/\n/;
 
     my @bits = split ( /\%([THLUDAPM])/i, ($jconfig->{'log_format'} || '[%P/%A/%U/%D] %M'));
@@ -96,7 +145,7 @@ sub print_message {
                 $output .= $$;
 
             } elsif ($bits[$idx] eq 'M') {
-                $output .= sprintf $msg, @params;
+                $output .= $msg;
             }
 
         } else {
@@ -107,12 +156,17 @@ sub print_message {
     return $output;
 }
 
+###############################################################################
+# Public Functions
+###############################################################################
+
 ################################################################################
-# Same but just debug.  Uses print_message.
+# Generate debug/dump/log output.  Uses print_message.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
 #       $msg - Message to print
+#       @params - Optional params to be "sprintf" written into $msg.
 #
 # Returns:
 #       Prints to STDERR and returns 1.
@@ -122,42 +176,99 @@ sub debug {
     my ($jconfig, $msg, @params) = @_;
 
     $jconfig->{'debug'} || return;
-
     print STDERR &print_message ($jconfig, 'debug', $msg, @params);
 }
-
-################################################################################
-# Used for debug that might produce LOTS of output.  Needs to be enabled
-# separately with dump="yes".
-#
-# Params:
-#       $jconfig - Jarvis::Config object
-#       $msg - Message to print
-#
-# Returns:
-#       Prints to STDERR and returns 1.
-################################################################################
-#
 sub dump {
     my ($jconfig, $msg, @params) = @_;
 
     $jconfig->{'dump'} || return;
     print STDERR &print_message ($jconfig, 'dump', $msg, @params);
 }
-
-################################################################################
-# Same as debug, but always prints.  Uses print_message.
-#
-# Params: Same as Debug.
-#
-# Returns:
-#       Prints to STDERR and returns 1.
-################################################################################
-#
 sub log {
     my ($jconfig, $msg, @params) = @_;
 
     print STDERR &print_message ($jconfig, 'log', $msg, @params);
+}
+
+################################################################################
+# Dump a hash/array/constant similar to Dump.
+#
+# Params:
+#       $jconfig - Jarvis::Config object
+#       $var - Variable to dump in structured format.
+#
+# Returns:
+#       <nothing>
+################################################################################
+#
+sub debug_var {
+    my ($jconfig, $var) = @_;
+    
+    $jconfig->{'debug'} || return;
+    &print_var ($jconfig, 'debug', $var);
+}
+sub dump_var {
+    my ($jconfig, $var) = @_;
+    
+    $jconfig->{'dump'} || return;
+    &print_var ($jconfig, 'dump', $var);
+}
+sub log_var {
+    my ($jconfig, $var) = @_;
+    
+    &print_var ($jconfig, 'log', $var);
+}
+sub print_var {
+    my ($jconfig, $level, $var) = @_;
+    
+    my $dumper = Data::Dumper->new([$var]);
+    my $var_dump = $dumper->Useqq(1)->Terse(1)->Indent(1)->Sortkeys(1)->Dump ();
+    foreach my $msg (split ("\n", $var_dump)) {
+        print STDERR &print_message ($jconfig, $level, $msg);
+    }
+}
+
+################################################################################
+# Dump a hash/array/constant similar to Dump.
+#
+# Params:
+#       $jconfig - Jarvis::Config object
+#       $msg - Binary block to print in hex.
+#
+# Returns:
+#       <nothing>
+################################################################################
+#
+sub debug_hex {
+    my ($jconfig, $msg) = @_;
+    
+    $jconfig->{'debug'} || return;
+    &print_hex ($jconfig, 'debug', $msg);
+}
+sub dump_hex {
+    my ($jconfig, $msg) = @_;
+    
+    $jconfig->{'dump'} || return;
+    &print_hex ($jconfig, 'dump', $msg);
+}
+sub log_hex {
+    my ($jconfig, $msg) = @_;
+    
+    &print_hex ($jconfig, 'log', $msg);
+}
+sub print_hex {
+    my ($jconfig, $level, $msg) = @_;
+    
+    if (! defined $msg) {
+        print STDERR &print_message ($jconfig, $level, "  <undef>");
+        
+    } else {
+        my $msglen = length ($msg);
+        for (my $pos = 0; $pos < $msglen; $pos = $pos + 16) {
+            my $hex = join (" ", unpack ("(H2)*", substr ($msg, $pos, 16)));
+            print STDERR &print_message ($jconfig, $level, "  " . $hex);
+        }
+    }
 }
 
 1;
