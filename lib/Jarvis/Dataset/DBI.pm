@@ -736,7 +736,7 @@ sub store {
                         }
                     }
 
-                    $row_result{'returning'} = scalar @$returning_aref;
+                    $row_result{'returning'} = $returning_aref;
                     $jconfig->{'out_nrows'} = scalar @$returning_aref;
                     &Jarvis::Error::debug ($jconfig, "Fetched " . (scalar @$returning_aref) . " rows for returning.");
 
