@@ -95,7 +95,7 @@ sub db_config {
 #       $dbtype - Identify which database to connect to, default = "dbi"
 #
 # Returns:
-#       1
+#       DBI Database Handle
 ################################################################################
 #
 sub handle {

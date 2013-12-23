@@ -148,11 +148,11 @@ Ext.onReady (function () {
                 text: 'New',
                 iconCls:'add',
                 handler: function () {
-                    var class = boat_class_filter.getValue (class);
+                    var boat_class = boat_class_filter.getValue ();
                     var r = new Ext.data.Record ({ });
                     r.set ('id', 0);
                     r.set ('name', '');
-                    r.set ('class', class);
+                    r.set ('class', boat_class);
                     r.set ('registration_num', '');
                     r.set ('owner', '');
                     boat_store.insert (0, r);
