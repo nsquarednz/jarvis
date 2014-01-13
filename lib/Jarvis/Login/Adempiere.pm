@@ -19,14 +19,13 @@
 #            <parameter name="client_name" value="MyCompany"/>
 #            <parameter name="org_name" value="MyCompany"/>
 #            <parameter name="allowed_groups" value="SuperUser,Admin"/>
-#            <parameter name="role_name_pattern" value="Propel%"/>
+#            <parameter name="role_name_pattern" value="Role_Prefix%"/>
 #        </login>
 #        ...
 #    </app>
 #
 #       You can set role_name_pattern to restrict users who can login
 #       to matching user roles.
-#       Default: Propel%
 #
 # GROUP LIST:
 #
@@ -157,7 +156,7 @@ sub Jarvis::Login::Adempiere::check {
     my $org_name = $login_parameters{'org_name'};
     my $dbname = $login_parameters{'dbname'} || 'default';
     my $allowed_groups = $login_parameters{'allowed_groups'} || '';
-    my $role_name_pattern = $login_parameters{'$role_name_pattern'} || 'Propel%';
+    my $role_name_pattern = $login_parameters{'role_name_pattern'} || '%';
 
     my $dbh = &Jarvis::DB::handle ($jconfig, $dbname);
 
