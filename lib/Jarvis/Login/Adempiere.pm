@@ -19,9 +19,13 @@
 #            <parameter name="client_name" value="MyCompany"/>
 #            <parameter name="org_name" value="MyCompany"/>
 #            <parameter name="allowed_groups" value="SuperUser,Admin"/>
+#            <parameter name="role_name_pattern" value="Role_Prefix%"/>
 #        </login>
 #        ...
 #    </app>
+#
+#       You can set role_name_pattern to restrict users who can login
+#       to matching user roles.
 #
 # GROUP LIST:
 #
@@ -152,6 +156,7 @@ sub Jarvis::Login::Adempiere::check {
     my $org_name = $login_parameters{'org_name'};
     my $dbname = $login_parameters{'dbname'} || 'default';
     my $allowed_groups = $login_parameters{'allowed_groups'} || '';
+    my $role_name_pattern = $login_parameters{'role_name_pattern'} || '%';
 
     my $dbh = &Jarvis::DB::handle ($jconfig, $dbname);
 
@@ -182,7 +187,7 @@ sub Jarvis::Login::Adempiere::check {
 
 
     # Check the username from the user name table.
-    $result_aref = $dbh->selectall_arrayref("SELECT ad_user_id, password FROM ad_user WHERE name = ? AND isactive = 'Y' AND (ad_client_id = ? OR ad_client_id = 0) AND (ad_org_id = ? OR ad_org_id = 0)", { Slice => {} }, $username, $ad_client_id, $ad_org_id);
+    $result_aref = $dbh->selectall_arrayref("SELECT DISTINCT u.ad_user_id, password FROM ad_user u JOIN ad_user_roles ur ON u.ad_user_id=ur.ad_user_id JOIN ad_role r ON ur.ad_role_id=r.ad_role_id WHERE u.name = ? AND u.isactive = 'Y' AND ur.isactive='Y' AND (u.ad_client_id = ? OR u.ad_client_id = 0) AND (u.ad_org_id = ? OR u.ad_org_id = 0) AND r.name LIKE ?", { Slice => {} }, $username, $ad_client_id, $ad_org_id, $role_name_pattern);
     if ((scalar @$result_aref) < 1) {
         return ("User '$username' not known/active.");
     }
