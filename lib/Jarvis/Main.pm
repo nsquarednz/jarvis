@@ -241,6 +241,13 @@ sub do {
     my $method = $cgi->request_method() || 'GET';
     my $content_type = $ENV{'CONTENT_TYPE'} || 'text/plain';
 
+    #
+    # We don't suppport OPTIONS requests, so return a 501 Not Implemented.
+    if ($method eq "OPTIONS") {
+        print $cgi->header(-status => '501 Not Implemented', -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt");
+        return;
+    }
+
     if (($method eq "POST") && ($content_type ne 'application/xml')) {
         my $query_string = '';
         if (exists $ENV{MOD_PERL}) {
