@@ -188,6 +188,14 @@ sub do {
     my $path = $cgi->path_info() ||
         die "Missing path info.  Send $script_name/<app>[/<dataset>[/<arg1>...]] in URI!\n";
 
+    my $method = $cgi->request_method() || 'GET';
+    #
+    # We don't suppport OPTIONS requests, so return a 501 Not Implemented.
+    if ($method eq "OPTIONS") {
+        print $cgi->header(-status => '501 Not Implemented', -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt");
+        return;
+    }
+
     # Clean up our path to remove & args, # names, and finally leading and trailing
     # spaces and slashes.
     #
@@ -238,15 +246,7 @@ sub do {
     # we really want exactly the same done for OTHER application types.  Hence
     # the following.
     #
-    my $method = $cgi->request_method() || 'GET';
     my $content_type = $ENV{'CONTENT_TYPE'} || 'text/plain';
-
-    #
-    # We don't suppport OPTIONS requests, so return a 501 Not Implemented.
-    if ($method eq "OPTIONS") {
-        print $cgi->header(-status => '501 Not Implemented', -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt");
-        return;
-    }
 
     if (($method eq "POST") && ($content_type ne 'application/xml')) {
         my $query_string = '';
