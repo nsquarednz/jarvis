@@ -118,11 +118,15 @@ sub error_handler {
     print $cgi->header(-status => $status, -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt");
     print $msg;
 
-    # Print URI to log if not done already.
-    &Jarvis::Error::log ($jconfig, "processed URI = $ENV{REQUEST_URI}") unless ($jconfig->{'debug'});
 
     # Print to error log.  Include stack trace if debug is enabled.
     my $long_msg = &Jarvis::Error::print_message ($jconfig, 'fatal', $msg);
+
+    # Print URI to log if not done already.
+    if (! $jconfig->{'debug'}) {
+        $long_msg = $long_msg . "        URI = $ENV{REQUEST_URI}";
+    }
+
     print STDERR ($jconfig->{'debug'} ? Carp::longmess $long_msg : Carp::shortmess $long_msg);
 
     # Track this error, if we got far enough to have enough info.
