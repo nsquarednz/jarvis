@@ -168,7 +168,7 @@ sub new {
 #       Hash of default parameters configured in the application XML file.
 ################################################################################
 #
-sub default_parameters () {
+sub default_parameters {
     my ($jconfig) = @_;
 
     $jconfig || die;

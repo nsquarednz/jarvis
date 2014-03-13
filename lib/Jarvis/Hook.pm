@@ -20,6 +20,9 @@
 #                 after_login ($jconfig, $hook_params_href, $additional_safe_href)
 #                 CALLED: After first login for the session.
 #
+#                 before_logout ($jconfig, $hook_params_href)
+#                 CALLED: Before explicit session logout by the client
+#
 #                 pre_connect ($jconfig, $dbname, $dbtype, $dbconnect_ref, $dbusername_ref, $dbpassword_ref, $parameters_href)
 #                 CALLED: Before first connecting to each database.
 #
@@ -227,7 +230,6 @@ sub after_login {
 
     # Now invoke "after_login" on all the hooks we found.
     foreach my $hook (@hooks) {
-        my $lib = $hook->{'lib'};
         my $module = $hook->{'module'};
         my $hook_parameters_href = $hook->{'parameters'};
 
@@ -236,6 +238,41 @@ sub after_login {
             no strict 'refs';
             exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
             exists &$method && &$method ($jconfig, $hook_parameters_href, $additional_safe_href);
+        }
+    }
+
+    return 1;
+}
+
+################################################################################
+# Invoke the "before_logout" method on each hook.
+#
+# Note that this hook is only invoked if the client was previously logged
+# in.  Don't bother overriding anything in this hook in the session - it
+# won't last.
+#
+# Params:
+#       $jconfig        - Jarvis::Config object
+#
+# Returns:
+#       1
+################################################################################
+#
+sub before_logout {
+    my ($jconfig) = @_;
+
+    my @hooks = @{ $jconfig->{'hooks'} };
+
+    # Now invoke "after_login" on all the hooks we found.
+    foreach my $hook (@hooks) {
+        my $module = $hook->{'module'};
+        my $hook_parameters_href = $hook->{'parameters'};
+
+        my $method = $module . "::before_logout";
+        {
+            no strict 'refs';
+            exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
+            exists &$method && &$method ($jconfig, $hook_parameters_href);
         }
     }
 
@@ -274,7 +311,6 @@ sub pre_connect {
 
     # Now invoke "pre_connect" on all the hooks we found.
     foreach my $hook (@hooks) {
-        my $lib = $hook->{'lib'};
         my $module = $hook->{'module'};
         my $hook_parameters_href = $hook->{'parameters'};
 
@@ -314,7 +350,6 @@ sub before_all {
 
     # Now invoke "before_all" on all the hooks we found.
     foreach my $hook (@hooks) {
-        my $lib = $hook->{'lib'};
         my $module = $hook->{'module'};
         my $hook_parameters_href = $hook->{'parameters'};
 
@@ -353,7 +388,6 @@ sub before_one {
 
     # Now invoke "before_one" on all the hooks we found.
     foreach my $hook (@hooks) {
-        my $lib = $hook->{'lib'};
         my $module = $hook->{'module'};
         my $hook_parameters_href = $hook->{'parameters'};
 
@@ -394,7 +428,6 @@ sub after_one {
 
     # Now invoke "after_one" on all the hooks we found.
     foreach my $hook (@hooks) {
-        my $lib = $hook->{'lib'};
         my $module = $hook->{'module'};
         my $hook_parameters_href = $hook->{'parameters'};
 
@@ -435,7 +468,6 @@ sub after_all {
 
     # Now invoke "after_all" on all the hooks we found.
     foreach my $hook (@hooks) {
-        my $lib = $hook->{'lib'};
         my $module = $hook->{'module'};
         my $hook_parameters_href = $hook->{'parameters'};
 
@@ -481,7 +513,6 @@ sub return_status {
 
     # Now invoke "return_status" on all the hooks we found.
     foreach my $hook (@hooks) {
-        my $lib = $hook->{'lib'};
         my $module = $hook->{'module'};
         my $hook_parameters_href = $hook->{'parameters'};
 
@@ -533,7 +564,6 @@ sub dataset_fetched {
 
     # Now invoke "dataset_fetched" on all the hooks we found.
     foreach my $hook (@hooks) {
-        my $lib = $hook->{'lib'};
         my $module = $hook->{'module'};
         my $hook_parameters_href = $hook->{'parameters'};
 
@@ -591,7 +621,6 @@ sub return_fetch {
 
     # Now invoke "return_fetch" on all the hooks we found.
     foreach my $hook (@hooks) {
-        my $lib = $hook->{'lib'};
         my $module = $hook->{'module'};
         my $hook_parameters_href = $hook->{'parameters'};
 
@@ -648,7 +677,6 @@ sub return_store {
 
     # Now invoke "return_store" on all the hooks we found.
     foreach my $hook (@hooks) {
-        my $lib = $hook->{'lib'};
         my $module = $hook->{'module'};
         my $hook_parameters_href = $hook->{'parameters'};
 
@@ -681,7 +709,6 @@ sub finish {
 
     # Now invoke "finish" on all the hooks we found.
     foreach my $hook (@hooks) {
-        my $lib = $hook->{'lib'};
         my $module = $hook->{'module'};
         my $hook_parameters_href = $hook->{'parameters'};
 

@@ -506,6 +506,9 @@ sub logout {
     &Jarvis::Error::debug ($jconfig, "Logout for '$username' on '$sid'.");
     my $session = $jconfig->{'session'};
     if ($session) {
+
+        &Jarvis::Hook::before_logout ($jconfig);
+
         $jconfig->{'session'} = undef;
         $jconfig->{'sname'} = '';
         $jconfig->{'sid'} = '';
