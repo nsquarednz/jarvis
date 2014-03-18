@@ -30,7 +30,7 @@ use warnings;
 
 package Jarvis::Dataset::DBI;
 
-use DBI;
+use DBI qw(:sql_types);;
 use JSON::PP; 
 use XML::Smart;
 use Data::Dumper;
@@ -96,7 +96,9 @@ sub get_sql {
 #       $args_href - Hash of Fetch and REST args.
 #
 # Returns:
-#       ($sql_with_substitutions, @variable_names).
+#       $sql_with_substitutions - SQL SCALAR
+#       $variable_names - Array of variable names.
+#       $variable_flags - Array of variable flags (undef or hash with name keys)
 ################################################################################
 #
 sub sql_with_substitutions {
@@ -114,13 +116,32 @@ sub sql_with_substitutions {
     # Parameters NAMES may contain only a-z, A-Z, 0-9, underscore(_), colon(:) and hyphen(-)
     # Note pipe(|) is also allowed at this point as it separates (try-else variable names)
     my $sql2 = "";
-    my @bits = split (/\{\{?\$?([a-zA-Z0-9_\-:\|]+)\}\}?/i, $sql);
+    my @bits = split (/\{\{?\$?([a-zA-Z0-9_\-:\|]+(?:\![a-z]+)*)\}\}?/i, $sql);
     my @variable_names = ();
+    my @variable_flags = ();
 
     foreach my $idx (0 .. $#bits) {
         if ($idx % 2) {
             my $name = $bits[$idx];
+            my %flags = ();
+
+            # Flags in bind variables are used for binding hints.  E.g. for DBD::Oracle
+            # you can specify "!out" to request a variable to be bound as an in/out var
+            # with bind_param_inout.
+            #
+            #   !out            Request an inout variable binding.
+            #   !varchar        Call bind_param(_inout) with SQL_VARCHAR (the default)
+            #   !numeric        Call bind_param(_inout) with SQL_NUMERIC
+            #
+            while ($name =~ m/^(.*)(\![a-z]+)$/) {
+                $name = $1;
+                my $flag = lc ($2);
+                $flag =~ s/[^a-z]//g;
+                $flags {$flag} = 1;
+            }
+
             push (@variable_names, $name);
+            push (@variable_flags, \%flags);
             $sql2 .= "?";
 
         } else {
@@ -149,6 +170,7 @@ sub sql_with_substitutions {
             #
             #   !noquote        Don't wrap strings with quotes, instead just restrict content.
             #   !quote          Always quote, even for numbers.
+            #   !raw            No quote, no restriction.  For experts only!
             #
             while ($name =~ m/^(.*)(\![a-z]+)$/) {
                 $name = $1;
@@ -187,7 +209,7 @@ sub sql_with_substitutions {
         }
     }
 
-    return ($sql3, @variable_names);
+    return ($sql3, \@variable_names, \@variable_flags);
 }
 
 # parses an attribute parameter string into a hash
@@ -219,6 +241,7 @@ sub parse_attr {
 #               {'returning'}
 #               {'sth'}
 #               {'vnames_aref'}
+#               {'vflags_aref'}
 #               {'nolog_dataset'}
 #               {'nolog_dbh'}
 #               {'noerr_dataset'}
@@ -249,9 +272,10 @@ sub parse_statement {
     &Jarvis::Error::debug ($jconfig, "Returning? = " . $obj->{'returning'});
 
     # Get our SQL with placeholders and prepare it.
-    my ($sql_with_substitutions, @variable_names) = &sql_with_substitutions ($jconfig, $dbh, $obj->{'raw_sql'}, $args_href);
+    my ($sql_with_substitutions, $variable_names, $variable_flags) = &sql_with_substitutions ($jconfig, $dbh, $obj->{'raw_sql'}, $args_href);
     $obj->{'sql_with_substitutions'} = $sql_with_substitutions;
-    $obj->{'vnames_aref'} = \@variable_names;
+    $obj->{'vnames_aref'} = $variable_names;
+    $obj->{'vflags_aref'} = $variable_flags;
 
     &Jarvis::Error::dump ($jconfig, "SQL after substition = " . $sql_with_substitutions);
 
@@ -391,10 +415,69 @@ sub statement_execute {
     my $err_handler = $SIG{__DIE__};
     $stm->{'retval'} = 0;
     $stm->{'error'} = undef;
+
     eval {
         no warnings 'uninitialized';
         $SIG{__DIE__} = sub {};
-        $stm->{'retval'} = $stm->{'sth'}->execute (@$arg_values_aref);
+
+        # Statement handle.
+        my $sth = $stm->{'sth'};
+
+        # Do we have any "!out" flagged variables?
+        my $out_flag = 0;
+        foreach my $flag (@{ $stm->{'vflags_aref'} }) {
+            if (defined $flag && $flag->{out}) {
+                $out_flag = 1;
+                last;
+            }
+        }
+
+        # The caes with "!out" variables is suddenly more interesting.
+        if ($out_flag) {
+            my %out_arg_refs = ();
+
+            # Note: The following arrays are all the same size (one per bind var).
+            #   @$arg_values_aref           # Arg values.
+            #   @{ $stm->{'vnames_aref'} }  # Arg names.
+            #   @{ $stm->{'vflags_aref'} }  # Arg flags.
+            #
+            &Jarvis::Error::debug ($jconfig, "At least one bind variable is flagged '!out'.  Use bind_param () mechanism.");
+            foreach my $i (0 .. $#$arg_values_aref) {
+                my $flags = $stm->{'vflags_aref'}[$i];
+                my $sql_type = SQL_VARCHAR;                
+                if (defined $flags->{numeric}) {
+                    $sql_type = SQL_NUMERIC;
+                }
+
+                if ($flags->{out}) {
+                    my $name = $stm->{'vnames_aref'}[$i];
+                    my $var = $$arg_values_aref[$i];
+                    $out_arg_refs{$name} = \$var;
+                    &Jarvis::Error::debug ($jconfig, "Binding variable [$i] as SQL type [$sql_type] (IN/OUT) (Name = '$name').");
+                    $sth->bind_param_inout ($i + 1, \$var, $sql_type);
+
+                } else {
+                    &Jarvis::Error::debug ($jconfig, "Binding variable [$i] as SQL type [$sql_type] (IN).");
+                    $sth->bind_param ($i + 1, $$arg_values_aref[$i], $sql_type);
+                }
+            }
+
+            # Execute using the previously attached args.
+            $stm->{'retval'} = $sth->execute ();
+
+            # We have some returned arg refs.
+            $stm->{returned} = \%out_arg_refs;
+
+            # Hey, this statement is "returning" be definition!
+            if (! $stm->{returning}) {
+                &Jarvis::Error::debug ($jconfig, "Forcing the 'returning' attribute on this statement.");
+                $stm->{returning} = 1;
+            }
+
+        # The case with no "!out" flagged variables is very much simpler.
+        } else {
+            $stm->{'retval'} = $sth->execute (@$arg_values_aref);
+        }
     };
     $SIG{__DIE__} = $err_handler;
 
@@ -701,7 +784,23 @@ sub store {
             # Try and determine the returned values (normally the auto-increment ID)
             if ($stm->{'returning'}) {
 
-                # See if the query had a built-in fetch.  Under PostGreSQL (and very
+                # If you flagged any variables as "!out" then we will have used
+                # bind_param_inout () and copied the output vars into $stm->{returned}.
+                # In this case, all the work is already done, and we just need to copy
+                # everything through.
+                if ($stm->{returned}) {
+
+                    my $row = {};
+                    foreach my $name (keys %{ $stm->{returned} }) {
+                        my $value_ref = $stm->{returned}{$name};
+                        $row->{$name} = $$value_ref;
+                    }
+
+                    $row_result{'returning'} = [ $row ];
+                    $jconfig->{'out_nrows'} = 1;
+                    &Jarvis::Error::debug ($jconfig, "Copied single row from bind_param_inout results.");
+
+                # Otherwise: See if the query had a built-in fetch.  Under PostGreSQL (and very
                 # likely also under other drivers) this will fail if there is no current
                 # query.  I.e. if you have no "RETURNING" clause on your insert.
                 #
@@ -709,103 +808,105 @@ sub store {
                 # RETURNING clause.  SQLite doesn't have a RETURNING clause, but it will
                 # quietly return no data, allowing us to have a second try just below.
                 #
-                my $returning_aref = $stm->{'sth'}->fetchall_arrayref({}) || undef;
+                } else {
+                    my $returning_aref = $stm->{'sth'}->fetchall_arrayref({}) || undef;
 
-                if ($returning_aref && (scalar @$returning_aref)) {
-                    if ($DBI::errstr) {
-                        my $error_message = $DBI::errstr;
-                        $error_message =~ s/\s+$//;
+                    if ($returning_aref && (scalar @$returning_aref)) {
+                        if ($DBI::errstr) {
+                            my $error_message = $DBI::errstr;
+                            $error_message =~ s/\s+$//;
 
-                        if (&nolog ($stm, $error_message)) {
-                            &Jarvis::Error::debug ($jconfig, "Failure fetching first return result set. Log disabled.");
-                        } else {
-                            &Jarvis::Error::log ($jconfig, "Failure fetching first return result set for '" . $stm->{'ttype'} . "'.  Details follow.");
-                            &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
-                            &Jarvis::Error::log ($jconfig, $error_message);
-                            &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) || 'NONE'));
+                            if (&nolog ($stm, $error_message)) {
+                                &Jarvis::Error::debug ($jconfig, "Failure fetching first return result set. Log disabled.");
+                            } else {
+                                &Jarvis::Error::log ($jconfig, "Failure fetching first return result set for '" . $stm->{'ttype'} . "'.  Details follow.");
+                                &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
+                                &Jarvis::Error::log ($jconfig, $error_message);
+                                &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) || 'NONE'));
+                            }
+
+                            $stm->{'sth'}->finish;
+                            $stm->{'error'} = $error_message;
+                            $success = 0;
+                            $message = $error_message;
+
+                            # Log the error in our tracker database.
+                            unless (&nolog ($stm, $error_message)) {
+                                &Jarvis::Tracker::error ($jconfig, '200', $error_message);
+                            }
                         }
 
-                        $stm->{'sth'}->finish;
-                        $stm->{'error'} = $error_message;
-                        $success = 0;
-                        $message = $error_message;
+                        $row_result{'returning'} = $returning_aref;
+                        $jconfig->{'out_nrows'} = scalar @$returning_aref;
+                        &Jarvis::Error::debug ($jconfig, "Fetched " . (scalar @$returning_aref) . " rows for returning.");
 
-                        # Log the error in our tracker database.
-                        unless (&nolog ($stm, $error_message)) {
-                            &Jarvis::Tracker::error ($jconfig, '200', $error_message);
+
+                    # Hmm... we're supposed to be returning data, but the query didn't give
+                    # us any.  Interesting.  Maybe it's SQLite?  In that case, we need to
+                    # go digging for the return values via last_insert_rowid().
+                    #
+                    } elsif ($row_ttype eq 'insert') {
+                        if ($jconfig->{'xml'}{'jarvis'}{'app'}{'database'}{'connect'}->content =~ m/^dbi:SQLite:/) {
+                            my $rowid = $dbh->func('last_insert_rowid');
+                            if ($rowid) {
+                                my %return_values = %safe_params;
+                                $return_values {'id'} = $rowid;
+
+                                $row_result{'returning'} = [ \%return_values ];
+                                $jconfig->{'out_nrows'} = 1;
+                            }
+                            &Jarvis::Error::debug ($jconfig, "Used SQLite last_insert_rowid to get returned 'id' => '$rowid'.");
                         }
                     }
 
-                    $row_result{'returning'} = $returning_aref;
-                    $jconfig->{'out_nrows'} = scalar @$returning_aref;
-                    &Jarvis::Error::debug ($jconfig, "Fetched " . (scalar @$returning_aref) . " rows for returning.");
+                    # When using output parameters from a SQL Server stored procedure, there is a
+                    # difference of behavior between Linux/FreeTDS and Windows/ODBC.  Under Linux you
+                    # always get a result set containing the output parameters, with autogenerated
+                    # column names prefixed by underscore.
+                    #
+                    # Under Windows you need to explicitly do a SELECT to get this and you must
+                    # specify the column names.
+                    #
+                    # This leads to the case where to write a dataset that works under both Linux
+                    # and Windows, you need to explicitly SELECT (so that you get the data under
+                    # Windows, and make sure that the column name you select AS is identical to the
+                    # auto-generated name created by FreeTDS).
+                    #
+                    # However, under Linux that means you get two result sets.  If you pass more than
+                    # one <row> in your request, then the second row will fail with
+                    # "Attempt to initiate a new Adaptive Server operation with results pending"
+                    #
+                    # To avoid that error, here we will look to see if there are any extra result
+                    # sets now pending to be read.  We will silently read and discard them.
+                    #
+                    while ($success && $stm->{'sth'}->{syb_more_results}) {
+                        &Jarvis::Error::debug ($jconfig, "Found additional result sets.  Fetch and discard.");
+                        $stm->{'sth'}->fetchall_arrayref ({});
 
+                        if ($DBI::errstr) {
+                            my $error_message = $DBI::errstr;
+                            $error_message =~ s/\s+$//;
 
-                # Hmm... we're supposed to be returning data, but the query didn't give
-                # us any.  Interesting.  Maybe it's SQLite?  In that case, we need to
-                # go digging for the return values via last_insert_rowid().
-                #
-                } elsif ($row_ttype eq 'insert') {
-                    if ($jconfig->{'xml'}{'jarvis'}{'app'}{'database'}{'connect'}->content =~ m/^dbi:SQLite:/) {
-                        my $rowid = $dbh->func('last_insert_rowid');
-                        if ($rowid) {
-                            my %return_values = %safe_params;
-                            $return_values {'id'} = $rowid;
+                            if (&nolog ($stm, $error_message)) {
+                                &Jarvis::Error::debug ($jconfig, "Failure fetching additional result sets. Log disabled.");
+                            } else {
+                                &Jarvis::Error::log ($jconfig, "Failure fetching additional result sets for '" . $stm->{'ttype'} . "'.  Details follow.");
+                                &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
+                                &Jarvis::Error::log ($jconfig, $error_message);
+                                &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) || 'NONE'));
+                            }
 
-                            $row_result{'returning'} = [ \%return_values ];
-                            $jconfig->{'out_nrows'} = 1;
+                            $stm->{'sth'}->finish;
+                            $stm->{'error'} = $error_message;
+                            $success = 0;
+                            $message = $error_message;
                         }
-                        &Jarvis::Error::debug ($jconfig, "Used SQLite last_insert_rowid to get returned 'id' => '$rowid'.");
-                    }
-                }
-
-                # When using output parameters from a SQL Server stored procedure, there is a
-                # difference of behavior between Linux/FreeTDS and Windows/ODBC.  Under Linux you
-                # always get a result set containing the output parameters, with autogenerated
-                # column names prefixed by underscore.
-                #
-                # Under Windows you need to explicitly do a SELECT to get this and you must
-                # specify the column names.
-                #
-                # This leads to the case where to write a dataset that works under both Linux
-                # and Windows, you need to explicitly SELECT (so that you get the data under
-                # Windows, and make sure that the column name you select AS is identical to the
-                # auto-generated name created by FreeTDS).
-                #
-                # However, under Linux that means you get two result sets.  If you pass more than
-                # one <row> in your request, then the second row will fail with
-                # "Attempt to initiate a new Adaptive Server operation with results pending"
-                #
-                # To avoid that error, here we will look to see if there are any extra result
-                # sets now pending to be read.  We will silently read and discard them.
-                #
-                while ($success && $stm->{'sth'}->{syb_more_results}) {
-                    &Jarvis::Error::debug ($jconfig, "Found additional result sets.  Fetch and discard.");
-                    $stm->{'sth'}->fetchall_arrayref ({});
-
-                    if ($DBI::errstr) {
-                        my $error_message = $DBI::errstr;
-                        $error_message =~ s/\s+$//;
-
-                        if (&nolog ($stm, $error_message)) {
-                            &Jarvis::Error::debug ($jconfig, "Failure fetching additional result sets. Log disabled.");
-                        } else {
-                            &Jarvis::Error::log ($jconfig, "Failure fetching additional result sets for '" . $stm->{'ttype'} . "'.  Details follow.");
-                            &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
-                            &Jarvis::Error::log ($jconfig, $error_message);
-                            &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) || 'NONE'));
-                        }
-
-                        $stm->{'sth'}->finish;
-                        $stm->{'error'} = $error_message;
-                        $success = 0;
-                        $message = $error_message;
                     }
                 }
 
                 # This is disappointing, but perhaps a "die" is too strong here.
                 if (! $row_result{'returning'}) {
-                    &Jarvis::Error::debug ($jconfig, "Cannot determine how to get returning values.");
+                    &Jarvis::Error::debug ($jconfig, "Cannot determine how to get values for 'returning' statement.");
                 }
             }
         }
