@@ -26,7 +26,6 @@
 use strict;
 use warnings;
 
-use JSON::PP;           # JSON::PP was giving double-free/corruption errors.
 use XML::Smart;
 use Text::CSV;
 use IO::String;

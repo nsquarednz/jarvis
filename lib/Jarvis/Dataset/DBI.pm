@@ -31,7 +31,7 @@ use warnings;
 package Jarvis::Dataset::DBI;
 
 use DBI qw(:sql_types);;
-use JSON::PP; 
+use JSON; 
 use XML::Smart;
 use Data::Dumper;
 
@@ -613,7 +613,7 @@ sub store {
 
     &Jarvis::Error::debug ($jconfig, "Request Content Type = '" . $content_type . "'");
     if ($content_type =~ m|^[a-z]+/json(; .*)?$|) {
-        my $ref = JSON::PP->new->utf8->decode ($content);
+        my $ref = JSON->new->utf8->decode ($content);
 
         # User may pass a single hash record, OR an array of hash records.  We normalise
         # to always be an array of hashes.
@@ -1008,7 +1008,7 @@ sub store {
         if ($success && ! $return_array) {
             $results[0]{'returning'} && ($return_data {'returning'} = $results[0]{'returning'});
         }
-        my $json = JSON::PP->new->pretty(1);
+        my $json = JSON->new->pretty(1);
         $return_text = $json->encode ( \%return_data );
 
     } elsif ($jconfig->{'format'} eq "xml") {

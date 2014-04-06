@@ -35,7 +35,7 @@ use warnings;
 package Jarvis::Dataset;
 
 use Data::Dumper;
-use JSON::PP;
+use JSON;
 use XML::Smart;
 use Text::CSV;
 use IO::String;
@@ -707,7 +707,7 @@ sub fetch {
             $all_results_object->{$name} = $extra_href->{$name};
         }
 
-        my $json = JSON::PP->new->pretty(1)->allow_blessed(1);
+        my $json = JSON->new->pretty(1)->allow_blessed(1);
         $return_value = $json->encode ( $all_results_object );
 
     # XML is also simple.
