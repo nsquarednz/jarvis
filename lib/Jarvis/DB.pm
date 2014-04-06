@@ -201,7 +201,12 @@ sub disconnect {
             next if ((defined $dbname) && ($dbname ne $dbn));
 
             &Jarvis::Error::debug ($jconfig, "Disconnecting from database type = '$dbt', name = '$dbn'.");
-            $dbhs{$dbt}{$dbn} && $dbhs{$dbt}{$dbn}->disconnect();
+            eval {
+                $dbhs{$dbt}{$dbn} && $dbhs{$dbt}{$dbn}->disconnect();
+            };
+            if ($@) {
+                &Jarvis::Error::debug ($jconfig, "Database disconnect error: $@");
+            }
             delete $dbhs{$dbt}{$dbn};
         }
     }
