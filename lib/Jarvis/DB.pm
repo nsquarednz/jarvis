@@ -184,19 +184,25 @@ sub handle {
 #
 # Params:
 #       $jconfig - Jarvis::Config object (not used)
+#       $dbtype - Connection type to disconnect 'dbi' or 'sdp'.  (Default = both)
+#       $dbname - Connection name to disconnect.  (Default = all)
 #
 # Returns:
 #       1
 ################################################################################
 #
 sub disconnect {
-    my ($jconfig) = @_;
+    my ($jconfig, $dbtype, $dbname) = @_;
 
-    foreach my $dbtype (sort (keys %dbhs)) {
-        foreach my $dbname (sort (keys %{ $dbhs{$dbtype} })) {
-            &Jarvis::Error::debug ($jconfig, "Disconnecting from database type = '$dbtype', name = '$dbname'.");
-            $dbhs{$dbtype}{$dbname} && $dbhs{$dbtype}{$dbname}->disconnect();
-            delete $dbhs{$dbtype}{$dbname};
+    foreach my $dbt (sort (keys %dbhs)) {
+        next if ((defined $dbtype) && ($dbtype ne $dbt));
+
+        foreach my $dbn (sort (keys %{ $dbhs{$dbt} })) {
+            next if ((defined $dbname) && ($dbname ne $dbn));
+
+            &Jarvis::Error::debug ($jconfig, "Disconnecting from database type = '$dbt', name = '$dbn'.");
+            $dbhs{$dbt}{$dbn} && $dbhs{$dbt}{$dbn}->disconnect();
+            delete $dbhs{$dbt}{$dbn};
         }
     }
 }
