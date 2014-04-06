@@ -184,15 +184,15 @@ sub handle {
 #
 # Params:
 #       $jconfig - Jarvis::Config object (not used)
-#       $dbtype - Connection type to disconnect 'dbi' or 'sdp'.  (Default = both)
 #       $dbname - Connection name to disconnect.  (Default = all)
+#       $dbtype - Connection type to disconnect 'dbi' or 'sdp'.  (Default = both)
 #
 # Returns:
 #       1
 ################################################################################
 #
 sub disconnect {
-    my ($jconfig, $dbtype, $dbname) = @_;
+    my ($jconfig, $dbname, $dbtype) = @_;
 
     foreach my $dbt (sort (keys %dbhs)) {
         next if ((defined $dbtype) && ($dbtype ne $dbt));
