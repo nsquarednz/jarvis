@@ -40,10 +40,10 @@ use Jarvis::DB::SDP;
 #
 # Note that global variables under mod_perl require careful consideration!
 #
-# Specifically, you must ensure that all variables which require 
+# Specifically, you must ensure that all variables which require
 # re-initialisation for each invocation will receive it.
 #
-# Cached database handles.  
+# Cached database handles.
 # Hash {type}{name}
 #
 # They is safe because they are set to undef by the disconnect method, which is
@@ -116,7 +116,7 @@ sub handle {
     my $dbconnect = $dbxml->{'connect'}->content || '';
     my $dbusername = $dbxml->{'username'}->content || '';
     my $dbpassword = $dbxml->{'password'}->content || '';
-    
+
     # Optional parameters, handled per-database type.
     my %parameters = ();
     if ($dbxml->{'parameter'}) {
@@ -131,14 +131,14 @@ sub handle {
         $post_connect =~ s/^\s*//;
         $post_connect =~ s/\s*$//;
     }
-    
+
     # Allow the hook to potentially modify some of these attributes.
     &Jarvis::Hook::pre_connect ($jconfig, $dbname, $dbtype, \$dbconnect, \$dbusername, \$dbpassword, \%parameters);
 
     &Jarvis::Error::debug ($jconfig, "DB Connect = '$dbconnect'");
     &Jarvis::Error::debug ($jconfig, "DB Username = '$dbusername'");
     &Jarvis::Error::debug ($jconfig, "DB Password = '$dbpassword'");
-    
+
     # DBI is our "standard" type.
     &Jarvis::Error::debug ($jconfig, "Connecting to '$dbtype' database with handle named '$dbname'");
     if ($dbtype eq "dbi") {
@@ -147,9 +147,9 @@ sub handle {
             &Jarvis::Error::debug ($jconfig, "DB Connect = '$dbconnect' (default)");
         }
         my $dbh_attributes = {
-            RaiseError => 1, 
-            PrintError => 1, 
-            AutoCommit => 1 
+            RaiseError => 1,
+            PrintError => 1,
+            AutoCommit => 1
         };
         # Optional DBI connect attribute parameters, handled per-database type.
         if ($dbxml->{'dbh_attributes'}) {
@@ -165,12 +165,12 @@ sub handle {
             &Jarvis::Error::debug ($jconfig, "DB PostConnect = '$post_connect'");
             $dbh->do($post_connect) or die "Error Executing PostConnect: " . DBI::errstr;
         }
-        
+
     # SDP is a SSAS DataPump pseudo-database.
     } elsif ($dbtype eq "sdp") {
         $dbconnect || die "Missing 'connect' parameter on SSAS DataPump database '$dbname'.";
         $dbhs{$dbtype}{$dbname} = Jarvis::DB::SDP->new ($jconfig, $dbconnect, $dbusername, $dbpassword, \%parameters);
-        
+
     } else {
         die "Unsupported Database Type '$dbtype'.";
     }
@@ -202,7 +202,12 @@ sub disconnect {
 
             &Jarvis::Error::debug ($jconfig, "Disconnecting from database type = '$dbt', name = '$dbn'.");
             eval {
+                my $handler = $SIG{ __DIE__ };
+                $SIG{ __DIE__ } = 'IGNORE';
+
                 $dbhs{$dbt}{$dbn} && $dbhs{$dbt}{$dbn}->disconnect();
+
+                $SIG{ __DIE__ } = $handler;
             };
             if ($@) {
                 &Jarvis::Error::debug ($jconfig, "Database disconnect error: $@");
