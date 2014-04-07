@@ -51,6 +51,7 @@ use Jarvis::Plugin;
 use Jarvis::Hook;
 use Jarvis::DB;
 use Jarvis::Tracker;
+use Jarvis::Route;
 
 ###############################################################################
 # Global variables.
@@ -185,12 +186,12 @@ sub do {
     $jarvis_etc || die "Cannot determine JARVIS_ETC.";    
 
     ###############################################################################
-    # Determine app name (and possibly data-set).
+    # Check basic HTML parameters.
     ###############################################################################
     #
     my $script_name = $cgi->script_name();
     my $path = $cgi->path_info() ||
-        die "Missing path info.  Send $script_name/<app>[/<dataset>[/<arg1>...]] in URI!\n";
+        die "Missing path info.  Send $script_name/<app-name>/<arg0>[/<arg1>...] in URI!\n";
 
     my $method = $cgi->request_method() || 'GET';
     #
@@ -199,44 +200,6 @@ sub do {
         print $cgi->header(-status => '501 Not Implemented', -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt");
         return;
     }
-
-    # Clean up our path to remove & args, # names, and finally leading and trailing
-    # spaces and slashes.
-    #
-    $path =~ s|(?<!\\)&.*$||;
-    $path =~ s|(?<!\\)#.*$||;
-    $path =~ s|^\s*/||;
-    $path =~ s|/\s*$||;
-
-    # Parse our app-name, optional dataset-name and REST args.  Note that path is no longer
-    # URL-encoded by the time it gets to us.  Setting AllowEncodedSlashes doesn't help us
-    # get slashes through to this point.  So we do a special case and allow \/ to escape
-    # a slash through to our REST args.
-    #
-    my ($app_name, $dataset_name, @rest_args) = split ( m|(?<!\\)/|, $path);
-    @rest_args = map { s|\\/|/|g; $_ } @rest_args;
-
-    $app_name || ($app_name = '');
-    $dataset_name || ($dataset_name = '');
-
-    # Check app_name is OK.
-    $app_name || die "Missing app name.  Send $script_name/<app>[/<dataset>[/<arg1>...]] in URI!\n";
-    $app_name =~ m|^[\w\-]+$| || die "Invalid app_name '$app_name'!\n";
-
-    # Dataset name can't be empty.  Also, it can only be normal characters 
-    # with "-", and "." for directory separator.
-    #
-    # Note that we don't check yet for leading and trailing dot and other file 
-    # security stuff.  We'll do that when we actually go to open the file, 
-    # because maybe some execs/plugins might allow it, and we don't want
-    # to restrict them.
-    #
-    # A "metaset" will allow multiple comma-separated dataset names.  This is allowed
-    # only for "fetch" and only for XML or JSON formats.  There will be additional 
-    # checks to follow to ensure that "," datasets are used only in specific cases.
-    #
-    ($dataset_name eq '') && die "All requests require $script_name/$app_name/<dataset-or-special>[/<arg1>...] in URI!\n";
-    ($dataset_name =~ m|^[\w\-\.,]+$|) || die "Invalid dataset_name '$dataset_name'!\n";    
 
     ###############################################################################
     # Some additional parameter parsing code, because of CGI.pm oddness.
@@ -273,39 +236,81 @@ sub do {
     }
     
     ###############################################################################
-    # Now we can create our $jconfig at last!  Debug can start too.
+    # Get our app name and read our $jconfig at last!  Debug can start too.
     ###############################################################################
+
+    # Clean up our path to remove & args, # names.  
+    $path =~ s|(?<!\\)&.*$||;
+    $path =~ s|(?<!\\)#.*$||;
+
+    # Remove leading slash to expose the application name.
+    $path =~ s|^/||;
+
+    # Parse our app-name and REST args.  Note that path is no longer
+    # URL-encoded by the time it gets to us.  Setting AllowEncodedSlashes doesn't help us
+    # get slashes through to this point.  So we do a special case and allow \/ to escape
+    # a slash through to our REST args.
+    #
+    print "PATH: '$path'\n";
+    my ($app_name, @rest_args) = split ( m|(?<!\\)/|, $path, -1);
+    @rest_args = map { s|\\/|/|g; $_ } @rest_args;
+
+    if (! $app_name) {
+        die "Missing app-name.  Send $script_name/<app-name>/<arg0>[/<arg1>...] in URI!\n";
+    }
+    $app_name =~ m|^[\w\-]+$| || die "Invalid app_name '$app_name'!\n";
 
     # Create $jconfig object.  This is used everywhere in Jarvis.
     $jconfig = new Jarvis::Config ($app_name, ('etc_dir' => "$jarvis_etc", 'cgi' => $cgi, 'mod_perl_io' => $mod_perl_io ) );
-    
-    # Store the dataset name.
-    $jconfig->{'dataset_name'} = $dataset_name;
 
     # Determine client's IP.
     $jconfig->{'client_ip'} = $ENV{"HTTP_X_FORWARDED_FOR"} || $ENV{"HTTP_CLIENT_IP"} || $ENV{"REMOTE_ADDR"} || '';
 
-    # Start tracking now.  Hopefully, not too much time has passed.
-    &Jarvis::Tracker::start ($jconfig);
-
     # Debug can now occur, since we have called Config!
     &Jarvis::Error::debug ($jconfig, "URI = $ENV{REQUEST_URI}");
-    &Jarvis::Error::debug ($jconfig, "Base Path = $path");
-    &Jarvis::Error::debug ($jconfig, "App Name = $app_name");
-    &Jarvis::Error::debug ($jconfig, "Dataset Name = $dataset_name");
-
+    &Jarvis::Error::debug ($jconfig, "Base Path = '$path'.");
+    &Jarvis::Error::debug ($jconfig, "App Name = '$app_name'.");
     foreach my $i (0 .. $#rest_args) {
-        &Jarvis::Error::debug ($jconfig, "Rest Arg " . ($i + 1) . " = " . $rest_args[$i]);
+        &Jarvis::Error::debug ($jconfig, "Rest Indexed Arg $i => '%s'.", $rest_args[$i]);
     }
 
-    # foreach my $env (keys %ENV) {
-    #     &Jarvis::Error::debug ($jconfig, "$env = $ENV{$env}");
-    # }
+    ###############################################################################
+    # Now we can start with the real action.  Start parsing
+    ###############################################################################
 
-    # my @names = $cgi->param;
-    # foreach my $name (@names) {
-    #     &Jarvis::Error::debug ($jconfig, "Query Param $name = " . $cgi->param ($name));
-    # }
+    # Now parse the rest of the args and apply our router.  This gives us dataset name too.
+    my ($dataset_name, $rest_args_href) = &Jarvis::Route::find ($jconfig, \@rest_args);
+    &Jarvis::Error::debug ($jconfig, "Dataset Name = '%s'.", $dataset_name);
+
+    # Store our restful named params.
+    my $raw_params = $jconfig->{'cgi'}->Vars;
+    foreach my $key (sort (keys %$rest_args_href)) {
+        &Jarvis::Error::debug ($jconfig, "Rest Named Arg '$key' => '%s'.", $$rest_args_href{$key});
+        $raw_params->{$key} = $$rest_args_href{$key};
+    }
+
+    # Dataset name can't be empty.  Also, it can only be normal characters 
+    # with "-", and "." for directory separator.
+    #
+    # Note that we don't check yet for leading and trailing dot and other file 
+    # security stuff.  We'll do that when we actually go to open the file, 
+    # because maybe some execs/plugins might allow it, and we don't want
+    # to restrict them.
+    #
+    # A "metaset" will allow multiple comma-separated dataset names.  This is allowed
+    # only for "fetch" and only for XML or JSON formats.  There will be additional 
+    # checks to follow to ensure that "," datasets are used only in specific cases.
+    #
+    if ((! defined $dataset_name) || ($dataset_name eq '')) {
+        die "All requests require $script_name/$app_name/<dataset-or-special>[/<arg1>...] in URI!\n";
+    }
+    ($dataset_name =~ m|^[\w\-\.,]+$|) || die "Invalid dataset_name '$dataset_name'!\n";    
+
+    # Store the dataset name.
+    $jconfig->{'dataset_name'} = $dataset_name;
+
+    # Start tracking now we have dataset name.  Hopefully, not too much time has passed.
+    &Jarvis::Tracker::start ($jconfig);
 
     ###############################################################################
     # Action: "status", "habitat", "logout", "fetch", "update",  or custom

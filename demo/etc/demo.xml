@@ -1,12 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <jarvis>
-    <app format="json" debug="yes" dump="no">
+    <app format="json" debug="yes" dump="yes">
         <tracker logins="no" requests="no" errors="no">
             <dbfile>/var/lib/jarvis/tracker/tracker.db</dbfile>
         </tracker>
 
         <!-- This is where our <dataset>.xml are all stored -->
-	<dataset_dir>/usr/share/jarvis/demo/dataset</dataset_dir>
+	    <dataset_dir>/usr/share/jarvis/demo/dataset</dataset_dir>
+
+        <!-- This is a server-side RESTful "router", it maps URLS to datasets
+             and assigns names to RESTful parameters.
+
+             NOTE: The first one will match, so when you have general and specific
+             cases, be sure to put the LONGEST (most specific) case first.
+
+             The "restful" type applies for "json.rest" format requests.
+                restful="array" (default) - Return an array of 0, 1 or more element.
+                restful="singleton" - Return exactly 1 element, NO array wrapper.  Return 404 on no data.  Die if > 1 element.    
+        -->
+        <router>
+            <route path="/boat_class/:boat_class" dataset="boat_class" restful="array"/>
+            <route path="/boat/by-class/:boat_class" dataset="boat" restful="array"/>
+            <route path="/boat/:id" dataset="boat" restful="singleton"/>
+        </router>
 
         <!-- For server-side paging and sorting -->
         <page_limit_param>limit</page_limit_param>
@@ -17,7 +33,7 @@
         <!-- XML Habitat. Contents are entirely free form.  This is 100% example only.
              For requests with &format=xml we will include the <habitat></habitat>.
 
-             BE WARNED.  Your HABITAT is PUBLIC.  Login is not required in order
+             NOTE: Your HABITAT is PUBLIC.  Login is not required in order
              to view the habitat.
         -->
         <habitat>
@@ -65,7 +81,7 @@
 
              http://localhost/jarvis-agent/demo/echo
 
-             Note that access = "**", so login is not required in order to access this particular exec.
+             NOTE: We set access = "**", so login is not required in order to access this particular exec.
              -->
         <exec dataset="echo" access="**" command="echo" add_headers="yes" filename_parameter="filename"  mime_type="text/plain"/>
     </app>
