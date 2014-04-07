@@ -279,8 +279,12 @@ sub do {
     ###############################################################################
 
     # Now parse the rest of the args and apply our router.  This gives us dataset name too.
-    my ($dataset_name, $rest_args_href) = &Jarvis::Route::find ($jconfig, \@rest_args);
+    my ($dataset_name, $rest_args_href, $presentation) = &Jarvis::Route::find ($jconfig, \@rest_args);
     &Jarvis::Error::debug ($jconfig, "Dataset Name = '%s'.", $dataset_name);
+    &Jarvis::Error::debug ($jconfig, "Presentation = '%s'.", $presentation);
+
+    # Store the presentation for later encoding.
+    $jconfig->{presentation} = $presentation;
 
     # Store our restful named params.
     my $raw_params = $jconfig->{'cgi'}->Vars;

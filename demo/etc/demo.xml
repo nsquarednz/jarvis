@@ -19,9 +19,9 @@
                 restful="singleton" - Return exactly 1 element, NO array wrapper.  Return 404 on no data.  Die if > 1 element.    
         -->
         <router>
-            <route path="/boat_class/:boat_class" dataset="boat_class" restful="array"/>
-            <route path="/boat/by-class/:boat_class" dataset="boat" restful="array"/>
-            <route path="/boat/:id" dataset="boat" restful="singleton"/>
+            <route path="/boat_class/:boat_class" dataset="boat_class"/>
+            <route path="/boat/by-class/:boat_class" dataset="boat"/>
+            <route path="/boat/:id" dataset="boat" presentation="singleton"/>
         </router>
 
         <!-- For server-side paging and sorting -->

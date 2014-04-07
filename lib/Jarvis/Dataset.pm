@@ -117,17 +117,17 @@ sub get_config_xml {
     # dataset.  Note that any remaining "." that aren't stripped off by a prefix
     # match are treated as subdirectories inside the dataset dir.
     #
-    my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
-    $axml->{'dataset_dir'} || die "Missing configuration for mandatory element(s) 'dataset_dir'.";
+    my $axml = $jconfig->{xml}{jarvis}{app};
+    $axml->{dataset_dir} || die "Missing configuration for mandatory element(s) 'dataset_dir'.";
     
     # Check for duplicate prefixes.
     my %prefix_seen = ();
     
-    foreach my $dsdir ($axml->{'dataset_dir'}('@')) {
+    foreach my $dsdir ($axml->{dataset_dir}('@')) {
         my $dir = $dsdir->content || die "Missing directory in 'dataset_dir' element.";
-        my $type = $dsdir->{'type'}->content || 'dbi';            
-        my $prefix = $dsdir->{'prefix'}->content || '';
-        my $dbname = $dsdir->{'dbname'}->content || 'default';
+        my $type = $dsdir->{type}->content || 'dbi';            
+        my $prefix = $dsdir->{prefix}->content || '';
+        my $dbname = $dsdir->{dbname}->content || 'default';
         
         # Non-empty prefix paths must end in a "." for matching purposes.
         if ($prefix && ($prefix !~ m/\.$/)) {
@@ -161,27 +161,27 @@ sub get_config_xml {
 
     # Check it exists.
     if (! -f $dsxml_filename) {
-        $jconfig->{'status'} = '404 Not Found';
-        die "No such DSXML file '$subset_name.xml' for application '" . $jconfig->{'app_name'} . "'";
+        $jconfig->{status} = '404 Not Found';
+        die "No such DSXML file '$subset_name.xml' for application '" . $jconfig->{app_name} . "'";
     }
 
     my $dsxml = XML::Smart->new ("$dsxml_filename") || die "Cannot read '$dsxml_filename': $!\n";
     ($dsxml->{dataset}) || die "Missing <dataset> tag in '$dsxml_filename'!\n";
 
     # Per-dataset DB name override default.
-    $jconfig->{'subset_name'} = $subset_name;
-    $jconfig->{'subset_type'} = $subset_type;
-    $jconfig->{'subset_dbname'} = $dsxml->{'dataset'}{'dbname'}->content || $default_dbname;
+    $jconfig->{subset_name} = $subset_name;
+    $jconfig->{subset_type} = $subset_type;
+    $jconfig->{subset_dbname} = $dsxml->{dataset}{dbname}->content || $default_dbname;
 
     # Enable per dataset dump/debug
-    $jconfig->{'dump'} = $jconfig->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($dsxml->{'dataset'}{'dump'}->content || "no")});
-    $jconfig->{'debug'} = $jconfig->{'debug'} || $jconfig->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($dsxml->{'dataset'}{'debug'}->content || "no")});
+    $jconfig->{dump} = $jconfig->{dump} || defined ($Jarvis::Config::yes_value {lc ($dsxml->{dataset}{dump}->content || "no")});
+    $jconfig->{debug} = $jconfig->{debug} || $jconfig->{dump} || defined ($Jarvis::Config::yes_value {lc ($dsxml->{dataset}{debug}->content || "no")});
 
     # Load a couple of other parameters.  This is a "side-effect".  Yeah, it's a bit yucky.
-    $jconfig->{'page_start_param'} = $axml->{'page_start_param'}->content || 'page_start';
-    $jconfig->{'page_limit_param'} = $axml->{'page_limit_param'}->content || 'page_limit';
-    $jconfig->{'sort_field_param'} = $axml->{'sort_field_param'}->content || 'sort_field';
-    $jconfig->{'sort_dir_param'} = $axml->{'sort_dir_param'}->content || 'sort_dir';
+    $jconfig->{page_start_param} = $axml->{page_start_param}->content || 'page_start';
+    $jconfig->{page_limit_param} = $axml->{page_limit_param}->content || 'page_limit';
+    $jconfig->{sort_field_param} = $axml->{sort_field_param}->content || 'sort_field';
+    $jconfig->{sort_dir_param} = $axml->{sort_dir_param}->content || 'sort_dir';
 
     # Load/Start dataset specific hooks.
     &Jarvis::Hook::start_dataset ($jconfig, $dsxml, $safe_params_href);
@@ -249,7 +249,7 @@ sub transform {
 
     # Convert MS Word characters into their HTML equivalent.  This will stop
     # XML::Smart from attempting to encode them in base64.
-    if ($$transforms_href{'word2html'}) {
+    if ($$transforms_href{word2html}) {
         foreach my $key (keys %$vals_href) {
             next if ! defined $$vals_href{$key};
             $$vals_href{$key} = &word2html ($$vals_href{$key});
@@ -257,7 +257,7 @@ sub transform {
     }
 
     # Trim leading and trailing space off any defined value.
-    if ($$transforms_href{'trim'}) {
+    if ($$transforms_href{trim}) {
         foreach my $key (keys %$vals_href) {
             next if ! defined $$vals_href{$key};
             $$vals_href{$key} = &trim ($$vals_href{$key});
@@ -266,7 +266,7 @@ sub transform {
 
     # Convert any whitespace values into undef.  Later, all undef values
     # will be omitted from the final results in JSON and XML format.
-    if ($$transforms_href{'null'}) {
+    if ($$transforms_href{null}) {
         foreach my $key (keys %$vals_href) {
             next if ! defined $$vals_href{$key};
             if ($$vals_href{$key} =~ m/^\s*$/) {
@@ -276,7 +276,7 @@ sub transform {
     }
 
     # Any undef values will be converted to whitespace.
-    if ($$transforms_href{'notnull'}) {
+    if ($$transforms_href{notnull}) {
         foreach my $key (keys %$vals_href) {
             (defined $$vals_href{$key}) || ($$vals_href{$key} = '');
         }
@@ -301,16 +301,16 @@ sub transform {
 sub get_post_data {
     my ($jconfig) = @_;
 
-    $jconfig->{'post_data'} && return $jconfig->{'post_data'};
+    $jconfig->{post_data} && return $jconfig->{post_data};
 
     # Get our submitted content.  This works for POST (insert) on non-XML data.  If the
     # content_type was "application/xml" then I think we will find our content in the
     # 'XForms:Model' parameter instead.
-    $jconfig->{'post_data'} = $jconfig->{'cgi'}->param ('POSTDATA');
+    $jconfig->{post_data} = $jconfig->{cgi}->param ('POSTDATA');
 
     # This is for POST (insert) on XML data.
-    if (! $jconfig->{'post_data'}) {
-        $jconfig->{'post_data'} = $jconfig->{'cgi'}->param ('XForms:Model');
+    if (! $jconfig->{post_data}) {
+        $jconfig->{post_data} = $jconfig->{cgi}->param ('XForms:Model');
     }
 
     # This works for DELETE (delete) and PUT (update) on any content.
@@ -319,23 +319,23 @@ sub get_post_data {
     # ... unless application/json is used, in which case they have a special
     # PUTDATA param.
     # Weird huh!
-    if (! $jconfig->{'post_data'}) {
-        $jconfig->{'post_data'} = $jconfig->{'cgi'}->keywords();
+    if (! $jconfig->{post_data}) {
+        $jconfig->{post_data} = $jconfig->{cgi}->keywords();
     }
 
-    if (! $jconfig->{'post_data'}) {
-        $jconfig->{'post_data'} = $jconfig->{'cgi'}->param('PUTDATA');
+    if (! $jconfig->{post_data}) {
+        $jconfig->{post_data} = $jconfig->{cgi}->param('PUTDATA');
     }
 
     # Last ditch effort - read STDIN.
-    if (! $jconfig->{'post_data'}) {
-        $jconfig->{'post_data'} = "";
+    if (! $jconfig->{post_data}) {
+        $jconfig->{post_data} = "";
         while (<STDIN>) {
-            $jconfig->{'post_data'} .= $_;
+            $jconfig->{post_data} .= $_;
         }
     }
 
-    return $jconfig->{'post_data'};
+    return $jconfig->{post_data};
 }
 
 ################################################################################
@@ -367,10 +367,10 @@ sub get_post_data {
 sub fetch {
     my ($jconfig, $rest_args_aref) = @_;
     
-    my $format = $jconfig->{'format'};
+    my $format = $jconfig->{format};
     
     # Handle multiple subsets, possibly.  Only for specific formats.
-    my @subsets = split (',', $jconfig->{'dataset_name'});
+    my @subsets = split (',', $jconfig->{dataset_name});
     if ((scalar @subsets) > 1) {
         if (($format ne 'json') && ($format ne 'json.array') && ($format ne 'xml')) {
             die "Multiple comma-separated datasets not supported for format '" . $format . "'\n";
@@ -396,12 +396,12 @@ sub fetch {
     # Handle our parameters.  Always with placeholders.  Note that our special variables
     # like __username are safe, and cannot come from user-defined values.
     #
-    my %raw_params = $jconfig->{'cgi'}->Vars;
+    my %raw_params = $jconfig->{cgi}->Vars;
     my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%raw_params, $rest_args_aref);
 
     # Store the params for logging purposes.
     my %params_copy = %safe_params;
-    $jconfig->{'params_href'} = \%params_copy;
+    $jconfig->{params_href} = \%params_copy;
 
     # Loop through each dataset file.  In most cases there is only one file.
     foreach my $subset_name (@subsets) {
@@ -417,18 +417,18 @@ sub fetch {
             if ((scalar @subsets) > 1) {
                 if ($format =~ m/^xml/) {
                     $result_object = { 'name' => $subset_name };
-                    push (@{ $all_results_object->{'response'}{'dataset'} }, $result_object);
+                    push (@{ $all_results_object->{response}{dataset} }, $result_object);
 
                 } elsif ($format =~ m/^json/) {
-                    $all_results_object->{'dataset'}{$subset_name} = {};
-                    $result_object = $all_results_object->{'dataset'}{$subset_name};
+                    $all_results_object->{dataset}{$subset_name} = {};
+                    $result_object = $all_results_object->{dataset}{$subset_name};
                 }
 
 
             # Single dataset.  This is backwards compatible with Jarvis 3.
             } else {
                 if ($format =~ m/^xml/) {
-                    $result_object = $all_results_object->{'response'}
+                    $result_object = $all_results_object->{response}
 
                 } elsif ($format =~ m/^json/) {
                     $result_object = $all_results_object;
@@ -444,19 +444,19 @@ sub fetch {
 
         my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
         if ($failure ne '') {
-            $jconfig->{'status'} = "401 Unauthorized";
-            die "Insufficient privileges to read '$subset_name'. $failure\n";
+            $jconfig->{status} = "401 Unauthorized";
+            die "Insufficient privileges to read '$subset_name': $failure\n";
         }    
 
         # What filename would this dataset use?
-        my $filename_parameter = $dsxml->{'dataset'}{'filename_parameter'}->content || 'filename';
+        my $filename_parameter = $dsxml->{dataset}{filename_parameter}->content || 'filename';
         &Jarvis::Error::debug ($jconfig, "Filename parameter = '$filename_parameter'.");        
-        $jconfig->{'return_filename'} = $safe_params {$filename_parameter} || '';        
-        &Jarvis::Error::debug ($jconfig, "Return filename = '" . $jconfig->{'return_filename'} . "'.");        
+        $jconfig->{return_filename} = $safe_params {$filename_parameter} || '';        
+        &Jarvis::Error::debug ($jconfig, "Return filename = '" . $jconfig->{return_filename} . "'.");        
         
         # Get a database handle.
-        my $subset_type = $jconfig->{'subset_type'}; 
-        my $subset_dbname = $jconfig->{'subset_dbname'}; 
+        my $subset_type = $jconfig->{subset_type}; 
+        my $subset_dbname = $jconfig->{subset_dbname}; 
         my $dbh = &Jarvis::DB::handle ($jconfig, $subset_dbname, $subset_type);
         
         # Get the data.  Note that this is the very first time in fetch processing
@@ -495,8 +495,8 @@ sub fetch {
             # under MS-SQL Server will not provide field names, and hence this feature will not
             # be available.
             #
-            my $sort_field = $jconfig->{'cgi'}->param ($jconfig->{'sort_field_param'}) || '';
-            my $sort_dir = $jconfig->{'cgi'}->param ($jconfig->{'sort_dir_param'}) || 'ASC';
+            my $sort_field = $jconfig->{cgi}->param ($jconfig->{sort_field_param}) || '';
+            my $sort_dir = $jconfig->{cgi}->param ($jconfig->{sort_dir_param}) || 'ASC';
         
             if ($sort_field) {
                 &Jarvis::Error::debug ($jconfig, "Server Sort on '$sort_field', Dir = '$sort_dir'.");
@@ -513,8 +513,8 @@ sub fetch {
             }
         
             # Should we truncate the data to a specific page?
-            my $limit = $jconfig->{'cgi'}->param ($jconfig->{'page_limit_param'}) || 0;
-            my $start = $jconfig->{'cgi'}->param ($jconfig->{'page_start_param'}) || 0;
+            my $limit = $jconfig->{cgi}->param ($jconfig->{page_limit_param}) || 0;
+            my $start = $jconfig->{cgi}->param ($jconfig->{page_start_param}) || 0;
         
             if ($limit > 0) {
                 ($start > 0) || ($start = 0); # Check we have a real zero, not ''
@@ -535,7 +535,7 @@ sub fetch {
             }
         
             # Store the number of returned rows for the current dataset in the list.
-            $jconfig->{'out_nrows'} = scalar @$rows_aref;
+            $jconfig->{out_nrows} = scalar @$rows_aref;
         
             # What transformations should we use when sending out fetch data?
             my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->{dataset}{transform}{fetch});
@@ -575,10 +575,10 @@ sub fetch {
                     
             # Store some additional info in jconfig for debugging/tracing.
             # These will refer to the most recent dataset being processed.
-            $jconfig->{'fetched'} = $num_fetched;
-            $jconfig->{'returned'} = scalar @$rows_aref;
-            $jconfig->{'rows_aref'} = $rows_aref;
-            $jconfig->{'column_names_aref'} = $column_names_aref;
+            $jconfig->{fetched} = $num_fetched;
+            $jconfig->{returned} = scalar @$rows_aref;
+            $jconfig->{rows_aref} = $rows_aref;
+            $jconfig->{column_names_aref} = $column_names_aref;
         
             # Assemble the result object.
             #
@@ -589,16 +589,16 @@ sub fetch {
                 $result_object->{$name} = $extra_href->{$name};
             }
         
-            $result_object->{'fetched'} = 1 * $num_fetched;                   # Fetched from database
-            $result_object->{'returned'} = scalar @$rows_aref;         # Returned to client (after paging)
+            $result_object->{fetched} = 1 * $num_fetched;                   # Fetched from database
+            $result_object->{returned} = scalar @$rows_aref;         # Returned to client (after paging)
             
             # XML encoding in its simplest form.  Column keys are attributes.
             if ($format eq "xml") {
-                $result_object->{'data'}{'row'} = $rows_aref;
+                $result_object->{data}{row} = $rows_aref;
                 
             # JSON array is array of arrays.                
             } elsif ($format eq "json.array") {
-                $result_object->{'columns'} = $column_names_aref;
+                $result_object->{columns} = $column_names_aref;
                 
                 # Convert the hashes into rows.
                 my @rows2;
@@ -606,13 +606,34 @@ sub fetch {
                     my @row2 = map { (defined $row->{$_}) ? $row->{$_} : undef } @$column_names_aref;
                     push (@rows2, \@row2);
                 }
-                $result_object->{'data'} = \@rows2;
+                $result_object->{data} = \@rows2;
 
-            # This is primarily for "json".  
-            # But it is also used by "json.rest", "csv" and "xmls". 
-            # It's a place to store the data, which will be post-processed a bit further down.
+            # For "json" and "json.rest", we have either an object, or an array of objects.
+            } elsif (($format eq "json") || ($format eq "json.rest")) {
+
+                # This is for when a router requests a "singleton" presentation explicitly.
+                if ($jconfig->{presentation} eq "singleton") {
+                    if (scalar (@$rows_aref) == 0) {
+                        $jconfig->{status} = "404 Not Found";
+                        die "Zero results returned from 'singleton' request.\n";
+
+                    } elsif (scalar (@$rows_aref) > 1) {
+                        $jconfig->{status} = "406 Not Acceptable";
+                        die "Multiple results returned from 'singleton' request.\n";
+                    }
+                    $result_object->{data} = $$rows_aref[0];
+
+                # This is the default case.  Zero or more objects in an array.
+                } else {
+                    $result_object->{data} = $rows_aref;
+                }
+
+            # The CSV and XLSX just need a place to store their data until they can make their spreadsheet.
+            } elsif (($format eq "csv") || ($format eq "xlsx")) {
+                $result_object->{data} = $rows_aref;
+
             } else {
-                $result_object->{'data'} = $rows_aref;
+                die "No return representation for format '$format', dataset '$subset_name'.";
             }
 
         } else {
@@ -637,7 +658,7 @@ sub fetch {
     #
     } elsif ($format eq "rows_aref") {
         &Jarvis::Error::debug ($jconfig, "Return rows_aref in raw format.");
-        $return_value = $jconfig->{'rows_aref'};
+        $return_value = $jconfig->{rows_aref};
         
     # JSON "Restful" encoding is now simple.  It presents ONLY the data.
     } elsif ($format eq "json.rest") {
@@ -649,10 +670,10 @@ sub fetch {
     } elsif (($format eq "json") || ($format eq "json.array")) {
         &Jarvis::Error::debug ($jconfig, "Encoding into JSON format ($format).");
 
-        $all_results_object->{'logged_in'} = $jconfig->{'logged_in'} ? 1 : 0;
-        $all_results_object->{'username'} = $jconfig->{'username'};
-        $all_results_object->{'error_string'} = $jconfig->{'error_string'};
-        $all_results_object->{'group_list'} = $jconfig->{'group_list'};
+        $all_results_object->{logged_in} = $jconfig->{logged_in} ? 1 : 0;
+        $all_results_object->{username} = $jconfig->{username};
+        $all_results_object->{error_string} = $jconfig->{error_string};
+        $all_results_object->{group_list} = $jconfig->{group_list};
 
         # Copy across any extra root parameters set by the return_fetch hook.
         foreach my $name (sort (keys %$extra_href)) {
@@ -666,14 +687,14 @@ sub fetch {
     } elsif ($format eq "xml") {
         &Jarvis::Error::debug ($jconfig, "Encoding into XML format ($format).");
 
-        $all_results_object->{'response'}{'logged_in'} = $jconfig->{'logged_in'};
-        $all_results_object->{'response'}{'username'} = $jconfig->{'username'};
-        $all_results_object->{'response'}{'error_string'} = $jconfig->{'error_string'};
-        $all_results_object->{'response'}{'group_list'} = $jconfig->{'group_list'};
+        $all_results_object->{response}{logged_in} = $jconfig->{logged_in};
+        $all_results_object->{response}{username} = $jconfig->{username};
+        $all_results_object->{response}{error_string} = $jconfig->{error_string};
+        $all_results_object->{response}{group_list} = $jconfig->{group_list};
 
         # Copy across any extra root parameters set by the return_fetch hook.
         foreach my $name (sort (keys %$extra_href)) {
-            $all_results_object->{'response'}{$name} = $extra_href->{$name};
+            $all_results_object->{response}{$name} = $extra_href->{$name};
         }
 
         $return_value = $all_results_object->data ();
@@ -696,8 +717,8 @@ sub fetch {
         &Jarvis::Error::debug ($jconfig, "Encoding into CSV format ($format).");
 
         # Check we have the data we need.
-        my $column_names_aref = $jconfig->{'column_names_aref'};
-        my $rows_aref = $jconfig->{'rows_aref'};
+        my $column_names_aref = $jconfig->{column_names_aref};
+        my $rows_aref = $jconfig->{rows_aref};
         
         if (! $rows_aref) {
             die "Data query did not include a return result.  Cannot convert to CSV.";
@@ -736,8 +757,8 @@ sub fetch {
         require Excel::Writer::XLSX;
         
         # Check we have the data we need.
-        my $column_names_aref = $jconfig->{'column_names_aref'};
-        my $rows_aref = $jconfig->{'rows_aref'};
+        my $column_names_aref = $jconfig->{column_names_aref};
+        my $rows_aref = $jconfig->{rows_aref};
         
         if (! $rows_aref) {
             die "Data query did not include a return result.  Cannot convert to XLSX.";
@@ -816,7 +837,7 @@ sub store {
     my ($jconfig, $rest_args_aref) = @_;
 
     # The dataset may only contain ONE single subset.    
-    my $dataset_name = $jconfig->{'dataset_name'} || '';
+    my $dataset_name = $jconfig->{dataset_name} || '';
     ($dataset_name =~ m/,/) && die "Multiple comma-separated datasets not permitted with store operations.";
     my $subset_name = $dataset_name;
     
@@ -824,20 +845,20 @@ sub store {
     my $dsxml = &get_config_xml ($jconfig, $subset_name) || die "Cannot load configuration for dataset '$subset_name'.";
     
     # Check that we are DBI only.
-    my $dataset_type = $jconfig->{'subset_type'}; 
+    my $dataset_type = $jconfig->{subset_type}; 
     ($dataset_type eq 'dbi') || die "Datasets of type '$dataset_type' do not support store operations.";
 
     # Now perform security check.
     my $allowed_groups = $dsxml->{dataset}{"write"};
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
     if ($failure ne '') {
-        $jconfig->{'status'} = "401 Unauthorized";
+        $jconfig->{status} = "401 Unauthorized";
         die "Insufficient privileges to write '$subset_name'. $failure\n";
     }
     
     # Get a database handle.
-    my $subset_type = $jconfig->{'subset_type'}; 
-    my $subset_dbname = $jconfig->{'subset_dbname'}; 
+    my $subset_type = $jconfig->{subset_type}; 
+    my $subset_dbname = $jconfig->{subset_dbname}; 
     my $dbh = &Jarvis::DB::handle ($jconfig, $subset_dbname, $subset_type);
     
     # Hand off to DBI code.  Maybe one day we will support different dataset
