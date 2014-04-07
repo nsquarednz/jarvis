@@ -351,8 +351,11 @@ sub get_post_data {
 #               cgi                 Contains data values for {{param}} in SQL
 #               username            Used for {{username}} in SQL
 #               group_list          Used for {{group_list}} in SQL
-#               format              Either "json", "json.array", "xml", "csv", 
-#                                   "xlsx", or "rows_aref".
+#               format              Either 
+#                                       "json", "json.array", "json.rest", 
+#                                       "xml",
+#                                       "csv", "xlsx", or
+#                                       "rows_aref".
 #
 #       $rest_args_aref - Optional ref to our REST args (slash-separated after dataset).
 #
@@ -366,10 +369,10 @@ sub fetch {
     
     my $format = $jconfig->{'format'};
     
-    # Handle multiple subsets, possibly.
+    # Handle multiple subsets, possibly.  Only for specific formats.
     my @subsets = split (',', $jconfig->{'dataset_name'});
     if ((scalar @subsets) > 1) {
-        if (($format !~ m/^json/) && ($format !~ m/^xml/)) {
+        if (($format ne 'json') && ($format ne 'json.array') && ($format ne 'xml')) {
             die "Multiple comma-separated datasets not supported for format '" . $format . "'\n";
         }
     }
@@ -407,6 +410,7 @@ sub fetch {
         my $result_object = undef;
 
         # For JSON and XML, we store to an object and encode it at the end.
+        # Supported only for: json, json.array, xml
         if (defined $all_results_object) {
 
             # Multiple datasets.  Nest each dataset's results in a sub-structure.
@@ -460,8 +464,11 @@ sub fetch {
         # now, we have only validated the prefix part (e.g. json*, xml*).  Now
         # we will be fussy about the exact requested return format. 
         #
-        if (($format eq 'xml') || ($format eq 'xml.array') || 
-            ($format eq 'json') || ($format eq 'json.array') || 
+        # Note that we will deal with ".rest" formats a little bit later, for
+        # now we just put everything into the normal places.
+        #
+        if (($format eq 'xml') ||
+            ($format eq 'json') || ($format eq 'json.array') || ($format eq 'json.rest') || 
             ($format eq 'csv') || ($format eq 'xlsx') || ($format eq 'rows_aref')) {
             
             # Call to the DBI interface to fetch the tuples.
@@ -589,21 +596,6 @@ sub fetch {
             if ($format eq "xml") {
                 $result_object->{'data'}{'row'} = $rows_aref;
                 
-            # XML array is a funny sort of mish-mash.
-            } elsif ($format eq "xml.array") {
-                my $i = 0;
-                my @column_objects = map { {'index' => $i++, 'name' => $_} } @$column_names_aref;
-                $result_object->{'columns'}{'header'} = \@column_objects;
-
-                # Convert the hashes into rows.
-                my @rows2;
-                foreach my $row (@$rows_aref) {
-                    my $i = 0;
-                    my @column_objects = map { (defined $row->{$_}) ? {'index' => $i++, 'value' => $row->{$_} } : {'index' => $i++, 'null' => '1' } } @$column_names_aref;
-                    push (@rows2, {'column' => \@column_objects});
-                }
-                $result_object->{'data'}{'row'} = \@rows2;
-                
             # JSON array is array of arrays.                
             } elsif ($format eq "json.array") {
                 $result_object->{'columns'} = $column_names_aref;
@@ -616,59 +608,13 @@ sub fetch {
                 }
                 $result_object->{'data'} = \@rows2;
 
-            # Note the JSON object is also temporary store for CSV and rows_aref. 
+            # This is primarily for "json".  
+            # But it is also used by "json.rest", "csv" and "xmls". 
+            # It's a place to store the data, which will be post-processed a bit further down.
             } else {
                 $result_object->{'data'} = $rows_aref;
             }
 
-        # 3D Data is a very, very special case.  It is only supported for MDX,
-        # and it uses a different return format so that hooks may not play
-        # nicely.
-        #
-            } elsif (($format eq 'json.3d') || ($format eq 'xml.3d')) {
-            
-            # Call to the DBI interface to fetch the nested hash..
-            my $data_href;
-            
-            if ($subset_type eq 'sdp') {
-                ($data_href) 
-                    = &Jarvis::Dataset::SDP::fetch_3d ($jconfig, $subset_name, $dsxml, $dbh, \%safe_params);
-                    
-            } else {
-                die "Unsupported dataset type '$subset_type' in fetch of format '$format'.";
-            }
-            
-            # This final hook allows you to modify the data returned by SQL for one dataset.
-            # This hook may do one or both of:
-            #
-            #   - Completely modify the returned content (by modifying $rows_aref)
-            #   - Add additional per-dataset scalar parameters (by setting $extra_href)
-            #
-            my $extra_href = {};
-            &Jarvis::Hook::dataset_fetched ($jconfig, $dsxml, \%safe_params, $data_href, undef, $extra_href);
-                    
-            # Store some additional info in jconfig for debugging/tracing.
-            # These will refer to the most recent dataset being processed.
-            $jconfig->{'data_href'} = $data_href;
-        
-            # Assemble the result object.
-            #
-            # NOTE: We always return a 'data' field, even if it is an empty array.
-            # That is because ExtJS and other libraries will flag an exception if we do not.
-            #
-            foreach my $name (sort (keys %$extra_href)) {
-                $result_object->{$name} = $extra_href->{$name};
-            }
-        
-            # XML encoding in its simplest form.
-            if ($format eq "xml.3d") {
-                $result_object->{'data'} = $data_href;
-                
-            # JSON encoding. 
-            } else {
-                $result_object->{'data'} = $data_href;
-            }
-            
         } else {
             die "No implementation for fetch format '$format', dataset '$subset_name'.";
         }
@@ -693,8 +639,14 @@ sub fetch {
         &Jarvis::Error::debug ($jconfig, "Return rows_aref in raw format.");
         $return_value = $jconfig->{'rows_aref'};
         
-    # JSON encoding is now simple.
-    } elsif (($format eq "json") || ($format =~ m/^json\./)) {
+    # JSON "Restful" encoding is now simple.  It presents ONLY the data.
+    } elsif ($format eq "json.rest") {
+        &Jarvis::Error::debug ($jconfig, "Encoding into JSON Restful format ($format).");
+        my $json = JSON->new->pretty(1)->allow_blessed(1);
+        $return_value = $json->encode ( $all_results_object->{data} );
+
+    # Other JSON encoding is nearly as simple.
+    } elsif (($format eq "json") || ($format eq "json.array")) {
         &Jarvis::Error::debug ($jconfig, "Encoding into JSON format ($format).");
 
         $all_results_object->{'logged_in'} = $jconfig->{'logged_in'} ? 1 : 0;
@@ -710,8 +662,8 @@ sub fetch {
         my $json = JSON->new->pretty(1)->allow_blessed(1);
         $return_value = $json->encode ( $all_results_object );
 
-    # XML is also simple.
-    } elsif (($format eq "xml") || ($format =~ m/^xml\./)) {
+    # Other XML is almost as simple.
+    } elsif ($format eq "xml") {
         &Jarvis::Error::debug ($jconfig, "Encoding into XML format ($format).");
 
         $all_results_object->{'response'}{'logged_in'} = $jconfig->{'logged_in'};

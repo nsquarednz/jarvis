@@ -1,4 +1,4 @@
-<dataset read="*" write="*">
+<dataset read="**" write="*">
     <transform fetch="notnull" store="trim,null" />
     <select>
 SELECT id, name, registration_num, class, owner, description
