@@ -226,17 +226,17 @@ sub safe_variables {
     foreach my $name (keys %$raw_params_href) {
         if ($name =~ m/^_?[a-z][a-z0-9_\-]*$/i) {
             my $value = $$raw_params_href {$name};
-            &Jarvis::Error::debug ($jconfig, "User Parameter: $name -> " . ((defined $value) ? ("'" . $value . "'") : 'NULL'));
+            &Jarvis::Error::debug ($jconfig, "User Named Arg: '$name' => '%s'.", $value);
             $safe_params{$name} = $$raw_params_href {$name};
         }
     }
 
-    # And our REST args go through as variable "1", "2", etc...
+    # And our REST args go through as variable "0" (usually the dataset), 1", "2", etc...
     foreach my $i (0 .. $#$rest_args_aref) {
-        my $name = $rest_arg_prefix . ($i + 1);
+        my $name = $rest_arg_prefix . $i;
         my $value = $$rest_args_aref[$i];
 
-        &Jarvis::Error::debug ($jconfig, "Rest Arg: $name -> $value");
+        &Jarvis::Error::debug ($jconfig, "User Indexed Arg: $name => '%s'.", $value);
         $safe_params{$name} = $value;
     }
 
@@ -245,13 +245,13 @@ sub safe_variables {
     #
     $safe_params{"__username"} = $jconfig->{'username'};
     $safe_params{"__group_list"} = $jconfig->{'group_list'};
-    &Jarvis::Error::debug ($jconfig, "Secure Parameter: __username = " . $safe_params{"__username"});
-    &Jarvis::Error::debug ($jconfig, "Secure Parameter: __group_list = " . $safe_params{"__group_list"});
+    &Jarvis::Error::debug ($jconfig, "Secure Arg: __username => " . $safe_params{"__username"});
+    &Jarvis::Error::debug ($jconfig, "Secure Arg: __group_list => " . $safe_params{"__group_list"});
 
     # And our separate groups.
     foreach my $group (split (',', $jconfig->{'group_list'})) {
         $safe_params{"__group:$group"} = 1;
-        &Jarvis::Error::debug ($jconfig, "Secure Parameter: __group:$group = 1");
+        &Jarvis::Error::debug ($jconfig, "Secure Arg: __group:$group => 1");
     }
 
     # Finally, any additional safe parameters that might have been added by
@@ -259,7 +259,7 @@ sub safe_variables {
     foreach my $name (keys %{ $jconfig->{'additional_safe'} }) {
         my $value = $jconfig->{'additional_safe'}{$name};
         $safe_params {$name} = $value;
-        &Jarvis::Error::debug ($jconfig, "Secure Parameter: $name = " . (defined $value ? "'$value'" : "NULL"));
+        &Jarvis::Error::debug ($jconfig, "Secure Arg: $name => " . (defined $value ? "'$value'" : "NULL"));
     }
 
     return %safe_params;

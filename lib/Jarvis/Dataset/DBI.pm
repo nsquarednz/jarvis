@@ -31,7 +31,7 @@ use warnings;
 package Jarvis::Dataset::DBI;
 
 use DBI qw(:sql_types);;
-use JSON::PP; 
+use JSON; 
 use XML::Smart;
 use Data::Dumper;
 
@@ -613,7 +613,7 @@ sub store {
 
     &Jarvis::Error::debug ($jconfig, "Request Content Type = '" . $content_type . "'");
     if ($content_type =~ m|^[a-z]+/json(;.*)?$|) {
-        my $ref = JSON::PP->new->utf8->decode ($content);
+        my $ref = JSON->new->utf8->decode ($content);
 
         # User may pass a single hash record, OR an array of hash records.  We normalise
         # to always be an array of hashes.
@@ -681,21 +681,29 @@ sub store {
     my @results = ();
     my $message = '';
 
-    # We pre-compute the "before" statement parameters even if there is no before statement,
-    # since we may also wish to log them.
-    my %restful_params = &Jarvis::Config::safe_variables ($jconfig, {}, $rest_args_aref);
-    my %params_copy = %restful_params;
-    $jconfig->{'params_href'} = \%params_copy;
+    # We pre-compute the "before" statement parameters even if there is 
+    # no before statement, since we may also wish to record them for later.
+    #
+    # Merge relevant parameters together.  This includes:
+    #   All-Row parameters (CGI Query & Named Restful) from ->Vars
+    #   Numeric Restful args from $rest_args_aref
+    #
+    # These are all made safe, and our secure __<varname> values are merged in also.
+    #
+    my $all_rows_params = $jconfig->{'cgi'}->Vars;
+    my %safe_all_rows_params = &Jarvis::Config::safe_variables ($jconfig, $all_rows_params, $rest_args_aref);
 
     # Invoke before_all hook.
-    &Jarvis::Hook::before_all ($jconfig, $dsxml, \%restful_params, $fields_aref);
+    my %before_params = %safe_all_rows_params;
+    $jconfig->{'params_href'} = \%before_params;
+    &Jarvis::Hook::before_all ($jconfig, $dsxml, \%before_params, $fields_aref);
 
     # Execute our "before" statement.  This statement is NOT permitted to fail.  If it does,
     # then we immediately barf
     {
-        my $bstm = &parse_statement ($jconfig, $dsxml, $dbh, 'before', \%params_copy);
+        my $bstm = &parse_statement ($jconfig, $dsxml, $dbh, 'before', \%before_params);
         if ($bstm) {
-            my @barg_values = &Jarvis::Dataset::names_to_values ($jconfig, $bstm->{'vnames_aref'}, \%restful_params);
+            my @barg_values = &Jarvis::Dataset::names_to_values ($jconfig, $bstm->{'vnames_aref'}, \%before_params);
 
             &statement_execute($jconfig, $bstm, \@barg_values);
             if ($bstm->{'error'}) {
@@ -717,15 +725,29 @@ sub store {
             last;
         }
 
-        # Handle our parameters.  Always with placeholders.  Note that our special variables
-        # like __username are safe, and cannot come from user-defined values.
+        # Merge all our parameters together.  This includes:
+        #   All-Row parameters (CGI Query & Named Restful) from ->Vars
+        #   Per-Row parameters (from content body) from $fields_href
+        #   Numeric Restful args from $rest_args_aref
         #
+        # These are all made safe, and our secure __<varname> values are merged in also.
+        #
+        my $all_rows_params = $jconfig->{'cgi'}->Vars;
         my %raw_params = %{ $fields_href };
+
+        # Merge the all-rows parameters into the per-row parameters.  Note here we 
+        # don't override any per-row parameter.  The per-row parameter will always 
+        # take precedence.
+        #
+        foreach my $key (keys %$all_rows_params) {
+            (defined $raw_params{$key}) || ($raw_params{$key} = $all_rows_params->{$key});
+        }
+
+        # Now we need to perform the "safe" process, and include our __<safe> variables.
         my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%raw_params, $rest_args_aref);
 
         # Store these new parameters for our tracking purposes.
-        %params_copy = %safe_params;
-        $jconfig->{'params_href'} = \%params_copy;
+        $jconfig->{'params_href'} = \%safe_params;
 
         # Any input transformations?
         if (scalar (keys %transforms)) {
@@ -741,7 +763,7 @@ sub store {
 
         # Get the statement type for this ttype if we don't have it.  This raises debug.
         if (! $stm{$row_ttype}) {
-            $stm{$row_ttype} = &parse_statement ($jconfig, $dsxml, $dbh, $row_ttype, \%params_copy);
+            $stm{$row_ttype} = &parse_statement ($jconfig, $dsxml, $dbh, $row_ttype, \%safe_params);
         }
 
         # Check we have an stm for this row.
@@ -920,8 +942,8 @@ sub store {
     }
 
     # Reset our parameters, our per-row parameters are no longer valid.
-    %params_copy = %restful_params;
-    $jconfig->{'params_href'} = \%params_copy;
+    my %after_params = %safe_all_rows_params;
+    $jconfig->{'params_href'} = \%after_params;
 
     # Free any remaining open statement types.
     foreach my $stm_type (keys %stm) {
@@ -931,9 +953,9 @@ sub store {
 
     # Execute our "after" statement.
     if ($success) {
-        my $astm = &parse_statement ($jconfig, $dsxml, $dbh, 'after', \%params_copy);
+        my $astm = &parse_statement ($jconfig, $dsxml, $dbh, 'after', \%after_params);
         if ($astm) {
-            my @aarg_values = &Jarvis::Dataset::names_to_values ($jconfig, $astm->{'vnames_aref'}, \%restful_params);
+            my @aarg_values = &Jarvis::Dataset::names_to_values ($jconfig, $astm->{'vnames_aref'}, \%after_params);
 
             &statement_execute($jconfig, $astm, \@aarg_values);
             if ($astm->{'error'}) {
@@ -941,7 +963,7 @@ sub store {
                 $message || ($message = $astm->{'error'});
             }
         }
-        &Jarvis::Hook::after_all ($jconfig, $dsxml, \%restful_params, $fields_aref, \@results);
+        &Jarvis::Hook::after_all ($jconfig, $dsxml, \%after_params, $fields_aref, \@results);
     }
 
     # Determine if we're going to rollback.
@@ -977,7 +999,8 @@ sub store {
     #
     my $extra_href = {};
     my $return_text = undef;
-    &Jarvis::Hook::return_store ($jconfig, $dsxml, \%restful_params, $fields_aref, \@results, $extra_href, \$return_text);
+    my %return_store_params = %safe_all_rows_params;
+    &Jarvis::Hook::return_store ($jconfig, $dsxml, \%return_store_params, $fields_aref, \@results, $extra_href, \$return_text);
 
     # If the hook set $return_text then we use that.
     if ($return_text) {
@@ -1008,7 +1031,7 @@ sub store {
         if ($success && ! $return_array) {
             $results[0]{'returning'} && ($return_data {'returning'} = $results[0]{'returning'});
         }
-        my $json = JSON::PP->new->pretty(1);
+        my $json = JSON->new->pretty(1);
         $return_text = $json->encode ( \%return_data );
 
     } elsif ($jconfig->{'format'} eq "xml") {
