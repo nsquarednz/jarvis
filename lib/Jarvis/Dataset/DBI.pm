@@ -612,7 +612,7 @@ sub store {
     my $content_type = $jconfig->{'cgi'}->content_type () || '';
 
     &Jarvis::Error::debug ($jconfig, "Request Content Type = '" . $content_type . "'");
-    if ($content_type =~ m|^[a-z]+/json(; .*)?$|) {
+    if ($content_type =~ m|^[a-z]+/json(;.*)?$|) {
         my $ref = JSON::PP->new->utf8->decode ($content);
 
         # User may pass a single hash record, OR an array of hash records.  We normalise
@@ -630,7 +630,7 @@ sub store {
         }
 
     # XML in here please.
-    } elsif ($content_type =~ m|^[a-z]+/xml(; .*)?$|) {
+    } elsif ($content_type =~ m|^[a-z]+/xml(;.*)?$|) {
         my $cxml = XML::Smart->new ($content);
 
         # Sanity check on outer object.
