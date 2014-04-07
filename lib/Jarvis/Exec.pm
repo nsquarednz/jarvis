@@ -67,6 +67,7 @@ sub do {
     my $add_headers = 0;                # Should we add headers.
     my $default_filename = undef;       # A default return filename to use.
     my $filename_parameter = undef;     # Which CGI parameter contains our filename.
+    my $mime_type = undef;              # Override the mime type if you want.
 
     my $use_tmpfile = undef;            # Write to temporary file?
     my $tmp_directory = undef;          # Override default tmp file directory
@@ -89,6 +90,7 @@ sub do {
             $add_headers = defined ($Jarvis::Config::yes_value {lc ($exec->{'add_headers'}->content || "no")});
             $default_filename = $exec->{'default_filename'}->content;
             $filename_parameter = $exec->{'filename_parameter'}->content || 'filename';
+            $mime_type = $exec->{'mime_type'}->content;
             $cleanup_after = $exec->{'cleanup_after'}->content || 0;
 
             # If HTTP redirection URL is specified, then use of tmp files is forced.
@@ -237,16 +239,18 @@ sub do {
     # Are we supposed to add headers?  Does that include a filename header?
     # Note that if we really wanted to, we could squeeze in
     if ($add_headers && ! $tmp_redirect) {
-        my $mime_types = MIME::Types->new;
-        my $mime_type = $mime_types->mimeTypeOf ($filename) || MIME::Types->type('text/plain');
+        if (! $mime_type) {
+            my $mime_types = MIME::Types->new;
+            my $filename_type = $mime_types->mimeTypeOf ($filename);
+            $mime_type = $filename_type ? $filename_type->type : 'text/plain';
+        }
+        &Jarvis::Error::debug ($jconfig, "Exec returning mime type '$mime_type'");
 
-        &Jarvis::Error::debug ($jconfig, "Exec returned mime type '" . $mime_type->type . "'");
-
-        if ($filename) {
+        if (defined $filename && ($filename ne '')) {
             if ($use_tmpfile) {
                 my $length = -s $tmp_file->filename;
                 print $jconfig->{'cgi'}->header(
-                    -type                   => $mime_type->type,
+                    -type                   => $mime_type,
                     'Content-Disposition'   => "attachment; filename=$filename",
                     -cookie                 => $jconfig->{'cookie'},
                     'Cache-Control'         => 'no-store, no-cache, must-revalidate',
@@ -254,7 +258,7 @@ sub do {
                 );
             } else {
                 print $jconfig->{'cgi'}->header(
-                    -type                   => $mime_type->type,
+                    -type                   => $mime_type,
                     'Content-Disposition'   => "attachment; filename=$filename",
                     -cookie                 => $jconfig->{'cookie'},
                     'Cache-Control'         => 'no-store, no-cache, must-revalidate'
@@ -263,7 +267,7 @@ sub do {
 
         } else {
             print $jconfig->{'cgi'}->header(
-                -type => $mime_type->type,
+                -type => $mime_type,
                 -cookie => $jconfig->{'cookie'},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             );

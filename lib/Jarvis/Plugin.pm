@@ -92,7 +92,7 @@ sub do {
             $module = $plugin->{'module'}->content || die "No 'module' defined for plugin dataset '$dataset'";
             $add_headers = defined ($Jarvis::Config::yes_value {lc ($plugin->{'add_headers'}->content || "no")});
             $default_filename = $plugin->{'default_filename'}->content;
-            $filename_parameter = $plugin->{'filename_parameter'}->content;
+            $filename_parameter = $plugin->{'filename_parameter'}->content || 'filename';
             $mime_type = $plugin->{'mime_type'}->content;
 
             $jconfig->{'dump'} = $jconfig->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($plugin->{'dump'}->content || "no")});
@@ -127,11 +127,21 @@ sub do {
         die "Wanted plugin access: $failure";
     }
 
+    # Get our CGI parameters hash for easy reference.
+    my %param_values = $jconfig->{'cgi'}->Vars;
+
     # Figure out a filename.  It's not mandatory, if we don't have a default
     # filename and we don't have a filename_parameter supplied and defined then
     # we will return anonymous content in text/plain format.
     #
-    my $filename = $jconfig->{'cgi'}->param ($filename_parameter) || $default_filename;
+    my $filename = $param_values {$filename_parameter} ? &File::Basename::basename ($param_values {$filename_parameter}) : ($default_filename || undef);
+
+    if (defined $filename) {
+        &Jarvis::Error::debug ($jconfig, "Using filename '$filename'");
+
+    } else {
+        &Jarvis::Error::debug ($jconfig, "No return filename given.  MIME types and redirection will make best efforts.");
+    }
 
     # Now load the module.
     #
@@ -166,8 +176,7 @@ sub do {
         }
         &Jarvis::Error::debug ($jconfig, "Plugin returning mime type '$mime_type'");
 
-        if ($filename) {
-            &Jarvis::Error::debug ($jconfig, "Plugin returning filename '$filename'");
+        if (defined $filename && ($filename ne '')) {
             print $jconfig->{'cgi'}->header(
                 -type => $mime_type,
                 'Content-Disposition' => $filename && "attachment; filename=$filename",

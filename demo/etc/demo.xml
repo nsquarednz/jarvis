@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <jarvis>
-    <app format="json" dump="no">
+    <app format="json" debug="yes" dump="no">
         <tracker logins="no" requests="no" errors="no">
             <dbfile>/var/lib/jarvis/tracker/tracker.db</dbfile>
         </tracker>
@@ -57,6 +57,9 @@
         <!-- This plugin is used to allow admin users to reset any user's password. -->
         <plugin dataset="SetPassword" access="*" lib="/usr/share/jarvis/demo" module="plugin::SetPassword" add_headers="yes"/>
 
+        <!-- This is a simple file download demo plugin. -->
+        <plugin dataset="FileDownload" access="**" lib="/usr/share/jarvis/demo" module="plugin::FileDownload" add_headers="yes" mime_type="text/plain"/>
+
         <!-- This is a very simple 'exec' action.  It uses "echo" to show you the supplied
              command line parameters.  Access it via:
 
@@ -64,6 +67,6 @@
 
              Note that access = "**", so login is not required in order to access this particular exec.
              -->
-        <exec dataset="echo" access="**" command="echo" add_headers="yes" filename_parameter="filename"/>
+        <exec dataset="echo" access="**" command="echo" add_headers="yes" filename_parameter="filename"  mime_type="text/plain"/>
     </app>
 </jarvis>
