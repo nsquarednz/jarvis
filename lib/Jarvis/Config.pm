@@ -186,16 +186,19 @@ sub default_parameters {
 
 
 ################################################################################
-# Go through the list of user-supplied variables and decide which ones are
-# safe.
+# Construct a final list of "safe" parameters from the following sources.  
+# The following order applies.  Later values will override earlier ones.
 #
-# Then add some special variables.
+#   - Globally defined defaults.
+#   - Safe-Named CGI parameters.
+#   - Safe-Named REST parameters.
+#   - Safe-Named per-Row parameters.
+#   - Special __ variables.
+#       __username  -> <logged-in-username>
+#       __grouplist -> ('<group1>', '<group2>', ...)
+#       __group:<groupname>  ->  1 (iff belong to <groupname>) or NULL
 #
-# Any variable which starts with "__" is safe.  Specifically.
-#
-#   __username  -> <logged-in-username>
-#   __grouplist -> ('<group1>', '<group2>', ...)
-#   __group:<groupname>  ->  1 (iff belong to <groupname>) or NULL
+#   - Additional Safe parameters (e.g. from hooks, session store, etc.)
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -203,9 +206,9 @@ sub default_parameters {
 #               username
 #               group_list
 #
-#       $raw_params_href - User-supplied (unsafe) hash of variables.
-#
-#       $rest_args_aref - A ref to our REST args (slash-separated after dataset)
+#       $cgi_params - User-supplied (unsafe) hash of CGI parameters.
+#       $rest_args - User-supplied (unsafe) hash of numbered and named REST args.
+#       $row_params - User-supplied (unsafe) hash of per-row parameters.
 #
 # Returns:
 #       1
@@ -213,31 +216,37 @@ sub default_parameters {
 #
 sub safe_variables {
 
-    my ($jconfig, $raw_params_href, $rest_args_aref, $rest_arg_prefix) = @_;
-
-    $rest_arg_prefix = $rest_arg_prefix || '';
+    my ($jconfig, $cgi_params, $rest_args, $row_params) = @_;
 
     # Start with our default parameters.
     my %safe_params = &default_parameters ($jconfig);
 
-    # Copy through some user-provided parameters.  Do not copy any user-provided
+    # Copy through the user-provided parameters.  Do not copy any user-provided
     # variable which begins with "__" (two underscores).  That prefix is strictly
     # reserved for our server-controlled "safe" parameters.
-    foreach my $name (keys %$raw_params_href) {
-        if ($name =~ m/^_?[a-z][a-z0-9_\-]*$/i) {
-            my $value = $$raw_params_href {$name};
-            &Jarvis::Error::debug ($jconfig, "User Named Arg: '$name' => '%s'.", $value);
-            $safe_params{$name} = $$raw_params_href {$name};
+    if (defined $cgi_params) {
+        foreach my $name (keys %$cgi_params) {
+            if ($name =~ m/^_?[a-z][a-z0-9_\-]*$/i) {
+                &Jarvis::Error::debug ($jconfig, "User CGI Parameter: '$name' => '%s'.", $cgi_params->{$name});
+                $safe_params{$name} = $cgi_params->{$name};
+            }
         }
     }
-
-    # And our REST args go through as variable "0" (usually the dataset), 1", "2", etc...
-    foreach my $i (0 .. $#$rest_args_aref) {
-        my $name = $rest_arg_prefix . $i;
-        my $value = $$rest_args_aref[$i];
-
-        &Jarvis::Error::debug ($jconfig, "User Indexed Arg: $name => '%s'.", $value);
-        $safe_params{$name} = $value;
+    if (defined $rest_args) {
+        foreach my $name (keys %$rest_args) {
+            if ($name =~ m/^_?[a-z0-9_\-]*$/i) {
+                &Jarvis::Error::debug ($jconfig, "User REST Arg: '$name' => '%s'.", $rest_args->{$name});
+                $safe_params{$name} = $rest_args->{$name};
+            }
+        }
+    }
+    if (defined $row_params) {
+        foreach my $name (keys %$row_params) {
+            if ($name =~ m/^_?[a-z][a-z0-9_\-]*$/i) {
+                &Jarvis::Error::debug ($jconfig, "Row Parameter: '$name' => '%s'.", $row_params->{$name});
+                $safe_params{$name} = $row_params->{$name};
+            }
+        }
     }
 
     # Our secure variables.  Note that __username and __group_list are null if

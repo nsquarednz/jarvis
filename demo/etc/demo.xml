@@ -8,6 +8,15 @@
         <!-- This is where our <dataset>.xml are all stored -->
 	    <dataset_dir>/usr/share/jarvis/demo/dataset</dataset_dir>
 
+        <!-- Demo Global Hook -->
+        <default_libs>
+            <lib path="/usr/share/jarvis/demo/hook"/>
+        </default_libs>
+
+        <hook module="Global">
+            <parameter name="quota" value="4 Gazillion"/>
+        </hook>
+
         <!-- This is a server-side RESTful "router", it maps URLS to datasets
              and assigns names to RESTful parameters.
 
@@ -19,6 +28,7 @@
                 restful="singleton" - Return exactly 1 element, NO array wrapper.  Return 404 on no data.  Die if > 1 element.    
         -->
         <router>
+            <route path="/boat/:boat_class/download/" dataset="FileDownload"/>
             <route path="/boat_class/:boat_class" dataset="boat_class"/>
             <route path="/boat/by-class/:boat_class" dataset="boat"/>
             <route path="/boat/:id" dataset="boat" presentation="singleton"/>
@@ -74,7 +84,9 @@
         <plugin dataset="SetPassword" access="*" lib="/usr/share/jarvis/demo" module="plugin::SetPassword" add_headers="yes"/>
 
         <!-- This is a simple file download demo plugin. -->
-        <plugin dataset="FileDownload" access="**" lib="/usr/share/jarvis/demo" module="plugin::FileDownload" add_headers="yes" mime_type="text/plain"/>
+        <plugin dataset="FileDownload" access="**" lib="/usr/share/jarvis/demo" module="plugin::FileDownload" add_headers="yes" mime_type="text/plain">
+            <parameter name="interview" value="Cross-Sectional"/>
+        </plugin>
 
         <!-- This is a very simple 'exec' action.  It uses "echo" to show you the supplied
              command line parameters.  Access it via:

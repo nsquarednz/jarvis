@@ -26,11 +26,12 @@
 use strict;
 use warnings;
 
+package Jarvis::Exec;
+
 use File::Temp;
 use File::Basename;
 use MIME::Types;
-
-package Jarvis::Exec;
+use Data::Dumper;
 
 use Jarvis::Config;
 use Jarvis::Error;
@@ -47,7 +48,7 @@ use Jarvis::Text;
 #
 #       $dataset_name - Name of the special "exec" dataset we are requested to perform.
 #
-#       $rest_args_aref - A ref to our REST args (slash-separated after dataset)
+#       $rest_args - A ref to our hash of REST args (numbered and named)
 #
 # Returns:
 #       0 if the dataset is not a known "exec" dataset
@@ -56,7 +57,7 @@ use Jarvis::Text;
 ################################################################################
 #
 sub do {
-    my ($jconfig, $dataset, $rest_args_aref, $return_result_ref) = @_;
+    my ($jconfig, $dataset, $rest_args) = @_;
 
     ###############################################################################
     # See if we have any extra "exec" dataset for this application.
@@ -124,13 +125,13 @@ sub do {
     # Get our parameters.  Note that our special variables like __username will
     # override sneaky user-supplied values.
     #
-    my %param_values = $jconfig->{'cgi'}->Vars;
+    my $cgi_params = $jconfig->{'cgi'}->Vars;
 
     # Figure out a filename.  It's not mandatory, if we don't have a default
     # filename and we don't have a filename_parameter supplied and defined then
     # we will return anonymous content in text/plain format.
     #
-    my $filename = $param_values {$filename_parameter} ? &File::Basename::basename ($param_values {$filename_parameter}) : ($default_filename || undef);
+    my $filename = $cgi_params->{$filename_parameter} ? &File::Basename::basename ($cgi_params->{$filename_parameter}) : ($default_filename || undef);
 
     if (defined $filename) {
         &Jarvis::Error::debug ($jconfig, "Using filename '$filename'");
@@ -142,8 +143,10 @@ sub do {
     # If we're under windows, force the use of tmp files.
     $use_tmpfile = 1 if $^O eq "MSWin32";
 
-    # Now pull out only the safe variables.  Add our rest args too.
-    my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%param_values, $rest_args_aref, 'p');
+    print STDERR &Dumper ($rest_args);
+
+    # Now construct our safe variables from our CGI, rest and per-row (none) arguments.
+    my %safe_params = &Jarvis::Config::safe_variables ($jconfig, $cgi_params, $rest_args, undef);
 
     my $tmp_file = undef;
     if ($use_tmpfile) {
@@ -190,6 +193,19 @@ sub do {
 
         # Quote param names AND values for the shell.
         my $param_value = $safe_params{$param};
+
+        # Add a leading "p" for numeric parameters.
+        if ($param =~ m/^[0-9]/) {
+
+            # Check this doesn't conflict with an explicit "p1"!
+            if (exists $safe_params{"p" . $param}) {
+                &Jarvis::Error::debug ($jconfig, "Skipping numeric exec parameter '$param', it conflicts with explicit parameter 'p$param'.");
+                next;
+            }
+
+            # Otherwise put a "p" on the front and pass it through.
+            $param = "p" . $param;
+        }
         &Jarvis::Error::debug ($jconfig, "Exec Parameter '$param' = '$param_value'");
 
         # MS Windows, we use double quotes.
@@ -219,16 +235,6 @@ sub do {
     &Jarvis::Error::debug ($jconfig, "Executing Command: $command");
     my $output =`$command`;
     my $status = $?; # Failure?
-
-    if ($return_result_ref) {
-        $return_result_ref->{'status'} = $status;
-        $return_result_ref->{'stdout'} = $output;
-        $return_result_ref->{'filename'} = $tmp_file->filename if $use_tmpfile;
-
-        # No further activity - the caller is now responsibly
-        # for doing something with the results.
-        return 1;
-    }
 
     if ($status != 0) {
         # log command in case we haven't done so already

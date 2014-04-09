@@ -45,7 +45,10 @@ use Jarvis::Error;
 use Jarvis::Text;
 
 ################################################################################
-# Shows our current connection status.
+# Look for a "plugin" dataset matching the given name.  If it exists then 
+# execute the "::do" method on the configured plugin module.  This method
+# should return the content to return to the user.  This content may include
+# headers.  See the "add_headers" option on the plugin content.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -54,8 +57,12 @@ use Jarvis::Text;
 #               cgi
 #
 #       $dataset - Name of the dataset we are requested to perform.
+#       $rest_args - Hash of numbered and/or named RESTful args.
 #
-#       $rest_args_aref - the RESTful arguments, if any, provided by the caller.
+#       Note: For Jarvis 5.6 and later, $rest_args is a HASH containing both
+#       numbered and named REST args.  Previously it was an ARRAY containing
+#       only the numbered REST args.  Your plugin will need modification if
+#       it uses the REST args.
 #
 # Returns:
 #       0 if the dataset is not a known "plugin"
@@ -64,7 +71,7 @@ use Jarvis::Text;
 ################################################################################
 #
 sub do {
-    my ($jconfig, $dataset, $rest_args_aref) = @_;
+    my ($jconfig, $dataset, $rest_args) = @_;
 
     ###############################################################################
     # See if we have any extra "plugin" datasets for this application.
@@ -163,7 +170,7 @@ sub do {
     my $output;
     {
         no strict 'refs';
-        $output = &$method ($jconfig, $rest_args_aref, %plugin_parameters);
+        $output = &$method ($jconfig, $rest_args, %plugin_parameters);
     }
 
     # Are we supposed to add headers?  Does that include a filename header?

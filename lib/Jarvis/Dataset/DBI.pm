@@ -106,8 +106,8 @@ sub sql_with_substitutions {
     my ($jconfig, $dbh, $sql, $args_href) = @_;
 
     # Dump the available arguments at this stage.
-    foreach my $k (keys %{$args_href}) {
-        &Jarvis::Error::dump ($jconfig, "SQL available args: '$k' -> " . (defined $args_href->{$k} ? '"' . $args_href->{$k} . '"' : '<NULL>') . ".");
+    foreach my $k (sort (keys %$args_href)) {
+        &Jarvis::Error::dump ($jconfig, "SQL available args: '$k' -> " . (defined $args_href->{$k} ? "'" . $args_href->{$k} . "'" : '<NULL>') . ".");
     }
     
     # Parse the update SQL to get a prepared statement, pulling out the list
@@ -188,14 +188,14 @@ sub sql_with_substitutions {
             (defined $value) || ($value = '');
 
             # Numeric values by default are NOT quoted, unless requested.
-            if ($value =~ m/^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$/ && ! $flags{'quote'}) {
+            if ($value =~ m/^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$/ && ! $flags{quote}) {
                 # No change.
 
             # Raw flag performs NO changes ever!  Only allowed for SAFE variables (not client-supplied). 
-            } elsif ($flags{'raw'} && ($name =~ m/^__/)) {
+            } elsif ($flags{raw} && ($name =~ m/^__/)) {
                 # No change.
                 
-            } elsif ($flags{'noquote'}) {
+            } elsif ($flags{noquote}) {
                 $value =~ s/[^0-9a-zA-Z _\-,]//g;
 
             } else {
@@ -235,19 +235,19 @@ sub parse_attr {
 #
 # Returns:
 #       STM hash with keys
-#               {'ttype'}
-#               {'raw_sql'}
-#               {'sql_with_substitutions'}
-#               {'returning'}
-#               {'sth'}
-#               {'vnames_aref'}
-#               {'vflags_aref'}
-#               {'nolog_dataset'}
-#               {'nolog_dbh'}
-#               {'noerr_dataset'}
-#               {'noerr_dbh'}
-#               {'error'}      (Set later, to error message from latest action)
-#               {'retval'}     (Set later, return value of latest action)
+#               {ttype}
+#               {raw_sql}
+#               {sql_with_substitutions}
+#               {returning}
+#               {sth}
+#               {vnames_aref}
+#               {vflags_aref}
+#               {nolog_dataset}
+#               {nolog_dbh}
+#               {noerr_dataset}
+#               {noerr_dbh}
+#               {error}      (Set later, to error message from latest action)
+#               {retval}     (Set later, return value of latest action)
 #
 #       Or undef if no SQL.
 ################################################################################
@@ -259,32 +259,32 @@ sub parse_statement {
 
     # Get and check the raw SQL, before parameter -> ? substitution.
     &Jarvis::Error::debug ($jconfig, "Parsing statement for transaction type '$ttype'");
-    $obj->{'ttype'} = $ttype;
-    $obj->{'raw_sql'} = &get_sql ($jconfig, $ttype, $dsxml);
-    if (! $obj->{'raw_sql'}) {
+    $obj->{ttype} = $ttype;
+    $obj->{raw_sql} = &get_sql ($jconfig, $ttype, $dsxml);
+    if (! $obj->{raw_sql}) {
         &Jarvis::Error::debug ($jconfig, "No SQL found for type '$ttype'");
         return undef;
     }
-    &Jarvis::Error::dump ($jconfig, "SQL as read from XML = " . $obj->{'raw_sql'});
+    &Jarvis::Error::dump ($jconfig, "SQL as read from XML = " . $obj->{raw_sql});
 
     # Does this insert return rows?
-    $obj->{'returning'} = defined ($Jarvis::Config::yes_value {lc ($dsxml->{dataset}{$ttype}{'returning'} || "no")});
-    &Jarvis::Error::debug ($jconfig, "Returning? = " . $obj->{'returning'});
+    $obj->{returning} = defined ($Jarvis::Config::yes_value {lc ($dsxml->{dataset}{$ttype}{returning} || "no")});
+    &Jarvis::Error::debug ($jconfig, "Returning? = " . $obj->{returning});
 
     # Get our SQL with placeholders and prepare it.
-    my ($sql_with_substitutions, $variable_names, $variable_flags) = &sql_with_substitutions ($jconfig, $dbh, $obj->{'raw_sql'}, $args_href);
-    $obj->{'sql_with_substitutions'} = $sql_with_substitutions;
-    $obj->{'vnames_aref'} = $variable_names;
-    $obj->{'vflags_aref'} = $variable_flags;
+    my ($sql_with_substitutions, $variable_names, $variable_flags) = &sql_with_substitutions ($jconfig, $dbh, $obj->{raw_sql}, $args_href);
+    $obj->{sql_with_substitutions} = $sql_with_substitutions;
+    $obj->{vnames_aref} = $variable_names;
+    $obj->{vflags_aref} = $variable_flags;
 
     &Jarvis::Error::dump ($jconfig, "SQL after substition = " . $sql_with_substitutions);
 
     # get db-specific parameters
-    my $dbxml = &Jarvis::DB::db_config ($jconfig, $dsxml->{dataset}{'dbname'}, $dsxml->{dataset}{'dbtype'});
+    my $dbxml = &Jarvis::DB::db_config ($jconfig, $dsxml->{dataset}{dbname}, $dsxml->{dataset}{dbtype});
 
     # Use special prepare parameters
-    my $db_prepare_str = $dbxml->{'prepare'};
-    my $ds_prepare_str = $dsxml->{dataset}{$ttype}{'prepare'};
+    my $db_prepare_str = $dbxml->{prepare};
+    my $ds_prepare_str = $dsxml->{dataset}{$ttype}{prepare};
     my %prepare_attr = ();
     foreach my $prepare_str (grep { $_ } ($db_prepare_str, $ds_prepare_str)) {
         &Jarvis::Error::debug ($jconfig, "Prepare += '$prepare_str'");
@@ -296,8 +296,8 @@ sub parse_statement {
     {
         local $dbh->{RaiseError};
         local $dbh->{PrintError};
-        $obj->{'sth'} = $dbh->prepare ($sql_with_substitutions, \%prepare_attr) ||
-            die "Couldn't prepare statement for $ttype on '" . $jconfig->{'dataset_name'} . "'.\nSQL ERROR = '" . $dbh->errstr . "'.";
+        $obj->{sth} = $dbh->prepare ($sql_with_substitutions, \%prepare_attr) ||
+            die "Couldn't prepare statement for $ttype on '" . $jconfig->{dataset_name} . "'.\nSQL ERROR = '" . $dbh->errstr . "'.";
     }
 
     # NOTE: "nolog" : Report back to client.  Do not log. 
@@ -379,7 +379,7 @@ sub noerr {
 sub ignore {
     my ($stm, $message) = @_;
 
-    my $ignore = $stm->{'ignore'};
+    my $ignore = $stm->{ignore};
     if ($ignore && $message =~ /$ignore/) {
         return 1;
     } else {
@@ -410,22 +410,22 @@ sub ignore {
 #       1 (success) or 0 (failure)
 ################################################################################
 sub statement_execute {
-    my ($jconfig, $stm, $arg_values_aref) = @_;
+    my ($jconfig, $stm, $args) = @_;
 
     my $err_handler = $SIG{__DIE__};
-    $stm->{'retval'} = 0;
-    $stm->{'error'} = undef;
+    $stm->{retval} = 0;
+    $stm->{error} = undef;
 
     eval {
         no warnings 'uninitialized';
         $SIG{__DIE__} = sub {};
 
         # Statement handle.
-        my $sth = $stm->{'sth'};
+        my $sth = $stm->{sth};
 
         # Do we have any "!out" flagged variables?
         my $out_flag = 0;
-        foreach my $flag (@{ $stm->{'vflags_aref'} }) {
+        foreach my $flag (@{ $stm->{vflags_aref} }) {
             if (defined $flag && $flag->{out}) {
                 $out_flag = 1;
                 last;
@@ -437,33 +437,33 @@ sub statement_execute {
             my %out_arg_refs = ();
 
             # Note: The following arrays are all the same size (one per bind var).
-            #   @$arg_values_aref           # Arg values.
-            #   @{ $stm->{'vnames_aref'} }  # Arg names.
-            #   @{ $stm->{'vflags_aref'} }  # Arg flags.
+            #   @$args           # Arg values.
+            #   @{ $stm->{vnames_aref} }  # Arg names.
+            #   @{ $stm->{vflags_aref} }  # Arg flags.
             #
             &Jarvis::Error::debug ($jconfig, "At least one bind variable is flagged '!out'.  Use bind_param () mechanism.");
-            foreach my $i (0 .. $#$arg_values_aref) {
-                my $flags = $stm->{'vflags_aref'}[$i];
+            foreach my $i (0 .. $#$args) {
+                my $flags = $stm->{vflags_aref}[$i];
                 my $sql_type = SQL_VARCHAR;                
                 if (defined $flags->{numeric}) {
                     $sql_type = SQL_NUMERIC;
                 }
 
                 if ($flags->{out}) {
-                    my $name = $stm->{'vnames_aref'}[$i];
-                    my $var = $$arg_values_aref[$i];
+                    my $name = $stm->{vnames_aref}[$i];
+                    my $var = $$args[$i];
                     $out_arg_refs{$name} = \$var;
                     &Jarvis::Error::debug ($jconfig, "Binding variable [$i] as SQL type [$sql_type] (IN/OUT) (Name = '$name').");
                     $sth->bind_param_inout ($i + 1, \$var, $sql_type);
 
                 } else {
                     &Jarvis::Error::debug ($jconfig, "Binding variable [$i] as SQL type [$sql_type] (IN).");
-                    $sth->bind_param ($i + 1, $$arg_values_aref[$i], $sql_type);
+                    $sth->bind_param ($i + 1, $$args[$i], $sql_type);
                 }
             }
 
             # Execute using the previously attached args.
-            $stm->{'retval'} = $sth->execute ();
+            $stm->{retval} = $sth->execute ();
 
             # We have some returned arg refs.
             $stm->{returned} = \%out_arg_refs;
@@ -476,13 +476,13 @@ sub statement_execute {
 
         # The case with no "!out" flagged variables is very much simpler.
         } else {
-            $stm->{'retval'} = $sth->execute (@$arg_values_aref);
+            $stm->{retval} = $sth->execute (@$args);
         }
     };
     $SIG{__DIE__} = $err_handler;
 
-    my $error_message = $stm->{'sth'}->errstr || $@ || $DBI::errstr;
-    if (($error_message && !ignore($stm, $error_message)) || (!defined $stm->{'retval'})) {
+    my $error_message = $stm->{sth}->errstr || $@ || $DBI::errstr;
+    if (($error_message && !ignore($stm, $error_message)) || (!defined $stm->{retval})) {
         # ensure we have an error message to return
         $error_message = $error_message || 'Unknown error SQL execution error.';
         $error_message =~ s/\s+$//;
@@ -491,21 +491,21 @@ sub statement_execute {
             &Jarvis::Error::debug ($jconfig, "Failure executing SQL. Log disabled.");
             
         } else {
-            &Jarvis::Error::log ($jconfig, "Failure executing SQL for '" . $stm->{'ttype'} . "'.  Details follow.");
-            &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
+            &Jarvis::Error::log ($jconfig, "Failure executing SQL for '" . $stm->{ttype} . "'.  Details follow.");
+            &Jarvis::Error::log ($jconfig, $stm->{sql_with_substitutions}) if $stm->{sql_with_substitutions};
             &Jarvis::Error::log ($jconfig, $error_message);
-            &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @$arg_values_aref) || 'NONE'));
+            &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @$args) || 'NONE'));
         }
 
-        $stm->{'sth'}->finish;
+        $stm->{sth}->finish;
         
         if (! &noerr ($stm, $error_message)) {        
-            $stm->{'error'} = $error_message;
+            $stm->{error} = $error_message;
         }
         return 0;
     }
 
-    &Jarvis::Error::debug ($jconfig, 'Successful statement execution.  RetVal = ' . $stm->{'retval'});
+    &Jarvis::Error::debug ($jconfig, 'Successful statement execution.  RetVal = ' . $stm->{retval});
     return 1;
 }
 
@@ -527,7 +527,7 @@ sub statement_execute {
 #       $subset_name - Name of single dataset we are fetching from.
 #       $dsxml - Dataset's XML configuration object.
 #       $dbh - Database handle of the correct type to match the dataset.
-#       $safe_params_href - All our safe parameters.
+#       $safe_params - All our safe parameters.
 #
 # Returns:
 #       $rows_aref - Array of tuple data returned.
@@ -535,26 +535,26 @@ sub statement_execute {
 ################################################################################
 #
 sub fetch {
-    my ($jconfig, $subset_name, $dsxml, $dbh, $safe_params_href) = @_;
+    my ($jconfig, $subset_name, $dsxml, $dbh, $safe_params) = @_;
     
     # Get our STM.  This has everything attached.
-    my $stm = &parse_statement ($jconfig, $dsxml, $dbh, 'select', $safe_params_href) ||
+    my $stm = &parse_statement ($jconfig, $dsxml, $dbh, 'select', $safe_params) ||
         die "Dataset '$subset_name' has no SQL of type 'select'.";
 
     # Convert the parameter names to corresponding values.
-    my @arg_values = &Jarvis::Dataset::names_to_values ($jconfig, $stm->{'vnames_aref'}, $safe_params_href);
+    my @args = &Jarvis::Dataset::names_to_values ($jconfig, $stm->{vnames_aref}, $safe_params);
 
     # Execute Select, return on error
-    &statement_execute ($jconfig, $stm, \@arg_values);
-    $stm->{'error'} && die $stm->{'error'};
+    &statement_execute ($jconfig, $stm, \@args);
+    $stm->{error} && die $stm->{error};
 
     # Fetch the data.
-    my $rows_aref = $stm->{'sth'}->fetchall_arrayref({});
+    my $rows_aref = $stm->{sth}->fetchall_arrayref({});
     
     # See if we can get column names.  If we can't get them legitimately 
     # then try sniffing them from the results, though we will lose any column
     # ordering that might have otherwise existed in the original query.
-    my $column_names_aref = $stm->{'sth'}->{NAME}; 
+    my $column_names_aref = $stm->{sth}{NAME}; 
     if ((scalar @$rows_aref) && ! $column_names_aref) {
         &Jarvis::Error::debug ($jconfig, 'No column names from query.  Try sniffing results.');
         my @column_names = sort (keys (%{ $$rows_aref[0] }));
@@ -562,7 +562,7 @@ sub fetch {
     }
     
     # Finish the statement handle.
-    $stm->{'sth'}->finish;
+    $stm->{sth}->finish;
 
     return ($rows_aref, $column_names_aref); 
 }
@@ -581,7 +581,7 @@ sub fetch {
 #       $subset_name - Name of single dataset we are storing to.
 #       $dsxml - Dataset XML object.
 #       $dbh - Database handle of the correct type to match the dataset.
-#       $rest_args_aref - A ref to our REST args (slash-separated after dataset)
+#       $rest_args - Hash of numbered and/or named REST args.
 #
 # Returns:
 #       "OK" on succes
@@ -590,8 +590,7 @@ sub fetch {
 ################################################################################
 #
 sub store {
-    my ($jconfig, $subset_name, $dsxml, $dbh, $rest_args_aref) = @_;
-    my $num_of_rest_args = scalar @{$rest_args_aref} ;
+    my ($jconfig, $subset_name, $dsxml, $dbh, $rest_args) = @_;
 
     # What transforms should we use when processing store data?
     my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->{dataset}{transform}{store});
@@ -599,7 +598,6 @@ sub store {
 
     # Get our submitted content
     my $content = &Jarvis::Dataset::get_post_data ($jconfig);
-    ($content || $num_of_rest_args > 0) || die "No content body to store";
     &Jarvis::Error::debug ($jconfig, "Request Content Length = " . length ($content));
     &Jarvis::Error::dump ($jconfig, $content);
 
@@ -609,7 +607,7 @@ sub store {
     # Check we have some changes and parse 'em from the JSON.  We get an
     # array of hashes.  Each array entry is a change record.
     my $return_array = 0;
-    my $content_type = $jconfig->{'cgi'}->content_type () || '';
+    my $content_type = $jconfig->{cgi}->content_type () || '';
 
     &Jarvis::Error::debug ($jconfig, "Request Content Type = '" . $content_type . "'");
     if ($content_type =~ m|^[a-z]+/json(;.*)?$|) {
@@ -634,40 +632,36 @@ sub store {
         my $cxml = XML::Smart->new ($content);
 
         # Sanity check on outer object.
-        $cxml->{'request'} || die "Missing top-level 'request' element in submitted XML content.\n";
+        $cxml->{request} || die "Missing top-level 'request' element in submitted XML content.\n";
 
         # Fields may either sit at the top level, or you may provide an array of
         # records in a <row> array.
         #
         my @rows = ();
-        if ($cxml->{'request'}{'row'}) {
-            foreach my $row (@{ $cxml->{'request'}{'row'} }) {
+        if ($cxml->{request}{row}) {
+            foreach my $row (@{ $cxml->{request}{row} }) {
                 my %fields =%{ $row };
                 push (@rows, \%fields);
             }
             $return_array = 1;
 
         } else {
-            my %fields = %{ $cxml->{'request'} };
+            my %fields = %{ $cxml->{request} };
             push (@rows, \%fields);
         }
         $fields_aref = \@rows;
 
-    # Unsupported format.
-    } elsif ($num_of_rest_args < 1) {
-        die "Unsupported content type for changes: '$content_type'\n";
+    # No body.  Execute a Single-Row with rest-args/cgi-args only.
+    } else {
+        &Jarvis::Error::debug ($jconfig, "No content supplied.  Store a single empty row + REST/CGI args.");
+        $fields_aref = [{}]; 
     }
 
     # Store this for tracking
-    if ($fields_aref){
-        $jconfig->{'in_nrows'} = scalar @$fields_aref;
-    } else {
-        $jconfig->{'in_nrows'} = $num_of_rest_args;
-        $fields_aref = [{}]; # This will cause the loop to execute once with no params (requires rest params)
-    }
+    $jconfig->{in_nrows} = scalar @$fields_aref;
 
     # Choose our statement and find the SQL and variable names.
-    my $ttype = $jconfig->{'action'};
+    my $ttype = $jconfig->{action};
     &Jarvis::Error::debug ($jconfig, "Transaction Type = '$ttype'");
     ($ttype eq "delete") || ($ttype eq "update") || ($ttype eq "insert") || ($ttype eq "mixed") ||
         die "Unsupported transaction type '$ttype'.";
@@ -684,18 +678,14 @@ sub store {
     # We pre-compute the "before" statement parameters even if there is 
     # no before statement, since we may also wish to record them for later.
     #
-    # Merge relevant parameters together.  This includes:
-    #   All-Row parameters (CGI Query & Named Restful) from ->Vars
-    #   Numeric Restful args from $rest_args_aref
+    # Merge CGI params + REST args, plus default, safe and session vars.
     #
-    # These are all made safe, and our secure __<varname> values are merged in also.
-    #
-    my $all_rows_params = $jconfig->{'cgi'}->Vars;
-    my %safe_all_rows_params = &Jarvis::Config::safe_variables ($jconfig, $all_rows_params, $rest_args_aref);
+    my $cgi_params = $jconfig->{cgi}->Vars;
+    my %safe_all_rows_params = &Jarvis::Config::safe_variables ($jconfig, $cgi_params, $rest_args, undef);
 
     # Invoke before_all hook.
     my %before_params = %safe_all_rows_params;
-    $jconfig->{'params_href'} = \%before_params;
+    $jconfig->{params_href} = \%before_params;
     &Jarvis::Hook::before_all ($jconfig, $dsxml, \%before_params, $fields_aref);
 
     # Execute our "before" statement.  This statement is NOT permitted to fail.  If it does,
@@ -703,12 +693,12 @@ sub store {
     {
         my $bstm = &parse_statement ($jconfig, $dsxml, $dbh, 'before', \%before_params);
         if ($bstm) {
-            my @barg_values = &Jarvis::Dataset::names_to_values ($jconfig, $bstm->{'vnames_aref'}, \%before_params);
+            my @barg_values = &Jarvis::Dataset::names_to_values ($jconfig, $bstm->{vnames_aref}, \%before_params);
 
             &statement_execute($jconfig, $bstm, \@barg_values);
-            if ($bstm->{'error'}) {
+            if ($bstm->{error}) {
                 $success = 0;
-                $message || ($message = $bstm->{'error'});
+                $message || ($message = $bstm->{error});
             }
         }
     }
@@ -725,29 +715,11 @@ sub store {
             last;
         }
 
-        # Merge all our parameters together.  This includes:
-        #   All-Row parameters (CGI Query & Named Restful) from ->Vars
-        #   Per-Row parameters (from content body) from $fields_href
-        #   Numeric Restful args from $rest_args_aref
-        #
-        # These are all made safe, and our secure __<varname> values are merged in also.
-        #
-        my $all_rows_params = $jconfig->{'cgi'}->Vars;
-        my %raw_params = %{ $fields_href };
-
-        # Merge the all-rows parameters into the per-row parameters.  Note here we 
-        # don't override any per-row parameter.  The per-row parameter will always 
-        # take precedence.
-        #
-        foreach my $key (keys %$all_rows_params) {
-            (defined $raw_params{$key}) || ($raw_params{$key} = $all_rows_params->{$key});
-        }
-
-        # Now we need to perform the "safe" process, and include our __<safe> variables.
-        my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%raw_params, $rest_args_aref);
+        # Re-do our parameter merge, this time including our per-row parameters.
+        my %safe_params = &Jarvis::Config::safe_variables ($jconfig, $cgi_params, $rest_args, $fields_href);
 
         # Store these new parameters for our tracking purposes.
-        $jconfig->{'params_href'} = \%safe_params;
+        $jconfig->{params_href} = \%safe_params;
 
         # Any input transformations?
         if (scalar (keys %transforms)) {
@@ -758,7 +730,7 @@ sub store {
         &Jarvis::Hook::before_one ($jconfig, $dsxml, \%safe_params);
 
         # Figure out which statement type we will use for this row.
-        my $row_ttype = $safe_params{'_ttype'} || $ttype;
+        my $row_ttype = $safe_params{_ttype} || $ttype;
         ($row_ttype eq 'mixed') && die "Transaction Type 'mixed', but no '_ttype' field present in row.";
 
         # Get the statement type for this ttype if we don't have it.  This raises debug.
@@ -771,7 +743,7 @@ sub store {
             die "Dataset '$subset_name' has no SQL of type '$row_ttype'.";
 
         # Determine our argument values.
-        my @arg_values = &Jarvis::Dataset::names_to_values ($jconfig, $stm->{'vnames_aref'}, \%safe_params);
+        my @arg_values = &Jarvis::Dataset::names_to_values ($jconfig, $stm->{vnames_aref}, \%safe_params);
 
         # Execute
         my %row_result = ();
@@ -779,32 +751,32 @@ sub store {
         my $num_rows = 0;
 
         &statement_execute ($jconfig, $stm, \@arg_values);
-        $row_result{'modified'} = $stm->{'retval'} || 0;
-        $modified = $modified + $row_result{'modified'};
+        $row_result{modified} = $stm->{retval} || 0;
+        $modified = $modified + $row_result{modified};
 
         # On failure, we will still return valid JSON/XML to the caller, but we will indicate
         # which request failed and will send back an overall "non-success" flag.
         #
-        if ($stm->{'error'}) {
-            $row_result{'success'} = 0;
-            $row_result{'modified'} = 0;
-            $row_result{'message'} = $stm->{'error'};
+        if ($stm->{error}) {
+            $row_result{success} = 0;
+            $row_result{modified} = 0;
+            $row_result{message} = $stm->{error};
             $success = 0;
-            $message || ($message = $stm->{'error'});
+            $message || ($message = $stm->{error});
 
             # Log the error in our tracker database.
-            unless (&nolog ($stm, $stm->{'error'})) {
-                &Jarvis::Tracker::error ($jconfig, '200', $stm->{'error'});
+            unless (&nolog ($stm, $stm->{error})) {
+                &Jarvis::Tracker::error ($jconfig, '200', $stm->{error});
             }
 
         # Suceeded.  Set per-row status, and fetch the returned results, if this
         # operation indicates that it returns values.
         #
         } else {
-            $row_result{'success'} = 1;
+            $row_result{success} = 1;
 
             # Try and determine the returned values (normally the auto-increment ID)
-            if ($stm->{'returning'}) {
+            if ($stm->{returning}) {
 
                 # If you flagged any variables as "!out" then we will have used
                 # bind_param_inout () and copied the output vars into $stm->{returned}.
@@ -818,8 +790,8 @@ sub store {
                         $row->{$name} = $$value_ref;
                     }
 
-                    $row_result{'returning'} = [ $row ];
-                    $jconfig->{'out_nrows'} = 1;
+                    $row_result{returning} = [ $row ];
+                    $jconfig->{out_nrows} = 1;
                     &Jarvis::Error::debug ($jconfig, "Copied single row from bind_param_inout results.");
 
                 # Otherwise: See if the query had a built-in fetch.  Under PostGreSQL (and very
@@ -831,7 +803,7 @@ sub store {
                 # quietly return no data, allowing us to have a second try just below.
                 #
                 } else {
-                    my $returning_aref = $stm->{'sth'}->fetchall_arrayref({}) || undef;
+                    my $returning_aref = $stm->{sth}->fetchall_arrayref({}) || undef;
 
                     if ($returning_aref && (scalar @$returning_aref)) {
                         if ($DBI::errstr) {
@@ -841,14 +813,14 @@ sub store {
                             if (&nolog ($stm, $error_message)) {
                                 &Jarvis::Error::debug ($jconfig, "Failure fetching first return result set. Log disabled.");
                             } else {
-                                &Jarvis::Error::log ($jconfig, "Failure fetching first return result set for '" . $stm->{'ttype'} . "'.  Details follow.");
-                                &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
+                                &Jarvis::Error::log ($jconfig, "Failure fetching first return result set for '" . $stm->{ttype} . "'.  Details follow.");
+                                &Jarvis::Error::log ($jconfig, $stm->{sql_with_substitutions}) if $stm->{sql_with_substitutions};
                                 &Jarvis::Error::log ($jconfig, $error_message);
                                 &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) || 'NONE'));
                             }
 
-                            $stm->{'sth'}->finish;
-                            $stm->{'error'} = $error_message;
+                            $stm->{sth}->finish;
+                            $stm->{error} = $error_message;
                             $success = 0;
                             $message = $error_message;
 
@@ -858,8 +830,8 @@ sub store {
                             }
                         }
 
-                        $row_result{'returning'} = $returning_aref;
-                        $jconfig->{'out_nrows'} = scalar @$returning_aref;
+                        $row_result{returning} = $returning_aref;
+                        $jconfig->{out_nrows} = scalar @$returning_aref;
                         &Jarvis::Error::debug ($jconfig, "Fetched " . (scalar @$returning_aref) . " rows for returning.");
 
 
@@ -868,14 +840,14 @@ sub store {
                     # go digging for the return values via last_insert_rowid().
                     #
                     } elsif ($row_ttype eq 'insert') {
-                        if ($jconfig->{'xml'}{'jarvis'}{'app'}{'database'}{'connect'}->content =~ m/^dbi:SQLite:/) {
+                        if ($jconfig->{xml}{jarvis}{app}{database}{connect}->content =~ m/^dbi:SQLite:/) {
                             my $rowid = $dbh->func('last_insert_rowid');
                             if ($rowid) {
                                 my %return_values = %safe_params;
-                                $return_values {'id'} = $rowid;
+                                $return_values {id} = $rowid;
 
-                                $row_result{'returning'} = [ \%return_values ];
-                                $jconfig->{'out_nrows'} = 1;
+                                $row_result{returning} = [ \%return_values ];
+                                $jconfig->{out_nrows} = 1;
                             }
                             &Jarvis::Error::debug ($jconfig, "Used SQLite last_insert_rowid to get returned 'id' => '$rowid'.");
                         }
@@ -901,9 +873,9 @@ sub store {
                     # To avoid that error, here we will look to see if there are any extra result
                     # sets now pending to be read.  We will silently read and discard them.
                     #
-                    while ($success && $stm->{'sth'}->{syb_more_results}) {
+                    while ($success && $stm->{sth}{syb_more_results}) {
                         &Jarvis::Error::debug ($jconfig, "Found additional result sets.  Fetch and discard.");
-                        $stm->{'sth'}->fetchall_arrayref ({});
+                        $stm->{sth}->fetchall_arrayref ({});
 
                         if ($DBI::errstr) {
                             my $error_message = $DBI::errstr;
@@ -912,14 +884,14 @@ sub store {
                             if (&nolog ($stm, $error_message)) {
                                 &Jarvis::Error::debug ($jconfig, "Failure fetching additional result sets. Log disabled.");
                             } else {
-                                &Jarvis::Error::log ($jconfig, "Failure fetching additional result sets for '" . $stm->{'ttype'} . "'.  Details follow.");
-                                &Jarvis::Error::log ($jconfig, $stm->{'sql_with_substitutions'}) if $stm->{'sql_with_substitutions'};
+                                &Jarvis::Error::log ($jconfig, "Failure fetching additional result sets for '" . $stm->{ttype} . "'.  Details follow.");
+                                &Jarvis::Error::log ($jconfig, $stm->{sql_with_substitutions}) if $stm->{sql_with_substitutions};
                                 &Jarvis::Error::log ($jconfig, $error_message);
                                 &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) || 'NONE'));
                             }
 
-                            $stm->{'sth'}->finish;
-                            $stm->{'error'} = $error_message;
+                            $stm->{sth}->finish;
+                            $stm->{error} = $error_message;
                             $success = 0;
                             $message = $error_message;
                         }
@@ -927,7 +899,7 @@ sub store {
                 }
 
                 # This is disappointing, but perhaps a "die" is too strong here.
-                if (! $row_result{'returning'}) {
+                if (! $row_result{returning}) {
                     &Jarvis::Error::debug ($jconfig, "Cannot determine how to get values for 'returning' statement.");
                 }
             }
@@ -943,24 +915,24 @@ sub store {
 
     # Reset our parameters, our per-row parameters are no longer valid.
     my %after_params = %safe_all_rows_params;
-    $jconfig->{'params_href'} = \%after_params;
+    $jconfig->{params_href} = \%after_params;
 
     # Free any remaining open statement types.
     foreach my $stm_type (keys %stm) {
         &Jarvis::Error::debug ($jconfig, "Finished with statement for ttype '$stm_type'.");
-        $stm{$stm_type}->{'sth'}->finish;
+        $stm{$stm_type}{sth}->finish;
     }
 
     # Execute our "after" statement.
     if ($success) {
         my $astm = &parse_statement ($jconfig, $dsxml, $dbh, 'after', \%after_params);
         if ($astm) {
-            my @aarg_values = &Jarvis::Dataset::names_to_values ($jconfig, $astm->{'vnames_aref'}, \%after_params);
+            my @aarg_values = &Jarvis::Dataset::names_to_values ($jconfig, $astm->{vnames_aref}, \%after_params);
 
             &statement_execute($jconfig, $astm, \@aarg_values);
-            if ($astm->{'error'}) {
+            if ($astm->{error}) {
                 $success = 0;
-                $message || ($message = $astm->{'error'});
+                $message || ($message = $astm->{error});
             }
         }
         &Jarvis::Hook::after_all ($jconfig, $dsxml, \%after_params, $fields_aref, \@results);
@@ -972,7 +944,7 @@ sub store {
 
         # Use "eval" as some drivers (e.g. SQL Server) will have already rolled-back on the
         # original failure, and hence a second rollback will fail.
-        eval { local $SIG{'__DIE__'}; $dbh->rollback (); }
+        eval { local $SIG{__DIE__}; $dbh->rollback (); }
 
     } else {
         &Jarvis::Error::debug ($jconfig, "All successful.  Committing all changes.");
@@ -986,10 +958,10 @@ sub store {
     $message =~ s/^Server message number=[0-9]+ severity=[0-9]+ state=[0-9]+ line=[0-9]+ server=[A-Z0-9\\]+text=//i;
 
     # Store some additional info in jconfig just in case the hook needs it.
-    $jconfig->{'return_array'} = $return_array;
-    $jconfig->{'success'} = $success;
-    $jconfig->{'message'} = $message;
-    $jconfig->{'modified'} = $modified;
+    $jconfig->{return_array} = $return_array;
+    $jconfig->{success} = $success;
+    $jconfig->{message} = $message;
+    $jconfig->{modified} = $modified;
 
     # This final hook allows you to do whatever you want to modify the returned
     # data.  This hook may do one or both of:
@@ -1013,49 +985,49 @@ sub store {
     # just one record (not in an array), or if you gave us an array of records.  An array
     # containing one record is NOT the same as a single record not in an array.
     #
-    } elsif ($jconfig->{'format'} =~ m/^json/) {
+    } elsif ($jconfig->{format} =~ m/^json/) {
         my %return_data = ();
-        $return_data {'success'} = $success;
-        $success && ($return_data {'modified'} = $modified);
-        $success || ($return_data {'message'} = &trim($message));
+        $return_data {success} = $success;
+        $success && ($return_data {modified} = $modified);
+        $success || ($return_data {message} = &trim($message));
         foreach my $name (sort (keys %$extra_href)) {
             $return_data {$name} = $extra_href->{$name};
         }
 
         # Return the array data if we succeded.
         if ($success && $return_array) {
-            $return_data {'row'} = \@results;
+            $return_data {row} = \@results;
         }
 
         # Return non-array fields in success case only.
         if ($success && ! $return_array) {
-            $results[0]{'returning'} && ($return_data {'returning'} = $results[0]{'returning'});
+            $results[0]{returning} && ($return_data {returning} = $results[0]{returning});
         }
         my $json = JSON->new->pretty(1);
         $return_text = $json->encode ( \%return_data );
 
-    } elsif ($jconfig->{'format'} eq "xml") {
+    } elsif ($jconfig->{format} eq "xml") {
         my $xml = XML::Smart->new ();
-        $xml->{'response'}{'success'} = $success;
-        $success && ($xml->{'response'}{'modified'} = $modified);
-        $success || ($xml->{'response'}{'message'} = &trim($message));
+        $xml->{response}{success} = $success;
+        $success && ($xml->{response}{modified} = $modified);
+        $success || ($xml->{response}{message} = &trim($message));
         foreach my $name (sort (keys %$extra_href)) {
-            $xml->{'response'}{$name} = $extra_href->{$name};
+            $xml->{response}{$name} = $extra_href->{$name};
         }
 
         # Return the array data if we succeeded.
         if ($success && $return_array) {
-            $xml->{'response'}{'results'}->{'row'} = \@results;
+            $xml->{response}{results}{row} = \@results;
         }
 
         # Return non-array fields in success case only.
         if ($success && ! $return_array) {
-            $results[0]{'returning'} && ($xml->{'response'}{'returning'} = $results[0]{'returning'});
+            $results[0]{returning} && ($xml->{response}{returning} = $results[0]{returning});
         }
         $return_text = $xml->data ();
 
     } else {
-        die "Unsupported format '" . $jconfig->{'format'} ."' for Dataset::store return data.\n";
+        die "Unsupported format '" . $jconfig->{format} ."' for Dataset::store return data.\n";
     }
 
     &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($return_text));

@@ -252,8 +252,8 @@ sub do {
     # a slash through to our REST args.
     #
     print "PATH: '$path'\n";
-    my ($app_name, @rest_args) = split ( m|(?<!\\)/|, $path, -1);
-    @rest_args = map { s|\\/|/|g; $_ } @rest_args;
+    my ($app_name, @path_parts) = split ( m|(?<!\\)/|, $path, -1);
+    @path_parts = map { s|\\/|/|g; $_ } @path_parts;
 
     if (! $app_name) {
         die "Missing app-name.  Send $script_name/<app-name>/<arg0>[/<arg1>...] in URI!\n";
@@ -270,8 +270,8 @@ sub do {
     &Jarvis::Error::debug ($jconfig, "URI = $ENV{REQUEST_URI}");
     &Jarvis::Error::debug ($jconfig, "Base Path = '$path'.");
     &Jarvis::Error::debug ($jconfig, "App Name = '$app_name'.");
-    foreach my $i (0 .. $#rest_args) {
-        &Jarvis::Error::debug ($jconfig, "Rest Indexed Arg $i => '%s'.", $rest_args[$i]);
+    foreach my $i (0 .. $#path_parts) {
+        &Jarvis::Error::debug ($jconfig, "Parsed Path Part $i => '%s'.", $path_parts[$i]);
     }
 
     ###############################################################################
@@ -279,18 +279,16 @@ sub do {
     ###############################################################################
 
     # Now parse the rest of the args and apply our router.  This gives us dataset name too.
-    my ($dataset_name, $rest_args_href, $presentation) = &Jarvis::Route::find ($jconfig, \@rest_args);
+    my ($dataset_name, $rest_args, $presentation) = &Jarvis::Route::find ($jconfig, \@path_parts);
     &Jarvis::Error::debug ($jconfig, "Dataset Name = '%s'.", $dataset_name);
     &Jarvis::Error::debug ($jconfig, "Presentation = '%s'.", $presentation);
 
     # Store the presentation for later encoding.
     $jconfig->{presentation} = $presentation;
 
-    # Store our restful named params.
-    my $raw_params = $jconfig->{'cgi'}->Vars;
-    foreach my $key (sort (keys %$rest_args_href)) {
-        &Jarvis::Error::debug ($jconfig, "Rest Named Arg '$key' => '%s'.", $$rest_args_href{$key});
-        $raw_params->{$key} = $$rest_args_href{$key};
+    # Show our final list of named args.
+    foreach my $key (sort (keys %$rest_args)) {
+        &Jarvis::Error::debug ($jconfig, "Rest Arg '$key' => '%s'.", $$rest_args{$key});
     }
 
     # Dataset name can't be empty.  Also, it can only be normal characters 
@@ -301,14 +299,10 @@ sub do {
     # because maybe some execs/plugins might allow it, and we don't want
     # to restrict them.
     #
-    # A "metaset" will allow multiple comma-separated dataset names.  This is allowed
-    # only for "fetch" and only for XML or JSON formats.  There will be additional 
-    # checks to follow to ensure that "," datasets are used only in specific cases.
-    #
     if ((! defined $dataset_name) || ($dataset_name eq '')) {
         die "All requests require $script_name/$app_name/<dataset-or-special>[/<arg1>...] in URI!\n";
     }
-    ($dataset_name =~ m|^[\w\-\.,]+$|) || die "Invalid dataset_name '$dataset_name'!\n";    
+    ($dataset_name =~ m|^[\w\-\.]+$|) || die "Invalid dataset_name '$dataset_name'!\n";    
 
     # Store the dataset name.
     $jconfig->{'dataset_name'} = $dataset_name;
@@ -343,7 +337,7 @@ sub do {
     $jconfig->{'action'} = $action;
 
     # Load/Start application-specific start hook(s).
-    &Jarvis::Hook::start_global ($jconfig);
+    &Jarvis::Hook::load_global ($jconfig);
 
     # Login as required.
     &Jarvis::Login::check ($jconfig);
@@ -401,21 +395,21 @@ sub do {
     # cases where it is doing the header.  But if the exec script itself is
     # doing all the headers, then there will be no session cookie.
     #
-    } elsif (&Jarvis::Exec::do ($jconfig, $dataset_name, \@rest_args)) {
+    } elsif (&Jarvis::Exec::do ($jconfig, $dataset_name, $rest_args)) {
         # All is well if this returns true.  The action is treated.
 
     # A custom plugin for this application?  This is very similar to an Exec,
     # except that where an exec is a `<command>` system call, a Plugin is a
     # dynamically loaded module method.
     #
-    } elsif (&Jarvis::Plugin::do ($jconfig, $dataset_name, \@rest_args)) {
+    } elsif (&Jarvis::Plugin::do ($jconfig, $dataset_name, $rest_args)) {
         # All is well if this returns true.  The action is treated.
 
     # Fetch a regular dataset.
     } elsif ($action eq "select") {
         $jconfig->{'dataset_type'} = 's';
 
-        my $return_text = &Jarvis::Dataset::fetch ($jconfig, \@rest_args);
+        my $return_text = &Jarvis::Dataset::fetch ($jconfig, $rest_args);
 
         #
         # When providing CSV output, it is most likely going to be downloaded and
@@ -459,7 +453,7 @@ sub do {
         ($dataset_name =~ m/,/) && die "Comma-Separated dataset '$dataset_name' not permitted for action '$action'\n";
 
         $jconfig->{'dataset_type'} = 's';
-        my $return_text = &Jarvis::Dataset::store ($jconfig, \@rest_args);
+        my $return_text = &Jarvis::Dataset::store ($jconfig, $rest_args);
 
         print $cgi->header(-type => "text/plain; charset=UTF-8", -cookie => $jconfig->{'cookie'});
         print $return_text;
@@ -474,10 +468,11 @@ sub do {
     # Cleanup.
     ###############################################################################
 
-    # Invoke application-specific finish hook(s).
-    &Jarvis::Hook::finish ($jconfig);
+    # Unload our global hooks.  This will call ::finish on them.
+    &Jarvis::Hook::unload_global ($jconfig);
+
     # Track the request end.
-    &Jarvis::Tracker::finish ($jconfig, \@rest_args);
+    &Jarvis::Tracker::finish ($jconfig);
 
     # We MUST ensure that ALL the cached database handles are removed.
     # Otherwise, under mod_perl, the next application would get OUR database handles!

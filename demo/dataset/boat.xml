@@ -1,4 +1,7 @@
 <dataset read="*" write="*" key_list="id">
+    <hook module="Boat">
+        <parameter name="index" value="Checked"/>
+    </hook>
     <transform fetch="notnull" store="trim,null" />
     <select>
 SELECT id, name, registration_num, class, owner, description

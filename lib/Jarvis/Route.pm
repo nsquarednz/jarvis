@@ -33,22 +33,30 @@ use Jarvis::Error;
 
 ################################################################################
 # Parses a URL, finds the best route, and performs parameter substitution.
+# We pull out any named REST args and merge them with our numbered rest args
+# array to form a complete combined REST args hash.
 # 
 # Fallback to $rest_args[0]
 #
 # Params:
-#       $rest_args_aref - Numbered rest args starting from 0.
+#       $path_parts - Numbered rest args starting from 0.
 #
 # Returns:
 #       $dataset_name - Dataset name from route, or from <arg0>
-#       $named_rest_args - Hash of named rest args extracted from route.
+#       $named_rest_args - Hash of named AND indexed rest args after route parsing.
 #       $presentation - Should restful encodings return an "array" or "singleton".
 ################################################################################
 #
 sub find {
-    my ($jconfig, $rest_args_aref) = @_;
+    my ($jconfig, $path_parts) = @_;
 
     $jconfig || die;
+
+    # Copy numbered rest args into a hash.
+    my %numbered_rest_args = ();
+    foreach my $i (0 .. $#$path_parts) {
+        $numbered_rest_args{$i} = $$path_parts[$i];
+    }
 
     # Load routes and store in $jconfig, just in case we need them again.
     if (! defined ($jconfig->{routes})) {
@@ -84,11 +92,11 @@ sub find {
         # Make sure each part matches.
         my $match = 1;
         my $route_parts = $route->{parts};
-        my $named_rest_args = {};
+        my %rest_args = %numbered_rest_args;
 
         foreach my $i (0 .. $#$route_parts) {
             my $route_part = $$route_parts[$i];
-            my $given_part = $$rest_args_aref[$i];
+            my $given_part = $$path_parts[$i];
             &Jarvis::Error::dump ($jconfig, "Part [$i].  Route = '%s', Given = '%s'.", $route_part, $given_part);
 
             # An empty route part is a mid-path // or /:/ or /*/, or follows a trailing /.  Match anything except undef.
@@ -108,7 +116,7 @@ sub find {
                 if (defined $given_part) {
                     my $collected_name = $1;
                     &Jarvis::Error::dump ($jconfig, "Collection Route Part matched.  Variable '%s' => '%s'.", $collected_name, $given_part);
-                    $$named_rest_args{$collected_name} = $given_part;
+                    $rest_args{$collected_name} = $given_part;
                     next;
 
                 } else {
@@ -135,15 +143,15 @@ sub find {
         if ($match) {
             my $dataset_name = $route->{dataset};
             &Jarvis::Error::debug ($jconfig, "Completed route match '%s' -> dataset '%s'.", $route->{path}, $dataset_name);
-            return ($dataset_name, $named_rest_args, $route->{presentation});
+            return ($dataset_name, \%rest_args, $route->{presentation});
         }
     }
 
     # Default logic, use arg0 as the dataset name, and no named args.
-    my $dataset_name = $$rest_args_aref[0];
+    my $dataset_name = $$path_parts[0];
     &Jarvis::Error::debug ($jconfig, "No route match.  Using arg0 as dataset_name '%s'.", $dataset_name);
 
-    return ($dataset_name, {}, "array");
+    return ($dataset_name, \%numbered_rest_args, "array");
 }
 
 1;
