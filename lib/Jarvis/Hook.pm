@@ -31,8 +31,8 @@
 #                 CALLED: Before returning result of a "store" request.
 #                   GLOBAL HOOKS
 #
-#                 finish ($jconfig, $hook_params_href, $return_text_ref)
-#                 CALLED: Before returned content is sent to client
+#                 finish ($jconfig, $hook_params_href)
+#                 CALLED: After Jarvis processing is complete, at cleanup time.
 #                   GLOBAL HOOKS
 #
 #           GLOBAL UTILITY HOOKS
@@ -70,7 +70,7 @@
 #                   GLOBAL and DATASET HOOKS
 #
 #                 finish ($jconfig, $hook_params_href, $dsxml)
-#                 CALLED: After dataset processing is complete.
+#                 CALLED: ("fetch" AND "store") After dataset processing is complete.
 #                   DATASET HOOKS
 #
 #           PER-ROW
@@ -79,7 +79,7 @@
 #                   GLOBAL and DATASET HOOKS
 #
 #                 after_one ($jconfig, $hook_params_href, $dsxml, $safe_row_params_href, $row_result_href)
-#                 CALLED: ("store" only) After we execute the row insert/update/delete SQL.  After any returning values are found.
+#                 CALLED: ("store" only) After insert/update/delete and "returning" extraction.
 #                   GLOBAL and DATASET HOOKS
 #
 #               Multiple hooks may be defined, they are simply invoked in
@@ -203,13 +203,16 @@ sub load_global {
 
     (defined $jconfig->{hooks}) || ($jconfig->{hooks} = []);
 
+    # Set the hook nesting level to 0 (global hooks only).
+    $jconfig->{hook_level} = 0;
+
     my $axml = $jconfig->{xml}{jarvis}{app};
     if ($axml->{hook}) {
         foreach my $hook (@{ $axml->{hook} }) {
             my $lib = $hook->{lib} ? $hook->{lib}->content : undef;
             my $module = $hook->{module}->content || die "Invalid global hook configuration, <hook> configured with no module.";
 
-            &Jarvis::Error::debug ($jconfig, "Found global <hook> with module '$module'.");
+            &Jarvis::Error::debug ($jconfig, "Loading (level 0) global <hook> with module '$module'.");
 
             my %hook_parameter = ();
             if ($hook->{parameter}) {
@@ -219,7 +222,7 @@ sub load_global {
                 }
             }
 
-            my %hook_def = ('module' => $module, 'lib' => $lib, 'parameters' => \%hook_parameter, global => 1);
+            my %hook_def = ('module' => $module, 'lib' => $lib, 'parameters' => \%hook_parameter, level => 0);
             push (@{ $jconfig->{hooks} }, \%hook_def);
             &load_module ($jconfig, \%hook_def);
 
@@ -248,16 +251,18 @@ sub load_global {
 sub unload_global {
     my ($jconfig) = @_;
 
-    # Invoke finish on all global hooks.
-    foreach my $hook (grep { $_->{global} } @{ $jconfig->{hooks} }) {
-        &invoke ($jconfig, $hook, "finish");
-    }
+    # Unload all our global hooks.  These must be level zero.
+    &Jarvis::Error::debug ($jconfig, "Unloading global (level 0) hooks.");
 
-    # There should NOT be any dataset hooks remaining, they SHOULD be already unloaded.
+    # Invoke finish on all global hooks.
     foreach my $hook (@{ $jconfig->{hooks} }) {
-        if (! $hook->{global}) {
-            &Jarvis::Error::log ($jconfig, "Dataset Hook '%s' still present at global hook unload time!", $hook->{module});
-        }
+
+        # All our dataset-level hooks should have been unloaded already.
+        $hook->{level} && die "Dataset Hook remains at global hook unload time.  Impossible.";
+
+        # Invoke the finish method with no extra parameters.
+        &Jarvis::Error::debug ($jconfig, "Finishing global <hook> with module '%s'.", $hook->{module});
+        &invoke ($jconfig, $hook, "finish");
     }
 
     # Finally remove ALL hooks (global and dataset). 
@@ -279,14 +284,17 @@ sub unload_global {
 sub load_dataset {
     my ($jconfig, $dsxml) = @_;
 
-    (defined $jconfig->{hooks}) || ($jconfig->{hooks} = []);
+    # Increment the hook level.  Level 0 are global.  Each nested dataset
+    # will increment the level by one.
+    my $hook_level = ++($jconfig->{hook_level});
+    &Jarvis::Error::debug ($jconfig, "Loading dataset-specific hooks at level $hook_level.");
 
     if ($dsxml->{dataset}{hook}) {
         foreach my $hook (@{ $dsxml->{dataset}{hook} }) {
             my $lib = $hook->{lib} ? $hook->{lib}->content : undef;
             my $module = $hook->{module}->content || die "Invalid dataset hook configuration, <hook> configured with no module.";
 
-            &Jarvis::Error::debug ($jconfig, "Found dataset-specific <hook> with module '$module'.");
+            &Jarvis::Error::debug ($jconfig, "Loading (level $hook_level) dataset-specific <hook> with module '$module'.");
 
             my %hook_parameter = ();
             if ($hook->{parameter}) {
@@ -298,7 +306,7 @@ sub load_dataset {
 
             # Note that you can NOT add $dsxml to the hook_def object.  You cannot
             # ever take a copy of an XML::Smart object, because the cleanup fails. 
-            my %hook_def = ('module' => $module, 'lib' => $lib, 'parameters' => \%hook_parameter, global => 0, dsxml => $dsxml);
+            my %hook_def = ('module' => $module, 'lib' => $lib, 'parameters' => \%hook_parameter, level => $hook_level, dsxml => $dsxml);
             push (@{ $jconfig->{hooks} }, \%hook_def);
             &load_module ($jconfig, \%hook_def);
 
@@ -315,7 +323,8 @@ sub load_dataset {
 }
 
 ###############################################################################
-# Unload our dataset hooks, invoke the "finish" method on each hook.
+# Unload any dataset hooks added by the most recent call to load_dataset (), 
+# invoke the "finish" method on each hook as we do so.
 #
 # Params:
 #       $jconfig         - Jarvis::Config object
@@ -327,14 +336,17 @@ sub load_dataset {
 sub unload_dataset {
     my ($jconfig) = @_;
 
-    # Invoke finish on all dataset hooks.
-    foreach my $hook (grep { ! $_->{global} } @{ $jconfig->{hooks} }) {
+    # What is the current hook level?  Decrement it.
+    my $hook_level = ($jconfig->{hook_level})--;
+    &Jarvis::Error::debug ($jconfig, "Unloading dataset-specific (level $hook_level) hooks.");
+
+    # Pop of hooks from the current level and invoke finish on them as we go.
+    my $hooks_aref = $jconfig->{hooks};
+    while (scalar @$hooks_aref && ($$hooks_aref[$#$hooks_aref]->{level} == $hook_level)) {
+        my $hook = pop (@$hooks_aref);
+        &Jarvis::Error::debug ($jconfig, "Finishing dataset-specific <hook> with module '%s'.", $hook->{module});
         &invoke ($jconfig, $hook, "finish", $hook->{dsxml});
     }
-
-    # Remove all dataset hooks.  Leave only the global hooks.
-    my @global_hooks = grep { $_->{global} } @{ $jconfig->{hooks} };
-    $jconfig->{hooks} = \@global_hooks;
 }
 
 ###############################################################################
@@ -367,7 +379,7 @@ sub unload_dataset {
 sub return_status {
     my ($jconfig, $extra_href, $return_text_ref) = @_;
 
-    foreach my $hook (grep { $_->{global} } @{ $jconfig->{hooks} }) {
+    foreach my $hook (grep { ! $_->{level} } @{ $jconfig->{hooks} }) {
         &invoke ($jconfig, $hook, "return_status", $extra_href, $return_text_ref);
     }
     return 1;
@@ -413,7 +425,7 @@ sub return_status {
 sub return_fetch {
     my ($jconfig, $safe_row_params_href, $return_object, $extra_href, $return_text_ref) = @_;
 
-    foreach my $hook (grep { $_->{global} } @{ $jconfig->{hooks} }) {
+    foreach my $hook (grep { ! $_->{level} } @{ $jconfig->{hooks} }) {
         &invoke ($jconfig, $hook, "return_fetch", $safe_row_params_href, $return_object, $extra_href, $return_text_ref);
     }
     return 1;
@@ -458,7 +470,7 @@ sub return_fetch {
 sub return_store {
     my ($jconfig, $dsxml, $safe_params_href, $fields_aref, $results_aref, $extra_href, $return_text_ref) = @_;
 
-    foreach my $hook (grep { $_->{global} } @{ $jconfig->{hooks} }) {
+    foreach my $hook (grep { ! $_->{level} } @{ $jconfig->{hooks} }) {
         &invoke ($jconfig, $hook, "return_store", $safe_params_href, $fields_aref, $results_aref, $extra_href, $return_text_ref);
     }
     return 1;
@@ -487,7 +499,7 @@ sub return_store {
 sub after_login {
     my ($jconfig, $additional_safe_href) = @_;
 
-    foreach my $hook (grep { $_->{global} } @{ $jconfig->{hooks} }) {
+    foreach my $hook (grep { ! $_->{level} } @{ $jconfig->{hooks} }) {
         &invoke ($jconfig, $hook, "after_login", $additional_safe_href);
     }
     return 1;
@@ -510,7 +522,7 @@ sub after_login {
 sub before_logout {
     my ($jconfig) = @_;
 
-    foreach my $hook (grep { $_->{global} } @{ $jconfig->{hooks} }) {
+    foreach my $hook (grep { ! $_->{level} } @{ $jconfig->{hooks} }) {
         &invoke ($jconfig, $hook, "before_logout");
     }
     return 1;
@@ -544,7 +556,7 @@ sub before_logout {
 sub pre_connect {
     my ($jconfig, $dbname, $dbtype, $dbconnect_ref, $dbusername_ref, $dbpassword_ref, $parameters_href) = @_;
 
-    foreach my $hook (grep { $_->{global} } @{ $jconfig->{hooks} }) {
+    foreach my $hook (grep { ! $_->{level} } @{ $jconfig->{hooks} }) {
         &invoke ($jconfig, $hook, "pre_connect", $dbname, $dbtype, $dbconnect_ref, $dbusername_ref, $dbpassword_ref, $parameters_href);
     }
     return 1;

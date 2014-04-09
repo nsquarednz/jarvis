@@ -826,7 +826,6 @@ sub store {
     }
     
     # Get a database handle.
-    my $dataset_type = $jconfig->{dataset_type}; 
     my $dataset_dbname = $jconfig->{dataset_dbname}; 
     my $dbh = &Jarvis::DB::handle ($jconfig, $dataset_dbname, $dataset_type);
     

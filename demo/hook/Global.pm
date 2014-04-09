@@ -47,8 +47,10 @@ sub Global::return_fetch {
 sub Global::dataset_pre_fetch {
     my ($jconfig, $hook_params_href, $dsxml, $safe_params_href) = @_;
 
-    if ($safe_params_href->{boat_class} eq 'Makleson') {
-        $safe_params_href->{boat_class} = 'Makkleson';
+    if (defined $safe_params_href->{boat_class}) {
+        if ($safe_params_href->{boat_class} eq 'Makleson') {
+            $safe_params_href->{boat_class} = 'Makkleson';
+        }
     }
 
     return 1;
