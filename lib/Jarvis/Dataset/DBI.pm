@@ -253,7 +253,7 @@ sub parse_attr {
 ################################################################################
 #
 sub parse_statement {
-    my ($jconfig, $dsxml, $dbh, $ttype, $args_href) = @_;
+    my ($jconfig, $dataset_name, $dsxml, $dbh, $ttype, $args_href) = @_;
 
     my $obj = {};
 
@@ -297,7 +297,7 @@ sub parse_statement {
         local $dbh->{RaiseError};
         local $dbh->{PrintError};
         $obj->{sth} = $dbh->prepare ($sql_with_substitutions, \%prepare_attr) ||
-            die "Couldn't prepare statement for $ttype on '" . $jconfig->{dataset_name} . "'.\nSQL ERROR = '" . $dbh->errstr . "'.";
+            die "Couldn't prepare statement for $ttype on '$dataset_name'.\nSQL ERROR = '" . $dbh->errstr . "'.";
     }
 
     # NOTE: "nolog" : Report back to client.  Do not log. 
@@ -524,7 +524,7 @@ sub statement_execute {
 #               username            Used for {{username}} in SQL
 #               group_list          Used for {{group_list}} in SQL
 #
-#       $subset_name - Name of single dataset we are fetching from.
+#       $dataset_name - Name of single dataset we are fetching from.
 #       $dsxml - Dataset's XML configuration object.
 #       $dbh - Database handle of the correct type to match the dataset.
 #       $safe_params - All our safe parameters.
@@ -535,11 +535,11 @@ sub statement_execute {
 ################################################################################
 #
 sub fetch {
-    my ($jconfig, $subset_name, $dsxml, $dbh, $safe_params) = @_;
+    my ($jconfig, $dataset_name, $dsxml, $dbh, $safe_params) = @_;
     
     # Get our STM.  This has everything attached.
-    my $stm = &parse_statement ($jconfig, $dsxml, $dbh, 'select', $safe_params) ||
-        die "Dataset '$subset_name' has no SQL of type 'select'.";
+    my $stm = &parse_statement ($jconfig, $dataset_name, $dsxml, $dbh, 'select', $safe_params) ||
+        die "Dataset '$dataset_name' has no SQL of type 'select'.";
 
     # Convert the parameter names to corresponding values.
     my @args = &Jarvis::Dataset::names_to_values ($jconfig, $stm->{vnames_aref}, $safe_params);
@@ -578,19 +578,18 @@ sub fetch {
 #               group_list          Used for {{group_list}} in SQL
 #               format              Either "json" or "xml" (not "csv").
 #
-#       $subset_name - Name of single dataset we are storing to.
+#       $dataset_name - Name of single dataset we are storing to.
 #       $dsxml - Dataset XML object.
 #       $dbh - Database handle of the correct type to match the dataset.
 #       $rest_args - Hash of numbered and/or named REST args.
 #
 # Returns:
-#       "OK" on succes
-#       "Error message" on soft error (duplicate key, etc.).
+#       XML/JSON object summary of results.
 #       die on hard error.
 ################################################################################
 #
 sub store {
-    my ($jconfig, $subset_name, $dsxml, $dbh, $rest_args) = @_;
+    my ($jconfig, $dataset_name, $dsxml, $dbh, $rest_args) = @_;
 
     # What transforms should we use when processing store data?
     my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->{dataset}{transform}{store});
@@ -691,7 +690,7 @@ sub store {
     # Execute our "before" statement.  This statement is NOT permitted to fail.  If it does,
     # then we immediately barf
     {
-        my $bstm = &parse_statement ($jconfig, $dsxml, $dbh, 'before', \%before_params);
+        my $bstm = &parse_statement ($jconfig, $dataset_name, $dsxml, $dbh, 'before', \%before_params);
         if ($bstm) {
             my @barg_values = &Jarvis::Dataset::names_to_values ($jconfig, $bstm->{vnames_aref}, \%before_params);
 
@@ -735,12 +734,12 @@ sub store {
 
         # Get the statement type for this ttype if we don't have it.  This raises debug.
         if (! $stm{$row_ttype}) {
-            $stm{$row_ttype} = &parse_statement ($jconfig, $dsxml, $dbh, $row_ttype, \%safe_params);
+            $stm{$row_ttype} = &parse_statement ($jconfig, $dataset_name, $dsxml, $dbh, $row_ttype, \%safe_params);
         }
 
         # Check we have an stm for this row.
         my $stm = $stm{$row_ttype} ||
-            die "Dataset '$subset_name' has no SQL of type '$row_ttype'.";
+            die "Dataset '$dataset_name' has no SQL of type '$row_ttype'.";
 
         # Determine our argument values.
         my @arg_values = &Jarvis::Dataset::names_to_values ($jconfig, $stm->{vnames_aref}, \%safe_params);
@@ -794,13 +793,27 @@ sub store {
                     $jconfig->{out_nrows} = 1;
                     &Jarvis::Error::debug ($jconfig, "Copied single row from bind_param_inout results.");
 
+                # SQLite uses the last_insert_rowid() function for returning IDs.  
+                # This is very special case handling.
+                #
+                } elsif ($dbh->{Driver}{Name} eq 'SQLite') {
+
+                    my $rowid = $dbh->func('last_insert_rowid');
+                    if ($rowid) {
+                        my %return_values = %$fields_href;
+                        $return_values {id} = $rowid;
+
+                        $row_result{returning} = [ \%return_values ];
+                        $jconfig->{out_nrows} = 1;
+                        &Jarvis::Error::debug ($jconfig, "Used SQLite last_insert_rowid to get returned 'id' => '$rowid'.");
+
+                    } else {
+                        &Jarvis::Error::log ($jconfig, "Used SQLite last_insert_rowid but it returned no id.");
+                    }
+
                 # Otherwise: See if the query had a built-in fetch.  Under PostGreSQL (and very
                 # likely also under other drivers) this will fail if there is no current
                 # query.  I.e. if you have no "RETURNING" clause on your insert.
-                #
-                # However, under SQLite, this appears to be forgiving if there is no
-                # RETURNING clause.  SQLite doesn't have a RETURNING clause, but it will
-                # quietly return no data, allowing us to have a second try just below.
                 #
                 } else {
                     my $returning_aref = $stm->{sth}->fetchall_arrayref({}) || undef;
@@ -833,24 +846,6 @@ sub store {
                         $row_result{returning} = $returning_aref;
                         $jconfig->{out_nrows} = scalar @$returning_aref;
                         &Jarvis::Error::debug ($jconfig, "Fetched " . (scalar @$returning_aref) . " rows for returning.");
-
-
-                    # Hmm... we're supposed to be returning data, but the query didn't give
-                    # us any.  Interesting.  Maybe it's SQLite?  In that case, we need to
-                    # go digging for the return values via last_insert_rowid().
-                    #
-                    } elsif ($row_ttype eq 'insert') {
-                        if ($jconfig->{xml}{jarvis}{app}{database}{connect}->content =~ m/^dbi:SQLite:/) {
-                            my $rowid = $dbh->func('last_insert_rowid');
-                            if ($rowid) {
-                                my %return_values = %safe_params;
-                                $return_values {id} = $rowid;
-
-                                $row_result{returning} = [ \%return_values ];
-                                $jconfig->{out_nrows} = 1;
-                            }
-                            &Jarvis::Error::debug ($jconfig, "Used SQLite last_insert_rowid to get returned 'id' => '$rowid'.");
-                        }
                     }
 
                     # When using output parameters from a SQL Server stored procedure, there is a
@@ -925,7 +920,7 @@ sub store {
 
     # Execute our "after" statement.
     if ($success) {
-        my $astm = &parse_statement ($jconfig, $dsxml, $dbh, 'after', \%after_params);
+        my $astm = &parse_statement ($jconfig, $dataset_name, $dsxml, $dbh, 'after', \%after_params);
         if ($astm) {
             my @aarg_values = &Jarvis::Dataset::names_to_values ($jconfig, $astm->{vnames_aref}, \%after_params);
 
@@ -956,12 +951,6 @@ sub store {
 
     # Cleanup SQL Server message for reporting purposes.
     $message =~ s/^Server message number=[0-9]+ severity=[0-9]+ state=[0-9]+ line=[0-9]+ server=[A-Z0-9\\]+text=//i;
-
-    # Store some additional info in jconfig just in case the hook needs it.
-    $jconfig->{return_array} = $return_array;
-    $jconfig->{success} = $success;
-    $jconfig->{message} = $message;
-    $jconfig->{modified} = $modified;
 
     # This final hook allows you to do whatever you want to modify the returned
     # data.  This hook may do one or both of:
