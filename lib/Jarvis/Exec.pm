@@ -112,9 +112,6 @@ sub do {
     # If no match, that's fine.  Just say we couldn't do it.
     $command || return 0;
 
-    # We're sure we are an exec now.  We're committed to this path.
-    $jconfig->{'dataset_type'} = 'e';
-
     # Check security.
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
     if ($failure ne '') {

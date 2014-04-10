@@ -50,7 +50,6 @@ use Jarvis::Exec;
 use Jarvis::Plugin;
 use Jarvis::Hook;
 use Jarvis::DB;
-use Jarvis::Tracker;
 use Jarvis::Route;
 
 ###############################################################################
@@ -114,8 +113,8 @@ sub error_handler {
 
     # Return error to client.  Note that we do not print stack trace to user, 
     # since that is a potential security weakness.
-    $jconfig->{'status'} = $jconfig->{'status'} || "500 Internal Server Error"; 
-    my $status = $jconfig->{'status'};
+    $jconfig->{status} = $jconfig->{status} || "500 Internal Server Error"; 
+    my $status = $jconfig->{status};
     print $cgi->header(-status => $status, -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt");
     print $msg;
 
@@ -124,14 +123,11 @@ sub error_handler {
     my $long_msg = &Jarvis::Error::print_message ($jconfig, 'fatal', $msg);
 
     # Print URI to log if not done already.
-    if (! $jconfig->{'debug'}) {
+    if (! $jconfig->{debug}) {
         $long_msg = $long_msg . "        URI = $ENV{REQUEST_URI}";
     }
 
-    print STDERR ($jconfig->{'debug'} ? Carp::longmess $long_msg : Carp::shortmess $long_msg);
-
-    # Track this error, if we got far enough to have enough info.
-    $jconfig && &Jarvis::Tracker::error ($jconfig, $status, Carp::longmess $long_msg);
+    print STDERR ($jconfig->{debug} ? Carp::longmess $long_msg : Carp::shortmess $long_msg);
 
     # We MUST ensure that ALL the cached database handles are removed.
     # Otherwise, under mod_perl, the next application would get OUR database handles!
@@ -167,7 +163,7 @@ sub do {
     $cgi = ($options && $options->{cgi}) || new CGI;
 
     # Environment variables.
-    my $jarvis_root = $ENV {'JARVIS_ROOT'};
+    my $jarvis_root = $ENV {JARVIS_ROOT};
     foreach my $inc (@INC) {
         last if $jarvis_root;
         if (-f "$inc/Jarvis/Main.pm") {
@@ -176,7 +172,7 @@ sub do {
     }
     $jarvis_root || die "Cannot determine JARVIS_ROOT.";
 
-    my $jarvis_etc = $ENV {'JARVIS_ETC'};
+    my $jarvis_etc = $ENV {JARVIS_ETC};
     foreach my $etc (@etc) {
         last if $jarvis_etc;
         if (-d $etc) {
@@ -213,7 +209,7 @@ sub do {
     # we really want exactly the same done for OTHER application types.  Hence
     # the following.
     #
-    my $content_type = $ENV{'CONTENT_TYPE'} || 'text/plain';
+    my $content_type = $ENV{CONTENT_TYPE} || 'text/plain';
 
     if (($method eq "POST") && ($content_type ne 'application/xml')) {
         my $query_string = '';
@@ -221,8 +217,8 @@ sub do {
             $query_string = $cgi->r->args;
 
         } else {
-            $query_string = $ENV{'QUERY_STRING'} if defined $ENV{'QUERY_STRING'};
-            $query_string ||= $ENV{'REDIRECT_QUERY_STRING'} if defined $ENV{'REDIRECT_QUERY_STRING'};
+            $query_string = $ENV{QUERY_STRING} if defined $ENV{QUERY_STRING};
+            $query_string ||= $ENV{REDIRECT_QUERY_STRING} if defined $ENV{REDIRECT_QUERY_STRING};
         }
 
         if ($query_string) {
@@ -230,7 +226,7 @@ sub do {
                 $cgi->parse_params($query_string);
             } else {
                 $cgi->add_parameter('keywords');
-                $cgi->{'keywords'} = [$cgi->parse_keywordlist($query_string)];
+                $cgi->{keywords} = [$cgi->parse_keywordlist($query_string)];
             }
         }
     }
@@ -264,7 +260,7 @@ sub do {
     $jconfig = new Jarvis::Config ($app_name, ('etc_dir' => "$jarvis_etc", 'cgi' => $cgi, 'mod_perl_io' => $mod_perl_io ) );
 
     # Determine client's IP.
-    $jconfig->{'client_ip'} = $ENV{"HTTP_X_FORWARDED_FOR"} || $ENV{"HTTP_CLIENT_IP"} || $ENV{"REMOTE_ADDR"} || '';
+    $jconfig->{client_ip} = $ENV{"HTTP_X_FORWARDED_FOR"} || $ENV{"HTTP_CLIENT_IP"} || $ENV{"REMOTE_ADDR"} || '';
 
     # Debug can now occur, since we have called Config!
     &Jarvis::Error::debug ($jconfig, "URI = $ENV{REQUEST_URI}");
@@ -304,18 +300,12 @@ sub do {
     }
     ($dataset_name =~ m|^[\w\-\.]+$|) || die "Invalid dataset_name '$dataset_name'!\n";    
 
-    # Store the dataset name.
-    $jconfig->{'dataset_name'} = $dataset_name;
-
-    # Start tracking now we have dataset name.  Hopefully, not too much time has passed.
-    &Jarvis::Tracker::start ($jconfig);
-
     ###############################################################################
     # Action: "status", "habitat", "logout", "fetch", "update",  or custom
     #           action from Exec or Plugin.
     ###############################################################################
     #
-    my $method_param = $jconfig->{'method_param'};
+    my $method_param = $jconfig->{method_param};
     if ($method_param) {
         my $new_method = $cgi->param($method_param);
         if ($new_method) {
@@ -334,7 +324,7 @@ sub do {
     if ($action eq 'create') { $action = 'insert' };
     if ($action eq 'put') { $action = 'update' };
 
-    $jconfig->{'action'} = $action;
+    $jconfig->{action} = $action;
 
     # Load/Start application-specific start hook(s).
     &Jarvis::Hook::load_global ($jconfig);
@@ -342,16 +332,16 @@ sub do {
     # Login as required.
     &Jarvis::Login::check ($jconfig);
 
-    &Jarvis::Error::debug ($jconfig, "User Name = '" . $jconfig->{'username'} . "'");
-    &Jarvis::Error::debug ($jconfig, "Group List = '" . $jconfig->{'group_list'} . "'");
-    &Jarvis::Error::debug ($jconfig, "Logged In = " . $jconfig->{'logged_in'});
-    &Jarvis::Error::debug ($jconfig, "Error String = '" . $jconfig->{'error_string'} . "'");
+    &Jarvis::Error::debug ($jconfig, "User Name = '" . $jconfig->{username} . "'");
+    &Jarvis::Error::debug ($jconfig, "Group List = '" . $jconfig->{group_list} . "'");
+    &Jarvis::Error::debug ($jconfig, "Logged In = " . $jconfig->{logged_in});
+    &Jarvis::Error::debug ($jconfig, "Error String = '" . $jconfig->{error_string} . "'");
     &Jarvis::Error::debug ($jconfig, "Method = '" . $method . "'");
     &Jarvis::Error::debug ($jconfig, "Action = '" . $action . "'");
 
-    # What kind of dataset?
+    # What kind of dataset?  Used by the tracker only.
     # 's' = sql, 'i' = internal, 'p' = plugin, 'e' = exec, undef for undetermined.
-    $jconfig->{'dataset_type'} = undef;
+    my $dataset_type = undef;
 
     # All special datasets start with "__".
     #
@@ -363,8 +353,8 @@ sub do {
     #
     if ($dataset_name =~ m/^__/) {
         my $return_text = undef;
-        $jconfig->{'dataset_type'} = 'i';
-        $jconfig->{'action'} = 'select';
+        $dataset_type = 'i';
+        $jconfig->{action} = 'select';
 
         # Status.  I.e. are we logged in?
         if ($dataset_name eq "__status") {
@@ -387,7 +377,7 @@ sub do {
             die "Unknown special dataset '$dataset_name'!\n";
         }
 
-        print $cgi->header(-type => "text/plain; charset=UTF-8", -cookie => $jconfig->{'cookie'}, 'Cache-Control' => 'no-store, no-cache, must-revalidate');
+        print $cgi->header(-type => "text/plain; charset=UTF-8", -cookie => $jconfig->{cookie}, 'Cache-Control' => 'no-store, no-cache, must-revalidate');
         print $return_text;
 
     # A custom exec for this application?  We hand off entirely for this case,
@@ -397,6 +387,7 @@ sub do {
     #
     } elsif (&Jarvis::Exec::do ($jconfig, $dataset_name, $rest_args)) {
         # All is well if this returns true.  The action is treated.
+        $dataset_type = 'e';
 
     # A custom plugin for this application?  This is very similar to an Exec,
     # except that where an exec is a `<command>` system call, a Plugin is a
@@ -404,12 +395,13 @@ sub do {
     #
     } elsif (&Jarvis::Plugin::do ($jconfig, $dataset_name, $rest_args)) {
         # All is well if this returns true.  The action is treated.
+        $dataset_type = 'p';
 
     # Fetch a regular dataset.
     } elsif ($action eq "select") {
-        $jconfig->{'dataset_type'} = 's';
+        $dataset_type = 's';
 
-        my $return_text = &Jarvis::Dataset::fetch ($jconfig, $rest_args);
+        my $return_text = &Jarvis::Dataset::fetch ($jconfig, $dataset_name, $rest_args);
 
         #
         # When providing CSV output, it is most likely going to be downloaded and
@@ -417,30 +409,30 @@ sub do {
         #
         # So, for CSV we suggest it as an attachment, with the filename of the dataset.
         #
-        if ($jconfig->{'format'} eq "csv") {
-            my $filename = $jconfig->{'return_filename'} || $jconfig->{'dataset_name'} . ".csv";
+        if ($jconfig->{format} eq "csv") {
+            my $filename = $jconfig->{return_filename} || $dataset_name . ".csv";
             $filename =~ s/"/\\"/g;
             print $cgi->header(
                 -type => 'text/csv; charset=UTF-8; name="' . $filename . '"',
                 'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-                -cookie => $jconfig->{'cookie'},
+                -cookie => $jconfig->{cookie},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             );
             
-        } elsif ($jconfig->{'format'} eq "xlsx") {
-            my $filename = $jconfig->{'return_filename'} || $jconfig->{'dataset_name'} . ".xlsx";
+        } elsif ($jconfig->{format} eq "xlsx") {
+            my $filename = $jconfig->{return_filename} || $dataset_name . ".xlsx";
             $filename =~ s/"/\\"/g;
             print $cgi->header(
                 -type => 'application/vnd.ms-excel; name="' . $filename . '"',
                 'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-                -cookie => $jconfig->{'cookie'},
+                -cookie => $jconfig->{cookie},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             );
             
         } else {
             print $cgi->header(
                 -type => "text/plain; charset=UTF-8",
-                -cookie => $jconfig->{'cookie'},
+                -cookie => $jconfig->{cookie},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             );
         }
@@ -452,10 +444,10 @@ sub do {
         # Meta-sets are for FETCH only, not STORE.
         ($dataset_name =~ m/,/) && die "Comma-Separated dataset '$dataset_name' not permitted for action '$action'\n";
 
-        $jconfig->{'dataset_type'} = 's';
-        my $return_text = &Jarvis::Dataset::store ($jconfig, $rest_args);
+        $dataset_type = 's';
+        my $return_text = &Jarvis::Dataset::store ($jconfig, $dataset_name, $rest_args);
 
-        print $cgi->header(-type => "text/plain; charset=UTF-8", -cookie => $jconfig->{'cookie'});
+        print $cgi->header(-type => "text/plain; charset=UTF-8", -cookie => $jconfig->{cookie});
         print $return_text;
 
     # It's the end of the world as we know it.
@@ -470,9 +462,6 @@ sub do {
 
     # Unload our global hooks.  This will call ::finish on them.
     &Jarvis::Hook::unload_global ($jconfig);
-
-    # Track the request end.
-    &Jarvis::Tracker::finish ($jconfig);
 
     # We MUST ensure that ALL the cached database handles are removed.
     # Otherwise, under mod_perl, the next application would get OUR database handles!

@@ -124,9 +124,6 @@ sub do {
     # If no match, that's fine.  Just say we couldn't do it.
     $module || return 0;
 
-    # We're sure we are a plugin now.  We're committed to this path.
-    $jconfig->{'dataset_type'} = 'p';
-
     # Check security.
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
     if ($failure ne '') {

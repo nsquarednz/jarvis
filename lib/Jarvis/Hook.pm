@@ -287,7 +287,7 @@ sub load_dataset {
     # Increment the hook level.  Level 0 are global.  Each nested dataset
     # will increment the level by one.
     my $hook_level = ++($jconfig->{hook_level});
-    &Jarvis::Error::debug ($jconfig, "Loading dataset-specific hooks at level $hook_level.");
+    &Jarvis::Error::debug ($jconfig, "Loading dataset-specific hooks at hook level $hook_level.");
 
     if ($dsxml->{dataset}{hook}) {
         foreach my $hook (@{ $dsxml->{dataset}{hook} }) {

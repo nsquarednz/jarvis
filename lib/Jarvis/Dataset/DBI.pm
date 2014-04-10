@@ -656,9 +656,6 @@ sub store {
         $fields_aref = [{}]; 
     }
 
-    # Store this for tracking
-    $jconfig->{in_nrows} = scalar @$fields_aref;
-
     # Choose our statement and find the SQL and variable names.
     my $ttype = $jconfig->{action};
     &Jarvis::Error::debug ($jconfig, "Transaction Type = '$ttype'");
@@ -684,7 +681,6 @@ sub store {
 
     # Invoke before_all hook.
     my %before_params = %safe_all_rows_params;
-    $jconfig->{params_href} = \%before_params;
     &Jarvis::Hook::before_all ($jconfig, $dsxml, \%before_params, $fields_aref);
 
     # Execute our "before" statement.  This statement is NOT permitted to fail.  If it does,
@@ -716,9 +712,6 @@ sub store {
 
         # Re-do our parameter merge, this time including our per-row parameters.
         my %safe_params = &Jarvis::Config::safe_variables ($jconfig, $cgi_params, $rest_args, $fields_href);
-
-        # Store these new parameters for our tracking purposes.
-        $jconfig->{params_href} = \%safe_params;
 
         # Any input transformations?
         if (scalar (keys %transforms)) {
@@ -763,11 +756,6 @@ sub store {
             $success = 0;
             $message || ($message = $stm->{error});
 
-            # Log the error in our tracker database.
-            unless (&nolog ($stm, $stm->{error})) {
-                &Jarvis::Tracker::error ($jconfig, '200', $stm->{error});
-            }
-
         # Suceeded.  Set per-row status, and fetch the returned results, if this
         # operation indicates that it returns values.
         #
@@ -790,7 +778,6 @@ sub store {
                     }
 
                     $row_result{returning} = [ $row ];
-                    $jconfig->{out_nrows} = 1;
                     &Jarvis::Error::debug ($jconfig, "Copied single row from bind_param_inout results.");
 
                 # SQLite uses the last_insert_rowid() function for returning IDs.  
@@ -804,7 +791,6 @@ sub store {
                         $return_values {id} = $rowid;
 
                         $row_result{returning} = [ \%return_values ];
-                        $jconfig->{out_nrows} = 1;
                         &Jarvis::Error::debug ($jconfig, "Used SQLite last_insert_rowid to get returned 'id' => '$rowid'.");
 
                     } else {
@@ -836,15 +822,9 @@ sub store {
                             $stm->{error} = $error_message;
                             $success = 0;
                             $message = $error_message;
-
-                            # Log the error in our tracker database.
-                            unless (&nolog ($stm, $error_message)) {
-                                &Jarvis::Tracker::error ($jconfig, '200', $error_message);
-                            }
                         }
 
                         $row_result{returning} = $returning_aref;
-                        $jconfig->{out_nrows} = scalar @$returning_aref;
                         &Jarvis::Error::debug ($jconfig, "Fetched " . (scalar @$returning_aref) . " rows for returning.");
                     }
 
@@ -910,7 +890,6 @@ sub store {
 
     # Reset our parameters, our per-row parameters are no longer valid.
     my %after_params = %safe_all_rows_params;
-    $jconfig->{params_href} = \%after_params;
 
     # Free any remaining open statement types.
     foreach my $stm_type (keys %stm) {

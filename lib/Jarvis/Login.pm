@@ -37,7 +37,6 @@ package Jarvis::Login;
 
 use Jarvis::Error;
 use Jarvis::Text;
-use Jarvis::Tracker;
 
 ################################################################################
 # Checks to see if we are logged in.  If permitted, we will create a new
@@ -369,7 +368,6 @@ sub check {
         } elsif ($offered_username) {
             &Jarvis::Error::log ($jconfig, "Login fail for '$offered_username' on sid $sid: $error_string.");
         }
-        &Jarvis::Tracker::login ($jconfig);
     }
 
     return 1;
