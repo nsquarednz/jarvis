@@ -504,47 +504,51 @@ sub fetch {
     my $num_fetched = scalar @$rows_aref;
     &Jarvis::Error::debug ($jconfig, "Number of rows fetched = $num_fetched.");
 
-    # Do we want to do server side sorting?  This happens BEFORE paging.  Note that this
-    # will only work when $sth->{NAME} is available.  Some (all?) stored procedures
-    # under MS-SQL Server will not provide field names, and hence this feature will not
-    # be available.
-    #
-    my $sort_field = $jconfig->{cgi}->param ($jconfig->{sort_field_param}) || '';
-    my $sort_dir = $jconfig->{cgi}->param ($jconfig->{sort_dir_param}) || 'ASC';
+    # Server-Side sorting and paging applies ONLY to the top-level dataset!
+    if ($dataset->{level} == 0) {
 
-    if ($sort_field) {
-        &Jarvis::Error::debug ($jconfig, "Server Sort on '$sort_field', Dir = '$sort_dir'.");
+        # Do we want to do server side sorting?  This happens BEFORE paging.  Note that this
+        # will only work when $sth->{NAME} is available.  Some (all?) stored procedures
+        # under MS-SQL Server will not provide field names, and hence this feature will not
+        # be available.
+        #
+        my $sort_field = $jconfig->{cgi}->param ($dataset->{sort_field_param}) || '';
+        my $sort_dir = $jconfig->{cgi}->param ($dataset->{sort_dir_param}) || 'ASC';
 
-        if (! grep { /$sort_field/ } @$column_names_aref) {
-            &Jarvis::Error::log ($jconfig, "Unknown sort field: '$sort_field'.");
+        if ($sort_field) {
+            &Jarvis::Error::debug ($jconfig, "Server Sort on '$sort_field', Dir = '$sort_dir'.");
 
-        } elsif (uc (substr ($sort_dir, 0, 1)) eq 'D') {
-            @$rows_aref = sort { ($b->{$sort_field} || chr(255)) cmp ($a->{$sort_field} || chr(255)) } @$rows_aref;
+            if (! grep { /$sort_field/ } @$column_names_aref) {
+                &Jarvis::Error::log ($jconfig, "Unknown sort field: '$sort_field'.");
 
-        } else {
-            @$rows_aref = sort { ($a->{$sort_field} || chr(255)) cmp ($b->{$sort_field} || chr(255)) } @$rows_aref;
-        }
-    }
+            } elsif (uc (substr ($sort_dir, 0, 1)) eq 'D') {
+                @$rows_aref = sort { ($b->{$sort_field} || chr(255)) cmp ($a->{$sort_field} || chr(255)) } @$rows_aref;
 
-    # Should we truncate the data to a specific page?
-    my $limit = $jconfig->{cgi}->param ($jconfig->{page_limit_param}) || 0;
-    my $start = $jconfig->{cgi}->param ($jconfig->{page_start_param}) || 0;
-
-    if ($limit > 0) {
-        ($start > 0) || ($start = 0); # Check we have a real zero, not ''
-
-        &Jarvis::Error::debug ($jconfig, "Limit = $limit, Offset = $start, Num Rows = $num_fetched.");
-
-        if ($start > $#$rows_aref) {
-            &Jarvis::Error::debug ($jconfig, "Page start over-run.  No data fetched perhaps.");
-            @$rows_aref = ();
-
-        } else {
-            if (($start + ($limit - 1)) > $#$rows_aref) {
-                &Jarvis::Error::debug ($jconfig, "Page finish over-run.  Partial page.");
-                $limit = 1 + ($#$rows_aref - $start);
+            } else {
+                @$rows_aref = sort { ($a->{$sort_field} || chr(255)) cmp ($b->{$sort_field} || chr(255)) } @$rows_aref;
             }
-            @$rows_aref = @$rows_aref[$start .. $start + ($limit - 1)];
+        }
+
+        # Should we truncate the data to a specific page?
+        my $limit = $jconfig->{cgi}->param ($dataset->{page_limit_param}) || 0;
+        my $start = $jconfig->{cgi}->param ($dataset->{page_start_param}) || 0;
+
+        if ($limit > 0) {
+            ($start > 0) || ($start = 0); # Check we have a real zero, not ''
+
+            &Jarvis::Error::debug ($jconfig, "Limit = $limit, Offset = $start, Num Rows = $num_fetched.");
+
+            if ($start > $#$rows_aref) {
+                &Jarvis::Error::debug ($jconfig, "Page start over-run.  No data fetched perhaps.");
+                @$rows_aref = ();
+
+            } else {
+                if (($start + ($limit - 1)) > $#$rows_aref) {
+                    &Jarvis::Error::debug ($jconfig, "Page finish over-run.  Partial page.");
+                    $limit = 1 + ($#$rows_aref - $start);
+                }
+                @$rows_aref = @$rows_aref[$start .. $start + ($limit - 1)];
+            }
         }
     }
 
