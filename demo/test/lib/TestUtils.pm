@@ -109,6 +109,7 @@ sub fetch {
  	($res->is_success) || die "Failed: $restful_url: " . $res->status_line . "\n" . $res->content;
  	($res->header ('Content-Type') =~ m|^text/plain|) || die "Wrong Content-Type: " . $res->header ('Content-Type');
  	my $json = decode_json ($res->content ());
+ 	print STDERR $res->content () . "\n";
 
  	# Check this looks like a valid response.
  	(defined $json->{logged_in}) || die "Missing 'logged_in' in response: " . &Dumper ($json);
