@@ -57,12 +57,14 @@ use Jarvis::Text;
 #               cgi
 #
 #       $dataset - Name of the dataset we are requested to perform.
-#       $rest_args - Hash of numbered and/or named RESTful args.
 #
-#       Note: For Jarvis 5.6 and later, $rest_args is a HASH containing both
-#       numbered and named REST args.  Previously it was an ARRAY containing
-#       only the numbered REST args.  Your plugin will need modification if
-#       it uses the REST args.
+#       $user_args - Hash of CGI + numbered/named REST args
+#
+#       Note: For Jarvis 5.6 and later, $user_args is a HASH containing CGI
+#       args plus numbered and named REST args.  
+#
+#       In earlier versions it was an ARRAY containing only the numbered REST 
+#       args.  Your plugin will need modification if it uses the REST args.
 #
 # Returns:
 #       0 if the dataset is not a known "plugin"
@@ -71,7 +73,7 @@ use Jarvis::Text;
 ################################################################################
 #
 sub do {
-    my ($jconfig, $dataset, $rest_args) = @_;
+    my ($jconfig, $dataset, $user_args) = @_;
 
     ###############################################################################
     # See if we have any extra "plugin" datasets for this application.
@@ -86,35 +88,35 @@ sub do {
     my $mime_type = undef;              # Override the mime type if you want.
     my %plugin_parameters = ();         # Taken from XML and handed to plugin
 
-    my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
-    if ($axml->{'plugin'}) {
-        foreach my $plugin (@{ $axml->{'plugin'} }) {
-            my $plugin_ds = $plugin->{'dataset'}->content;
+    my $axml = $jconfig->{xml}{jarvis}{app};
+    if ($axml->{plugin}) {
+        foreach my $plugin (@{ $axml->{plugin} }) {
+            my $plugin_ds = $plugin->{dataset}->content;
             &Jarvis::Error::dump ($jconfig, "Comparing '$dataset' to '$plugin_ds'.");
             next if (($dataset ne $plugin_ds) && ($dataset !~ m/^$plugin_ds\./));
             &Jarvis::Error::debug ($jconfig, "Found matching custom <plugin> dataset '$dataset'.");
 
-            $allowed_groups = $plugin->{'access'}->content || die "No 'access' defined for plugin dataset '$dataset'";
-            $lib = $plugin->{'lib'}->content if $plugin->{'lib'};
-            $module = $plugin->{'module'}->content || die "No 'module' defined for plugin dataset '$dataset'";
-            $add_headers = defined ($Jarvis::Config::yes_value {lc ($plugin->{'add_headers'}->content || "no")});
-            $default_filename = $plugin->{'default_filename'}->content;
-            $filename_parameter = $plugin->{'filename_parameter'}->content || 'filename';
-            $mime_type = $plugin->{'mime_type'}->content;
+            $allowed_groups = $plugin->{access}->content || die "No 'access' defined for plugin dataset '$dataset'";
+            $lib = $plugin->{lib}->content if $plugin->{lib};
+            $module = $plugin->{module}->content || die "No 'module' defined for plugin dataset '$dataset'";
+            $add_headers = defined ($Jarvis::Config::yes_value {lc ($plugin->{add_headers}->content || "no")});
+            $default_filename = $plugin->{default_filename}->content;
+            $filename_parameter = $plugin->{filename_parameter}->content || 'filename';
+            $mime_type = $plugin->{mime_type}->content;
 
-            $jconfig->{'dump'} = $jconfig->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($plugin->{'dump'}->content || "no")});
-            $jconfig->{'debug'} = $jconfig->{'dump'} || $jconfig->{'debug'} || defined ($Jarvis::Config::yes_value {lc ($plugin->{'debug'}->content || "no")});
+            $jconfig->{dump} = $jconfig->{dump} || defined ($Jarvis::Config::yes_value {lc ($plugin->{dump}->content || "no")});
+            $jconfig->{debug} = $jconfig->{dump} || $jconfig->{debug} || defined ($Jarvis::Config::yes_value {lc ($plugin->{debug}->content || "no")});
 
             # Get our parameters.  These are the configured parameters from the XML file,
             # which we handily load up for you, to avoid duplicating this code in every
             # module.  If you want CGI parameters from within your module, then you can access
-            # the $jconfig->{'cgi'} CGI object.  Ditto for anything else you might want from
-            # the $jconfig->{'xml'} XML::Smartt object.
+            # the $jconfig->{cgi} CGI object.  Ditto for anything else you might want from
+            # the $jconfig->{xml} XML::Smartt object.
             #
-            if ($plugin->{'parameter'}) {
-                foreach my $parameter ($plugin->{'parameter'}('@')) {
-                    &Jarvis::Error::debug ($jconfig, "Plugin Parameter: " . $parameter->{'name'}->content . " -> " . $parameter->{'value'}->content);
-                    $plugin_parameters {$parameter->{'name'}->content} = $parameter->{'value'}->content;
+            if ($plugin->{parameter}) {
+                foreach my $parameter ($plugin->{parameter}('@')) {
+                    &Jarvis::Error::debug ($jconfig, "Plugin Parameter: " . $parameter->{name}->content . " -> " . $parameter->{value}->content);
+                    $plugin_parameters {$parameter->{name}->content} = $parameter->{value}->content;
                 }
             }
             last;
@@ -127,18 +129,15 @@ sub do {
     # Check security.
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
     if ($failure ne '') {
-        $jconfig->{'status'} = "401 Unauthorized";
+        $jconfig->{status} = "401 Unauthorized";
         die "Wanted plugin access: $failure";
     }
-
-    # Get our CGI parameters hash for easy reference.
-    my %param_values = $jconfig->{'cgi'}->Vars;
 
     # Figure out a filename.  It's not mandatory, if we don't have a default
     # filename and we don't have a filename_parameter supplied and defined then
     # we will return anonymous content in text/plain format.
     #
-    my $filename = $param_values {$filename_parameter} ? &File::Basename::basename ($param_values {$filename_parameter}) : ($default_filename || undef);
+    my $filename = $user_args->{$filename_parameter} ? &File::Basename::basename ($user_args->{$filename_parameter}) : ($default_filename || undef);
 
     if (defined $filename) {
         &Jarvis::Error::debug ($jconfig, "Using filename '$filename'");
@@ -149,11 +148,11 @@ sub do {
 
     # Now load the module.
     #
-    &Jarvis::Error::debug ($jconfig, "Using default libs: '" . (join ',', @{$jconfig->{'default_libs'}}) . "'". ($lib ? ", plugin lib '$lib'." : ", no plugin specific lib."));
+    &Jarvis::Error::debug ($jconfig, "Using default libs: '" . (join ',', @{$jconfig->{default_libs}}) . "'". ($lib ? ", plugin lib '$lib'." : ", no plugin specific lib."));
     &Jarvis::Error::debug ($jconfig, "Loading plugin module '$module'.");
 
     {
-        map { eval "use lib \"$_\""; } @{$jconfig->{'default_libs'}};
+        map { eval "use lib \"$_\""; } @{$jconfig->{default_libs}};
         eval "use lib \"$lib\"" if $lib;
         eval "require $module";
         if ($@) {
@@ -167,7 +166,7 @@ sub do {
     my $output;
     {
         no strict 'refs';
-        $output = &$method ($jconfig, $rest_args, %plugin_parameters);
+        $output = &$method ($jconfig, $user_args, %plugin_parameters);
     }
 
     # Are we supposed to add headers?  Does that include a filename header?
@@ -181,17 +180,17 @@ sub do {
         &Jarvis::Error::debug ($jconfig, "Plugin returning mime type '$mime_type'");
 
         if (defined $filename && ($filename ne '')) {
-            print $jconfig->{'cgi'}->header(
+            print $jconfig->{cgi}->header(
                 -type => $mime_type,
                 'Content-Disposition' => $filename && "attachment; filename=$filename",
-                -cookie => $jconfig->{'cookie'},
+                -cookie => $jconfig->{cookie},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             );
 
         } else {
-            print $jconfig->{'cgi'}->header(
+            print $jconfig->{cgi}->header(
                 -type => $mime_type,
-                -cookie => $jconfig->{'cookie'},
+                -cookie => $jconfig->{cookie},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             );
         }

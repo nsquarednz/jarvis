@@ -48,7 +48,7 @@ use Jarvis::Text;
 #
 #       $dataset_name - Name of the special "exec" dataset we are requested to perform.
 #
-#       $rest_args - A ref to our hash of REST args (numbered and named)
+#       $user_args - Hash of CGI + numbered/named REST args
 #
 # Returns:
 #       0 if the dataset is not a known "exec" dataset
@@ -57,7 +57,7 @@ use Jarvis::Text;
 ################################################################################
 #
 sub do {
-    my ($jconfig, $dataset, $rest_args) = @_;
+    my ($jconfig, $dataset, $user_args) = @_;
 
     ###############################################################################
     # See if we have any extra "exec" dataset for this application.
@@ -77,33 +77,33 @@ sub do {
     my $tmp_redirect = 0;               # Are we going to redirect the user to the results?
     my $cleanup_after = 0;              # Cleanup after how many minutes?  0 = NEVER CLEANUP.
 
-    my $axml = $jconfig->{'xml'}{'jarvis'}{'app'};
-    if ($axml->{'exec'}) {
-        foreach my $exec (@{ $axml->{'exec'} }) {
-            my $exec_ds = $exec->{'dataset'}->content;
+    my $axml = $jconfig->{xml}{jarvis}{app};
+    if ($axml->{exec}) {
+        foreach my $exec (@{ $axml->{exec} }) {
+            my $exec_ds = $exec->{dataset}->content;
             &Jarvis::Error::dump ($jconfig, "Comparing '$dataset' to '$exec_ds'.");
             next if (($dataset ne $exec_ds) && ($dataset !~ m/^$exec_ds\./));
 
             &Jarvis::Error::debug ($jconfig, "Found matching custom <exec> dataset '$dataset'.");
 
-            $allowed_groups = $exec->{'access'}->content || die "No 'access' defined for exec dataset '$dataset'";
-            $command = $exec->{'command'}->content || die "No 'command' defined for exec dataset '$dataset'";
-            $add_headers = defined ($Jarvis::Config::yes_value {lc ($exec->{'add_headers'}->content || "no")});
-            $default_filename = $exec->{'default_filename'}->content;
-            $filename_parameter = $exec->{'filename_parameter'}->content || 'filename';
-            $mime_type = $exec->{'mime_type'}->content;
-            $cleanup_after = $exec->{'cleanup_after'}->content || 0;
+            $allowed_groups = $exec->{access}->content || die "No 'access' defined for exec dataset '$dataset'";
+            $command = $exec->{command}->content || die "No 'command' defined for exec dataset '$dataset'";
+            $add_headers = defined ($Jarvis::Config::yes_value {lc ($exec->{add_headers}->content || "no")});
+            $default_filename = $exec->{default_filename}->content;
+            $filename_parameter = $exec->{filename_parameter}->content || 'filename';
+            $mime_type = $exec->{mime_type}->content;
+            $cleanup_after = $exec->{cleanup_after}->content || 0;
 
             # If HTTP redirection URL is specified, then use of tmp files is forced.
-            $tmp_directory = $exec->{'tmp_directory'}->content;
-            $tmp_http_path = $exec->{'tmp_http_path'}->content;
+            $tmp_directory = $exec->{tmp_directory}->content;
+            $tmp_http_path = $exec->{tmp_http_path}->content;
 
-            $use_tmpfile = $tmp_http_path || $tmp_directory || defined ($Jarvis::Config::yes_value {lc ($exec->{'use_tmpfile'}->content || "no")});
+            $use_tmpfile = $tmp_http_path || $tmp_directory || defined ($Jarvis::Config::yes_value {lc ($exec->{use_tmpfile}->content || "no")});
             $tmp_redirect = $tmp_http_path;
 
             # Override debug/dump.  Won't get much, but at least we'll see what is produced.
-            $jconfig->{'dump'} = $jconfig->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($exec->{'dump'}->content || "no")});
-            $jconfig->{'debug'} = $jconfig->{'dump'} || $jconfig->{'debug'} || defined ($Jarvis::Config::yes_value {lc ($exec->{'debug'}->content || "no")});
+            $jconfig->{dump} = $jconfig->{dump} || defined ($Jarvis::Config::yes_value {lc ($exec->{dump}->content || "no")});
+            $jconfig->{debug} = $jconfig->{dump} || $jconfig->{debug} || defined ($Jarvis::Config::yes_value {lc ($exec->{debug}->content || "no")});
 
             last;
         }
@@ -115,20 +115,15 @@ sub do {
     # Check security.
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
     if ($failure ne '') {
-        $jconfig->{'status'} = "401 Unauthorized";
+        $jconfig->{status} = "401 Unauthorized";
         die "Wanted exec access: $failure";
     }
-
-    # Get our parameters.  Note that our special variables like __username will
-    # override sneaky user-supplied values.
-    #
-    my $cgi_params = $jconfig->{'cgi'}->Vars;
 
     # Figure out a filename.  It's not mandatory, if we don't have a default
     # filename and we don't have a filename_parameter supplied and defined then
     # we will return anonymous content in text/plain format.
     #
-    my $filename = $cgi_params->{$filename_parameter} ? &File::Basename::basename ($cgi_params->{$filename_parameter}) : ($default_filename || undef);
+    my $filename = $user_args->{$filename_parameter} ? &File::Basename::basename ($user_args->{$filename_parameter}) : ($default_filename || undef);
 
     if (defined $filename) {
         &Jarvis::Error::debug ($jconfig, "Using filename '$filename'");
@@ -140,10 +135,10 @@ sub do {
     # If we're under windows, force the use of tmp files.
     $use_tmpfile = 1 if $^O eq "MSWin32";
 
-    print STDERR &Dumper ($rest_args);
+    print STDERR &Dumper ($user_args);
 
     # Now construct our safe variables from our CGI, rest and per-row (none) arguments.
-    my %safe_params = &Jarvis::Config::safe_variables ($jconfig, $cgi_params, $rest_args, undef);
+    my %safe_params = &Jarvis::Config::safe_variables ($jconfig, $user_args, undef);
 
     my $tmp_file = undef;
     if ($use_tmpfile) {
@@ -177,12 +172,12 @@ sub do {
             DIR => $tmp_directory,
             UNLINK => 0 #(! $tmp_http_path)
         );
-        $safe_params{'__tmpfile'} = $tmp_file->filename;
+        $safe_params{__tmpfile} = $tmp_file->filename;
         &Jarvis::Error::debug ($jconfig, "TMP filename = " . $tmp_file->filename);
     }
 
     # Add the dataset as a safe variable too.
-    $safe_params{'__dataset'} = $dataset;
+    $safe_params{__dataset} = $dataset;
 
     # Add parameters to our command.  Note that we will take ALL parameters supplied
     # by the user, so we need to watch out for any funny business.
@@ -224,8 +219,8 @@ sub do {
     }
 
     # Set DEBUG if required.
-    if ($jconfig->{'debug'}) {
-        $ENV{'DEBUG'} = 1;
+    if ($jconfig->{debug}) {
+        $ENV{DEBUG} = 1;
     }
 
     # Execute the command
@@ -235,7 +230,7 @@ sub do {
 
     if ($status != 0) {
         # log command in case we haven't done so already
-        &Jarvis::Error::log ($jconfig, "Executed Command: $command") unless ($jconfig->{'debug'});
+        &Jarvis::Error::log ($jconfig, "Executed Command: $command") unless ($jconfig->{debug});
         die "Command failed with status $status.\n$output";
     }
 
@@ -252,26 +247,26 @@ sub do {
         if (defined $filename && ($filename ne '')) {
             if ($use_tmpfile) {
                 my $length = -s $tmp_file->filename;
-                print $jconfig->{'cgi'}->header(
+                print $jconfig->{cgi}->header(
                     -type                   => $mime_type,
                     'Content-Disposition'   => "attachment; filename=$filename",
-                    -cookie                 => $jconfig->{'cookie'},
+                    -cookie                 => $jconfig->{cookie},
                     'Cache-Control'         => 'no-store, no-cache, must-revalidate',
                     'Content-Length'        => $length
                 );
             } else {
-                print $jconfig->{'cgi'}->header(
+                print $jconfig->{cgi}->header(
                     -type                   => $mime_type,
                     'Content-Disposition'   => "attachment; filename=$filename",
-                    -cookie                 => $jconfig->{'cookie'},
+                    -cookie                 => $jconfig->{cookie},
                     'Cache-Control'         => 'no-store, no-cache, must-revalidate'
                 );
             }
 
         } else {
-            print $jconfig->{'cgi'}->header(
+            print $jconfig->{cgi}->header(
                 -type => $mime_type,
-                -cookie => $jconfig->{'cookie'},
+                -cookie => $jconfig->{cookie},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             );
         }
@@ -310,7 +305,7 @@ sub do {
 
         my $url = "http://" . $ENV{"HTTP_HOST"} . "/" . $tmp_http_path . (($tmp_http_path =~ m|\/$|) ? "" : "/") . &File::Basename::basename ($tmp_file->filename);
         &Jarvis::Error::debug ($jconfig, "Redirect to: $url");
-        print $jconfig->{'cgi'}->redirect( -URL => $url);
+        print $jconfig->{cgi}->redirect( -URL => $url);
 
     # OPTION THREE - Just print out whatever was pumped back via STDOUT.
     #

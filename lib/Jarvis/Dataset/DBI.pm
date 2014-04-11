@@ -520,7 +520,6 @@ sub statement_execute {
 # Params:
 #       $jconfig - Jarvis::Config object
 #           READ
-#               cgi                 Contains data values for {{param}} in SQL
 #               username            Used for {{username}} in SQL
 #               group_list          Used for {{group_list}} in SQL
 #
@@ -573,7 +572,7 @@ sub fetch {
 # Params:
 #       $jconfig - Jarvis::Config object
 #           READ
-#               cgi                 Contains data values for {{param}} in SQL
+#               cgi                 Submitted content and content-type.
 #               username            Used for {{username}} in SQL
 #               group_list          Used for {{group_list}} in SQL
 #               format              Either "json" or "xml" (not "csv").
@@ -581,7 +580,7 @@ sub fetch {
 #       $dataset_name - Name of single dataset we are storing to.
 #       $dsxml - Dataset XML object.
 #       $dbh - Database handle of the correct type to match the dataset.
-#       $rest_args - Hash of numbered and/or named REST args.
+#       $user_args - Hash of CGI + numbered/named REST args.
 #
 # Returns:
 #       XML/JSON object summary of results.
@@ -589,7 +588,7 @@ sub fetch {
 ################################################################################
 #
 sub store {
-    my ($jconfig, $dataset_name, $dsxml, $dbh, $rest_args) = @_;
+    my ($jconfig, $dataset_name, $dsxml, $dbh, $user_args) = @_;
 
     # What transforms should we use when processing store data?
     my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->{dataset}{transform}{store});
@@ -676,8 +675,7 @@ sub store {
     #
     # Merge CGI params + REST args, plus default, safe and session vars.
     #
-    my $cgi_params = $jconfig->{cgi}->Vars;
-    my %safe_all_rows_params = &Jarvis::Config::safe_variables ($jconfig, $cgi_params, $rest_args, undef);
+    my %safe_all_rows_params = &Jarvis::Config::safe_variables ($jconfig, $user_args, undef);
 
     # Invoke before_all hook.
     my %before_params = %safe_all_rows_params;
@@ -711,7 +709,7 @@ sub store {
         }
 
         # Re-do our parameter merge, this time including our per-row parameters.
-        my %safe_params = &Jarvis::Config::safe_variables ($jconfig, $cgi_params, $rest_args, $fields_href);
+        my %safe_params = &Jarvis::Config::safe_variables ($jconfig, $user_args, $fields_href);
 
         # Any input transformations?
         if (scalar (keys %transforms)) {

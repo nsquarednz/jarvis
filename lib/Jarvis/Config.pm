@@ -206,8 +206,8 @@ sub default_parameters {
 #               username
 #               group_list
 #
-#       $cgi_params - User-supplied (unsafe) hash of CGI parameters.
-#       $rest_args - User-supplied (unsafe) hash of numbered and named REST args.
+#       $user_args - Hash of CGI + numbered/named REST args (top level datasest).
+#                    OR linked child args (for nested datasets).
 #       $row_params - User-supplied (unsafe) hash of per-row parameters.
 #
 # Returns:
@@ -216,7 +216,7 @@ sub default_parameters {
 #
 sub safe_variables {
 
-    my ($jconfig, $cgi_params, $rest_args, $row_params) = @_;
+    my ($jconfig, $user_args, $row_params) = @_;
 
     # Start with our default parameters.
     my %safe_params = &default_parameters ($jconfig);
@@ -224,19 +224,11 @@ sub safe_variables {
     # Copy through the user-provided parameters.  Do not copy any user-provided
     # variable which begins with "__" (two underscores).  That prefix is strictly
     # reserved for our server-controlled "safe" parameters.
-    if (defined $cgi_params) {
-        foreach my $name (keys %$cgi_params) {
-            if ($name =~ m/^_?[a-z][a-z0-9_\-]*$/i) {
-                &Jarvis::Error::debug ($jconfig, "User CGI Parameter: '$name' => '%s'.", $cgi_params->{$name});
-                $safe_params{$name} = $cgi_params->{$name};
-            }
-        }
-    }
-    if (defined $rest_args) {
-        foreach my $name (keys %$rest_args) {
+    if (defined $user_args) {
+        foreach my $name (keys %$user_args) {
             if ($name =~ m/^_?[a-z0-9_\-]*$/i) {
-                &Jarvis::Error::debug ($jconfig, "User REST Arg: '$name' => '%s'.", $rest_args->{$name});
-                $safe_params{$name} = $rest_args->{$name};
+                &Jarvis::Error::debug ($jconfig, "User REST Arg: '$name' => '%s'.", $user_args->{$name});
+                $safe_params{$name} = $user_args->{$name};
             }
         }
     }

@@ -23,7 +23,7 @@
 #                 CALLED: Before returning result of a "__status" request.
 #                   GLOBAL HOOKS
 #
-#                 return_fetch ($jconfig, $hook_params_href, $rest_args_aref, $rows_aref, $extra_href, $return_text_aref)
+#                 return_fetch ($jconfig, $hook_params_href, $user_args_aref, $rows_aref, $extra_href, $return_text_aref)
 #                 CALLED: Before returning result of a "fetch" request.
 #                   GLOBAL HOOKS
 #
@@ -387,19 +387,18 @@ sub return_status {
 
 ###############################################################################
 # Invoke the "return_fetch" method on each GLOBAL hook.  This occurs for all
-# dataset within a regular SQL fetch.  If the fetch specifies more than one
-# dataset in a comma-separated list, then we call this for each one.
+# dataset within a regular SQL fetch, including for nested datasets.
 #
 # This hook may do one or more of:
 #
-#   - Add some extra per-dataset parameters (by modifying $extra_href)
-#   - Completely modify the returned content (by modifying $rows_aref)
+#   - Add some extra per-dataset parameters (via $extra_href)
+#   - Completely modify the returned content (via $rows_aref)
 #
 # Params:
 #       $jconfig        - Jarvis::Config object
 #
-#       $rest_args_aref - The hash of REST args parsed for the request.
-#                         Includes numbered and named REST args.
+#       $user_args_aref - The hash of user args parsed for the request.
+#                         Includes CGI + numbered and named REST args.
 #
 #       $rows_aref      - The array of rows returned from the top level
 #                         dataset query.  May included nested child 
@@ -416,10 +415,10 @@ sub return_status {
 ###############################################################################
 #
 sub return_fetch {
-    my ($jconfig, $rest_args_aref, $rows_aref, $extra_href, $return_text_ref) = @_;
+    my ($jconfig, $user_args_aref, $rows_aref, $extra_href, $return_text_ref) = @_;
 
     foreach my $hook (grep { ! $_->{level} } @{ $jconfig->{hooks} }) {
-        &invoke ($jconfig, $hook, "return_fetch", $rest_args_aref, $rows_aref, $extra_href, $return_text_ref);
+        &invoke ($jconfig, $hook, "return_fetch", $user_args_aref, $rows_aref, $extra_href, $return_text_ref);
     }
     return 1;
 }

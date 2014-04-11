@@ -1,0 +1,27 @@
+<dataset read="*" write="*" key_list="id">
+    <transform fetch="notnull" store="trim,null" />
+    <select>
+SELECT id, name
+FROM boat_part
+WHERE ({{boat_id}} IS NULL OR boat_id = {{boat_id})
+    AND ({{id}} IS NULL OR id = {{id}})
+ORDER BY name;
+    </select>
+    <update>
+UPDATE boat_part
+SET boat_id = {{boat_id}},
+    name = {{name}}
+    change_user = {{__username}},
+    change_date = datetime ('now')
+WHERE id = {{id}};
+    </update>
+    <insert returning="yes">
+INSERT INTO boat_part (boat_id, name, change_user, change_date)
+VALUES ({{boat_id}}, {{name}},
+        {{__username}}, datetime ('now'));
+    </insert>
+    <delete>
+DELETE FROM boat_part
+WHERE id = {{id}};
+    </delete>
+</dataset>

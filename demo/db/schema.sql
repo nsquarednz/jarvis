@@ -1,10 +1,13 @@
 -- ".read schema.sql" in "sqlite3" to create the database.  A pre-created version
 -- of the database is shipped in jarvis/demo/db/demo.db for your convenience.
 --
+DROP TABLE boat_part;
 DROP TABLE boat;
 DROP TABLE boat_class;
-DROP TABLE users;
 DROP VIEW groups;
+DROP TABLE users;
+
+PRAGMA foreign_keys = ON;
 
 CREATE TABLE users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,7 +63,7 @@ CREATE TABLE boat (
     class text NOT NULL REFERENCES boat_class (class) ON DELETE RESTRICT ON UPDATE CASCADE,
     owner text,
     description text,
-    UNIQUE (class, name));
+    UNIQUE (name));
 
 INSERT INTO boat (name, registration_num, class, owner, change_user)
     VALUES ('MyMakk', 33, 'Makkleson', 'John Smith', 'admin');
@@ -162,6 +165,6 @@ CREATE TABLE boat_part (
     change_user text NOT NULL REFERENCES users (name) ON DELETE RESTRICT ON UPDATE CASCADE,
     change_date timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    boat text NOT NULL REFERENCES boat (name) ON DELETE CASCADE ON UPDATE CASCADE,
+    boat_id INTEGER NOT NULL REFERENCES boat (id) ON DELETE CASCADE ON UPDATE CASCADE,
     name text,
-    UNIQUE (boat, name));
+    UNIQUE (boat_id, name));

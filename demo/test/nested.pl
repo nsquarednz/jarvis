@@ -100,9 +100,9 @@ print ">>> New Boat '$fd_boat_name' (ID $fd_boat_id)\n";
 ###############################################################################
 print "TEST: Inserting Boat Parts for '$en_boat_name'\n";
 $insert = [
-	{ boat => $en_boat_name, name => "Widget" },
-	{ boat => $en_boat_name, name => "Sprocket" },
-	{ boat => $en_boat_name, name => "Gadget" },
+	{ boat_id => $en_boat_id, name => "Widget" },
+	{ boat_id => $en_boat_id, name => "Sprocket" },
+	{ boat_id => $en_boat_id, name => "Gadget" },
 ];
 $json = TestUtils::store ([ 'boat_part' ], { _method => 'insert' }, $insert);
 if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 3))) {
@@ -114,7 +114,7 @@ my @part_ids = map { $_->{returning}[0]{id} } @{ $json->{row} };
 # OK, now try a nested fetch!
 ###############################################################################
 print "TEST: Selecting Nested Boat Object for '$en_boat_name'\n";
-$json = TestUtils::fetch ([ 'boat' ], { id => $en_boat_id });
+$json = TestUtils::fetch ([ 'boat_object' ], { id => $en_boat_id });
 
 if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data})) {
     BAIL_OUT("Failed to store: " . &Dumper ($json));    

@@ -398,7 +398,7 @@ sub get_post_data {
 #                      "csv", "xlsx".
 #
 #       $dataset_name - Dataset name we parsed/routed to.
-#       $rest_args - Hash of numbered and/or named REST args.
+#       $user_args - Hash of CGI + numbered/named REST args.
 #
 # Returns:
 #       Reference to Hash of returned data.  You may convert to JSON or XML.
@@ -406,7 +406,7 @@ sub get_post_data {
 ################################################################################
 #
 sub fetch {
-    my ($jconfig, $dataset_name, $rest_args) = @_;
+    my ($jconfig, $dataset_name, $user_args) = @_;
     
     # What format will we encode into.
     my $format = $jconfig->{format};
@@ -427,7 +427,7 @@ sub fetch {
     }
 
     # Get the ROWS inner content for the dataset.
-    my ($rows_aref, $column_names_aref) = &fetch_rows ($jconfig, $dataset_name, $rest_args);
+    my ($rows_aref, $column_names_aref) = &fetch_rows ($jconfig, $dataset_name, $user_args);
 
     # Now we have an array of hash objects.  Apply post-processing.
     my $num_fetched = scalar @$rows_aref;
@@ -452,7 +452,7 @@ sub fetch {
     #
     my $extra_href = {};
     my $return_value = undef;
-    &Jarvis::Hook::return_fetch ($jconfig, $rest_args, $rows_aref, $extra_href, \$return_value);
+    &Jarvis::Hook::return_fetch ($jconfig, $user_args, $rows_aref, $extra_href, \$return_value);
 
     # If the hook performed its own encoding, we have no further work to do.
     if (defined $return_value) {
@@ -648,7 +648,8 @@ sub fetch {
 #               group_list          Used for {{group_list}} in SQL
 #
 #       $dataset_name - Dataset name we parsed/routed to.
-#       $rest_args - Hash of numbered and/or named REST args.
+#       $user_args - Hash of CGI + numbered/named REST args (top level datasest).
+#                    OR linked child args (for nested datasets).
 #
 # Returns:
 #       Reference to Hash of returned data.  You may convert to JSON or XML.
@@ -656,13 +657,9 @@ sub fetch {
 ################################################################################
 #
 sub fetch_rows {    
-    my ($jconfig, $dataset_name, $rest_args) = @_;
+    my ($jconfig, $dataset_name, $user_args) = @_;
 
-    # Turn our CGI params and REST args into a safe list of parameters.
-    # This will also add our special parameters - __username, __group_list, etc.
-    # It will also merge in application default parameters and session safe variables.
-    my $cgi_params = $jconfig->{cgi}->Vars;
-    my %params_copy = &Jarvis::Config::safe_variables ($jconfig, $cgi_params, $rest_args, undef);
+    &Jarvis::Error::debug ($jconfig, "Fetching dataset rows - load dataset XML and per-datasets hooks.");
 
     # Read the dataset config file.  This changes debug level as a side-effect.
     my $dataset = &load_dsxml ($jconfig, $dataset_name) || die "Cannot load configuration for dataset '$dataset_name'.\n";
@@ -682,16 +679,16 @@ sub fetch_rows {
         die "Insufficient privileges to read '$dataset_name': $failure\n";
     }    
 
+    # Get our all-rows safe variables.
+    # Turn our CGI params and REST args into a safe list of parameters.
+    # This will also add our special parameters - __username, __group_list, etc.
+    # It will also merge in application default parameters and session safe variables.
+    my %params_copy = &Jarvis::Config::safe_variables ($jconfig, $user_args, undef);
+
     # Call the pre-fetch hook.
     my %safe_params = %params_copy;
     &Jarvis::Hook::dataset_pre_fetch ($jconfig, $dsxml, \%safe_params);
 
-    # What filename would this dataset use?
-    my $filename_parameter = $dsxml->{dataset}{filename_parameter}->content || 'filename';
-    &Jarvis::Error::debug ($jconfig, "Filename parameter = '$filename_parameter'.");        
-    $jconfig->{return_filename} = $safe_params {$filename_parameter} || '';        
-    &Jarvis::Error::debug ($jconfig, "Return filename = '" . $jconfig->{return_filename} . "'.");        
-    
     # Get a database handle.
     my $dbh = &Jarvis::DB::handle ($jconfig, $dbname, $dbtype);
 
@@ -786,8 +783,10 @@ sub fetch_rows {
     }            
 
     # Now do we have any child datasets?
-    if ($dsxml->{child}) {
-        foreach my $child (@{ $dsxml->{child} }) {
+    if ($dsxml->{dataset}{child}) {
+        &Jarvis::Error::debug ($jconfig, "We have child datasets to append.");
+
+        foreach my $child (@{ $dsxml->{dataset}{child} }) {
 
             # What dataset do we use to get child data, and where do we store it?
             $child->{field} || die "Invalid dataset child configuration, <child> with no 'field' attribute.";
@@ -811,18 +810,40 @@ sub fetch_rows {
             # for single row requests, it could get real inefficient real fast.            
             foreach my $row (@$rows_aref) {
 
-                # Start with a copy of our own rest args.
-                my %child_args = %$rest_args;
+                # We copy across only the child args.
+                my %child_args = ();
+                foreach my $parent (keys %links) {
+                    my $child = $links{$parent};                    
+                    $child_args{$child} = $row->{$parent};
+                    &Jarvis::Error::debug ($jconfig, "Passing parent field [%s] -> child field [%s] as value '%s'.", $parent, $child, $row->{$parent}, );
+                }
 
-                # Merge in the row attributes.
-                map { $child_args{$_} = $row->{$_} } (keys %$row);
+                # Change debug output to show the nested set.
+                my $old_dataset_name = $jconfig->{dataset_name};
+                $jconfig->{dataset_name} .= ">" . $child_dataset;
 
                 # Execute the sub query and store it in the child field.
+                # This will add default and safe args.
                 $row->{$child_field} = &fetch_rows ($jconfig, $child_dataset, \%child_args);
+
+                # Restore the old name for debugging.
+                $jconfig->{dataset_name} = $old_dataset_name;
             }
         }
     }    
-    
+
+    # What filename would this dataset use?  This is an ugly side-effect.
+    #
+    # TODO: Get rid of this parameter from the dataset/exec/plugin level.
+    #       See http://support.nsquaredsoftware.com/tickets/view.php?id=6777
+    #
+    if ($dataset->{level} == 0) {
+        my $filename_parameter = $dsxml->{dataset}{filename_parameter}->content || 'filename';
+        &Jarvis::Error::debug ($jconfig, "Filename parameter = '$filename_parameter'.");        
+        $jconfig->{return_filename} = $safe_params {$filename_parameter} || '';        
+        &Jarvis::Error::debug ($jconfig, "Return filename = '" . $jconfig->{return_filename} . "'.");        
+    }
+
     # This final hook allows you to modify the data returned by SQL for one dataset.
     # This hook may completely modify the returned content (by modifying $rows_aref).
     &Jarvis::Hook::dataset_fetched ($jconfig, $dsxml, \%safe_params, $rows_aref, $column_names_aref);
@@ -853,7 +874,7 @@ sub fetch_rows {
 #                      "csv", "xlsx".
 #
 #       $dataset_name - Dataset name we parsed/routed to.
-#       $rest_args_aref - A ref to our REST args (slash-separated after dataset)
+#       $user_args - Hash of CGI + numbered/named REST args.
 #
 # Returns:
 #       "OK" on succes
@@ -862,7 +883,7 @@ sub fetch_rows {
 ################################################################################
 #
 sub store {
-    my ($jconfig, $dataset_name, $rest_args_aref) = @_;
+    my ($jconfig, $dataset_name, $user_args) = @_;
 
     # Read the dataset config file.  This changes debug level as a side-effect.
     my $dataset = &load_dsxml ($jconfig, $dataset_name) || die "Cannot load configuration for dataset '$dataset_name'.";
@@ -897,7 +918,7 @@ sub store {
     # Dataset.pm, and only the DBI specific stuff should be in DBI.pm.
     #
     # But until then, let's just let sleeping dogs lie.
-    my $result = &Jarvis::Dataset::DBI::store ($jconfig, $dataset_name, $dsxml, $dbh, $rest_args_aref);
+    my $result = &Jarvis::Dataset::DBI::store ($jconfig, $dataset_name, $dsxml, $dbh, $user_args);
 
     # In any case, Unload/Finish dataset specific hooks.
     &Jarvis::Hook::unload_dataset ($jconfig);

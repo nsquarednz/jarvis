@@ -275,16 +275,30 @@ sub do {
     ###############################################################################
 
     # Now parse the rest of the args and apply our router.  This gives us dataset name too.
-    my ($dataset_name, $rest_args, $presentation) = &Jarvis::Route::find ($jconfig, \@path_parts);
+    my ($dataset_name, $user_args, $presentation) = &Jarvis::Route::find ($jconfig, \@path_parts);
+
+    # Store this for debugging.
+    $jconfig->{dataset_name} = $dataset_name;
     &Jarvis::Error::debug ($jconfig, "Dataset Name = '%s'.", $dataset_name);
     &Jarvis::Error::debug ($jconfig, "Presentation = '%s'.", $presentation);
 
     # Store the presentation for later encoding.
     $jconfig->{presentation} = $presentation;
 
-    # Show our final list of named args.
-    foreach my $key (sort (keys %$rest_args)) {
-        &Jarvis::Error::debug ($jconfig, "Rest Arg '$key' => '%s'.", $$rest_args{$key});
+    # Show our rest args.
+    foreach my $key (sort (keys %$user_args)) {
+        &Jarvis::Error::debug ($jconfig, "Rest Arg: '$key' => '%s'.", $$user_args{$key});
+    }
+
+    # Merge in the CGI vars.  Do NOT override REST args.
+    my $cgi_params = $jconfig->{cgi}->Vars;
+    foreach my $name (keys %$cgi_params) {
+        next if ($name !~ m/^_?[a-z][a-z0-9_\-]*$/i);
+        next if ($name eq 'POSTDATA');
+        next if (defined $user_args->{$name});
+
+        &Jarvis::Error::debug ($jconfig, "CGI Param: '$name' => '%s'.", $cgi_params->{$name});
+        $user_args->{$name} = $cgi_params->{$name};
     }
 
     # Dataset name can't be empty.  Also, it can only be normal characters 
@@ -385,7 +399,7 @@ sub do {
     # cases where it is doing the header.  But if the exec script itself is
     # doing all the headers, then there will be no session cookie.
     #
-    } elsif (&Jarvis::Exec::do ($jconfig, $dataset_name, $rest_args)) {
+    } elsif (&Jarvis::Exec::do ($jconfig, $dataset_name, $user_args)) {
         # All is well if this returns true.  The action is treated.
         $dataset_type = 'e';
 
@@ -393,7 +407,7 @@ sub do {
     # except that where an exec is a `<command>` system call, a Plugin is a
     # dynamically loaded module method.
     #
-    } elsif (&Jarvis::Plugin::do ($jconfig, $dataset_name, $rest_args)) {
+    } elsif (&Jarvis::Plugin::do ($jconfig, $dataset_name, $user_args)) {
         # All is well if this returns true.  The action is treated.
         $dataset_type = 'p';
 
@@ -401,7 +415,7 @@ sub do {
     } elsif ($action eq "select") {
         $dataset_type = 's';
 
-        my $return_text = &Jarvis::Dataset::fetch ($jconfig, $dataset_name, $rest_args);
+        my $return_text = &Jarvis::Dataset::fetch ($jconfig, $dataset_name, $user_args);
 
         #
         # When providing CSV output, it is most likely going to be downloaded and
@@ -441,11 +455,8 @@ sub do {
     # Modify a regular dataset.
     } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete") || ($action eq "mixed")) {
 
-        # Meta-sets are for FETCH only, not STORE.
-        ($dataset_name =~ m/,/) && die "Comma-Separated dataset '$dataset_name' not permitted for action '$action'\n";
-
         $dataset_type = 's';
-        my $return_text = &Jarvis::Dataset::store ($jconfig, $dataset_name, $rest_args);
+        my $return_text = &Jarvis::Dataset::store ($jconfig, $dataset_name, $user_args);
 
         print $cgi->header(-type => "text/plain; charset=UTF-8", -cookie => $jconfig->{cookie});
         print $return_text;

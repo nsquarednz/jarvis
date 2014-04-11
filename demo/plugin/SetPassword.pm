@@ -4,7 +4,7 @@ use warnings;
 use Digest::MD5 qw (md5 md5_hex);
 
 sub plugin::SetPassword::do {
-    my ($jconfig, $rest_args, %args) = @_;
+    my ($jconfig, $user_args, %args) = @_;
 
     # Check we are admin.
     &Jarvis::Error::debug ($jconfig, "Setting password being attempted by user '" . $jconfig->{'username'} . "'.");
