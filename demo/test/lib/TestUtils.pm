@@ -38,7 +38,7 @@ sub logout {
 
  	# Check request succeeded, and result is interpretable as JSON.
  	my $res = $ua->request ($req);
- 	($res->is_success) || die "Failed: __logout: " . $res->status_line;
+ 	($res->is_success) || die "Failed: __status: " . $res->status_line . "\n" . $res->content;
  	($res->header ('Content-Type') =~ m|^text/plain|) || die "Wrong Content-Type: " . $res->header ('Content-Type');
  	my $json = decode_json ($res->content ());
 
@@ -73,7 +73,7 @@ sub login {
 
  	# Check request succeeded, and result is interpretable as JSON.
  	my $res = $ua->request ($req);
- 	($res->is_success) || die "Failed: __status: " . $res->status_line;
+ 	($res->is_success) || die "Failed: __status: " . $res->status_line . "\n" . $res->content;
  	($res->header ('Content-Type') =~ m|^text/plain|) || die "Wrong Content-Type: " . $res->header ('Content-Type');
  	my $json = decode_json ($res->content ());
 
@@ -106,7 +106,7 @@ sub fetch {
 
   	# Check request succeeded, and result is interpretable as JSON.
 	my $res = $ua->request ($req);
- 	($res->is_success) || die "Failed: __status: " . $res->status_line;
+ 	($res->is_success) || die "Failed: $restful_url: " . $res->status_line . "\n" . $res->content;
  	($res->header ('Content-Type') =~ m|^text/plain|) || die "Wrong Content-Type: " . $res->header ('Content-Type');
  	my $json = decode_json ($res->content ());
 
@@ -143,7 +143,7 @@ sub store {
 
   	# Check request succeeded, and result is interpretable as JSON.
 	my $res = $ua->request ($req);
- 	($res->is_success) || die "Failed: __status: " . $res->status_line;
+ 	($res->is_success) || die "Failed: $restful_url: " . $res->status_line . "\n" . $res->content;
  	($res->header ('Content-Type') =~ m|^text/plain|) || die "Wrong Content-Type: " . $res->header ('Content-Type');
  	my $json = decode_json ($res->content ());
 

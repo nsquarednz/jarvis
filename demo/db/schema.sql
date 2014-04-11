@@ -157,7 +157,7 @@ INSERT INTO boat (name, registration_num, class, owner, description, change_user
     VALUES ('Anonymous', NULL, 'SemiFlot', NULL, 'Found abandoned.  Seeking owner.', 'admin');
 
 -- And this is for individual boat parts.
-CREATE TABLE boat_parts (
+CREATE TABLE boat_part (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     change_user text NOT NULL REFERENCES users (name) ON DELETE RESTRICT ON UPDATE CASCADE,
     change_date timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -23,7 +23,7 @@
 #                 CALLED: Before returning result of a "__status" request.
 #                   GLOBAL HOOKS
 #
-#                 return_fetch ($jconfig, $hook_params_href, $safe_params_href, $return_object, $extra_href, $return_text_aref)
+#                 return_fetch ($jconfig, $hook_params_href, $rest_args_aref, $rows_aref, $extra_href, $return_text_aref)
 #                 CALLED: Before returning result of a "fetch" request.
 #                   GLOBAL HOOKS
 #
@@ -57,7 +57,7 @@
 #                 CALLED: ("fetch" only) Before constructing the fetch request.
 #                   GLOBAL and DATASET HOOKS
 #
-#                 dataset_fetched ($jconfig, $hook_params_href, $dsxml, $safe_params_href, $rows_aref, $column_names_aref, $extra_href)
+#                 dataset_fetched ($jconfig, $hook_params_href, $dsxml, $safe_params_href, $rows_aref, $column_names_aref)
 #                 CALLED: ("fetch" only) After fetching results array for a single dataset.
 #                   GLOBAL and DATASET HOOKS
 #
@@ -210,7 +210,7 @@ sub load_global {
     if ($axml->{hook}) {
         foreach my $hook (@{ $axml->{hook} }) {
             my $lib = $hook->{lib} ? $hook->{lib}->content : undef;
-            my $module = $hook->{module}->content || die "Invalid global hook configuration, <hook> configured with no module.";
+            my $module = $hook->{module}->content || die "Invalid global hook configuration, <hook> configured with no 'module' attribute.";
 
             &Jarvis::Error::debug ($jconfig, "Loading (level 0) global <hook> with module '$module'.");
 
@@ -398,19 +398,12 @@ sub return_status {
 # Params:
 #       $jconfig        - Jarvis::Config object
 #
-#       $safe_params_href - The "all rows" safe params. 
-#                           Default + CGI + REST + Session.  
-#                           Changes will have no effect.
+#       $rest_args_aref - The hash of REST args parsed for the request.
+#                         Includes numbered and named REST args.
 #
-#       $return_object  - The complete nested object that we intend to
-#                         encode in JSON/XML and send back to the client.
-#                         This includes the "rows_aref" for each contained
-#                         dataset in the fetch request.
-#
-#       NOTE: In Jarvis 4.0 this $return_object parameter replaced the
-#       simple $rows_aref structure, as part of the extension to support
-#       multiple datasets within a single fetch request.  It is likely
-#       that your existing hook will be broken.  We apologise in advance.
+#       $rows_aref      - The array of rows returned from the top level
+#                         dataset query.  May included nested child 
+#                         dataset arrays.
 #
 #       $extra_href     - Hash of extra parameters to add to the root of
 #                         the returned JSON/XML document.
@@ -423,10 +416,10 @@ sub return_status {
 ###############################################################################
 #
 sub return_fetch {
-    my ($jconfig, $safe_row_params_href, $return_object, $extra_href, $return_text_ref) = @_;
+    my ($jconfig, $rest_args_aref, $rows_aref, $extra_href, $return_text_ref) = @_;
 
     foreach my $hook (grep { ! $_->{level} } @{ $jconfig->{hooks} }) {
-        &invoke ($jconfig, $hook, "return_fetch", $safe_row_params_href, $return_object, $extra_href, $return_text_ref);
+        &invoke ($jconfig, $hook, "return_fetch", $rest_args_aref, $rows_aref, $extra_href, $return_text_ref);
     }
     return 1;
 }
@@ -672,18 +665,15 @@ sub after_all {
 #
 #       $column_names_aref - Array of names of all returned columns.
 #
-#       $extra_href     - Hash of extra parameters to add inside the per-dataset
-#                         object that we will return.
-#
 # Returns:
 #       1
 ###############################################################################
 #
 sub dataset_fetched {
-    my ($jconfig, $dsxml, $safe_row_params_href, $rows_aref, $column_names_aref, $extra_href) = @_;
+    my ($jconfig, $dsxml, $safe_row_params_href, $rows_aref, $column_names_aref) = @_;
 
     foreach my $hook (@{ $jconfig->{hooks} }) {
-        &invoke ($jconfig, $hook, "dataset_fetched", $dsxml, $safe_row_params_href, $rows_aref, $column_names_aref, $extra_href);
+        &invoke ($jconfig, $hook, "dataset_fetched", $dsxml, $safe_row_params_href, $rows_aref, $column_names_aref);
     }
     return 1;
 }

@@ -1,10 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <jarvis>
     <app format="json" debug="yes" dump="no">
-        <tracker logins="no" requests="no" errors="no">
-            <dbfile>/var/lib/jarvis/tracker/tracker.db</dbfile>
-        </tracker>
-
         <!-- This is where our <dataset>.xml are all stored -->
 	    <dataset_dir>/usr/share/jarvis/demo/dataset</dataset_dir>
 
@@ -78,7 +74,7 @@
         </login>
 
         <!-- This defines our database connection.  SQLite in our case. -->
-        <database connect="dbi:SQLite:dbname=/var/lib/jarvis/demo/demo.db" username="" password=""/>
+        <database connect="dbi:SQLite:dbname=/var/lib/jarvis/demo/demo.db" username="" password="" post_connect="PRAGMA foreign_keys = ON"/>
 
         <!-- This plugin is used to allow admin users to reset any user's password. -->
         <plugin dataset="SetPassword" access="*" lib="/usr/share/jarvis/demo" module="plugin::SetPassword" add_headers="yes"/>
