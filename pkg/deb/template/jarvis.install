@@ -5,4 +5,3 @@ etc/README.txt etc/jarvis
 etc/apache etc/jarvis
 htdocs usr/share/jarvis
 lib usr/share/jarvis
-tracker usr/share/jarvis
