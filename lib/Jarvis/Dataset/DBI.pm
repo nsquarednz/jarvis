@@ -533,7 +533,7 @@ sub statement_execute {
 #       $column_names_aref - Array of tuple column names, if available.
 ################################################################################
 #
-sub fetch {
+sub fetch_inner {
     my ($jconfig, $dataset_name, $dsxml, $dbh, $safe_params) = @_;
     
     # Get our STM.  This has everything attached.
@@ -580,425 +580,176 @@ sub fetch {
 #       $dataset_name - Name of single dataset we are storing to.
 #       $dsxml - Dataset XML object.
 #       $dbh - Database handle of the correct type to match the dataset.
-#       $user_args - Hash of CGI + numbered/named REST args.
+#       $stms - Hash of pre-prepared statements by row type.
+#       $row_ttype - Transaction type for this row.
+#       $safe_params - All our safe parameters.
 #
 # Returns:
-#       XML/JSON object summary of results.
+#       $row_result - HASH REF containing {
+#           success => 0/1
+#           modified => num-modified,
+#           message => Error message if not success,
+#           returning => ARRAY of returned rows
+#       }
 #       die on hard error.
 ################################################################################
 #
-sub store {
-    my ($jconfig, $dataset_name, $dsxml, $dbh, $user_args) = @_;
+sub store_inner {
+    my ($jconfig, $dataset_name, $dsxml, $dbh, $stms, $row_ttype, $safe_params) = @_;
 
-    # What transforms should we use when processing store data?
-    my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->{dataset}{transform}{store});
-    &Jarvis::Error::debug ($jconfig, "Store transformations = " . join (', ', keys %transforms) . " (applied to incoming row data)");
+    # Get the statement type for this ttype if we don't have it.  This raises debug.
+    if (! $stms->{$row_ttype}) {
+        $stms->{$row_ttype} = &parse_statement ($jconfig, $dataset_name, $dsxml, $dbh, $row_ttype, $safe_params);
+    }
 
-    # Get our submitted content
-    my $content = &Jarvis::Dataset::get_post_data ($jconfig);
-    &Jarvis::Error::debug ($jconfig, "Request Content Length = " . length ($content));
-    &Jarvis::Error::dump ($jconfig, $content);
+    # Check we have an stm for this row.
+    my $stm = $stms->{$row_ttype} ||
+        die "Dataset '$dataset_name' has no SQL of type '$row_ttype'.";
 
-    # Fields we need to store.  This is an ARRAY ref to multiple rows each a HASH REF
-    my $fields_aref = undef;
+    # Determine our argument values.
+    my @arg_values = &Jarvis::Dataset::names_to_values ($jconfig, $stm->{vnames_aref}, $safe_params);
 
-    # Check we have some changes and parse 'em from the JSON.  We get an
-    # array of hashes.  Each array entry is a change record.
-    my $return_array = 0;
-    my $content_type = $jconfig->{cgi}->content_type () || '';
+    # Execute
+    my $row_result = {};
+    my $stop = 0;
+    my $num_rows = 0;
 
-    &Jarvis::Error::debug ($jconfig, "Request Content Type = '" . $content_type . "'");
-    if ($content_type =~ m|^[a-z]+/json(;.*)?$|) {
-        my $ref = JSON->new->utf8->decode ($content);
+    &statement_execute ($jconfig, $stm, \@arg_values);
+    $row_result->{modified} = $stm->{retval} || 0;
 
-        # User may pass a single hash record, OR an array of hash records.  We normalise
-        # to always be an array of hashes.
-        if (ref $ref eq 'HASH') {
-            my @fields = ($ref);
-            $fields_aref = \@fields;
+    # On failure, we will still return valid JSON/XML to the caller, but we will indicate
+    # which request failed and will send back an overall "non-success" flag.
+    #
+    if ($stm->{error}) {
+        $row_result->{success} = 0;
+        $row_result->{modified} = 0;
+        $row_result->{message} = $stm->{error};
 
-        } elsif (ref $ref eq 'ARRAY') {
-            $return_array = 1;
-            $fields_aref = $ref;
-
-        } else {
-            die "Bad JSON ref type " . (ref $ref);
-        }
-
-    # XML in here please.
-    } elsif ($content_type =~ m|^[a-z]+/xml(;.*)?$|) {
-        my $cxml = XML::Smart->new ($content);
-
-        # Sanity check on outer object.
-        $cxml->{request} || die "Missing top-level 'request' element in submitted XML content.\n";
-
-        # Fields may either sit at the top level, or you may provide an array of
-        # records in a <row> array.
-        #
-        my @rows = ();
-        if ($cxml->{request}{row}) {
-            foreach my $row (@{ $cxml->{request}{row} }) {
-                my %fields =%{ $row };
-                push (@rows, \%fields);
-            }
-            $return_array = 1;
-
-        } else {
-            my %fields = %{ $cxml->{request} };
-            push (@rows, \%fields);
-        }
-        $fields_aref = \@rows;
-
-    # No body.  Execute a Single-Row with rest-args/cgi-args only.
+    # Suceeded.  Set per-row status, and fetch the returned results, if this
+    # operation indicates that it returns values.
+    #
     } else {
-        &Jarvis::Error::debug ($jconfig, "No content supplied.  Store a single empty row + REST/CGI args.");
-        $fields_aref = [{}]; 
-    }
+        $row_result->{success} = 1;
 
-    # Choose our statement and find the SQL and variable names.
-    my $ttype = $jconfig->{action};
-    &Jarvis::Error::debug ($jconfig, "Transaction Type = '$ttype'");
-    ($ttype eq "delete") || ($ttype eq "update") || ($ttype eq "insert") || ($ttype eq "mixed") ||
-        die "Unsupported transaction type '$ttype'.";
+        # Try and determine the returned values (normally the auto-increment ID)
+        if ($stm->{returning}) {
 
-    # Shared database handle.
-    $dbh->begin_work() || die;
+            # If you flagged any variables as "!out" then we will have used
+            # bind_param_inout () and copied the output vars into $stm->{returned}.
+            # In this case, all the work is already done, and we just need to copy
+            # everything through.
+            if ($stm->{returned}) {
 
-    # Loop for each set of updates.
-    my $success = 1;
-    my $modified = 0;
-    my @results = ();
-    my $message = '';
+                my $row = {};
+                foreach my $name (keys %{ $stm->{returned} }) {
+                    my $value_ref = $stm->{returned}{$name};
+                    $row->{$name} = $$value_ref;
+                }
 
-    # We pre-compute the "before" statement parameters even if there is 
-    # no before statement, since we may also wish to record them for later.
-    #
-    # Merge CGI params + REST args, plus default, safe and session vars.
-    #
-    my %safe_all_rows_params = &Jarvis::Config::safe_variables ($jconfig, $user_args, undef);
+                $row_result->{returning} = [ $row ];
+                &Jarvis::Error::debug ($jconfig, "Copied single row from bind_param_inout results.");
 
-    # Invoke before_all hook.
-    my %before_params = %safe_all_rows_params;
-    &Jarvis::Hook::before_all ($jconfig, $dsxml, \%before_params, $fields_aref);
+            # SQLite uses the last_insert_rowid() function for returning IDs.  
+            # This is very special case handling.
+            #
+            } elsif ($dbh->{Driver}{Name} eq 'SQLite') {
 
-    # Execute our "before" statement.  This statement is NOT permitted to fail.  If it does,
-    # then we immediately barf
-    {
-        my $bstm = &parse_statement ($jconfig, $dataset_name, $dsxml, $dbh, 'before', \%before_params);
-        if ($bstm) {
-            my @barg_values = &Jarvis::Dataset::names_to_values ($jconfig, $bstm->{vnames_aref}, \%before_params);
+                my $rowid = $dbh->func('last_insert_rowid');
+                if ($rowid) {
+                    my %return_values = %$safe_params;
+                    $return_values {id} = $rowid;
 
-            &statement_execute($jconfig, $bstm, \@barg_values);
-            if ($bstm->{error}) {
-                $success = 0;
-                $message || ($message = $bstm->{error});
-            }
-        }
-    }
+                    $row_result->{returning} = [ \%return_values ];
+                    &Jarvis::Error::debug ($jconfig, "Used SQLite last_insert_rowid to get returned 'id' => '$rowid'.");
 
-    # Our cached statement handle(s).
-    my %stm = ();
-
-    # Handle each insert/update/delete request row.
-    foreach my $fields_href (@$fields_aref) {
-
-        # Stop as soon as anything goes wrong.
-        if (! $success) {
-            &Jarvis::Error::debug ($jconfig, "Error detected.  Stopping.");
-            last;
-        }
-
-        # Re-do our parameter merge, this time including our per-row parameters.
-        my %safe_params = &Jarvis::Config::safe_variables ($jconfig, $user_args, $fields_href);
-
-        # Any input transformations?
-        if (scalar (keys %transforms)) {
-            &Jarvis::Dataset::transform (\%transforms, \%safe_params);
-        }
-
-        # Invoke before_one hook.
-        &Jarvis::Hook::before_one ($jconfig, $dsxml, \%safe_params);
-
-        # Figure out which statement type we will use for this row.
-        my $row_ttype = $safe_params{_ttype} || $ttype;
-        ($row_ttype eq 'mixed') && die "Transaction Type 'mixed', but no '_ttype' field present in row.";
-
-        # Get the statement type for this ttype if we don't have it.  This raises debug.
-        if (! $stm{$row_ttype}) {
-            $stm{$row_ttype} = &parse_statement ($jconfig, $dataset_name, $dsxml, $dbh, $row_ttype, \%safe_params);
-        }
-
-        # Check we have an stm for this row.
-        my $stm = $stm{$row_ttype} ||
-            die "Dataset '$dataset_name' has no SQL of type '$row_ttype'.";
-
-        # Determine our argument values.
-        my @arg_values = &Jarvis::Dataset::names_to_values ($jconfig, $stm->{vnames_aref}, \%safe_params);
-
-        # Execute
-        my %row_result = ();
-        my $stop = 0;
-        my $num_rows = 0;
-
-        &statement_execute ($jconfig, $stm, \@arg_values);
-        $row_result{modified} = $stm->{retval} || 0;
-        $modified = $modified + $row_result{modified};
-
-        # On failure, we will still return valid JSON/XML to the caller, but we will indicate
-        # which request failed and will send back an overall "non-success" flag.
-        #
-        if ($stm->{error}) {
-            $row_result{success} = 0;
-            $row_result{modified} = 0;
-            $row_result{message} = $stm->{error};
-            $success = 0;
-            $message || ($message = $stm->{error});
-
-        # Suceeded.  Set per-row status, and fetch the returned results, if this
-        # operation indicates that it returns values.
-        #
-        } else {
-            $row_result{success} = 1;
-
-            # Try and determine the returned values (normally the auto-increment ID)
-            if ($stm->{returning}) {
-
-                # If you flagged any variables as "!out" then we will have used
-                # bind_param_inout () and copied the output vars into $stm->{returned}.
-                # In this case, all the work is already done, and we just need to copy
-                # everything through.
-                if ($stm->{returned}) {
-
-                    my $row = {};
-                    foreach my $name (keys %{ $stm->{returned} }) {
-                        my $value_ref = $stm->{returned}{$name};
-                        $row->{$name} = $$value_ref;
-                    }
-
-                    $row_result{returning} = [ $row ];
-                    &Jarvis::Error::debug ($jconfig, "Copied single row from bind_param_inout results.");
-
-                # SQLite uses the last_insert_rowid() function for returning IDs.  
-                # This is very special case handling.
-                #
-                } elsif ($dbh->{Driver}{Name} eq 'SQLite') {
-
-                    my $rowid = $dbh->func('last_insert_rowid');
-                    if ($rowid) {
-                        my %return_values = %$fields_href;
-                        $return_values {id} = $rowid;
-
-                        $row_result{returning} = [ \%return_values ];
-                        &Jarvis::Error::debug ($jconfig, "Used SQLite last_insert_rowid to get returned 'id' => '$rowid'.");
-
-                    } else {
-                        &Jarvis::Error::log ($jconfig, "Used SQLite last_insert_rowid but it returned no id.");
-                    }
-
-                # Otherwise: See if the query had a built-in fetch.  Under PostGreSQL (and very
-                # likely also under other drivers) this will fail if there is no current
-                # query.  I.e. if you have no "RETURNING" clause on your insert.
-                #
                 } else {
-                    my $returning_aref = $stm->{sth}->fetchall_arrayref({}) || undef;
-
-                    if ($returning_aref && (scalar @$returning_aref)) {
-                        if ($DBI::errstr) {
-                            my $error_message = $DBI::errstr;
-                            $error_message =~ s/\s+$//;
-
-                            if (&nolog ($stm, $error_message)) {
-                                &Jarvis::Error::debug ($jconfig, "Failure fetching first return result set. Log disabled.");
-                            } else {
-                                &Jarvis::Error::log ($jconfig, "Failure fetching first return result set for '" . $stm->{ttype} . "'.  Details follow.");
-                                &Jarvis::Error::log ($jconfig, $stm->{sql_with_substitutions}) if $stm->{sql_with_substitutions};
-                                &Jarvis::Error::log ($jconfig, $error_message);
-                                &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) || 'NONE'));
-                            }
-
-                            $stm->{sth}->finish;
-                            $stm->{error} = $error_message;
-                            $success = 0;
-                            $message = $error_message;
-                        }
-
-                        $row_result{returning} = $returning_aref;
-                        &Jarvis::Error::debug ($jconfig, "Fetched " . (scalar @$returning_aref) . " rows for returning.");
-                    }
-
-                    # When using output parameters from a SQL Server stored procedure, there is a
-                    # difference of behavior between Linux/FreeTDS and Windows/ODBC.  Under Linux you
-                    # always get a result set containing the output parameters, with autogenerated
-                    # column names prefixed by underscore.
-                    #
-                    # Under Windows you need to explicitly do a SELECT to get this and you must
-                    # specify the column names.
-                    #
-                    # This leads to the case where to write a dataset that works under both Linux
-                    # and Windows, you need to explicitly SELECT (so that you get the data under
-                    # Windows, and make sure that the column name you select AS is identical to the
-                    # auto-generated name created by FreeTDS).
-                    #
-                    # However, under Linux that means you get two result sets.  If you pass more than
-                    # one <row> in your request, then the second row will fail with
-                    # "Attempt to initiate a new Adaptive Server operation with results pending"
-                    #
-                    # To avoid that error, here we will look to see if there are any extra result
-                    # sets now pending to be read.  We will silently read and discard them.
-                    #
-                    while ($success && $stm->{sth}{syb_more_results}) {
-                        &Jarvis::Error::debug ($jconfig, "Found additional result sets.  Fetch and discard.");
-                        $stm->{sth}->fetchall_arrayref ({});
-
-                        if ($DBI::errstr) {
-                            my $error_message = $DBI::errstr;
-                            $error_message =~ s/\s+$//;
-
-                            if (&nolog ($stm, $error_message)) {
-                                &Jarvis::Error::debug ($jconfig, "Failure fetching additional result sets. Log disabled.");
-                            } else {
-                                &Jarvis::Error::log ($jconfig, "Failure fetching additional result sets for '" . $stm->{ttype} . "'.  Details follow.");
-                                &Jarvis::Error::log ($jconfig, $stm->{sql_with_substitutions}) if $stm->{sql_with_substitutions};
-                                &Jarvis::Error::log ($jconfig, $error_message);
-                                &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) || 'NONE'));
-                            }
-
-                            $stm->{sth}->finish;
-                            $stm->{error} = $error_message;
-                            $success = 0;
-                            $message = $error_message;
-                        }
-                    }
+                    &Jarvis::Error::log ($jconfig, "Used SQLite last_insert_rowid but it returned no id.");
                 }
 
-                # This is disappointing, but perhaps a "die" is too strong here.
-                if (! $row_result{returning}) {
-                    &Jarvis::Error::debug ($jconfig, "Cannot determine how to get values for 'returning' statement.");
+            # Otherwise: See if the query had a built-in fetch.  Under PostGreSQL (and very
+            # likely also under other drivers) this will fail if there is no current
+            # query.  I.e. if you have no "RETURNING" clause on your insert.
+            #
+            } else {
+                my $returning_aref = $stm->{sth}->fetchall_arrayref({}) || undef;
+
+                if ($returning_aref && (scalar @$returning_aref)) {
+                    if ($DBI::errstr) {
+                        my $error_message = $DBI::errstr;
+                        $error_message =~ s/\s+$//;
+
+                        if (&nolog ($stm, $error_message)) {
+                            &Jarvis::Error::debug ($jconfig, "Failure fetching first return result set. Log disabled.");
+                        } else {
+                            &Jarvis::Error::log ($jconfig, "Failure fetching first return result set for '" . $stm->{ttype} . "'.  Details follow.");
+                            &Jarvis::Error::log ($jconfig, $stm->{sql_with_substitutions}) if $stm->{sql_with_substitutions};
+                            &Jarvis::Error::log ($jconfig, $error_message);
+                            &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) || 'NONE'));
+                        }
+
+                        $stm->{sth}->finish;
+                        $stm->{error} = $error_message;
+                        $row_result->{success} = 0;
+                        $row_result->{message} = $error_message;
+                    }
+
+                    $row_result->{returning} = $returning_aref;
+                    &Jarvis::Error::debug ($jconfig, "Fetched " . (scalar @$returning_aref) . " rows for returning.");
+                }
+
+                # When using output parameters from a SQL Server stored procedure, there is a
+                # difference of behavior between Linux/FreeTDS and Windows/ODBC.  Under Linux you
+                # always get a result set containing the output parameters, with autogenerated
+                # column names prefixed by underscore.
+                #
+                # Under Windows you need to explicitly do a SELECT to get this and you must
+                # specify the column names.
+                #
+                # This leads to the case where to write a dataset that works under both Linux
+                # and Windows, you need to explicitly SELECT (so that you get the data under
+                # Windows, and make sure that the column name you select AS is identical to the
+                # auto-generated name created by FreeTDS).
+                #
+                # However, under Linux that means you get two result sets.  If you pass more than
+                # one <row> in your request, then the second row will fail with
+                # "Attempt to initiate a new Adaptive Server operation with results pending"
+                #
+                # To avoid that error, here we will look to see if there are any extra result
+                # sets now pending to be read.  We will silently read and discard them.
+                #
+                while ($row_result->{success} && $stm->{sth}{syb_more_results}) {
+                    &Jarvis::Error::debug ($jconfig, "Found additional result sets.  Fetch and discard.");
+                    $stm->{sth}->fetchall_arrayref ({});
+
+                    if ($DBI::errstr) {
+                        my $error_message = $DBI::errstr;
+                        $error_message =~ s/\s+$//;
+
+                        if (&nolog ($stm, $error_message)) {
+                            &Jarvis::Error::debug ($jconfig, "Failure fetching additional result sets. Log disabled.");
+                        } else {
+                            &Jarvis::Error::log ($jconfig, "Failure fetching additional result sets for '" . $stm->{ttype} . "'.  Details follow.");
+                            &Jarvis::Error::log ($jconfig, $stm->{sql_with_substitutions}) if $stm->{sql_with_substitutions};
+                            &Jarvis::Error::log ($jconfig, $error_message);
+                            &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) || 'NONE'));
+                        }
+
+                        $stm->{sth}->finish;
+                        $stm->{error} = $error_message;
+                        $row_result->{success} = 0;
+                        $row_result->{message} = $error_message;
+                    }
                 }
             }
-        }
 
-        # Invoke after_one hook.
-        if ($success) {
-            &Jarvis::Hook::after_one ($jconfig, $dsxml, \%safe_params, \%row_result);
-        }
-
-        push (@results, \%row_result);
-    }
-
-    # Reset our parameters, our per-row parameters are no longer valid.
-    my %after_params = %safe_all_rows_params;
-
-    # Free any remaining open statement types.
-    foreach my $stm_type (keys %stm) {
-        &Jarvis::Error::debug ($jconfig, "Finished with statement for ttype '$stm_type'.");
-        $stm{$stm_type}{sth}->finish;
-    }
-
-    # Execute our "after" statement.
-    if ($success) {
-        my $astm = &parse_statement ($jconfig, $dataset_name, $dsxml, $dbh, 'after', \%after_params);
-        if ($astm) {
-            my @aarg_values = &Jarvis::Dataset::names_to_values ($jconfig, $astm->{vnames_aref}, \%after_params);
-
-            &statement_execute($jconfig, $astm, \@aarg_values);
-            if ($astm->{error}) {
-                $success = 0;
-                $message || ($message = $astm->{error});
+            # This is disappointing, but perhaps a "die" is too strong here.
+            if (! $row_result->{returning}) {
+                &Jarvis::Error::debug ($jconfig, "Cannot determine how to get values for 'returning' statement.");
             }
         }
-        &Jarvis::Hook::after_all ($jconfig, $dsxml, \%after_params, $fields_aref, \@results);
     }
 
-    # Determine if we're going to rollback.
-    if (! $success) {
-        &Jarvis::Error::debug ($jconfig, "Error detected.  Rolling back.");
-
-        # Use "eval" as some drivers (e.g. SQL Server) will have already rolled-back on the
-        # original failure, and hence a second rollback will fail.
-        eval { local $SIG{__DIE__}; $dbh->rollback (); }
-
-    } else {
-        &Jarvis::Error::debug ($jconfig, "All successful.  Committing all changes.");
-        $dbh->commit ();
-    }
-
-    # Return content in requested format.
-    &Jarvis::Error::debug ($jconfig, "Return Array = $return_array.");
-
-    # Cleanup SQL Server message for reporting purposes.
-    $message =~ s/^Server message number=[0-9]+ severity=[0-9]+ state=[0-9]+ line=[0-9]+ server=[A-Z0-9\\]+text=//i;
-
-    # This final hook allows you to do whatever you want to modify the returned
-    # data.  This hook may do one or both of:
-    #
-    #   - Completely modify the returned content (by modifying \@results)
-    #   - Peform a custom encoding into text (by setting $return_text)
-    #
-    my $extra_href = {};
-    my $return_text = undef;
-    my %return_store_params = %safe_all_rows_params;
-    &Jarvis::Hook::return_store ($jconfig, $dsxml, \%return_store_params, $fields_aref, \@results, $extra_href, \$return_text);
-
-    # If the hook set $return_text then we use that.
-    if ($return_text) {
-        &Jarvis::Error::debug ($jconfig, "Return content determined by hook ::return_store");
-
-    # Otherwise we encode to a supported format.  Note that the hook may have modified
-    # the data prior to this encoding.
-    #
-    # Note here that our return structure is different depending on whether you handed us
-    # just one record (not in an array), or if you gave us an array of records.  An array
-    # containing one record is NOT the same as a single record not in an array.
-    #
-    } elsif ($jconfig->{format} =~ m/^json/) {
-        my %return_data = ();
-        $return_data {success} = $success;
-        $success && ($return_data {modified} = $modified);
-        $success || ($return_data {message} = &trim($message));
-        foreach my $name (sort (keys %$extra_href)) {
-            $return_data {$name} = $extra_href->{$name};
-        }
-
-        # Return the array data if we succeded.
-        if ($success && $return_array) {
-            $return_data {row} = \@results;
-        }
-
-        # Return non-array fields in success case only.
-        if ($success && ! $return_array) {
-            $results[0]{returning} && ($return_data {returning} = $results[0]{returning});
-        }
-        my $json = JSON->new->pretty(1);
-        $return_text = $json->encode ( \%return_data );
-
-    } elsif ($jconfig->{format} eq "xml") {
-        my $xml = XML::Smart->new ();
-        $xml->{response}{success} = $success;
-        $success && ($xml->{response}{modified} = $modified);
-        $success || ($xml->{response}{message} = &trim($message));
-        foreach my $name (sort (keys %$extra_href)) {
-            $xml->{response}{$name} = $extra_href->{$name};
-        }
-
-        # Return the array data if we succeeded.
-        if ($success && $return_array) {
-            $xml->{response}{results}{row} = \@results;
-        }
-
-        # Return non-array fields in success case only.
-        if ($success && ! $return_array) {
-            $results[0]{returning} && ($xml->{response}{returning} = $results[0]{returning});
-        }
-        $return_text = $xml->data ();
-
-    } else {
-        die "Unsupported format '" . $jconfig->{format} ."' for Dataset::store return data.\n";
-    }
-
-    &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($return_text));
-    &Jarvis::Error::dump ($jconfig, $return_text);
-    return $return_text;
+    return $row_result;
 }
 
 1;

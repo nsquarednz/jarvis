@@ -334,8 +334,6 @@ sub transform {
 #
 # Params:
 #       $jconfig - Jarvis::Config object
-#           READ
-#               cgi                 Contains data values for {{param}} in SQL
 #
 # Returns:
 #       Reference to Hash of returned data.  You may convert to JSON or XML.
@@ -642,12 +640,7 @@ sub fetch {
 #
 # Params:
 #       $jconfig - Jarvis::Config object
-#           READ
-#               cgi                 Contains data values for {{param}} in SQL
-#               username            Used for {{username}} in SQL
-#               group_list          Used for {{group_list}} in SQL
-#
-#       $dataset_name - Dataset name we parsed/routed to.
+#       $dataset_name - Dataset name we parsed/routed to (or child dataset).
 #       $user_args - Hash of CGI + numbered/named REST args (top level datasest).
 #                    OR linked child args (for nested datasets).
 #
@@ -687,7 +680,7 @@ sub fetch_rows {
 
     # Call the pre-fetch hook.
     my %safe_params = %params_copy;
-    &Jarvis::Hook::dataset_pre_fetch ($jconfig, $dsxml, \%safe_params);
+    &Jarvis::Hook::dataset_pre_fetch ($jconfig, $dsxml, $user_args);
 
     # Get a database handle.
     my $dbh = &Jarvis::DB::handle ($jconfig, $dbname, $dbtype);
@@ -697,11 +690,11 @@ sub fetch_rows {
     
     if ($dbtype eq 'dbi') {
         ($rows_aref, $column_names_aref) 
-            = &Jarvis::Dataset::DBI::fetch ($jconfig, $dataset_name, $dsxml, $dbh, \%safe_params);
+            = &Jarvis::Dataset::DBI::fetch_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%safe_params);
             
     } elsif ($dbtype eq 'sdp') {
         ($rows_aref, $column_names_aref) 
-            = &Jarvis::Dataset::SDP::fetch ($jconfig, $dataset_name, $dsxml, $dbh, \%safe_params);
+            = &Jarvis::Dataset::SDP::fetch_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%safe_params);
             
     } else {
         die "Unsupported dataset type '$dbtype'.";
@@ -715,8 +708,8 @@ sub fetch_rows {
     # NOTE: This feature is only provided for the TOP LEVEL dataset.
     #
     if ($dataset->{level} == 0) {
-        my $sort_field = $jconfig->{cgi}->param ($dataset->{sort_field_param}) || '';
-        my $sort_dir = $jconfig->{cgi}->param ($dataset->{sort_dir_param}) || 'ASC';
+        my $sort_field = $user_args->{$dataset->{sort_field_param}} || '';
+        my $sort_dir = $user_args->{$dataset->{sort_dir_param}} || 'ASC';
 
         if ($sort_field) {
             &Jarvis::Error::debug ($jconfig, "Server Sort on '$sort_field', Dir = '$sort_dir'.");
@@ -733,8 +726,8 @@ sub fetch_rows {
         }
 
         # Should we truncate the data to a specific page?
-        my $limit = $jconfig->{cgi}->param ($dataset->{page_limit_param}) || 0;
-        my $start = $jconfig->{cgi}->param ($dataset->{page_start_param}) || 0;
+        my $limit = $user_args->{$dataset->{page_limit_param}} || 0;
+        my $start = $user_args->{$dataset->{page_start_param}} || 0;
 
         if ($limit > 0) {
             ($start > 0) || ($start = 0); # Check we have a real zero, not ''
@@ -859,20 +852,10 @@ sub fetch_rows {
 }
 
 ################################################################################
-# Performs an update to the specified table underlying the named dataset.
-# This is currently only supported for DBI datasets.
+# Performs top-level update.  DBI datasets only.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
-#           READ
-#               cgi                 Contains data values for {{param}} in SQL
-#               username            Used for {{username}} in SQL
-#               group_list          Used for {{group_list}} in SQL
-#               format - Either 
-#                      "json", "json.array", "json.rest", 
-#                      "xml",
-#                      "csv", "xlsx".
-#
 #       $dataset_name - Dataset name we parsed/routed to.
 #       $user_args - Hash of CGI + numbered/named REST args.
 #
@@ -885,17 +868,194 @@ sub fetch_rows {
 sub store {
     my ($jconfig, $dataset_name, $user_args) = @_;
 
+    # NOTE: The return format is implied by the input format.
+    my $format = undef;
+
+    # ARRAY ref of per-row fields HASH we need to store.
+    my $rows_aref = undef;
+
+    # Check we have some changes and parse 'em from the JSON.  We get an
+    # array of hashes.  Each array entry is a change record.
+    my $return_array = 0;
+
+    # Get our submitted content
+    my $content = &Jarvis::Dataset::get_post_data ($jconfig);
+    &Jarvis::Error::debug ($jconfig, "Request Content Length = " . length ($content));
+    &Jarvis::Error::dump ($jconfig, $content);
+
+    # Dig into the CGI to get the top-level of the data structure.
+    my $content_type = $jconfig->{cgi}->content_type () || '';
+    &Jarvis::Error::debug ($jconfig, "Request Content Type = '" . $content_type . "'");
+
+    if ($content_type =~ m|^[a-z]+/json(;.*)?$|) {
+        $format = 'json';
+        my $ref = JSON->new->utf8->decode ($content);
+
+        # User may pass a single hash record, OR an array of hash records.  We normalise
+        # to always be an array of hashes.
+        if (ref $ref eq 'HASH') {
+            $rows_aref = [ $ref ];
+
+        } elsif (ref $ref eq 'ARRAY') {
+            $return_array = 1;
+            $rows_aref = $ref;
+
+        } else {
+            die "Bad JSON ref type " . (ref $ref);
+        }
+
+    # XML in here please.
+    } elsif ($content_type =~ m|^[a-z]+/xml(;.*)?$|) {
+        $format = 'xml';
+        my $cxml = XML::Smart->new ($content);
+
+        # Sanity check on outer object.
+        $cxml->{request} || die "Missing top-level 'request' element in submitted XML content.\n";
+
+        # Fields may either sit at the top level, or you may provide an array of
+        # records in a <row> array.
+        #
+        my @rows = ();
+        if ($cxml->{request}{row}) {
+            foreach my $row (@{ $cxml->{request}{row} }) {
+                my %fields =%{ $row };
+                push (@rows, \%fields);
+            }
+            $return_array = 1;
+
+        } else {
+            my %fields = %{ $cxml->{request} };
+            push (@rows, \%fields);
+        }
+        $rows_aref = \@rows;
+
+    # No body.  Execute a Single-Row with rest-args/cgi-args only.
+    } else {
+        &Jarvis::Error::debug ($jconfig, "No content supplied.  Store a single empty row + REST/CGI args.");
+        $rows_aref = [{}]; 
+    }    
+
+    # What is the default transaction type from here down?
+    my $ttype = $jconfig->{action};
+    &Jarvis::Error::debug ($jconfig, "Transaction Type = '$ttype'");
+    ($ttype eq "delete") || ($ttype eq "update") || ($ttype eq "insert") || ($ttype eq "mixed") ||
+        die "Unsupported transaction type '$ttype'.";
+
+    # Store the row content for the top-level dataset.  This may push out to child sets.
+    my ($success, $message, $modified, $results_aref) = &store_rows ($jconfig, $dataset_name, $ttype, $user_args, $rows_aref);
+
+    # This final GLOBAL hook allows you to do whatever you want to modify the returned
+    # data.  This hook may do one or both of:
+    #
+    #   - Completely modify the returned content (by modifying \@results)
+    #   - Peform a custom encoding into text (by setting $return_text)
+    #
+    my $extra_href = {};
+    my $return_text = undef;
+    &Jarvis::Hook::return_store ($jconfig, $user_args, $results_aref, $extra_href, \$return_text);
+
+    # If the hook set $return_text then we use that.
+    if ($return_text) {
+        &Jarvis::Error::debug ($jconfig, "Return content determined by hook ::return_store");
+
+    # Otherwise we encode to a supported format.  Note that the hook may have modified
+    # the data prior to this encoding.
+    #
+    # Note here that our return structure is different depending on whether you handed us
+    # just one record (not in an array), or if you gave us an array of records.  An array
+    # containing one record is NOT the same as a single record not in an array.
+    #
+    } elsif ($jconfig->{format} =~ m/^json/) {
+        &Jarvis::Error::debug ($jconfig, "Returning JSON.  Return Array = $return_array.");
+
+        my %return_data = ();
+        $return_data {success} = $success;
+        $success && ($return_data {modified} = $modified);
+        $success || ($return_data {message} = &trim($message));
+        foreach my $name (sort (keys %$extra_href)) {
+            $return_data {$name} = $extra_href->{$name};
+        }
+
+        # Return the array data if we succeded.
+        if ($success && $return_array) {
+            $return_data {row} = $results_aref;
+        }
+
+        # Return non-array fields in success case only.
+        if ($success && ! $return_array) {
+            $$results_aref[0]{returning} && ($return_data {returning} = $$results_aref[0]{returning});
+        }
+        my $json = JSON->new->pretty(1);
+        $return_text = $json->encode ( \%return_data );
+
+    } elsif ($jconfig->{format} eq "xml") {
+        &Jarvis::Error::debug ($jconfig, "Returning XML.  Return Array = $return_array.");
+
+        my $xml = XML::Smart->new ();
+        $xml->{response}{success} = $success;
+        $success && ($xml->{response}{modified} = $modified);
+        $success || ($xml->{response}{message} = &trim($message));
+        foreach my $name (sort (keys %$extra_href)) {
+            $xml->{response}{$name} = $extra_href->{$name};
+        }
+
+        # Return the array data if we succeeded.
+        if ($success && $return_array) {
+            $xml->{response}{results}{row} = $results_aref;
+        }
+
+        # Return non-array fields in success case only.
+        if ($success && ! $return_array) {
+            $$results_aref[0]{returning} && ($xml->{response}{returning} = $$results_aref[0]{returning});
+        }
+        $return_text = $xml->data ();
+
+    } else {
+        die "Unsupported format '" . $jconfig->{format} ."' for Dataset::store return data.\n";
+    }
+
+    &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($return_text));
+    &Jarvis::Error::dump ($jconfig, $return_text);
+
+    return $return_text;    
+}
+
+################################################################################
+# Performs an update to the specified table underlying the named dataset.
+# This is currently only supported for DBI datasets.
+#
+# Params:
+#       $jconfig - Jarvis::Config object
+#       $dataset_name - Dataset name we parsed/routed to (or child dataset).
+#       $ttype - Default transaction type from here down.
+#       $user_args - Hash of CGI + numbered/named REST args (top level datasest).
+#                    OR linked child args (for nested datasets).
+#       $rows_aref - Array of records to store.
+#
+# Returns:
+#       ($success, $message, $results_aref)
+#           $success - 1/0 did all inserts fail.
+#           $message - "Error message" on soft error (duplicate key, etc.).
+#           $modified - Number of top-level rows modified.
+#           $results_aref - Returned results, one per row, potentially nested.
+#
+#       die on hard error.
+################################################################################
+#
+sub store_rows {
+    my ($jconfig, $dataset_name, $ttype, $user_args, $rows_aref) = @_;
+
     # Read the dataset config file.  This changes debug level as a side-effect.
     my $dataset = &load_dsxml ($jconfig, $dataset_name) || die "Cannot load configuration for dataset '$dataset_name'.";
     my $dsxml = $dataset->{dsxml};
     my $dbtype = $dataset->{dbtype};
     my $dbname = $dataset->{dbname};
     
-    # Load/Start dataset specific hooks.
-    &Jarvis::Hook::load_dataset ($jconfig, $dsxml);
-
     # Check that we are DBI only.
     ($dbtype eq 'dbi') || die "Datasets of type '$dbtype' do not support store operations.";
+
+    # Load/Start dataset specific hooks.
+    &Jarvis::Hook::load_dataset ($jconfig, $dsxml);
 
     # Now perform security check.
     my $allowed_groups = $dsxml->{dataset}{"write"};
@@ -904,21 +1064,141 @@ sub store {
         $jconfig->{status} = "401 Unauthorized";
         die "Insufficient privileges to write '$dataset_name'. $failure\n";
     }
-    
+
+    # We pre-compute the "before" statement parameters even if there is 
+    # no before statement, since we may also wish to record them for later.
+    #
+    # Merge CGI params + REST args, plus default, safe and session vars.
+    #
+    my %safe_all_rows_params = &Jarvis::Config::safe_variables ($jconfig, $user_args, undef);
+
+    # What transforms should we use when processing store data?
+    my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->{dataset}{transform}{store});
+    &Jarvis::Error::debug ($jconfig, "Store transformations = " . join (', ', keys %transforms) . " (applied to incoming row data)");
+
+    # Apply input transformations to the all-rows before_all/after_all parameters too.
+    if (scalar (keys %transforms)) {
+        &Jarvis::Dataset::transform (\%transforms, \%safe_all_rows_params);
+    }
+
+    # Call the pre-store hook.    
+    &Jarvis::Hook::dataset_pre_store ($jconfig, $dsxml, \%safe_all_rows_params, $rows_aref);
+
     # Get a database handle.
     my $dbh = &Jarvis::DB::handle ($jconfig, $dbname, $dbtype);
     
-    # Hand off to DBI code.  Maybe one day we will support different dataset
-    # types for "store" operations, in which case some more of the common
-    # pre-processing and results encoding code may move from the DBI module
-    # up into this one.  
-    # 
-    # See the "fetch" method above for a good example of how that should work.
-    # Most of the pre-processing and hook invocation should be here in 
-    # Dataset.pm, and only the DBI specific stuff should be in DBI.pm.
-    #
-    # But until then, let's just let sleeping dogs lie.
-    my $result = &Jarvis::Dataset::DBI::store ($jconfig, $dataset_name, $dsxml, $dbh, $user_args);
+    # Shared database handle.
+    $dbh->begin_work() || die;
+
+    # Invoke before_all hook.
+    my %before_params = %safe_all_rows_params;
+    &Jarvis::Hook::before_all ($jconfig, $dsxml, \%before_params, $rows_aref);
+
+    # Loop for each set of updates.
+    my $success = 1;
+    my $modified = 0;
+    my $results_aref = [];
+    my $message = '';
+
+    # Execute our "before" statement.  This statement is NOT permitted to fail.  If it does,
+    # then we immediately barf
+    {
+        my $bstm = &Jarvis::Dataset::DBI::parse_statement ($jconfig, $dataset_name, $dsxml, $dbh, 'before', \%before_params);
+        if ($bstm) {
+            my @barg_values = &Jarvis::Dataset::names_to_values ($jconfig, $bstm->{vnames_aref}, \%before_params);
+
+            &statement_execute($jconfig, $bstm, \@barg_values);
+            if ($bstm->{error}) {
+                $success = 0;
+                $message || ($message = $bstm->{error});
+            }
+        }
+    }
+
+    # Our cached statement handle(s).
+    my %stms = ();
+
+    # Handle each insert/update/delete request row.
+    foreach my $fields_href (@$rows_aref) {
+
+        # Re-do our parameter merge, this time including our per-row parameters.
+        my %safe_params = &Jarvis::Config::safe_variables ($jconfig, $user_args, $fields_href);
+
+        # Any input transformations?
+        if (scalar (keys %transforms)) {
+            &Jarvis::Dataset::transform (\%transforms, \%safe_params);
+        }
+
+        # Invoke before_one hook.
+        &Jarvis::Hook::before_one ($jconfig, $dsxml, \%safe_params);
+
+        # Figure out which statement type we will use for this row.
+        my $row_ttype = $safe_params{_ttype} || $ttype;
+        ($row_ttype eq 'mixed') && die "Transaction Type 'mixed', but no '_ttype' field present in row.";    
+
+        # Hand off to DBI code for the actual store.
+        my $row_result = &Jarvis::Dataset::DBI::store_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%stms, $row_ttype, \%safe_params);
+
+        # Increment our top-level counts.
+        $modified = $modified + $row_result->{modified};
+        if (! $row_result->{success}) {
+            $success = 0;
+            $message = $row_result->{message};
+        }
+
+        # Stop as soon as anything goes wrong.
+        if (! $success) {
+            &Jarvis::Error::debug ($jconfig, "Error detected.  Stopping.");
+            last;
+        }
+
+        # Invoke after_one hook.
+        if ($success) {
+            &Jarvis::Hook::after_one ($jconfig, $dsxml, \%safe_params, $row_result);
+        }
+
+        push (@$results_aref, $row_result);
+    }
+
+    # Determine if we're going to rollback.
+    if (! $success) {
+        &Jarvis::Error::debug ($jconfig, "Error detected.  Rolling back.");
+
+        # Use "eval" as some drivers (e.g. SQL Server) will have already rolled-back on the
+        # original failure, and hence a second rollback will fail.
+        eval { local $SIG{__DIE__}; $dbh->rollback (); }
+
+    } else {
+        &Jarvis::Error::debug ($jconfig, "All successful.  Committing all changes.");
+        $dbh->commit ();
+    }
+
+    # Reset our parameters, our per-row parameters are no longer valid.
+    my %after_params = %safe_all_rows_params;
+
+    # Free any remaining open statement types.
+    foreach my $stm_type (keys %stms) {
+        &Jarvis::Error::debug ($jconfig, "Finished with statement for ttype '$stm_type'.");
+        $stms{$stm_type}{sth}->finish;
+    }
+
+    # Execute our "after" statement.
+    if ($success) {
+        my $astm = &Jarvis::Dataset::DBI::parse_statement ($jconfig, $dataset_name, $dsxml, $dbh, 'after', \%after_params);
+        if ($astm) {
+            my @aarg_values = &Jarvis::Dataset::names_to_values ($jconfig, $astm->{vnames_aref}, \%after_params);
+
+            &statement_execute($jconfig, $astm, \@aarg_values);
+            if ($astm->{error}) {
+                $success = 0;
+                $message || ($message = $astm->{error});
+            }
+        }
+        &Jarvis::Hook::after_all ($jconfig, $dsxml, \%after_params, $rows_aref, $results_aref);
+    }
+
+    # Cleanup SQL Server message for reporting purposes.
+    $message =~ s/^Server message number=[0-9]+ severity=[0-9]+ state=[0-9]+ line=[0-9]+ server=[A-Z0-9\\]+text=//i;
 
     # In any case, Unload/Finish dataset specific hooks.
     &Jarvis::Hook::unload_dataset ($jconfig);
@@ -926,7 +1206,7 @@ sub store {
     # And unwind our own dataset stack.
     &unload_dsxml ($jconfig);
 
-    return $result;
+    return ($success, $message, $modified, $results_aref);
 }
 
 1;

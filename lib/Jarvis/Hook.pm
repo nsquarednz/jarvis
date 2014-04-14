@@ -11,79 +11,17 @@
 #               (b) Change the Jarvis behaviour, e.g. custom formatting, or
 #                   security checking.
 #
-#               The hook points are as follows.  Each hook is optional.  
-#               If you wish to abort processing then call "die".
-#
-#           GLOBAL QUERY HOOKS
-#                 start ($jconfig, $hook_params_href)
-#                 CALLED: After all Jarvis setup is complete.
-#                   GLOBAL HOOKS
-#
-#                 return_status ($jconfig, $hook_params_href, $extra_href, $return_text_aref)
-#                 CALLED: Before returning result of a "__status" request.
-#                   GLOBAL HOOKS
-#
-#                 return_fetch ($jconfig, $hook_params_href, $user_args_aref, $rows_aref, $extra_href, $return_text_aref)
-#                 CALLED: Before returning result of a "fetch" request.
-#                   GLOBAL HOOKS
-#
-#                 return_store ($jconfig, $hook_params_href, $dsxml, $safe_params_href, $fields_aref, $results_aref, $extra_href, $return_text_aref)
-#                 CALLED: Before returning result of a "store" request.
-#                   GLOBAL HOOKS
-#
-#                 finish ($jconfig, $hook_params_href)
-#                 CALLED: After Jarvis processing is complete, at cleanup time.
-#                   GLOBAL HOOKS
-#
-#           GLOBAL UTILITY HOOKS
-#                 after_login ($jconfig, $hook_params_href, $additional_safe_href)
-#                 CALLED: After first login for the session.
-#                   GLOBAL HOOKS
-#
-#                 before_logout ($jconfig, $hook_params_href)
-#                 CALLED: Before explicit session logout by the client
-#                   GLOBAL HOOKS
-#
-#                 pre_connect ($jconfig, $dbname, $dbtype, $dbconnect_ref, $dbusername_ref, $dbpassword_ref, $parameters_href)
-#                 CALLED: Before first connecting to each database.
-#                   GLOBAL HOOKS
-#
-#           PER-DATASET
-#                 start ($jconfig, $hook_params_href, $dsxml)
-#                 CALLED: ("fetch" AND "store") Just after loading dataset config.
-#                   DATASET HOOKS
-#
-#                 dataset_pre_fetch ($jconfig, $hook_params_href, $dsxml, $safe_params_href)
-#                 CALLED: ("fetch" only) Before constructing the fetch request.
-#                   GLOBAL and DATASET HOOKS
-#
-#                 dataset_fetched ($jconfig, $hook_params_href, $dsxml, $safe_params_href, $rows_aref, $column_names_aref)
-#                 CALLED: ("fetch" only) After fetching results array for a single dataset.
-#                   GLOBAL and DATASET HOOKS
-#
-#                 before_all ($jconfig, $hook_params_href, $dsxml, $safe_params_href, $fields_aref)
-#                 CALLED: ("store" only) After transaction begins.  Before any "before" SQL.
-#                   GLOBAL and DATASET HOOKS
-#
-#                 after_all ($jconfig, $hook_params_href, $dsxml, $safe_params_href, $fields_aref, $results_aref)
-#                 CALLED: ("store" only) After any "after" SQL.  Before transaction ends.
-#                   GLOBAL and DATASET HOOKS
-#
-#                 finish ($jconfig, $hook_params_href, $dsxml)
-#                 CALLED: ("fetch" AND "store") After dataset processing is complete.
-#                   DATASET HOOKS
-#
-#           PER-ROW
-#                 before_one ($jconfig, $hook_params_href, $dsxml, $safe_row_params_href)
-#                 CALLED: ("store" only) Before we execute the row insert/update/delete SQL.
-#                   GLOBAL and DATASET HOOKS
-#
-#                 after_one ($jconfig, $hook_params_href, $dsxml, $safe_row_params_href, $row_result_href)
-#                 CALLED: ("store" only) After insert/update/delete and "returning" extraction.
-#                   GLOBAL and DATASET HOOKS
+#               Each hook is optional.  If you wish to abort processing then call "die".
 #
 #               Multiple hooks may be defined, they are simply invoked in
 #               the order they appear in then application XML config file.
+#
+#               ************************************************************************
+#               PLEASE SEE THE JARVIS GUIDE FOR DOCUMENTATION ON HOOK USE AND PARAMETERS
+#               ************************************************************************
+#
+#               It is just too difficult to keep these docs in sync with the "Jarvis Guide",
+#               so please just refer to the Jarvis Guide which is the official documentation.
 #
 # Licence:
 #       This file is part of the Jarvis WebApp/Database gateway utility.
@@ -350,32 +288,9 @@ sub unload_dataset {
 }
 
 ###############################################################################
-# PER-QUERY HOOKS
+# GLOBAL PER-QUERY HOOKS
 ###############################################################################
 
-###############################################################################
-# Invoke the "return_status" method on each hook.  This occurs for all "__status"
-# requests.  It is performed just before we convert the status return results
-# into JSON or XML.
-#
-# This hook may do one or more of:
-#
-#   - Add some extra root level parameters (by modifying $extra_href)
-#   - Peform a custom encoding into text (by setting $return_text)
-#
-# Params:
-#       $jconfig        - Jarvis::Config object
-#
-#       $extra_href     - Hash of extra parameters to add to the root of
-#                         the returned JSON/XML document.
-#
-#       $return_text_ref - Return text.  If we define this, it will be used
-#                          instead of the default JSON/XML encoding.
-#
-# Returns:
-#       1
-###############################################################################
-#
 sub return_status {
     my ($jconfig, $extra_href, $return_text_ref) = @_;
 
@@ -384,36 +299,6 @@ sub return_status {
     }
     return 1;
 }
-
-###############################################################################
-# Invoke the "return_fetch" method on each GLOBAL hook.  This occurs for all
-# dataset within a regular SQL fetch, including for nested datasets.
-#
-# This hook may do one or more of:
-#
-#   - Add some extra per-dataset parameters (via $extra_href)
-#   - Completely modify the returned content (via $rows_aref)
-#
-# Params:
-#       $jconfig        - Jarvis::Config object
-#
-#       $user_args_aref - The hash of user args parsed for the request.
-#                         Includes CGI + numbered and named REST args.
-#
-#       $rows_aref      - The array of rows returned from the top level
-#                         dataset query.  May included nested child 
-#                         dataset arrays.
-#
-#       $extra_href     - Hash of extra parameters to add to the root of
-#                         the returned JSON/XML document.
-#
-#       $return_text_ref - Return text.  If we define this, it will be used
-#                          instead of the default JSON/XML encoding.
-#
-# Returns:
-#       1
-###############################################################################
-#
 sub return_fetch {
     my ($jconfig, $user_args_aref, $rows_aref, $extra_href, $return_text_ref) = @_;
 
@@ -422,72 +307,19 @@ sub return_fetch {
     }
     return 1;
 }
-
-
-###############################################################################
-# Invoke the "return_store" method on each GLOBAL hook.  This occurs for all 
-# "store" requests on regular datasets.
-#
-# This hook may do one or more of:
-#
-#   - Add some extra root level parameters (by modifying $extra_href)
-#   - Completely modify the returned content (by modifying $results_aref)
-#   - Peform a custom encoding into text (by setting $return_text)
-#
-# Params:
-#       $jconfig        - Jarvis::Config object
-#
-#       $dsxml          - The XML::Smart object for our dataset XML config.
-#
-#       $safe_params_href - The "all rows" safe params. 
-#                           Default + CGI + REST + Session.
-#                           Changes will have no effect.
-#
-#       $fields_aref    - The client-supplied per-row parameters, one per
-#                         store request given to us.
-#
-#       $results_aref   - The results rows, one per store operation that
-#                         we will return as the response.
-#
-#       $extra_href     - Hash of extra parameters to add to the root of
-#                         the returned JSON/XML document.
-#
-#       $return_text_ref - Return text.  If we define this, it will be used
-#                          instead of the default JSON/XML encoding of results.
-#
-# Returns:
-#       1
-###############################################################################
-#
 sub return_store {
-    my ($jconfig, $dsxml, $safe_params_href, $fields_aref, $results_aref, $extra_href, $return_text_ref) = @_;
+    my ($jconfig, $dsxml, $user_args_aref, $results_aref, $extra_href, $return_text_ref) = @_;
 
     foreach my $hook (grep { ! $_->{level} } @{ $jconfig->{hooks} }) {
-        &invoke ($jconfig, $hook, "return_store", $safe_params_href, $fields_aref, $results_aref, $extra_href, $return_text_ref);
+        &invoke ($jconfig, $hook, "return_store", $user_args_aref, $results_aref, $extra_href, $return_text_ref);
     }
     return 1;
 }
 
 ###############################################################################
-# UTILITY HOOKS
+# GLOBAL UTILITY HOOKS
 ###############################################################################
 
-###############################################################################
-# Invoke the "after_login" method on each GLOBAL hook.
-#
-# Note that this hook is only invoked if the client was not previously logged
-# in.  Don't bother overriding session expiry in this hook, as it won't last.
-#
-# Params:
-#       $jconfig        - Jarvis::Config object
-#
-#       $additional_safe_href - Reference to the hash of additional safe
-#                               parameters.  Hook module may add new ones.
-#
-# Returns:
-#       1
-###############################################################################
-#
 sub after_login {
     my ($jconfig, $additional_safe_href) = @_;
 
@@ -496,21 +328,6 @@ sub after_login {
     }
     return 1;
 }
-
-###############################################################################
-# Invoke the "before_logout" method on each GLOBAL hook.
-#
-# Note that this hook is only invoked if the client was previously logged
-# in.  Don't bother overriding anything in this hook in the session - it
-# won't last.
-#
-# Params:
-#       $jconfig        - Jarvis::Config object
-#
-# Returns:
-#       1
-###############################################################################
-#
 sub before_logout {
     my ($jconfig) = @_;
 
@@ -519,32 +336,6 @@ sub before_logout {
     }
     return 1;
 }
-
-###############################################################################
-# Invoke the "pre_connect" method on each GLOBAL hook.
-#
-# This hook is invoked before attempting to connect to any database.  It allows
-# the hook to possibly modify the connection parameters.
-#
-# Params:
-#       $jconfig        - Jarvis::Config object
-#
-#       $dbname         - The requested Jarvis dbname (e.g. "default").
-#
-#       $dbtype         - The requested Jarvis dbtype (e.g. "dbi").
-#
-#       $dbconnect_ref  - The DBI connection string.  Hook may modify.
-#
-#       $dbusername_ref - The DBI username string.  Hook may modify.
-#
-#       $dbpassword_ref - The DBI password string.  Hook may modify.
-#
-#       $parameters_href - The configured parameters.  Hook may modify.
-#
-# Returns:
-#       1
-###############################################################################
-#
 sub pre_connect {
     my ($jconfig, $dbname, $dbtype, $dbconnect_ref, $dbusername_ref, $dbpassword_ref, $parameters_href) = @_;
 
@@ -555,25 +346,9 @@ sub pre_connect {
 }
 
 ###############################################################################
-# PER-DATASET HOOKS
+# GLOBAL/DATASET PER-DATASET HOOKS
 ###############################################################################
 
-###############################################################################
-# Invoke the "dataset_pre_fetch" method on a data hook.
-#
-# Params:
-#       $jconfig        - Jarvis::Config object
-#
-#       $dsxml          - The XML::Smart object for our dataset XML config.
-#
-#       $safe_params_href - The "all rows" safe params. 
-#                           Default + CGI + REST + Session.
-#                           Changes will be reflected in the query for THIS dataset only.
-#
-# Returns:
-#       1
-###############################################################################
-#
 sub dataset_pre_fetch {
     my ($jconfig, $dsxml, $safe_params_href) = @_;
 
@@ -582,25 +357,14 @@ sub dataset_pre_fetch {
     }
     return 1;
 }
+sub dataset_pre_store {
+    my ($jconfig, $dsxml, $safe_params_href, $rows_aref) = @_;
 
-###############################################################################
-# Invoke the "before_all" method on each hook.
-#
-# Params:
-#       $jconfig        - Jarvis::Config object
-#
-#       $dsxml          - The XML::Smart object for our dataset XML config.
-#
-#       $safe_params_href - The "all rows" safe params. 
-#                           Default + CGI + REST + Session.
-#                           Changes will be reflected in the query.
-#
-#       $fields_aref    - The submitted rows we are about to apply.
-#
-# Returns:
-#       1
-###############################################################################
-#
+    foreach my $hook (@{ $jconfig->{hooks} }) {
+        &invoke ($jconfig, $hook, "dataset_pre_store", $dsxml, $safe_params_href, $rows_aref);
+    }
+    return 1;
+}
 sub before_all {
     my ($jconfig, $dsxml, $safe_params_href, $fields_aref) = @_;
 
@@ -609,28 +373,6 @@ sub before_all {
     }
     return 1;
 }
-
-###############################################################################
-# Invoke the "after_all" method on each hook.  This occurs AFTER any <after>
-# SQL has been executed.
-#
-# Params:
-#       $jconfig        - Jarvis::Config object
-#
-#       $dsxml          - The XML::Smart object for our dataset XML config.
-#
-#       $safe_params_href - The "all rows" safe params. 
-#                           Default + CGI + REST + Session.
-#                           Changes will have no effect.
-#
-#       $fields_aref    - The submitted rows we just applied.
-#
-#       $results_aref   - Reference to the @results array we plan to return.
-#
-# Returns:
-#       1
-###############################################################################
-#
 sub after_all {
     my ($jconfig, $dsxml, $safe_params_href, $fields_aref, $results_aref) = @_;
 
@@ -639,64 +381,27 @@ sub after_all {
     }
     return 1;
 }
-
-
-###############################################################################
-# Invoke the "dataset_fetched" method on each hook.  This occurs for all
-# dataset within a regular SQL fetch.  If the fetch specifies more than one
-# dataset in a comma-separated list, then we call this for each one.
-#
-# This hook may do one or more of:
-#
-#   - Add some extra per-dataset parameters (by modifying $extra_href)
-#   - Modify the returned content (by modifying $rows_aref)
-#
-# Params:
-#       $jconfig        - Jarvis::Config object
-#
-#       $dsxml          - The XML::Smart object for our dataset XML config.
-#
-#       $safe_params_href - The "all rows" safe params. 
-#                           Default + CGI + REST + Session.
-#                           Changes will have no effect.
-#
-#       $rows_aref      - The array of return objects to be encoded.
-#
-#       $column_names_aref - Array of names of all returned columns.
-#
-# Returns:
-#       1
-###############################################################################
-#
 sub dataset_fetched {
-    my ($jconfig, $dsxml, $safe_row_params_href, $rows_aref, $column_names_aref) = @_;
+    my ($jconfig, $dsxml, $safe_params_href, $rows_aref, $column_names_aref) = @_;
 
     foreach my $hook (@{ $jconfig->{hooks} }) {
-        &invoke ($jconfig, $hook, "dataset_fetched", $dsxml, $safe_row_params_href, $rows_aref, $column_names_aref);
+        &invoke ($jconfig, $hook, "dataset_fetched", $dsxml, $safe_params_href, $rows_aref, $column_names_aref);
+    }
+    return 1;
+}
+sub dataset_stored {
+    my ($jconfig, $dsxml, $safe_params_href, $results_aref) = @_;
+
+    foreach my $hook (@{ $jconfig->{hooks} }) {
+        &invoke ($jconfig, $hook, "dataset_stored", $dsxml, $safe_params_href, $results_aref);
     }
     return 1;
 }
 
 ###############################################################################
-# PER-QUERY/PER-ROW HOOKS
+# GLOBAL/DATASET PER-ROW HOOKS
 ###############################################################################
 
-###############################################################################
-# Invoke the "before_one" method on each hook.
-#
-# Params:
-#       $jconfig         - Jarvis::Config object
-#
-#       $dsxml           - The XML::Smart object for our dataset XML config.
-#
-#       $safe_params_href - The "all rows" safe params. 
-#                           Default + CGI + REST + Session + Per-Row.
-#                           Changes will affect only this row.
-#
-# Returns:
-#       1
-###############################################################################
-#
 sub before_one {
     my ($jconfig, $dsxml, $safe_row_params_href) = @_;
 
@@ -705,27 +410,6 @@ sub before_one {
     }
     return 1;
 }
-
-###############################################################################
-# Invoke the "after_one" method on each hook.
-#
-# Params:
-#       $jconfig         - Jarvis::Config object
-#
-#       $dsxml           - The XML::Smart object for our dataset XML config.
-#
-#       $safe_params_href - The "all rows" safe params. 
-#                           Default + CGI + REST + Session + Per-Row.
-#                           Changes will have no effect.
-#
-#       $row_result_href - Reference to any row result generated by the
-#                          insert/update, e.g. from a "returning" clause.
-#                          The hook may change these values.
-#
-# Returns:
-#       1
-###############################################################################
-#
 sub after_one {
     my ($jconfig, $dsxml, $safe_row_params_href, $row_result_href) = @_;
 
