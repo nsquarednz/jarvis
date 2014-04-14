@@ -425,7 +425,8 @@ sub fetch {
     }
 
     # Get the ROWS inner content for the dataset.
-    my ($rows_aref, $column_names_aref) = &fetch_rows ($jconfig, $dataset_name, $user_args);
+    my $extra_href = {};
+    my ($rows_aref, $column_names_aref) = &fetch_rows ($jconfig, $dataset_name, $user_args, $extra_href);
 
     # Now we have an array of hash objects.  Apply post-processing.
     my $num_fetched = scalar @$rows_aref;
@@ -448,7 +449,6 @@ sub fetch {
     # This may: Set extra return fields.
     #           Completely override the return content formatting.
     #
-    my $extra_href = {};
     my $return_value = undef;
     &Jarvis::Hook::return_fetch ($jconfig, $user_args, $rows_aref, $extra_href, \$return_value);
 
@@ -643,6 +643,7 @@ sub fetch {
 #       $dataset_name - Dataset name we parsed/routed to (or child dataset).
 #       $user_args - Hash of CGI + numbered/named REST args (top level datasest).
 #                    OR linked child args (for nested datasets).
+#       $extra_href - Top-level return values we can add to.
 #
 # Returns:
 #       Reference to Hash of returned data.  You may convert to JSON or XML.
@@ -650,7 +651,7 @@ sub fetch {
 ################################################################################
 #
 sub fetch_rows {    
-    my ($jconfig, $dataset_name, $user_args) = @_;
+    my ($jconfig, $dataset_name, $user_args, $extra_href) = @_;
 
     &Jarvis::Error::debug ($jconfig, "Fetching dataset rows - load dataset XML and per-datasets hooks.");
 
@@ -839,7 +840,7 @@ sub fetch_rows {
 
     # This final hook allows you to modify the data returned by SQL for one dataset.
     # This hook may completely modify the returned content (by modifying $rows_aref).
-    &Jarvis::Hook::dataset_fetched ($jconfig, $dsxml, \%safe_params, $rows_aref, $column_names_aref);
+    &Jarvis::Hook::dataset_fetched ($jconfig, $dsxml, \%safe_params, $rows_aref, $extra_href, $column_names_aref);
             
     # In any case, Unload/Finish dataset specific hooks.
     &Jarvis::Hook::unload_dataset ($jconfig);
@@ -942,7 +943,8 @@ sub store {
         die "Unsupported transaction type '$ttype'.";
 
     # Store the row content for the top-level dataset.  This may push out to child sets.
-    my ($success, $message, $modified, $results_aref) = &store_rows ($jconfig, $dataset_name, $ttype, $user_args, $rows_aref);
+    my $extra_href = {};
+    my ($success, $message, $modified, $results_aref) = &store_rows ($jconfig, $dataset_name, $ttype, $user_args, $rows_aref, $extra_href);
 
     # This final GLOBAL hook allows you to do whatever you want to modify the returned
     # data.  This hook may do one or both of:
@@ -950,7 +952,6 @@ sub store {
     #   - Completely modify the returned content (by modifying \@results)
     #   - Peform a custom encoding into text (by setting $return_text)
     #
-    my $extra_href = {};
     my $return_text = undef;
     &Jarvis::Hook::return_store ($jconfig, $user_args, $results_aref, $extra_href, \$return_text);
 
@@ -1031,6 +1032,7 @@ sub store {
 #       $user_args - Hash of CGI + numbered/named REST args (top level datasest).
 #                    OR linked child args (for nested datasets).
 #       $rows_aref - Array of records to store.
+#       $extra_href - Top-level return values we can add to.
 #
 # Returns:
 #       ($success, $message, $results_aref)
@@ -1043,7 +1045,7 @@ sub store {
 ################################################################################
 #
 sub store_rows {
-    my ($jconfig, $dataset_name, $ttype, $user_args, $rows_aref) = @_;
+    my ($jconfig, $dataset_name, $ttype, $user_args, $rows_aref, $extra_href) = @_;
 
     # Read the dataset config file.  This changes debug level as a side-effect.
     my $dataset = &load_dsxml ($jconfig, $dataset_name) || die "Cannot load configuration for dataset '$dataset_name'.";
@@ -1199,6 +1201,10 @@ sub store_rows {
 
     # Cleanup SQL Server message for reporting purposes.
     $message =~ s/^Server message number=[0-9]+ severity=[0-9]+ state=[0-9]+ line=[0-9]+ server=[A-Z0-9\\]+text=//i;
+
+    # This final hook allows you to modify the data returned by SQL for one dataset.
+    # This hook may completely modify the returned content (by modifying $rows_aref).
+    &Jarvis::Hook::dataset_stored ($jconfig, $dsxml, \%safe_all_rows_params, $results_aref, $extra_href);
 
     # In any case, Unload/Finish dataset specific hooks.
     &Jarvis::Hook::unload_dataset ($jconfig);

@@ -382,18 +382,18 @@ sub after_all {
     return 1;
 }
 sub dataset_fetched {
-    my ($jconfig, $dsxml, $safe_params_href, $rows_aref, $column_names_aref) = @_;
+    my ($jconfig, $dsxml, $safe_params_href, $rows_aref, $extra_href, $column_names_aref) = @_;
 
     foreach my $hook (@{ $jconfig->{hooks} }) {
-        &invoke ($jconfig, $hook, "dataset_fetched", $dsxml, $safe_params_href, $rows_aref, $column_names_aref);
+        &invoke ($jconfig, $hook, "dataset_fetched", $dsxml, $safe_params_href, $rows_aref, $extra_href, $column_names_aref);
     }
     return 1;
 }
 sub dataset_stored {
-    my ($jconfig, $dsxml, $safe_params_href, $results_aref) = @_;
+    my ($jconfig, $dsxml, $safe_params_href, $results_aref, $extra_href) = @_;
 
     foreach my $hook (@{ $jconfig->{hooks} }) {
-        &invoke ($jconfig, $hook, "dataset_stored", $dsxml, $safe_params_href, $results_aref);
+        &invoke ($jconfig, $hook, "dataset_stored", $dsxml, $safe_params_href, $results_aref, $extra_href);
     }
     return 1;
 }
