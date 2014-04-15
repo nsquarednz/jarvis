@@ -107,7 +107,13 @@ sub sql_with_substitutions {
 
     # Dump the available arguments at this stage.
     foreach my $k (sort (keys %$args_href)) {
-        &Jarvis::Error::dump ($jconfig, "SQL available args: '$k' -> " . (defined $args_href->{$k} ? "'" . $args_href->{$k} . "'" : '<NULL>') . ".");
+        my $v = $args_href->{$k};
+        if ((ref $v) eq '') {
+            &Jarvis::Error::dump ($jconfig, "SQL available args: '$k' -> " . (defined $v ? "'" . $v . "'" : '<NULL>') . ".");
+
+        } else {
+            &Jarvis::Error::dump ($jconfig, "SQL available args: '$k' -> <" . (ref $v) . ">.");
+        }
     }
     
     # Parse the update SQL to get a prepared statement, pulling out the list
@@ -183,6 +189,7 @@ sub sql_with_substitutions {
             my $value = undef;
             foreach my $option (split ('\|', $name)) {
                 $value = $args_href->{$option};
+                next if (ref $value ne '');
                 last if (defined $value);
             }
             (defined $value) || ($value = '');

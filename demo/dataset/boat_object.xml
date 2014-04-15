@@ -4,6 +4,7 @@
     </hook>
     <child field="parts" dataset="boat_part">
         <link parent="name" child="boat_name"/>
+        <link parent="id" child="boat_id"/>
     </child>
     <transform fetch="notnull" store="trim,null" />
     <select>

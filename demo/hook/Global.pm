@@ -35,8 +35,15 @@ sub Global::return_status {
 
 # Add "quota" to __fetch return.
 sub Global::return_fetch {
-    my ($jconfig, $hook_params_href, $safe_row_params_href, $return_object, $extra_href, $return_text_ref) = @_;
+    my ($jconfig, $hook_params_href, $user_args_href, $rows_aref, $extra_href, $return_text_ref) = @_;
 
+    # Duplicate the first row if requested.    
+    if ($user_args_href->{duplicate}) {
+        my %copy = %{ $$rows_aref[0] };
+        push (@$rows_aref, \%copy);
+    }
+
+    # Always add our quota.
     $extra_href->{quota} = $jconfig->{__quota};
 
     return 1;

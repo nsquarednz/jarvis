@@ -655,6 +655,10 @@ sub fetch_rows {
 
     &Jarvis::Error::debug ($jconfig, "Fetching dataset rows - load dataset XML and per-datasets hooks.");
 
+    # Plugins using fetch_rows may decide not to give us $user_args or $extra_href;
+    (defined $user_args) || ($user_args = {});
+    (defined $extra_href) || ($extra_href = {});
+
     # Read the dataset config file.  This changes debug level as a side-effect.
     my $dataset = &load_dsxml ($jconfig, $dataset_name) || die "Cannot load configuration for dataset '$dataset_name'.\n";
     my $dsxml = $dataset->{dsxml};
@@ -684,7 +688,16 @@ sub fetch_rows {
     &Jarvis::Hook::dataset_pre_fetch ($jconfig, $dsxml, $user_args);
 
     # Get a database handle.
-    my $dbh = &Jarvis::DB::handle ($jconfig, $dbname, $dbtype);
+    my $dbh = undef;
+    if ($dataset->{level} == 0) {
+        &Jarvis::Error::debug ($jconfig, "Top-Level Fetch Dataset.  Opening database handle.");
+        $dbh = &Jarvis::DB::handle ($jconfig, $dbname, $dbtype);
+        $jconfig->{txn_dbh} = $dbh;
+
+    } else {
+        &Jarvis::Error::debug ($jconfig, "Nested Fetch Dataset.  Using already-open parent database handle.");
+        $dbh = $jconfig->{txn_dbh};
+    }
 
     # Call to the DBI interface to fetch the tuples.
     my ($rows_aref, $column_names_aref);
@@ -809,7 +822,7 @@ sub fetch_rows {
                 foreach my $parent (keys %links) {
                     my $child = $links{$parent};                    
                     $child_args{$child} = $row->{$parent};
-                    &Jarvis::Error::debug ($jconfig, "Passing parent field [%s] -> child field [%s] as value '%s'.", $parent, $child, $row->{$parent}, );
+                    &Jarvis::Error::debug ($jconfig, "Passing FETCHED parent field [%s] -> child field [%s] as value '%s'.", $parent, $child, $child_args{$child});
                 }
 
                 # Change debug output to show the nested set.
@@ -818,7 +831,7 @@ sub fetch_rows {
 
                 # Execute the sub query and store it in the child field.
                 # This will add default and safe args.
-                $row->{$child_field} = &fetch_rows ($jconfig, $child_dataset, \%child_args);
+                $row->{$child_field} = &fetch_rows ($jconfig, $child_dataset, \%child_args, $extra_href);
 
                 # Restore the old name for debugging.
                 $jconfig->{dataset_name} = $old_dataset_name;
@@ -1089,8 +1102,20 @@ sub store_rows {
     # Get a database handle.
     my $dbh = &Jarvis::DB::handle ($jconfig, $dbname, $dbtype);
     
-    # Shared database handle.
-    $dbh->begin_work() || die;
+    # Get a database handle.
+    my $dbh = undef;
+    if ($dataset->{level} == 0) {
+        &Jarvis::Error::debug ($jconfig, "Top-Level Store Dataset.  Opening database handle.");
+        $dbh = &Jarvis::DB::handle ($jconfig, $dbname, $dbtype);
+        $jconfig->{txn_dbh} = $dbh;
+
+        # Start a transaction.
+        $dbh->begin_work() || die;
+
+    } else {
+        &Jarvis::Error::debug ($jconfig, "Nested Store Dataset.  Using already-open parent database handle.");
+        $dbh = $jconfig->{txn_dbh};
+    }
 
     # Invoke before_all hook.
     my %before_params = %safe_all_rows_params;
@@ -1113,6 +1138,7 @@ sub store_rows {
             if ($bstm->{error}) {
                 $success = 0;
                 $message || ($message = $bstm->{error});
+                $message =~ s/^Server message number=[0-9]+ severity=[0-9]+ state=[0-9]+ line=[0-9]+ server=[A-Z0-9\\]+text=//i;
             }
         }
     }
@@ -1122,6 +1148,8 @@ sub store_rows {
 
     # Handle each insert/update/delete request row.
     foreach my $fields_href (@$rows_aref) {
+
+        ((ref $fields_href) eq 'HASH') || die "User-supplied object to store is not HASH.";
 
         # Re-do our parameter merge, this time including our per-row parameters.
         my %safe_params = &Jarvis::Config::safe_variables ($jconfig, $user_args, $fields_href);
@@ -1138,7 +1166,7 @@ sub store_rows {
         my $row_ttype = $safe_params{_ttype} || $ttype;
         ($row_ttype eq 'mixed') && die "Transaction Type 'mixed', but no '_ttype' field present in row.";    
 
-        # Hand off to DBI code for the actual store.
+        # Hand off to DBI code for the actual store.  This will also perform our "returning" logic.
         my $row_result = &Jarvis::Dataset::DBI::store_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%stms, $row_ttype, \%safe_params);
 
         # Increment our top-level counts.
@@ -1146,6 +1174,7 @@ sub store_rows {
         if (! $row_result->{success}) {
             $success = 0;
             $message = $row_result->{message};
+            $message =~ s/^Server message number=[0-9]+ severity=[0-9]+ state=[0-9]+ line=[0-9]+ server=[A-Z0-9\\]+text=//i;
         }
 
         # Stop as soon as anything goes wrong.
@@ -1153,6 +1182,90 @@ sub store_rows {
             &Jarvis::Error::debug ($jconfig, "Error detected.  Stopping.");
             last;
         }
+
+        # Now do we have any child datasets?  
+        if ($dsxml->{dataset}{child}) {
+
+            # For insert/update only!  Don't recurse on delete.
+            if ($row_ttype eq 'delete') {
+                &Jarvis::Error::debug ($jconfig, "Ignoring child datasets for '$row_ttype' store.");
+
+            } else {
+                &Jarvis::Error::debug ($jconfig, "Processing child datasets for '$row_ttype' store.");
+            }
+            foreach my $child (@{ $dsxml->{dataset}{child} }) {
+
+                # What dataset do we use to get child data, and where do we store it?
+                $child->{field} || die "Invalid dataset child configuration, <child> with no 'field' attribute.";
+                $child->{dataset} || die "Invalid dataset child configuration, <child> with no 'dataset' attribute.";
+                my $child_field = $child->{field}->content;
+                my $child_dataset = $child->{dataset}->content;
+                &Jarvis::Error::debug ($jconfig, "Processing child dataset '$child_dataset' to store as field '$child_field'.");
+
+                # Get all our links.  This ties a parent row value to a child query arg.
+                # We can execute with no links, although it doesn't give a very strong parent/child relationship!
+                my %links = ();
+                if ($child->{link}) {
+                    foreach my $link (@{ $child->{link} }) {
+                        $link->{parent} || die "Invalid dataset child link configuration, <link> with no 'parent' attribute.";
+                        $link->{child} || die "Invalid dataset child link configuration, <link> with no 'child' attribute.";
+                        $links{$link->{parent}->content} = $link->{child}->content;
+                    }
+                }
+
+                # Right, we will only continue now if we have been provided with rows to action.
+                my $child_rows_aref = $fields_href->{$child_field};
+                if (! defined $child_rows_aref) {
+                    &Jarvis::Error::debug ($jconfig, "No supplied rows for '$child_field' in parent.  Skip child dataset.");
+                    next;                    
+                }
+                ((ref $child_rows_aref) eq 'ARRAY') || die "Parent dataset has child dataset field '$child_field' but it is not ARRAY.";
+
+                # Parent/Child links will be passed through from SUPPLIED and RETURNING parameters too.
+                my %child_args = ();
+                foreach my $parent (keys %links) {
+                    my $child = $links{$parent};        
+
+                    # Returning parameters take precedence.  Note that in theory a "returning" 
+                    # clause can return more than one row.  But we only ever use the first returned row.
+                    if ($row_result->{returning} && (scalar @{ $row_result->{returning} }) && exists $row_result->{returning}[0]->{$parent}) {
+                        $child_args{$child} = $row_result->{returning}[0]->{$parent};
+                        &Jarvis::Error::debug ($jconfig, "Passing RETURNING parent field [%s] -> child field [%s] as value '%s'.", $parent, $child, $child_args{$child});
+
+                    } else {
+                        $child_args{$child} = $fields_href->{$parent};
+                        &Jarvis::Error::debug ($jconfig, "Passing SUPPLIED parent field [%s] -> child field [%s] as value '%s'.", $parent, $child, $child_args{$child});
+                    }
+                }
+
+                # Change debug output to show the nested set.
+                my $old_dataset_name = $jconfig->{dataset_name};
+                $jconfig->{dataset_name} .= ">" . $child_dataset;
+
+                # Execute the sub query and store it in the child field.
+                # This will add default and safe args.
+                my ($child_success, $child_message, $child_modified, $child_results_aref) =
+                    &store_rows ($jconfig, $child_dataset, $row_ttype, \%child_args, $child_rows_aref, $extra_href);
+
+                # Restore the old name for debugging.
+                $jconfig->{dataset_name} = $old_dataset_name;
+
+                # Failure?  Pass back up.
+                if (! $child_success) {
+                    &Jarvis::Error::debug ($jconfig, "Child dataset store failed.  Abandon nested store.");
+                    $success = 0;
+                    $message = $child_message;
+                    last;
+                }
+
+                # Success?
+                $row_result->{child}{$child_field} = {
+                    success => $child_success,
+                    modified => $child_modified,
+                    row => $child_results_aref,
+                }
+            }
+        }            
 
         # Invoke after_one hook.
         if ($success) {
@@ -1163,20 +1276,19 @@ sub store_rows {
     }
 
     # Determine if we're going to rollback.
-    if (! $success) {
-        &Jarvis::Error::debug ($jconfig, "Error detected.  Rolling back.");
+    if ($dataset->{level} == 0) {
+        if (! $success) {
+            &Jarvis::Error::debug ($jconfig, "Store Error detected.  Rolling back.");
 
-        # Use "eval" as some drivers (e.g. SQL Server) will have already rolled-back on the
-        # original failure, and hence a second rollback will fail.
-        eval { local $SIG{__DIE__}; $dbh->rollback (); }
+            # Use "eval" as some drivers (e.g. SQL Server) will have already rolled-back on the
+            # original failure, and hence a second rollback will fail.
+            eval { local $SIG{__DIE__}; $dbh->rollback (); }
 
-    } else {
-        &Jarvis::Error::debug ($jconfig, "All successful.  Committing all changes.");
-        $dbh->commit ();
+        } else {
+            &Jarvis::Error::debug ($jconfig, "Store all successful.  Committing all changes.");
+            $dbh->commit ();
+        }
     }
-
-    # Reset our parameters, our per-row parameters are no longer valid.
-    my %after_params = %safe_all_rows_params;
 
     # Free any remaining open statement types.
     foreach my $stm_type (keys %stms) {
@@ -1186,6 +1298,11 @@ sub store_rows {
 
     # Execute our "after" statement.
     if ($success) {
+
+        # Reset our parameters, our per-row parameters are no longer valid.
+        my %after_params = %safe_all_rows_params;
+
+        # Invoke the after statement if we have one.
         my $astm = &Jarvis::Dataset::DBI::parse_statement ($jconfig, $dataset_name, $dsxml, $dbh, 'after', \%after_params);
         if ($astm) {
             my @aarg_values = &Jarvis::Dataset::names_to_values ($jconfig, $astm->{vnames_aref}, \%after_params);
@@ -1194,13 +1311,13 @@ sub store_rows {
             if ($astm->{error}) {
                 $success = 0;
                 $message || ($message = $astm->{error});
+                $message =~ s/^Server message number=[0-9]+ severity=[0-9]+ state=[0-9]+ line=[0-9]+ server=[A-Z0-9\\]+text=//i;
             }
         }
+
+        # Invoke the "after_all" hook, even if we have no "after" statement.
         &Jarvis::Hook::after_all ($jconfig, $dsxml, \%after_params, $rows_aref, $results_aref);
     }
-
-    # Cleanup SQL Server message for reporting purposes.
-    $message =~ s/^Server message number=[0-9]+ severity=[0-9]+ state=[0-9]+ line=[0-9]+ server=[A-Z0-9\\]+text=//i;
 
     # This final hook allows you to modify the data returned by SQL for one dataset.
     # This hook may completely modify the returned content (by modifying $rows_aref).

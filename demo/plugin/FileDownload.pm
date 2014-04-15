@@ -23,8 +23,8 @@ sub plugin::FileDownload::do {
     my $interview = $plugin_args{interview} || 'Unknown';
 
     my $dbh = &Jarvis::DB::handle ($jconfig);
-    my $rows = $dbh->selectall_arrayref ("SELECT COUNT(*) as count FROM boat", 
-                                         { Slice => {} });    
+    my $rows = $dbh->selectall_arrayref ("SELECT COUNT(*) as count FROM boat WHERE class = ?", 
+                                         { Slice => {} }, $user_args->{boat_class});    
 
     my $num_boats = $$rows[0]{count};
     my $content = 

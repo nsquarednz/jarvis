@@ -91,7 +91,7 @@ sub login {
 #		$query_args - Hash of CGI args.
 #
 # Returns:
-#       Returned $json (die on error)
+#       Returned $content (die on error)
 ################################################################################
 #
 sub fetch {
@@ -108,10 +108,27 @@ sub fetch {
 	my $res = $ua->request ($req);
  	($res->is_success) || die "Failed: $restful_url: " . $res->status_line . "\n" . $res->content;
  	($res->header ('Content-Type') =~ m|^text/plain|) || die "Wrong Content-Type: " . $res->header ('Content-Type');
- 	my $json = decode_json ($res->content ());
- 	print STDERR $res->content () . "\n";
 
- 	# Check this looks like a valid response.
+ 	return $res->content ();
+}
+
+################################################################################
+# Perform a fetch, with specified args.  Assumes we are logged in already.
+#
+# Params:
+#		$url_parts - Array of URL parts, dataset plus any restful args.  We will encode.
+#		$query_args - Hash of CGI args.
+#
+# Returns:
+#       Returned $json (die on error)
+################################################################################
+#
+sub fetch_json {
+	my ($url_parts, $query_args) = @_;
+
+	my $content = &fetch ($url_parts, $query_args);
+
+ 	my $json = decode_json ($content);
  	(defined $json->{logged_in}) || die "Missing 'logged_in' in response: " . &Dumper ($json);
 
  	return $json;
