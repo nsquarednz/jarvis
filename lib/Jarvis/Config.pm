@@ -163,6 +163,29 @@ sub new {
 #
 # Params:
 #       $jconfig - Jarvis::Config object
+#       $fxml - An XML::Smart flag element on which we can invoke ->content.
+#       $default - Default true/false value.  Default = Default NO.
+#
+# Returns:
+#       Hash of default parameters configured in the application XML file.
+################################################################################
+#
+sub xml_yes_no {
+    my ($jconfig, $fxml, $default) = @_;
+
+    if ($fxml) {
+        return (defined $Jarvis::Config::yes_value{ lc ($fxml->content) }) ? 1 : 0;
+
+    } else {
+        return $default ? 1 : 0;
+    }
+}
+
+################################################################################
+# Returns a list of our default parameters.  Could be handy to some.
+#
+# Params:
+#       $jconfig - Jarvis::Config object
 #
 # Returns:
 #       Hash of default parameters configured in the application XML file.

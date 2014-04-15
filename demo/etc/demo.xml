@@ -25,6 +25,7 @@
         -->
         <router>
             <route path="/file_download/:boat_class" dataset="FileDownload"/>
+            <route path="/boat_object/:id" dataset="boat_object" presentation="singleton"/>
             <route path="/boat_class/:boat_class" dataset="boat_class"/>
             <route path="/boat_singleton/:id" dataset="boat" presentation="singleton"/>
             <route path="/boat/by-class/:boat_class" dataset="boat"/>

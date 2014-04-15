@@ -262,27 +262,27 @@ sub parse_attr {
 sub parse_statement {
     my ($jconfig, $dataset_name, $dsxml, $dbh, $ttype, $args_href) = @_;
 
-    my $obj = {};
+    my $stm = {};
 
     # Get and check the raw SQL, before parameter -> ? substitution.
     &Jarvis::Error::debug ($jconfig, "Parsing statement for transaction type '$ttype'");
-    $obj->{ttype} = $ttype;
-    $obj->{raw_sql} = &get_sql ($jconfig, $ttype, $dsxml);
-    if (! $obj->{raw_sql}) {
+    $stm->{ttype} = $ttype;
+    $stm->{raw_sql} = &get_sql ($jconfig, $ttype, $dsxml);
+    if (! $stm->{raw_sql}) {
         &Jarvis::Error::debug ($jconfig, "No SQL found for type '$ttype'");
         return undef;
     }
-    &Jarvis::Error::dump ($jconfig, "SQL as read from XML = " . $obj->{raw_sql});
+    &Jarvis::Error::dump ($jconfig, "SQL as read from XML = " . $stm->{raw_sql});
 
     # Does this insert return rows?
-    $obj->{returning} = defined ($Jarvis::Config::yes_value {lc ($dsxml->{dataset}{$ttype}{returning} || "no")});
-    &Jarvis::Error::debug ($jconfig, "Returning? = " . $obj->{returning});
+    $stm->{returning} = &Jarvis::Config::xml_yes_no ($jconfig, $dsxml->{dataset}{$ttype}{returning});
+    &Jarvis::Error::debug ($jconfig, "Returning? = " . $stm->{returning});
 
     # Get our SQL with placeholders and prepare it.
-    my ($sql_with_substitutions, $variable_names, $variable_flags) = &sql_with_substitutions ($jconfig, $dbh, $obj->{raw_sql}, $args_href);
-    $obj->{sql_with_substitutions} = $sql_with_substitutions;
-    $obj->{vnames_aref} = $variable_names;
-    $obj->{vflags_aref} = $variable_flags;
+    my ($sql_with_substitutions, $variable_names, $variable_flags) = &sql_with_substitutions ($jconfig, $dbh, $stm->{raw_sql}, $args_href);
+    $stm->{sql_with_substitutions} = $sql_with_substitutions;
+    $stm->{vnames_aref} = $variable_names;
+    $stm->{vflags_aref} = $variable_flags;
 
     &Jarvis::Error::dump ($jconfig, "SQL after substition = " . $sql_with_substitutions);
 
@@ -303,7 +303,7 @@ sub parse_statement {
     {
         local $dbh->{RaiseError};
         local $dbh->{PrintError};
-        $obj->{sth} = $dbh->prepare ($sql_with_substitutions, \%prepare_attr) ||
+        $stm->{sth} = $dbh->prepare ($sql_with_substitutions, \%prepare_attr) ||
             die "Couldn't prepare statement for $ttype on '$dataset_name'.\nSQL ERROR = '" . $dbh->errstr . "'.";
     }
 
@@ -311,17 +311,17 @@ sub parse_statement {
     #       "noerr" : Do NOT report back to client.  Do not log. 
     
     # Log and error suppression patterns (dataset)
-    $obj->{nolog_dataset} = ($dsxml->{dataset}{$ttype}{nolog} ? $dsxml->{dataset}{$ttype}{nolog}->content : '');
-    $obj->{noerr_dataset} = ($dsxml->{dataset}{$ttype}{noerr} ? $dsxml->{dataset}{$ttype}{noerr}->content : '');
+    $stm->{nolog_dataset} = ($dsxml->{dataset}{$ttype}{nolog} ? $dsxml->{dataset}{$ttype}{nolog}->content : '');
+    $stm->{noerr_dataset} = ($dsxml->{dataset}{$ttype}{noerr} ? $dsxml->{dataset}{$ttype}{noerr}->content : '');
     
     # Log and error suppression patterns (database global)
-    $obj->{nolog_dbh} = ($dbxml->{nolog} ? $dbxml->{nolog}->content : '');
-    $obj->{noerr_dbh} = ($dbxml->{noerr} ? $dbxml->{noerr}->content : '');
+    $stm->{nolog_dbh} = ($dbxml->{nolog} ? $dbxml->{nolog}->content : '');
+    $stm->{noerr_dbh} = ($dbxml->{noerr} ? $dbxml->{noerr}->content : '');
     
     # Warning/error suppression pattern
-    $obj->{ignore} = ($dsxml->{dataset}{$ttype}{ignore} ? $dsxml->{dataset}{$ttype}{ignore}->content : '');
+    $stm->{ignore} = ($dsxml->{dataset}{$ttype}{ignore} ? $dsxml->{dataset}{$ttype}{ignore}->content : '');
 
-    return $obj;
+    return $stm;
 }
 
 ################################################################################
@@ -590,6 +590,7 @@ sub fetch_inner {
 #       $stms - Hash of pre-prepared statements by row type.
 #       $row_ttype - Transaction type for this row.
 #       $safe_params - All our safe parameters.
+#       $fields_href - The raw fields.  We echo those for some DB types.
 #
 # Returns:
 #       $row_result - HASH REF containing {
@@ -602,7 +603,7 @@ sub fetch_inner {
 ################################################################################
 #
 sub store_inner {
-    my ($jconfig, $dataset_name, $dsxml, $dbh, $stms, $row_ttype, $safe_params) = @_;
+    my ($jconfig, $dataset_name, $dsxml, $dbh, $stms, $row_ttype, $safe_params, $fields_href) = @_;
 
     # Get the statement type for this ttype if we don't have it.  This raises debug.
     if (! $stms->{$row_ttype}) {
@@ -657,16 +658,18 @@ sub store_inner {
                 &Jarvis::Error::debug ($jconfig, "Copied single row from bind_param_inout results.");
 
             # SQLite uses the last_insert_rowid() function for returning IDs.  
-            # This is very special case handling.
+            # This is very special case handling.  We echo the input fields too!
             #
             } elsif ($dbh->{Driver}{Name} eq 'SQLite') {
 
                 my $rowid = $dbh->func('last_insert_rowid');
                 if ($rowid) {
-                    my %return_values = %$safe_params;
-                    $return_values {id} = $rowid;
-
-                    $row_result->{returning} = [ \%return_values ];
+                    my $returning_row = {};
+                    foreach my $field (keys %$fields_href) {
+                        (ref $fields_href->{$field} eq '') && ($returning_row->{$field} = $fields_href->{$field});
+                    }
+                    $returning_row->{id} = $rowid;
+                    $row_result->{returning} = [ $returning_row ];
                     &Jarvis::Error::debug ($jconfig, "Used SQLite last_insert_rowid to get returned 'id' => '$rowid'.");
 
                 } else {
@@ -754,6 +757,8 @@ sub store_inner {
                 &Jarvis::Error::debug ($jconfig, "Cannot determine how to get values for 'returning' statement.");
             }
         }
+
+
     }
 
     return $row_result;

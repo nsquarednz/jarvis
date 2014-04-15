@@ -10,7 +10,7 @@ ORDER BY name;
     <update>
 UPDATE boat_part
 SET boat_id = {{boat_id}},
-    name = {{name}}
+    name = {{name}},
     change_user = {{__username}},
     change_date = datetime ('now')
 WHERE id = {{id}};

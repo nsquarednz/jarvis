@@ -3,7 +3,6 @@
         <parameter name="index" value="Checked"/>
     </hook>
     <child field="parts" dataset="boat_part">
-        <link parent="name" child="boat_name"/>
         <link parent="id" child="boat_id"/>
     </child>
     <transform fetch="notnull" store="trim,null" />
@@ -26,6 +25,7 @@ SET name = {{name}},
 WHERE id = {{id}};
     </update>
     <insert returning="yes">
+        <echo field="name"/>
 INSERT INTO boat (name, registration_num, class, owner, description, change_user, change_date)
 VALUES ({{name}}, {{registration_num}}, {{class}}, {{owner}}, {{description}},
         {{__username}}, datetime ('now'));

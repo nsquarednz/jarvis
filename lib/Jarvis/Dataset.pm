@@ -982,31 +982,39 @@ sub store {
     } elsif ($jconfig->{format} =~ m/^json/) {
         &Jarvis::Error::debug ($jconfig, "Returning JSON.  Return Array = $return_array.");
 
-        my %return_data = ();
-        $return_data {success} = $success;
-        $success && ($return_data {modified} = $modified);
-        $success || ($return_data {message} = &trim($message));
+        my $return_object = {};
+        $return_object->{success} = $success;
+        $return_object->{logged_in} = $jconfig->{logged_in};
+        $return_object->{username} = $jconfig->{username};
+        $return_object->{error_string} = $jconfig->{error_string};
+        $return_object->{group_list} = $jconfig->{group_list};
+        $success && ($return_object->{modified} = $modified);
+        $success || ($return_object->{message} = &trim($message));
         foreach my $name (sort (keys %$extra_href)) {
-            $return_data {$name} = $extra_href->{$name};
+            $return_object->{$name} = $extra_href->{$name};
         }
 
         # Return the array data if we succeded.
         if ($success && $return_array) {
-            $return_data {row} = $results_aref;
+            $return_object->{row} = $results_aref;
         }
 
         # Return non-array fields in success case only.
         if ($success && ! $return_array) {
-            $$results_aref[0]{returning} && ($return_data {returning} = $$results_aref[0]{returning});
+            $$results_aref[0]{returning} && ($return_object->{returning} = $$results_aref[0]{returning});
         }
         my $json = JSON->new->pretty(1);
-        $return_text = $json->encode ( \%return_data );
+        $return_text = $json->encode ($return_object);
 
     } elsif ($jconfig->{format} eq "xml") {
         &Jarvis::Error::debug ($jconfig, "Returning XML.  Return Array = $return_array.");
 
         my $xml = XML::Smart->new ();
         $xml->{response}{success} = $success;
+        $xml->{response}{logged_in} = $jconfig->{logged_in};
+        $xml->{response}{username} = $jconfig->{username};
+        $xml->{response}{error_string} = $jconfig->{error_string};
+        $xml->{response}{group_list} = $jconfig->{group_list};
         $success && ($xml->{response}{modified} = $modified);
         $success || ($xml->{response}{message} = &trim($message));
         foreach my $name (sort (keys %$extra_href)) {
@@ -1100,9 +1108,6 @@ sub store_rows {
     &Jarvis::Hook::dataset_pre_store ($jconfig, $dsxml, \%safe_all_rows_params, $rows_aref);
 
     # Get a database handle.
-    my $dbh = &Jarvis::DB::handle ($jconfig, $dbname, $dbtype);
-    
-    # Get a database handle.
     my $dbh = undef;
     if ($dataset->{level} == 0) {
         &Jarvis::Error::debug ($jconfig, "Top-Level Store Dataset.  Opening database handle.");
@@ -1167,7 +1172,7 @@ sub store_rows {
         ($row_ttype eq 'mixed') && die "Transaction Type 'mixed', but no '_ttype' field present in row.";    
 
         # Hand off to DBI code for the actual store.  This will also perform our "returning" logic.
-        my $row_result = &Jarvis::Dataset::DBI::store_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%stms, $row_ttype, \%safe_params);
+        my $row_result = &Jarvis::Dataset::DBI::store_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%stms, $row_ttype, \%safe_params, $fields_href);
 
         # Increment our top-level counts.
         $modified = $modified + $row_result->{modified};
