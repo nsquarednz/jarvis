@@ -1139,7 +1139,7 @@ sub store_rows {
         if ($bstm) {
             my @barg_values = &Jarvis::Dataset::names_to_values ($jconfig, $bstm->{vnames_aref}, \%before_params);
 
-            &statement_execute($jconfig, $bstm, \@barg_values);
+            &Jarvis::Dataset::DBI::statement_execute($jconfig, $bstm, \@barg_values);
             if ($bstm->{error}) {
                 $success = 0;
                 $message || ($message = $bstm->{error});
@@ -1312,7 +1312,7 @@ sub store_rows {
         if ($astm) {
             my @aarg_values = &Jarvis::Dataset::names_to_values ($jconfig, $astm->{vnames_aref}, \%after_params);
 
-            &statement_execute($jconfig, $astm, \@aarg_values);
+            &Jarvis::Dataset::DBI::statement_execute($jconfig, $astm, \@aarg_values);
             if ($astm->{error}) {
                 $success = 0;
                 $message || ($message = $astm->{error});

@@ -15,6 +15,7 @@
 #    <app format="json" debug="no">
 #        ...
 #        <login module="Jarvis::Login::Drupal">
+#            <parameter name="dbname" value="jarvis-config-db-name"/>
 #            <parameter name="login_type" value="yes"/>
 #            <parameter name="admin_only" value="yes"/>
 #            <parameter name="admin_role" value="admin"/>
