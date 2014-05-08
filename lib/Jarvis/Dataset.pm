@@ -461,13 +461,13 @@ sub fetch {
         &Jarvis::Error::debug ($jconfig, "Encoding into XML format ($format).");
 
         my $return_object = XML::Smart->new ();
-        $return_object->{data}{row} = $rows_aref;
+        $return_object->{response}{data}{row} = $rows_aref;
         $return_object->{response}{logged_in} = $jconfig->{logged_in};
         $return_object->{response}{username} = $jconfig->{username};
         $return_object->{response}{error_string} = $jconfig->{error_string};
         $return_object->{response}{group_list} = $jconfig->{group_list};
-        $return_object->{fetched} = 1 * $num_fetched;            # Fetched from database
-        $return_object->{returned} = scalar @$rows_aref;         # Returned to client (after paging)
+        $return_object->{response}{fetched} = 1 * $num_fetched;            # Fetched from database
+        $return_object->{response}{returned} = scalar @$rows_aref;         # Returned to client (after paging)
 
         # Copy across any extra root parameters set by the return_fetch hook.
         foreach my $name (sort (keys %$extra_href)) {
