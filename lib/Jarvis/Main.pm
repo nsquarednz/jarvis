@@ -82,6 +82,9 @@ my $jconfig = undef;
 #
 my @etc = ('/etc/jarvis', '/opt/jarvis/etc');
 
+# Version 6.0.0.
+$Jarvis::Main::JARVIS_VERSION = 601;
+
 ###############################################################################
 # Debugging for our old friend XML::Smart and its beloved clean errors.
 ###############################################################################
@@ -355,7 +358,7 @@ sub do {
 
     # What kind of dataset?  Used by the tracker only.
     # 's' = sql, 'i' = internal, 'p' = plugin, 'e' = exec, undef for undetermined.
-    my $dataset_type = undef;
+    $jconfig->{dataset_type} = undef;
 
     # All special datasets start with "__".
     #
@@ -367,7 +370,7 @@ sub do {
     #
     if ($dataset_name =~ m/^__/) {
         my $return_text = undef;
-        $dataset_type = 'i';
+        $jconfig->{dataset_type} = 'i';
         $jconfig->{action} = 'select';
 
         # Status.  I.e. are we logged in?
@@ -401,7 +404,7 @@ sub do {
     #
     } elsif (&Jarvis::Exec::do ($jconfig, $dataset_name, $user_args)) {
         # All is well if this returns true.  The action is treated.
-        $dataset_type = 'e';
+        $jconfig->{dataset_type} = 'e';
 
     # A custom plugin for this application?  This is very similar to an Exec,
     # except that where an exec is a `<command>` system call, a Plugin is a
@@ -409,11 +412,11 @@ sub do {
     #
     } elsif (&Jarvis::Plugin::do ($jconfig, $dataset_name, $user_args)) {
         # All is well if this returns true.  The action is treated.
-        $dataset_type = 'p';
+        $jconfig->{dataset_type} = 'p';
 
     # Fetch a regular dataset.
     } elsif ($action eq "select") {
-        $dataset_type = 's';
+        $jconfig->{dataset_type} = 's';
 
         my $return_text = &Jarvis::Dataset::fetch ($jconfig, $dataset_name, $user_args);
 
@@ -455,7 +458,7 @@ sub do {
     # Modify a regular dataset.
     } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete") || ($action eq "mixed")) {
 
-        $dataset_type = 's';
+        $jconfig->{dataset_type} = 's';
         my $return_text = &Jarvis::Dataset::store ($jconfig, $dataset_name, $user_args);
 
         print $cgi->header(-type => "text/plain; charset=UTF-8", -cookie => $jconfig->{cookie});
