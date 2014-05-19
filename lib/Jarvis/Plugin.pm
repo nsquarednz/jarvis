@@ -172,10 +172,12 @@ sub do {
     # Are we supposed to add headers?  Does that include a filename header?
     # Note that if we really wanted to, we could squeeze in
     if ($add_headers) {
-        if (! $mime_type) {
+        if (! $mime_type && $filename) {
             my $mime_types = MIME::Types->new;
             my $filename_type = $mime_types->mimeTypeOf ($filename);
             $mime_type = $filename_type ? $filename_type->type : 'text/plain';
+        } else {
+            $mime_type = 'text/plain';
         }
         &Jarvis::Error::debug ($jconfig, "Plugin returning mime type '$mime_type'");
 
