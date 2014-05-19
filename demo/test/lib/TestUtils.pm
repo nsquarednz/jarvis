@@ -12,6 +12,7 @@ use HTTP::Cookies;
 use Data::Dumper;
 use JSON qw(encode_json decode_json);
 use URI::Encode qw(uri_encode uri_decode);
+use XML::Smart;
 
 # Jarvis base URL.
 my $base_url = "http://localhost/jarvis-agent/demo";
@@ -31,7 +32,7 @@ $ua->cookie_jar (HTTP::Cookies->new (file => "cookies.txt", autosave => 1));
 #       Returned $json (die on error)
 ################################################################################
 #
-sub logout {
+sub logout_json {
 
 	# Request is a simple GET.
  	my $req = HTTP::Request->new (GET => "$base_url/__logout");
@@ -49,16 +50,16 @@ sub logout {
 }
 
 ################################################################################
-# Perform a login as part of a test.
+# Perform a login request.
 #
 # Params:
 #		$username - Must a be a known username.  We will supply the password.
 #
 # Returns:
-#       Returned $json (die on error)
+#       Returned JSON OBJECT (die on error)
 ################################################################################
 #
-sub login {
+sub login_json {
 	my ($username) = @_;
 
 	# Username and password are sent.
@@ -120,7 +121,7 @@ sub fetch {
 #		$query_args - Hash of CGI args.
 #
 # Returns:
-#       Returned $json (die on error)
+#       Returned JSON OBJECT (die on error)
 ################################################################################
 #
 sub fetch_json {
@@ -132,6 +133,29 @@ sub fetch_json {
  	(defined $json->{logged_in}) || die "Missing 'logged_in' in response: " . &Dumper ($json);
 
  	return $json;
+}
+
+################################################################################
+# Perform a fetch, with specified args.  Assumes we are logged in already.
+#
+# Params:
+#		$url_parts - Array of URL parts, dataset plus any restful args.  We will encode.
+#		$query_args - Hash of CGI args.
+#
+# Returns:
+#       Returned XML::Smart OBJECT (die on error)
+################################################################################
+#
+sub fetch_xml {
+	my ($url_parts, $query_args) = @_;
+
+	$query_args->{format} = 'xml';
+	my $content = &fetch ($url_parts, $query_args);
+
+ 	my $xml = XML::Smart->new ($content);
+ 	(defined $xml->{response}{logged_in}) || die "Missing 'logged_in' in response: " . &Dumper ($xml);
+
+ 	return $xml;
 }
 
 ################################################################################

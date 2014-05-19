@@ -25,29 +25,41 @@ use TestUtils;
 ###############################################################################
 
 # Logout.
-my $json = TestUtils::logout ();
-if (! ok ($json->{logged_in} == 0, "Log Out")) {
+my $json = TestUtils::logout_json ();
+if (! ok ($json->{logged_in} == 0, "JSON Log Out")) {
     BAIL_OUT("Failed to logout: " . &Dumper ($json));    
 }
 
 # Login.
-$json = TestUtils::login ("admin");
-if (! ok ($json->{logged_in} == 1, "Log In")) {
+$json = TestUtils::login_json ("admin");
+if (! ok ($json->{logged_in} == 1, "JSON Log In")) {
     BAIL_OUT("Failed to login: " . &Dumper ($json));    
 }
-if (! eq_or_diff ($json->{quota}, "4 Gazillion", '__status quota parameter matches.')) {
+if (! eq_or_diff ($json->{quota}, "4 Gazillion", 'JSON Login quota parameter matches.')) {
     BAIL_OUT("Unexpected __status quota: " . &Dumper ($json));    
 }
-if (! eq_or_diff ($json->{group_list}, "admin,default", '__status group_list matches.')) {
+if (! eq_or_diff ($json->{group_list}, "admin,default", 'JSON Login group_list matches.')) {
     BAIL_OUT("Unexpected __status group_list: " . &Dumper ($json));    
+}
+
+# JSON Status check
+$json = TestUtils::fetch_json ([ '__status' ]);
+if (! ok (defined $json->{logged_in} && $json->{logged_in}, "JSON Status")) {
+    BAIL_OUT("Failed to JSON status: " . &Dumper ($json));    
+}
+
+# XML Status check
+my $xml = TestUtils::fetch_xml ([ '__status' ]);
+if (! ok (defined $xml->{response} && defined $xml->{response}{logged_in} && $xml->{response}{logged_in}->content, "XML Status")) {
+    BAIL_OUT("Failed to XML status: " . &Dumper ($xml));    
 }
 
 # Get all boats.
 $json = TestUtils::fetch_json ([ 'boat' ]);
-if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data}, "Get all Boats")) {
+if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data}, "JSON Get all Boats")) {
     BAIL_OUT("Failed to fetch: " . &Dumper ($json));    
 }
-if (! eq_or_diff ($json->{quota}, "4 Gazillion", '__status quota parameter matches.')) {
+if (! eq_or_diff ($json->{quota}, "4 Gazillion", 'JSON Fetch quota parameter matches.')) {
     BAIL_OUT("Unexpected __status quota: " . &Dumper ($json));    
 }
 my @all_boats = @{ $json->{data} };
@@ -66,7 +78,7 @@ if (scalar @my_boat) {
 		{ id => $id }
 	];
 	$json = TestUtils::store ([ 'boat' ], { _method => 'delete' }, $delete);
-	if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1), "Delete Boat '$en_boat_name'")) {
+	if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1), "JSON Delete Boat '$en_boat_name'")) {
 	    BAIL_OUT("Failed to delete: " . &Dumper ($json));    
 	}
 }
@@ -76,7 +88,7 @@ my $insert = [
 ];
 $json = TestUtils::store ([ 'boat' ], { _method => 'insert' }, $insert);
 my $en_boat_id = $json->{row}[0]{returning}[0]{id};
-if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1) && $en_boat_id, "Insert Boat '$en_boat_name'")) {
+if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1) && $en_boat_id, "JSON Insert Boat '$en_boat_name'")) {
     BAIL_OUT("Failed to insert: " . &Dumper ($json));    
 }
 
@@ -87,7 +99,7 @@ if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{succ
 ###############################################################################
 
 $json = TestUtils::fetch_json ([ 'boat_singleton', $en_boat_id ]);
-if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data}, "Get Boat '$en_boat_name' by ID $en_boat_id")) {
+if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data}, "JSON Get Boat Singleton '$en_boat_name' by ID $en_boat_id")) {
     BAIL_OUT("Failed to fetch: " . &Dumper ($json));    
 }
 my $expected = {
@@ -98,8 +110,25 @@ my $expected = {
     'id' => $en_boat_id,
     'description' => ''
 };
-if (! eq_or_diff ($json->{data}, $expected, 'Singleton Fetch matches.')) {
+if (! eq_or_diff ($json->{data}, $expected, 'JSON Singleton Fetch matches.')) {
     BAIL_OUT("Unexpected Singleton Fetch result: " . &Dumper ($json));    
+}
+
+# Repeat for XML format.
+$xml = TestUtils::fetch_xml ([ 'boat_singleton', $en_boat_id ]);
+if (! ok (defined $xml->{response}{returned} && defined $xml->{response}{fetched} && defined $xml->{response}{data}, "XML Get Boat Singleton '$en_boat_name' by ID $en_boat_id")) {
+    BAIL_OUT("Failed to fetch: " . &Dumper ($xml));    
+}
+my $row0 = $xml->{response}{data}{row}[0];
+if (! ok (($row0->{owner}->content eq '') &&
+		  ($row0->{registration_num}->content eq '') && 
+		  ($row0->{name}->content eq 'Empty Nest') && 
+		  ($row0->{class}->content eq 'X Class') &&
+		  ($row0->{id}->content eq $en_boat_id) &&
+		  ($row0->{description}->content eq ''), 
+		  'XML Singleton Fetch matches.')) {
+
+    BAIL_OUT("Unexpected Singleton Fetch result: " . &Dumper ($xml));    
 }
 
 ###############################################################################
@@ -109,7 +138,7 @@ if (! eq_or_diff ($json->{data}, $expected, 'Singleton Fetch matches.')) {
 ###############################################################################
 
 $json = TestUtils::fetch_json ([ 'boat', $en_boat_id ], { duplicate => 1 });
-if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data}, "Get Boat '$en_boat_name' by ID $en_boat_id")) {
+if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data}, "JSON Get Boat '$en_boat_name' by ID $en_boat_id with Duplicate")) {
     BAIL_OUT("Failed to fetch: " . &Dumper ($json));    
 }
 $expected = [ {
@@ -127,9 +156,75 @@ $expected = [ {
     'id' => $en_boat_id,
     'description' => ''
 } ];
-if (! eq_or_diff ($json->{data}, $expected, 'Duplicated Fetch matches.')) {
+if (! eq_or_diff ($json->{data}, $expected, 'JSON Duplicated Fetch matches.')) {
     BAIL_OUT("Unexpected Duplicated Fetch result: " . &Dumper ($json));    
 }
+
+###############################################################################
+# Get all boats and test paging.
+###############################################################################
+
+$json = TestUtils::fetch_json ([ 'boat' ]);
+if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data}, "JSON Get All Boats")) {
+    BAIL_OUT("Failed to fetch: " . &Dumper ($json));    
+}
+
+my $num_rows = scalar (@{ $json->{data} });
+if (! ok ($num_rows > 10, 'JSON All Boats Fetch count.')) {
+    BAIL_OUT("Unexpected All Boats Fetch count: " . &Dumper ($json));    
+}
+
+# NOTE: "start" and "limit" parameter names are specified in demo.xml
+#
+# Test page 1 counts.
+$json = TestUtils::fetch_json ([ 'boat' ], { start => 0, limit => 5 });
+if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data}, "JSON Get All Boats Page 1")) {
+    BAIL_OUT("Failed to fetch: " . &Dumper ($json));    
+}
+if (! ok (($json->{returned} == 5) && ($json->{fetched} == $num_rows), "JSON Page 1 Sizing")) {
+    BAIL_OUT("Page 1 Sizing: ". &Dumper ($json)); 
+}
+my $page1_name = $json->{data}[0]{name};
+
+# Test page 2 counts.
+$json = TestUtils::fetch_json ([ 'boat' ], { start => 5, limit => 5 });
+if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data}, "JSON Get All Boats Page 2")) {
+    BAIL_OUT("Failed to fetch: " . &Dumper ($json));    
+}
+if (! ok (($json->{returned} == 5) && ($json->{fetched} == $num_rows), "JSON Page 2 Sizing")) {
+    BAIL_OUT("Page 2 Sizing: ". &Dumper ($json)); 
+}
+my $page2_name = $json->{data}[0]{name};
+
+if (! ok ($page1_name ne $page2_name, "JSON Page 1 and Page 2 Differ")) {
+    BAIL_OUT("Page 1 ($page1_name) eq Page 2 ($page2_name)"); 
+}
+
+
+# Repeat Page Tests in XML
+$xml = TestUtils::fetch_xml ([ 'boat' ], { start => 0, limit => 5 });
+if (! ok (defined $xml->{response}{returned} && defined $xml->{response}{fetched} && defined $xml->{response}{data}, "XML Get All Boats Page 1")) {
+    BAIL_OUT("Failed to fetch: " . &Dumper ($xml));    
+}
+if (! ok (($xml->{response}{returned} == 5) && ($xml->{response}{fetched} == $num_rows), "XML Page 1 Sizing")) {
+    BAIL_OUT("Page 1 Sizing: ". &Dumper ($xml)); 
+}
+$page1_name = $xml->{response}{data}{row}[0]{name}->content;
+
+# Test page 2 counts.
+$xml = TestUtils::fetch_xml ([ 'boat' ], { start => 5, limit => 5 });
+if (! ok (defined $xml->{response}{returned} && defined $xml->{response}{fetched} && defined $xml->{response}{data}, "XML Get All Boats Page 2")) {
+    BAIL_OUT("Failed to fetch: " . &Dumper ($xml));    
+}
+if (! ok (($xml->{response}{returned} == 5) && ($xml->{response}{fetched} == $num_rows), "XML Page 2 Sizing")) {
+    BAIL_OUT("Page 2 Sizing: ". &Dumper ($xml)); 
+}
+$page2_name = $xml->{response}{data}{row}[0]{name}->content;
+
+if (! ok ($page1_name ne $page2_name, "XML Page 1 and Page 2 Differ")) {
+    BAIL_OUT("Page 1 ($page1_name) eq Page 2 ($page2_name)"); 
+}
+
 
 ###############################################################################
 # Delete/Create Boat "Fatal Dodger"
@@ -145,7 +240,7 @@ if (scalar @my_boat) {
 		{ id => $id }
 	];
 	$json = TestUtils::store ([ 'boat' ], { _method => 'delete' }, $delete);
-	if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1), "Delete Boat '$fd_boat_name'")) {
+	if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1), "JSON Delete Boat '$fd_boat_name'")) {
 	    BAIL_OUT("Failed to delete: " . &Dumper ($json));    
 	}
 }
@@ -155,7 +250,7 @@ $insert = [
 ];
 $json = TestUtils::store ([ 'boat' ], { _method => 'insert' }, $insert);
 my $fd_boat_id = $json->{row}[0]{returning}[0]{id};
-if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1) && $fd_boat_id, "Insert Boat '$fd_boat_name'")) {
+if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1) && $fd_boat_id, "JSON Insert Boat '$fd_boat_name'")) {
     BAIL_OUT("Failed to insert: " . &Dumper ($json));    
 }
 
@@ -185,7 +280,7 @@ $insert = [
 	{ boat_id => $en_boat_id, name => "Gadget" },
 ];
 $json = TestUtils::store ([ 'boat_part' ], { _method => 'insert' }, $insert);
-if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 3), "Insert Boat Parts for '$en_boat_name'")) {
+if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 3), "JSON Insert Boat Parts for '$en_boat_name'")) {
     BAIL_OUT("Failed to insert: " . &Dumper ($json));    
 }
 my @part_ids = map { $_->{returning}[0]{id} } @{ $json->{row} };
@@ -195,7 +290,7 @@ my @part_ids = map { $_->{returning}[0]{id} } @{ $json->{row} };
 ###############################################################################
 $json = TestUtils::fetch_json ([ 'boat_object' ], { id => $en_boat_id });
 
-if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data}, "Select Nested Boat Object for '$en_boat_name'")) {
+if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data}, "JSON Select Nested Boat Object for '$en_boat_name'")) {
     BAIL_OUT("Failed to fetch: " . &Dumper ($json));    
 }
 
@@ -208,7 +303,7 @@ my $mh_boat_class = 'X Class';
 @my_boat = grep { $_->{name} eq $mh_boat_name } @all_boats;
 if (scalar @my_boat) {
 	$json = TestUtils::store ([ 'boat' ], { _method => 'delete' }, [ { id => $my_boat[0]->{id} } ]);
-	if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1), "Delete Boat '$mh_boat_name'")) {
+	if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1), "JSON Delete Boat '$mh_boat_name'")) {
 	    BAIL_OUT("Failed to delete: " . &Dumper ($json));    
 	}
 }
@@ -226,7 +321,7 @@ $insert = [
 ];
 $json = TestUtils::store ([ 'boat_object' ], { _method => 'insert' }, $insert);
 my $mh_boat_id = $json->{row}[0]{returning}[0]{id};
-if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1) && $mh_boat_id, "Nested Insert for '$mh_boat_name'")) {
+if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1) && $mh_boat_id, "JSON Nested Insert for '$mh_boat_name'")) {
     BAIL_OUT("Failed to insert: " . &Dumper ($json));    
 }
 my $mh_doodad_id = $json->{row}[0]{child}{parts}{row}[0]{returning}[0]{id};
@@ -250,7 +345,7 @@ my $update = [
 	}
 ];
 $json = TestUtils::store ([ 'boat_object' ], { _method => 'mixed' }, $update);
-if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1), "Nested Update for '$mh_boat_name'")) {
+if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1), "JSON Nested Update for '$mh_boat_name'")) {
     BAIL_OUT("Failed to mixed: " . &Dumper ($json));    
 }
 my $mh_thingey_id = $json->{row}[0]{child}{parts}{row}[2]{returning}[0]{id};
@@ -261,7 +356,7 @@ my $mh_thingey_id = $json->{row}[0]{child}{parts}{row}[2]{returning}[0]{id};
 ###############################################################################
 
 $json = TestUtils::fetch_json ([ 'boat_object', $mh_boat_id ]);
-if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data}, "Get Boat '$mh_boat_name' by ID $mh_boat_id")) {
+if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data}, "JSON Get Boat '$mh_boat_name' by ID $mh_boat_id")) {
     BAIL_OUT("Failed to fetch: " . &Dumper ($json));    
 }
 $expected = {
@@ -277,7 +372,7 @@ $expected = {
     	{ 'name' => 'Whatsitt', 'id' => $mh_whatsit_id },
     ]
 };
-if (! eq_or_diff ($json->{data}, $expected, 'Duplicated Fetch matches.')) {
+if (! eq_or_diff ($json->{data}, $expected, 'JSON Duplicated Fetch matches.')) {
     BAIL_OUT("Unexpected Duplicated Fetch result: " . &Dumper ($json));    
 }
 
@@ -299,7 +394,7 @@ Rest 1|X Class
 Boat Class|X Class
 All Boats|4";
 
-if (! eq_or_diff ($content, $expected, 'FileDownload Plugin Content Check')) {
+if (! eq_or_diff ($content, $expected, 'JSON FileDownload Plugin Content Check')) {
     BAIL_OUT("Unexpected FilePlugin result: " . &Dumper ($content));    
 }
 

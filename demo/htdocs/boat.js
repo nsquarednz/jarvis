@@ -307,9 +307,6 @@ Ext.onReady (function () {
     // boat class list to load, and we will change the boat loading off that.
     //
     if (! boat_class) {
-        var params = {};
-        params.boat_class = boat_class || null;
-        boat_store.baseParams = params;
-        boat_store.load();
+        reloadList ();
     }
 });

@@ -428,10 +428,6 @@ sub fetch {
     my $extra_href = {};
     my ($rows_aref, $column_names_aref) = &fetch_rows ($jconfig, $dataset_name, $user_args, $extra_href);
 
-    # Now we have an array of hash objects.  Apply post-processing.
-    my $num_fetched = scalar @$rows_aref;
-    &Jarvis::Error::debug ($jconfig, "Number of rows fetched = $num_fetched (after dataset_fetched hook).");
-
     # This is for when a router requests a "singleton" presentation explicitly.
     if ($jconfig->{presentation} eq "singleton") {
         if (scalar (@$rows_aref) == 0) {
@@ -466,8 +462,6 @@ sub fetch {
         $return_object->{response}{username} = $jconfig->{username};
         $return_object->{response}{error_string} = $jconfig->{error_string};
         $return_object->{response}{group_list} = $jconfig->{group_list};
-        $return_object->{response}{fetched} = 1 * $num_fetched;            # Fetched from database
-        $return_object->{response}{returned} = scalar @$rows_aref;         # Returned to client (after paging)
 
         # Copy across any extra root parameters set by the return_fetch hook.
         foreach my $name (sort (keys %$extra_href)) {
@@ -577,8 +571,6 @@ sub fetch {
 
             # Assemble the result object.
             $return_object = {
-                fetched => 1 * $num_fetched,                    # Fetched from database
-                returned => scalar @$rows_aref,                 # Returned to client (after paging)
                 logged_in => ($jconfig->{logged_in} ? 1 : 0),
                 username => $jconfig->{username},
                 error_string => $jconfig->{error_string},
@@ -637,6 +629,9 @@ sub fetch {
 ################################################################################
 # Performs the inner fetching of a dataset into an ARRAY reference, with no
 # formatting.
+#
+# NOTE: THIS IS AN OFFICIAL, PUBLICALLY AVAILABLE METHOD DOCUMENTED IN THE
+#       JARVIS GUIDE AND USED BY MANY PLUGINS.  DO NOT MODIFY ITS INTERFACE!
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -714,6 +709,11 @@ sub fetch_rows {
         die "Unsupported dataset type '$dbtype'.";
     }
     
+    # Now we have an array of hash objects.  Apply post-processing.
+    my $num_fetched = scalar @$rows_aref;
+    &Jarvis::Error::debug ($jconfig, "Number of rows fetched = $num_fetched.");
+    $extra_href->{fetched} = $num_fetched;
+
     # Do we want to do server side sorting?  This happens BEFORE paging.  Note that this
     # will only work when $sth->{NAME} is available.  Some (all?) stored procedures
     # under MS-SQL Server will not provide field names, and hence this feature will not
@@ -855,6 +855,11 @@ sub fetch_rows {
     # This hook may completely modify the returned content (by modifying $rows_aref).
     &Jarvis::Hook::dataset_fetched ($jconfig, $dsxml, \%safe_params, $rows_aref, $extra_href, $column_names_aref);
             
+    # Now we have an array of hash objects.  Apply post-processing.
+    my $num_returned = scalar @$rows_aref;
+    &Jarvis::Error::debug ($jconfig, "Number of rows returned = $num_returned (after 'dataset_fetched' hook).");
+    $extra_href->{returned} = $num_returned;
+
     # In any case, Unload/Finish dataset specific hooks.
     &Jarvis::Hook::unload_dataset ($jconfig);
 
