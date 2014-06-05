@@ -250,7 +250,6 @@ sub do {
     # get slashes through to this point.  So we do a special case and allow \/ to escape
     # a slash through to our REST args.
     #
-    print "PATH: '$path'\n";
     my ($app_name, @path_parts) = split ( m|(?<!\\)/|, $path, -1);
     @path_parts = map { s|\\/|/|g; $_ } @path_parts;
 
