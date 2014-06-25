@@ -641,8 +641,14 @@ sub fetch {
 #       $extra_href - Top-level return values we can add to.
 #
 # Returns:
-#       Reference to Hash of returned data.  You may convert to JSON or XML.
-#       die on error (including permissions error)
+#       If called in an array context, will return a two element array of:
+#           1. Reference to Hash of returned data.  
+#              You may convert to JSON or XML. die on error 
+#              (including permissions error)
+#           2. A list of column names, as provided by the DBI driver.
+#
+#       If called in a scalar context, returns only the reference to the hash
+#       of returned data.
 ################################################################################
 #
 sub fetch_rows {    
@@ -867,7 +873,7 @@ sub fetch_rows {
     &unload_dsxml ($jconfig);
 
     # And we're done.
-    return $rows_aref;
+    return wantarray ? ($rows_aref, $column_names_aref) : $rows_aref;
 }
 
 ################################################################################
