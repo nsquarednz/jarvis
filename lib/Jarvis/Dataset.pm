@@ -381,8 +381,7 @@ sub get_post_data {
 }
 
 ################################################################################
-# Loads the data for the current dataset(s), and puts it into our return data
-# hash so that it can be presented to the client in JSON.
+# Loads the data for the specified dataset(s), and encodes in JSON, XML, CSV.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -399,7 +398,7 @@ sub get_post_data {
 #       $user_args - Hash of CGI + numbered/named REST args.
 #
 # Returns:
-#       Reference to Hash of returned data.  You may convert to JSON or XML.
+#       Returning string content in JSON or XML or other format.
 #       die on error (including permissions error)
 ################################################################################
 #

@@ -135,8 +135,6 @@ sub do {
     # If we're under windows, force the use of tmp files.
     $use_tmpfile = 1 if $^O eq "MSWin32";
 
-    print STDERR &Dumper ($user_args);
-
     # Now construct our safe variables from our CGI, rest and per-row (none) arguments.
     my %safe_params = &Jarvis::Config::safe_variables ($jconfig, $user_args, undef);
 
