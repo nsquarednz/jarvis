@@ -4,7 +4,7 @@
 # make -f pkg/rpm/Makefile
 
 PACKAGE=jarvis
-ROOT=/opt/jarvis
+ROOT=/usr/share/jarvis
 
 all: rpms
 
@@ -32,7 +32,9 @@ rpms: sdist
 install:
 	mkdir -p ${DESTDIR}/${ROOT}/
 	mkdir -p ${DESTDIR}/etc/httpd/conf.d/
+	mkdir -p ${DESTDIR}/etc/jarvis/
 	tar xvf ${PACKAGE}.tar -C ${DESTDIR}/${ROOT}/
-	cp ${DESTDIR}/${ROOT}/etc/apache/jarvis-mod-perl-rpm.conf ${DESTDIR}/etc/httpd/conf.d/jarvis.conf
+	cp ${DESTDIR}/${ROOT}/etc/apache/jarvis.conf ${DESTDIR}/etc/httpd/conf.d/jarvis.conf
+	touch ${DESTDIR}/etc/jarvis/jarvis-app-config-goes-here.txt
 
 

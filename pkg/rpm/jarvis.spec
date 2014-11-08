@@ -9,10 +9,16 @@ Source0: jarvis.tar
 BuildArch: noarch
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
-%global Root /opt/jarvis
+%global Root /usr/share/jarvis
+
+%global _binaries_in_noarch_packages_terminate_build 0
+%{?perl_default_filter}
+
+# Lets do our own perl requires, because 50% of the packages we want are not available via yum.
+%global __requires_exclude perl\\(
 
 #BuildRequires:
-Requires: perl(DBD::SQLite) perl(Apache::DBI)
+Requires: perl(Net::LDAP) perl(LWP::UserAgent) perl(IO::String) perl(HTTP::Cookies) perl(Digest::MD5) perl(DBD::SQLite) perl(CGI::Session) perl(CGI::Cookie) perl(CGI)  perl(XML::Parser) perl(Class::Inspector) perl(MIME::Types) perl(URI::Encode) perl(Text::CSV)
 
 %description
 Jarvis is "helper glue". It is designed to bridge the gap between your
@@ -44,19 +50,18 @@ rm -rf %{buildroot}
 %files
 %defattr(-,root,root,-)
 %{Root}
-%doc /opt/jarvis/docs/COPYING.LESSER 
-%doc /opt/jarvis/docs/jarvis_guide.pdf
-%docdir /opt/jarvis/docs/
+%docdir /usr/share/jarvis/docs/
 %config /etc/httpd/conf.d/jarvis.conf
+%config /etc/jarvis/
 
 %changelog
 
 %post
 echo "Jarvis installed and configuration created in /etc/httpd/conf.d"
 echo "Reload the Apache configuration now."
-echo "   /etc/init.d/httpd reload"
+echo "   systemctl restart httpd"
 
 %postun
 echo "Jarvis uninstalled and configuration removd from /etc/httpd/conf.d"
 echo "Reload the Apache configuration now."
-echo "   /etc/init.d/httpd reload"
+echo "   systemctl restart httpd"
