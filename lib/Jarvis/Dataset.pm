@@ -1290,28 +1290,14 @@ sub store_rows {
         push (@$results_aref, $row_result);
     }
 
-    # Determine if we're going to rollback.
-    if ($dataset->{level} == 0) {
-        if (! $success) {
-            &Jarvis::Error::debug ($jconfig, "Store Error detected.  Rolling back.");
-
-            # Use "eval" as some drivers (e.g. SQL Server) will have already rolled-back on the
-            # original failure, and hence a second rollback will fail.
-            eval { local $SIG{__DIE__}; $dbh->rollback (); }
-
-        } else {
-            &Jarvis::Error::debug ($jconfig, "Store all successful.  Committing all changes.");
-            $dbh->commit ();
-        }
-    }
-
     # Free any remaining open statement types.
     foreach my $stm_type (keys %stms) {
         &Jarvis::Error::debug ($jconfig, "Finished with statement for ttype '$stm_type'.");
         $stms{$stm_type}{sth}->finish;
     }
 
-    # Execute our "after" statement.
+    # Execute our "after" statement.  
+    # As of 6.1.0 this (and the after_all hook) occurs INSIDE the transaction.
     if ($success) {
 
         # Reset our parameters, our per-row parameters are no longer valid.
@@ -1330,8 +1316,27 @@ sub store_rows {
             }
         }
 
-        # Invoke the "after_all" hook, even if we have no "after" statement.
-        &Jarvis::Hook::after_all ($jconfig, $dsxml, \%after_params, $rows_aref, $results_aref);
+        # Invoke the "after_all" hook, if the "after" statement succeeded.
+        # Or even if we have no "after" statement.
+        if ($success) {
+            &Jarvis::Hook::after_all ($jconfig, $dsxml, \%after_params, $rows_aref, $results_aref);
+        }
+    }
+
+    # Determine if we're going to rollback.  
+    # This now occurs subsequent to the "after" statement and hook.
+    if ($dataset->{level} == 0) {
+        if (! $success) {
+            &Jarvis::Error::debug ($jconfig, "Store Error detected.  Rolling back.");
+
+            # Use "eval" as some drivers (e.g. SQL Server) will have already rolled-back on the
+            # original failure, and hence a second rollback will fail.
+            eval { local $SIG{__DIE__}; $dbh->rollback (); }
+
+        } else {
+            &Jarvis::Error::debug ($jconfig, "Store all successful.  Committing all changes.");
+            $dbh->commit ();
+        }
     }
 
     # This final hook allows you to modify the data returned by SQL for one dataset.
