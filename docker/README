@@ -1,0 +1,76 @@
+================================================================================
+Introduction
+================================================================================
+
+Following these instructions will allow you to create a Jarvis Docker image.
+You can then easily run this image as a "container", which will automatically start up
+a fully functional web server hosting Jarvis for you. This will also allow you
+to easily build other Docker images that are built upon Jarvis.
+
+    What is Docker? See here:
+    
+    https://www.docker.com/whatisdocker/
+    
+Docker is required for this, so please follow the instructions relevant to your system from this page:
+    
+    https://docs.docker.com/installation/#installation
+    
+================================================================================
+Installation
+================================================================================
+    
+Follow these instructions to set up your Docker image:
+
+    1) Run the build.sh script in this folder (internet connectivity is required for this).
+       This script takes a Jarvis Debian package as an argument.
+       For example:
+       
+           sudo ./build.sh jarvis_6.1.1-1_all.deb
+           
+       The Jarvis image is built upon the base Ubuntu 14.04 image, which is 200mb.
+       Building may take several minutes due to this and the dependecies required for Jarvis.
+           
+    2) Once step 1 is complete, you need to rename the Docker image that was created.
+       By default the image will be referenced porse-educators_2.5.4-2_all.debby an ID, so rename it with
+       
+           sudo docker tag <id> jarvis
+           
+       <id> is the ID of the Docker image, which will be output at the end of step 1.
+       You can also find the ID with the command "sudo docker images".
+       
+       Although this image will run fine with any name, other images that are built upon
+       Jarvis will depend on this image being named "jarvis". Therefore it is recommended
+       to name it as such.
+       
+================================================================================
+Using The Docker Image
+================================================================================
+
+You're done! You may now run the Docker image as a container:
+
+       sudo docker run -d -p 7533:80 jarvis
+       
+This will run the Apache web server in a container, already configured.
+The "-p" flag here specifies the port that you'd like to connect to the site on
+(7533 is used as an example). As Apache runs on port 80, this part can't be
+changed, but you may use any port you like in place of 7533.
+   
+You now can connect to localhost:7533 (or whichever port you specified) to ensure
+that the site is working correctly.
+
+If you wish to use the Jarvis image you've created for a purpose other than running
+Jarvis, you can use the --entrypoint flag with the run command followed by the command you
+wish to execute. For example:
+
+    sudo docker run -t -i --entrypoint=/bin/bash jarvis
+    
+Here the -t flag means "TTY output" and the -i flag makes it interactive, which is required
+to run an interactive bash session in the container. More information on the run command can
+be found here: https://docs.docker.com/reference/run/
+
+After starting the container, you may wish to check that it's running using
+
+    sudo docker ps
+    
+which displays the running containers. You can then find the ID of such a container here,
+and stop it or remove it with "sudo docker stop <id>" or "sudo docker rm <id>".
