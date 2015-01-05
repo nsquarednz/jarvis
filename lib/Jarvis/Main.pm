@@ -107,6 +107,7 @@ use XML::Smart;
 #
 sub error_handler {
     my ($msg) = @_;
+    return unless defined $^S and $^S == 0; # Ignore errors in eval
 
     # Truncate any thing after a null-TERM.  This is because LDAP error
     # messages sometimes put some junk in, which means that the browser
