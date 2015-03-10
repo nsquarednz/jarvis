@@ -52,7 +52,7 @@ use Jarvis::Dataset::SDP;
 ###############################################################################
 
 ################################################################################
-# Loads the DataSet config from the config dir.  This will push a dataset 
+# Loads the DataSet config from the config dir.  This will push a dataset
 # descriptor onto the dataset stack (and return it).
 #
 #       $jconfig - Jarvis::Config object
@@ -77,11 +77,11 @@ use Jarvis::Dataset::SDP;
 #       Top element from $jconfig->{datasets}
 #       {
 #           level => 0+             # 0 = Master dataset.  1 = child, 2 = grandchild, etc.
-#           name => $dataset_name,  
+#           name => $dataset_name,
 #           dsxml => $dsxml,        # XML::Smart object holding config info read from file
 #           dbtype => 'dbi'/'sdp'
 #           dbname => $dbname,      # Key into Jarvis app <database> list
-#   
+#
 #           # These are extended from global defaults and/or previous stack level.
 #           debug => 0/1,           # Current debug flag at this level
 #           dump => 0/1,            # Current dump flag at this level
@@ -108,7 +108,7 @@ sub load_dsxml {
     my $dbtype = undef;
     my $best_prefix_len = -1;
     my $default_dbname = undef;
-        
+
     # Look at all our 'dataset_dir' entries.  They must all have a directory
     # as their inner content.  Also they may have a type (sdp or dbi), and
     # they can have a prefix which is a "." separated prefix on the incoming
@@ -117,33 +117,33 @@ sub load_dsxml {
     #
     my $axml = $jconfig->{xml}{jarvis}{app};
     $axml->{dataset_dir} || die "Missing configuration for mandatory element(s) 'dataset_dir'.";
-    
+
     # Check for duplicate prefixes.
     my %prefix_seen = ();
-    
+
     foreach my $dsdir ($axml->{dataset_dir}('@')) {
         my $dir = $dsdir->content || die "Missing directory in 'dataset_dir' element.";
-        my $type = $dsdir->{type}->content || 'dbi';            
+        my $type = $dsdir->{type}->content || 'dbi';
         my $prefix = $dsdir->{prefix}->content || '';
         my $dbname = $dsdir->{dbname}->content || 'default';
-        
+
         # Non-empty prefix paths must end in a "." for matching purposes.
         if ($prefix && ($prefix !~ m/\.$/)) {
             $prefix .= ".";
         }
         my $prefix_len = length ($prefix);
 
-        $prefix_seen{$prefix}++ && die "Duplicate dataset_dir entries for prefix '$prefix' are defined.";             
-        
+        $prefix_seen{$prefix}++ && die "Duplicate dataset_dir entries for prefix '$prefix' are defined.";
+
         &Jarvis::Error::debug ($jconfig, "Dataset Directory: '$dir', type '$type', prefix '$prefix', dbname '$dbname'.");
         if ($dataset_name =~ m/^$prefix(.*)$/) {
             my $remainder = $1;
-            
+
             &Jarvis::Error::dump ($jconfig, "Prefix '$prefix' matched, length = " . $prefix_len);
             if ($prefix_len > $best_prefix_len) {
                 $best_prefix_len = $prefix_len;
                 $dbtype = $type;
-                
+
                 # Now turn "." into "/" on the dataset name (with prefix stripped).
                 $remainder =~ s/\./\//g;
                 $dsxml_filename = "$dir/$remainder.xml";
@@ -152,7 +152,7 @@ sub load_dsxml {
             }
         }
     }
-    $dsxml_filename || die "No dataset_dir defined with prefix matching dataset '$dataset_name'.";    
+    $dsxml_filename || die "No dataset_dir defined with prefix matching dataset '$dataset_name'.";
 
     # Load the dataset-specific XML file and double-check it has top-level <dataset> tag.
     &Jarvis::Error::debug ($jconfig, "Opening DSXML file '$dsxml_filename', type '$dbtype'.");
@@ -183,14 +183,14 @@ sub load_dsxml {
     # Construct our dataset descriptor.
     my $dataset = {
         level => $level,
-        name => $dataset_name,  
+        name => $dataset_name,
         dsxml => $dsxml,
         dbtype => $dbtype,
         dbname => $dbname,
         debug_previous => $debug_previous,
         debug => $debug,
         dump_previous => $dump_previous,
-        dump => $dump,        
+        dump => $dump,
     };
 
     # Only the top level set supports paging.
@@ -390,7 +390,7 @@ sub get_post_data {
 #               username            Used for {{username}} in SQL
 #               group_list          Used for {{group_list}} in SQL
 #               format
-#                      "json", "json.array", "json.rest", 
+#                      "json", "json.array", "json.rest",
 #                      "xml",
 #                      "csv", "xlsx".
 #
@@ -404,14 +404,14 @@ sub get_post_data {
 #
 sub fetch {
     my ($jconfig, $dataset_name, $user_args) = @_;
-    
+
     # What format will we encode into.
     my $format = $jconfig->{format};
-    
+
     # Get the data.  Note that this is the very first time in fetch processing
     # that we have performed an EXACT match on the requested format.  Until
     # now, we have only validated the prefix part (e.g. json*, xml*).  Now
-    # we will be fussy about the exact requested return format. 
+    # we will be fussy about the exact requested return format.
     #
     # Note that we will deal with ".rest" formats a little bit later, for
     # now we just put everything into the normal places.
@@ -419,7 +419,7 @@ sub fetch {
     if (($format ne 'xml') &&
         ($format ne 'json') && ($format ne 'json.array') && ($format ne 'json.rest') &&
         ($format ne 'csv') && ($format ne 'xlsx')) {
-        
+
         die "No implementation for fetch format '$format', dataset '$dataset_name'.";
     }
 
@@ -468,7 +468,7 @@ sub fetch {
         }
 
         $return_value = $return_object->data ();
-        
+
     # CSV format tricky.  Note that it is dependent on the $sth->{NAME} data
     # being available.  This field is absent in the following cases at least:
     #
@@ -476,10 +476,10 @@ sub fetch {
     #  - Pivot queries under MS SQL.
     #  - SqlLite database.
     #
-    # In such case, you will need to write a "smart" plugin which can figure out 
+    # In such case, you will need to write a "smart" plugin which can figure out
     # the field names itself, access the data with "rows_aref" format, and
     # put two and two together.
-    # 
+    #
     # Or alternative, we could extend the dataset definition to allow you to
     # configure the column names.  Or a post-fetch hook could fake them up.
     #
@@ -489,7 +489,7 @@ sub fetch {
         if (! $column_names_aref || ! (scalar @$column_names_aref)) {
             die "Data query did not return column names.  Cannot convert to CSV.";
         }
-        
+
         my %field_index = ();
         @field_index { @$column_names_aref } = (0 .. $#$column_names_aref);
 
@@ -508,7 +508,7 @@ sub fetch {
             $csv->print ($io, \@columns);
             print $io "\n";
         }
-        
+
     # XLSX is basically the same as CSV, but with different encoding.
     #
     } elsif ($format eq "xlsx") {
@@ -516,11 +516,11 @@ sub fetch {
 
         # Dynamically load this module.
         require Excel::Writer::XLSX;
-        
+
         if (! $column_names_aref || ! (scalar @$column_names_aref)) {
             die "Data query did not return column names.  Cannot convert to XLSX.";
         }
-        
+
         my %field_index = ();
         @field_index { @$column_names_aref } = (0 .. $#$column_names_aref);
 
@@ -532,23 +532,26 @@ sub fetch {
         my $size = 10;
         my $default_format = $workbook->add_format (font => 'Arial', size => $size);
         my $worksheet = $workbook->add_worksheet ();
-        
+
         my ($row, $col) = (0, 0);
         foreach my $column_name (@$column_names_aref) {
             $worksheet->write ($row, $col++, $column_name, $default_format);
         }
         $row++;
 
+        my $row_num = 1;
         foreach my $row (@$rows_aref) {
             $col = 0;
             my @columns = map { $$row{$_} } @$column_names_aref;
             foreach my $value (@columns) {
-                $worksheet->write ($row, $col++, $value, $default_format);
+                if ($value){
+                    $worksheet->write ($row_num, $col++, $value, $default_format);
+                }
             }
-            $row++;
-        }        
-        $workbook->close(); 
-        
+            $row_num++;
+        }
+        $workbook->close();
+
     # Various JSON formats.
     } elsif (($format eq "json") || ($format eq "json.array") || ($format eq "json.rest")) {
 
@@ -564,7 +567,7 @@ sub fetch {
             } else {
                 $return_object = $rows_aref;
             }
- 
+
         # Other JSON formats have a base object with various attributes.
         } else {    # "json", "json.array"
 
@@ -585,7 +588,7 @@ sub fetch {
             if ($format eq "json.array") {
 
                 $return_object->{columns} = $column_names_aref;
-                
+
                 # Convert the hashes into rows.
                 my @rows2;
                 foreach my $row (@$rows_aref) {
@@ -615,7 +618,7 @@ sub fetch {
     # Nothing else supported.
     } else {
         die "No return representation for format '$format', dataset '$dataset_name'.";
-    }   
+    }
 
     # Debug/Dump.
     &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($return_value));
@@ -641,8 +644,8 @@ sub fetch {
 #
 # Returns:
 #       If called in an array context, will return a two element array of:
-#           1. Reference to Hash of returned data.  
-#              You may convert to JSON or XML. die on error 
+#           1. Reference to Hash of returned data.
+#              You may convert to JSON or XML. die on error
 #              (including permissions error)
 #           2. A list of column names, as provided by the DBI driver.
 #
@@ -650,7 +653,7 @@ sub fetch {
 #       of returned data.
 ################################################################################
 #
-sub fetch_rows {    
+sub fetch_rows {
     my ($jconfig, $dataset_name, $user_args, $extra_href) = @_;
 
     &Jarvis::Error::debug ($jconfig, "Fetching dataset rows - load dataset XML and per-datasets hooks.");
@@ -675,7 +678,7 @@ sub fetch_rows {
     if ($failure ne '') {
         $jconfig->{status} = "401 Unauthorized";
         die "Insufficient privileges to read '$dataset_name': $failure\n";
-    }    
+    }
 
     # Get our all-rows safe variables.
     # Turn our CGI params and REST args into a safe list of parameters.
@@ -701,19 +704,19 @@ sub fetch_rows {
 
     # Call to the DBI interface to fetch the tuples.
     my ($rows_aref, $column_names_aref);
-    
+
     if ($dbtype eq 'dbi') {
-        ($rows_aref, $column_names_aref) 
+        ($rows_aref, $column_names_aref)
             = &Jarvis::Dataset::DBI::fetch_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%safe_params);
-            
+
     } elsif ($dbtype eq 'sdp') {
-        ($rows_aref, $column_names_aref) 
+        ($rows_aref, $column_names_aref)
             = &Jarvis::Dataset::SDP::fetch_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%safe_params);
-            
+
     } else {
         die "Unsupported dataset type '$dbtype'.";
     }
-    
+
     # Now we have an array of hash objects.  Apply post-processing.
     my $num_fetched = scalar @$rows_aref;
     &Jarvis::Error::debug ($jconfig, "Number of rows fetched = $num_fetched.");
@@ -792,7 +795,7 @@ sub fetch_rows {
         foreach my $key (keys %$row) {
             (defined $$row{$key}) || delete $$row{$key};
         }
-    }            
+    }
 
     # Now do we have any child datasets?
     if ($dsxml->{dataset}{child}) {
@@ -818,14 +821,14 @@ sub fetch_rows {
                 }
             }
 
-            # Now invoke the child dataset for each row.  Really you want to only do this 
-            # for single row requests, it could get real inefficient real fast.            
+            # Now invoke the child dataset for each row.  Really you want to only do this
+            # for single row requests, it could get real inefficient real fast.
             foreach my $row (@$rows_aref) {
 
                 # We copy across only the child args.
                 my %child_args = ();
                 foreach my $parent (keys %links) {
-                    my $child = $links{$parent};                    
+                    my $child = $links{$parent};
                     $child_args{$child} = $row->{$parent};
                     &Jarvis::Error::debug ($jconfig, "Passing FETCHED parent field [%s] -> child field [%s] as value '%s'.", $parent, $child, $child_args{$child});
                 }
@@ -842,7 +845,7 @@ sub fetch_rows {
                 $jconfig->{dataset_name} = $old_dataset_name;
             }
         }
-    }    
+    }
 
     # What filename would this dataset use?  This is an ugly side-effect.
     #
@@ -851,15 +854,15 @@ sub fetch_rows {
     #
     if ($dataset->{level} == 0) {
         my $filename_parameter = $dsxml->{dataset}{filename_parameter}->content || 'filename';
-        &Jarvis::Error::debug ($jconfig, "Filename parameter = '$filename_parameter'.");        
-        $jconfig->{return_filename} = $safe_params {$filename_parameter} || '';        
-        &Jarvis::Error::debug ($jconfig, "Return filename = '" . $jconfig->{return_filename} . "'.");        
+        &Jarvis::Error::debug ($jconfig, "Filename parameter = '$filename_parameter'.");
+        $jconfig->{return_filename} = $safe_params {$filename_parameter} || '';
+        &Jarvis::Error::debug ($jconfig, "Return filename = '" . $jconfig->{return_filename} . "'.");
     }
 
     # This final hook allows you to modify the data returned by SQL for one dataset.
     # This hook may completely modify the returned content (by modifying $rows_aref).
     &Jarvis::Hook::dataset_fetched ($jconfig, $dsxml, \%safe_params, $rows_aref, $extra_href, $column_names_aref);
-            
+
     # Now we have an array of hash objects.  Apply post-processing.
     my $num_returned = scalar @$rows_aref;
     &Jarvis::Error::debug ($jconfig, "Number of rows returned = $num_returned (after 'dataset_fetched' hook).");
@@ -956,8 +959,8 @@ sub store {
     # No body.  Execute a Single-Row with rest-args/cgi-args only.
     } else {
         &Jarvis::Error::debug ($jconfig, "No content supplied.  Store a single empty row + REST/CGI args.");
-        $rows_aref = [{}]; 
-    }    
+        $rows_aref = [{}];
+    }
 
     # What is the default transaction type from here down?
     my $ttype = $jconfig->{action};
@@ -1049,7 +1052,7 @@ sub store {
     &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($return_text));
     &Jarvis::Error::dump ($jconfig, $return_text);
 
-    return $return_text;    
+    return $return_text;
 }
 
 ################################################################################
@@ -1083,7 +1086,7 @@ sub store_rows {
     my $dsxml = $dataset->{dsxml};
     my $dbtype = $dataset->{dbtype};
     my $dbname = $dataset->{dbname};
-    
+
     # Check that we are DBI only.
     ($dbtype eq 'dbi') || die "Datasets of type '$dbtype' do not support store operations.";
 
@@ -1098,7 +1101,7 @@ sub store_rows {
         die "Insufficient privileges to write '$dataset_name'. $failure\n";
     }
 
-    # We pre-compute the "before" statement parameters even if there is 
+    # We pre-compute the "before" statement parameters even if there is
     # no before statement, since we may also wish to record them for later.
     #
     # Merge CGI params + REST args, plus default, safe and session vars.
@@ -1114,7 +1117,7 @@ sub store_rows {
         &Jarvis::Dataset::transform (\%transforms, \%safe_all_rows_params);
     }
 
-    # Call the pre-store hook.    
+    # Call the pre-store hook.
     &Jarvis::Hook::dataset_pre_store ($jconfig, $dsxml, \%safe_all_rows_params, $rows_aref);
 
     # Get a database handle.
@@ -1179,7 +1182,7 @@ sub store_rows {
 
         # Figure out which statement type we will use for this row.
         my $row_ttype = $safe_params{_ttype} || $ttype;
-        ($row_ttype eq 'mixed') && die "Transaction Type 'mixed', but no '_ttype' field present in row.";    
+        ($row_ttype eq 'mixed') && die "Transaction Type 'mixed', but no '_ttype' field present in row.";
 
         # Hand off to DBI code for the actual store.  This will also perform our "returning" logic.
         my $row_result = &Jarvis::Dataset::DBI::store_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%stms, $row_ttype, \%safe_params, $fields_href);
@@ -1198,7 +1201,7 @@ sub store_rows {
             last;
         }
 
-        # Now do we have any child datasets?  
+        # Now do we have any child datasets?
         if ($dsxml->{dataset}{child}) {
 
             # For insert/update only!  Don't recurse on delete.
@@ -1232,16 +1235,16 @@ sub store_rows {
                 my $child_rows_aref = $fields_href->{$child_field};
                 if (! defined $child_rows_aref) {
                     &Jarvis::Error::debug ($jconfig, "No supplied rows for '$child_field' in parent.  Skip child dataset.");
-                    next;                    
+                    next;
                 }
                 ((ref $child_rows_aref) eq 'ARRAY') || die "Parent dataset has child dataset field '$child_field' but it is not ARRAY.";
 
                 # Parent/Child links will be passed through from SUPPLIED and RETURNING parameters too.
                 my %child_args = ();
                 foreach my $parent (keys %links) {
-                    my $child = $links{$parent};        
+                    my $child = $links{$parent};
 
-                    # Returning parameters take precedence.  Note that in theory a "returning" 
+                    # Returning parameters take precedence.  Note that in theory a "returning"
                     # clause can return more than one row.  But we only ever use the first returned row.
                     if ($row_result->{returning} && (scalar @{ $row_result->{returning} }) && exists $row_result->{returning}[0]->{$parent}) {
                         $child_args{$child} = $row_result->{returning}[0]->{$parent};
@@ -1280,7 +1283,7 @@ sub store_rows {
                     row => $child_results_aref,
                 }
             }
-        }            
+        }
 
         # Invoke after_one hook.
         if ($success) {
@@ -1296,7 +1299,7 @@ sub store_rows {
         $stms{$stm_type}{sth}->finish;
     }
 
-    # Execute our "after" statement.  
+    # Execute our "after" statement.
     # As of 6.1.0 this (and the after_all hook) occurs INSIDE the transaction.
     if ($success) {
 
@@ -1323,7 +1326,7 @@ sub store_rows {
         }
     }
 
-    # Determine if we're going to rollback.  
+    # Determine if we're going to rollback.
     # This now occurs subsequent to the "after" statement and hook.
     if ($dataset->{level} == 0) {
         if (! $success) {
