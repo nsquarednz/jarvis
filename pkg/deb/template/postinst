@@ -38,9 +38,15 @@ case "$1" in
             fi
         fi
 
-        # Link in our Jarvis Apache configuration files to Apache.
+        # Link in our Jarvis Apache configuration files to Apache - pre apache 2.4
         if [ -d /etc/apache2/conf.d/ ] && [ ! -e /etc/apache2/conf.d/jarvis.conf ] && [ ! -e /etc/apache2/conf.d/jarvis-mod-perl.conf ] ; then
             ln -s /etc/jarvis/apache/jarvis.conf /etc/apache2/conf.d/jarvis.conf
+        fi
+        # Link in our Jarvis Apache configuration files to Apache - apache 2.4+
+        if [ -d /etc/apache2/conf-available/ ] && [ ! -e /etc/apache2/conf-available/jarvis.conf ] && [ ! -e /etc/apache2/conf-available/jarvis-mod-perl.conf ] ; then
+            cp /etc/jarvis/apache/jarvis.conf /etc/apache2/conf-available/jarvis.conf
+            ln -s /etc/apache2/conf-available/jarvis.conf /etc/apache2/conf-enabled/jarvis.conf
+            a2enmod cgi
         fi
 
 	# Don't restart apache.  It's not nice.
