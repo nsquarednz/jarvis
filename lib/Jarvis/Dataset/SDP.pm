@@ -68,10 +68,10 @@ sub mdx_with_substitutions {
         &Jarvis::Error::dump ($jconfig, "MDX available args: '$k' -> '$args_href->{$k}'.");
     }
 
-    # Parameters NAMES may contain only a-z, A-Z, 0-9, underscore(_), colon(:) and hyphen(-)
+    # Parameters NAMES may contain only a-z, A-Z, 0-9, underscore(_), colon(:), dot(.) and hyphen(-)
     # Note pipe(|) is also allowed at this point as it separates (try-else variable names)
     #
-    my @bits = split (/\{\$([a-zA-Z0-9_\-:\|]+(?:\![a-z]+)*)\}/i, $mdx);
+    my @bits = split (/\{\$([\.a-zA-Z0-9_\-:\|]+(?:\![a-z]+)*)\}/i, $mdx);
 
     my $mdx2 = "";
     foreach my $idx (0 .. $#bits) {

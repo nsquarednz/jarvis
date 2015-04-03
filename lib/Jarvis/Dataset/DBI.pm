@@ -119,10 +119,10 @@ sub sql_with_substitutions {
     # Parse the update SQL to get a prepared statement, pulling out the list
     # of names of {{variables}} we replaced by ?.
     #
-    # Parameters NAMES may contain only a-z, A-Z, 0-9, underscore(_), colon(:) and hyphen(-)
+    # Parameters NAMES may contain only a-z, A-Z, 0-9, underscore(_), colon(:), dot(.) and hyphen(-)
     # Note pipe(|) is also allowed at this point as it separates (try-else variable names)
     my $sql2 = "";
-    my @bits = split (/\{\{?\$?([a-zA-Z0-9_\-:\|]+(?:\![a-z]+)*)\}\}?/i, $sql);
+    my @bits = split (/\{\{?\$?([\.a-zA-Z0-9_\-:\|]+(?:\![a-z]+)*)\}\}?/i, $sql);
     my @variable_names = ();
     my @variable_flags = ();
 
