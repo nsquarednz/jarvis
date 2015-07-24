@@ -133,13 +133,13 @@ sub error_handler {
     	    # We don't want to die at all in this case!  Just return and let the user's "eval" 
     	    # post-processing run and deal with things.
     	    if ($subroutine eq '(eval)') {
-    		return;
+                return;
 
     	    # Otherwise if we got to "Jarvis::Main::do" without hitting a user "(eval)" then
     	    # this means that something really did call a "die", and we really do want to
     	    # invoke this handler and return a message back to the client.
     	    } elsif ($subroutine eq 'Jarvis::Main::do') {
-    		last;
+                last;
     	    }
     	    $frames++;
     	}
