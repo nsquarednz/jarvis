@@ -107,7 +107,43 @@ use XML::Smart;
 #
 sub error_handler {
     my ($msg) = @_;
-    return unless defined $^S and $^S == 0; # Ignore errors in eval
+
+    # Are we parsing ($^S undef) or executing ($^S == 1) an eval?
+    #
+    # If this is an "eval" within a Jarvis plugin, then we don't want to fire
+    # this "die" handler and shut down the whole process, that's a massive
+    # over-reaction.
+    #
+    # The problem arises when running under mod_perl.  The mod_perl wrapper
+    # runs everything inside its own "eval", which we detect, and confuse
+    # with a Jarvis plugin "eval". 
+    #
+    if ((! defined $^S) or ($^S == 1)) {
+
+    	# Go up the caller stack and see if we find an "(eval)" before we hit "Jarvis::Main::do".
+     	my $frames = 0;
+    	while (1) {
+    	    my @frame = caller ($frames);
+    	    if (! scalar (@frame)) {
+                die "Cannot find '(eval)' frame in call stack.";
+    	    }
+    	    my $subroutine = $frame[3];
+
+    	    # If we hit "(eval)" before Jarvis::Main::do, then that means this is a user-eval.
+    	    # We don't want to die at all in this case!  Just return and let the user's "eval" 
+    	    # post-processing run and deal with things.
+    	    if ($subroutine eq '(eval)') {
+    		return;
+
+    	    # Otherwise if we got to "Jarvis::Main::do" without hitting a user "(eval)" then
+    	    # this means that something really did call a "die", and we really do want to
+    	    # invoke this handler and return a message back to the client.
+    	    } elsif ($subroutine eq 'Jarvis::Main::do') {
+    		last;
+    	    }
+    	    $frames++;
+    	}
+    }
 
     # Truncate any thing after a null-TERM.  This is because LDAP error
     # messages sometimes put some junk in, which means that the browser
@@ -121,7 +157,6 @@ sub error_handler {
     my $status = $jconfig->{status};
     print $cgi->header(-status => $status, -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt");
     print $msg;
-
 
     # Print to error log.  Include stack trace if debug is enabled.
     my $long_msg = &Jarvis::Error::print_message ($jconfig, 'fatal', $msg);
@@ -137,9 +172,9 @@ sub error_handler {
     # Otherwise, under mod_perl, the next application would get OUR database handles!
     &Jarvis::DB::disconnect ($jconfig);
     
-    # Perhaps we need more clean-up in here, since we may also be serving  
-    # Jarvis from a perl HTTPD in some cases.  Need to keep an eye out for
-    # any other resource leaks.
+    # Under mod_perl this will be ModPerl::Util::exit (), which won't really end the process.
+    # Under non-mod_perl, this will really exit the process.
+    exit ();
 }
 
 ###############################################################################
@@ -152,11 +187,15 @@ sub jconfig {
 
 ###############################################################################
 # Main "do" method.
+#
+# This method is called by either:
+#	Main::Agent (mod_perl case) or 
+#	agent.pl (non-mod_perl case)
 ###############################################################################
 #
 sub do {
     my $options = shift;
-    
+   
     $SIG{__WARN__} = sub { die shift };
     $SIG{__DIE__} = \&Jarvis::Main::error_handler;
 
