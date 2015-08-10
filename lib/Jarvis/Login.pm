@@ -118,7 +118,7 @@ sub check {
                 last;
             }
         }
-        &Jarvis::Error::debug ($jconfig, "SID source: " . ($jconfig->{'sid_source'} || "none"));
+        &Jarvis::Error::debug ($jconfig, "SID Source: " . ($jconfig->{'sid_source'} || "none"));
 
         # Get an existing/new session.
         # Under windows, avoid having CGI::Session throw the error:

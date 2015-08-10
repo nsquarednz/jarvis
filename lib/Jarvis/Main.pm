@@ -339,7 +339,12 @@ sub do {
         next if ($name eq 'POSTDATA');
         next if (defined $user_args->{$name});
 
-        &Jarvis::Error::debug ($jconfig, "CGI Param: '$name' => '%s'.", $cgi_params->{$name});
+        if (length ($cgi_params->{$name}) > 256) {
+            &Jarvis::Error::debug ($jconfig, "CGI Param: '$name' => (%d bytes).", length ($cgi_params->{$name}));
+
+        } else {
+            &Jarvis::Error::debug ($jconfig, "CGI Param: '$name' => '%s'.", $cgi_params->{$name});
+        }
         $user_args->{$name} = $cgi_params->{$name};
     }
 
