@@ -61,7 +61,7 @@ sub printable {
     }
     
     # If it contains any 'odd' characters, print as HEX.  Maybe truncated.    
-    if ($value =~ m/[^\x20-\x7e]/s) {       
+    if ($value =~ m/[^\n\r\t\x20-\x7e]/s) {       
         my $hex = $value;
         utf8::downgrade ($hex);
         $hex =~ s/(.)/'\x'.sprintf("%02x", ord ($1))/egs;
