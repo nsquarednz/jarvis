@@ -86,7 +86,9 @@ sub do {
     my $default_filename = undef;       # A default return filename to use.
     my $filename_parameter = undef;     # Which CGI parameter contains our filename.
     my $mime_type = undef;              # Override the mime type if you want.
-    my %plugin_parameters = ();         # Taken from XML and handed to plugin
+
+    # Start with the <default_parameters>, and add/replace any per-plugin configured parameters.
+    my %plugin_parameters = &Jarvis::Config::default_parameters ($jconfig);         
 
     my $axml = $jconfig->{xml}{jarvis}{app};
     if ($axml->{plugin}) {
