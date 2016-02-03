@@ -19,7 +19,7 @@ fi
 
 # Other parameters.
 DATE=`date -R`
-TAR_ORIG=jarvisNew_$VERSION.orig.tar.gz
+TAR_ORIG=jarvisnew_$VERSION.orig.tar.gz
 
 # Find our base directory, so we can build the package directory correctly
 DIR=`pwd`
@@ -32,13 +32,13 @@ echo $BASEPATH
 echo $BASEDIR
 
 # Clean up.
-rm -rf jarvisNew-*
-rm -f jarvisNew_*.orig.tar.gz
-rm -f jarvisNew_*_all.deb
-rm -f jarvisNew_*.diff.gz
-rm -f jarvisNew_*.dsc
-rm -f jarvisNew_*.build
-rm -f jarvisNew_*.changes
+rm -rf jarvisnew-*
+rm -f jarvisnew_*.orig.tar.gz
+rm -f jarvisnew_*_all.deb
+rm -f jarvisnew_*.diff.gz
+rm -f jarvisnew_*.dsc
+rm -f jarvisnew_*.build
+rm -f jarvisnew_*.changes
 
 # BUILD THE SOURCE TARBALL.
 tar zcf $TAR_ORIG "../../../$BASEDIR" \
@@ -48,7 +48,7 @@ tar zcf $TAR_ORIG "../../../$BASEDIR" \
     --exclude=.hg \
     --exclude=rpms \
     --exclude=jarvis.tar \
-    --transform "s/^$BASEDIR/jarvisNew-$VERSION/"
+    --transform "s/^$BASEDIR/jarvisnew-$VERSION/"
 
 # COPY THE DEBIAN PACKAGE TEMPLATE.
 #
@@ -59,14 +59,14 @@ tar zcf $TAR_ORIG "../../../$BASEDIR" \
 # (But has been customized since then)
 #
 tar -xzf $TAR_ORIG
-mkdir -p jarvisNew-$VERSION/debian
-find template -maxdepth 1 -type f -exec cp {} jarvisNew-$VERSION/debian/ \;
+mkdir -p jarvisnew-$VERSION/debian
+find template -maxdepth 1 -type f -exec cp {} jarvisnew-$VERSION/debian/ \;
 
 # MODIFY TEMPLATE DEFAULTS
-perl -pi -e "s/VERSION/$VERSION/" jarvisNew-$VERSION/debian/changelog
-perl -pi -e "s/RELEASE/$RELEASE/" jarvisNew-$VERSION/debian/changelog
-perl -pi -e "s/DATE/$DATE/" jarvisNew-$VERSION/debian/changelog
-perl -pi -e "s/DATE/$DATE/" jarvisNew-$VERSION/debian/copyright
+perl -pi -e "s/VERSION/$VERSION/" jarvisnew-$VERSION/debian/changelog
+perl -pi -e "s/RELEASE/$RELEASE/" jarvisnew-$VERSION/debian/changelog
+perl -pi -e "s/DATE/$DATE/" jarvisnew-$VERSION/debian/changelog
+perl -pi -e "s/DATE/$DATE/" jarvisnew-$VERSION/debian/copyright
 
 # PERFORM THE PACKAGE BUILD
 #
@@ -74,5 +74,5 @@ perl -pi -e "s/DATE/$DATE/" jarvisNew-$VERSION/debian/copyright
 # See: http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=566837
 # (Fixed in dpkg version 1.15.6)
 #
-cd jarvisNew-$VERSION
+cd jarvisnew-$VERSION
 debuild -uc -us
