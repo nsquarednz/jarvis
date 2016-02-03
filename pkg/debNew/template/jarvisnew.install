@@ -1,0 +1,7 @@
+cgi-bin usr/share/jarvisNew
+demo usr/share/jarvisNew
+docs/jarvis_guide.pdf usr/share/doc/jarvisNew
+#etc/README.txt etc/jarvisNew
+etc/apache etc/jarvisNew
+htdocs usr/share/jarvisNew
+lib usr/share/jarvisNew
