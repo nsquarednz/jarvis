@@ -712,7 +712,6 @@ sub fetch_rows {
     } elsif ($dbtype eq 'sdp') {
         ($rows_aref, $column_names_aref)
             = &Jarvis::Dataset::SDP::fetch_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%safe_params);
-
     } else {
         die "Unsupported dataset type '$dbtype'.";
     }

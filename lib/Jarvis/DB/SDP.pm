@@ -181,11 +181,11 @@ sub fetchall_arrayref {
     ($root->{'Axes'}->{'Axis'}[0]->{'name'}->content eq 'Axis0') || die "Inconsistent Axis0 Name";
     ($root->{'Axes'}->{'Axis'}[1]->{'name'}->content eq 'Axis1') || die "Inconsistent Axis1 Name";
 
-    my @column_names = map { $_->{'Member'}->{'Caption'}->content } $root->{'Axes'}->{'Axis'}[0]->{'Tuples'}{'Tuple'}('@');
+    my @column_names = map { my $x = $_->{'Member'}->{'Caption'}->content; $x; } $root->{'Axes'}->{'Axis'}[0]->{'Tuples'}{'Tuple'}('@');
 
     my $num_columns = scalar @column_names;
     
-    my @row_names = map { $_->{'Member'}->{'Caption'}->content } $root->{'Axes'}->{'Axis'}[1]->{'Tuples'}{'Tuple'}('@');
+    my @row_names = map { my $x = $_->{'Member'}->{'Caption'}->content; $x; } $root->{'Axes'}->{'Axis'}[1]->{'Tuples'}{'Tuple'}('@');
     my $num_rows = scalar @row_names;    
     
     # Pre-fill the rows.
