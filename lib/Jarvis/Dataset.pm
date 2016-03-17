@@ -697,9 +697,13 @@ sub fetch_rows {
         $dbh = &Jarvis::DB::handle ($jconfig, $dbname, $dbtype);
         $jconfig->{txn_dbh} = $dbh;
 
-    } else {
-        &Jarvis::Error::debug ($jconfig, "Nested Fetch Dataset.  Using already-open parent database handle.");
+    } elsif ($jconfig->{txn_dbh}) {
+        &Jarvis::Error::debug ($jconfig, "Nested Fetch Dataset.  Existing database handle. Using already-open parent database handle.");
         $dbh = $jconfig->{txn_dbh};
+    } else {
+        &Jarvis::Error::debug ($jconfig, "Nested Fetch Dataset.  Opening database handle.");
+        $dbh = &Jarvis::DB::handle ($jconfig, $dbname, $dbtype);
+        $jconfig->{txn_dbh} = $dbh;
     }
 
     # Call to the DBI interface to fetch the tuples.
