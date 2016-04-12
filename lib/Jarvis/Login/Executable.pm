@@ -31,8 +31,6 @@ use warnings;
 
 package Jarvis::Login::Executable;
 
-use Net::LDAP;
-
 use Jarvis::Error;
 use JSON::Parse 'parse_json';
 
