@@ -31,6 +31,8 @@ use warnings;
 
 package Jarvis::Login::Executable;
 
+use Cwd;
+use File::Basename 'dirname';
 use Jarvis::Error;
 use JSON::Parse 'parse_json';
 
@@ -100,14 +102,15 @@ sub list_regexp {
 #               "message": "Reason why it failed."
 #             }
 #
-#    Key        | Description
-#    ---------- | ----------------------------------------------------------------------------
-#    success    | If successful then 1 otherwise 0 or undefined for fail. <Optional>
-#    message    | In the case of an unsuccessful login the reason can be specified. <Optional>
-#    groups     | An array of strings naming the user groups or roles applicable to the login.
-#               : Or a comma separated list of names. <Optional>
-#    additional | An object of key=values to assign to the session. <Optional>
-#               : Key names for safe parameters must start with __ and will be put into $jconfig->{additional_safe}.
+#    Key         | Description
+#    ----------  | ----------------------------------------------------------------------------
+#    success     | If successful then 1 otherwise 0 or undefined for fail. <Optional>
+#    message     | In the case of an unsuccessful login the reason can be specified. <Optional>
+#    groups      | An array of strings naming the user groups or roles applicable to the login.
+#                : Or a comma separated list of names. <Optional>
+#    additional  | An object of key=values to assign to the session. <Optional>
+#                : Key names for safe parameters must start with __ and will be put into $jconfig->{additional_safe}.
+#    working_dir | The working directory to execute in. Default: Directory the executable is in or /tmp for # command.
 # 
 #
 # Params:
@@ -128,6 +131,7 @@ sub Jarvis::Login::Executable::check {
     my $executable = $login_parameters{'executable'};
     my $allowed_groups = $login_parameters{'allowed_groups'} || '';
     my $result_type = $login_parameters{'result_type'} || 'json';
+    my $working_dir = $login_parameters{'working_dir'} || '';
 
     # No info?
     $username || return ("No username supplied.");
@@ -139,9 +143,17 @@ sub Jarvis::Login::Executable::check {
     # Sanity check on config.
     $executable || return ("Missing 'executable' configuration for Login module Executable.");
 
+    # Decide if executable is a shell command or an executable.
     my $is_cmd = substr($executable,0, 1) eq '#';
     if ($is_cmd) {
         $executable = substr($executable, 1);
+        if ($working_dir eq '') {
+            $working_dir = '/tmp';
+        }
+    } else {
+        if ($working_dir eq '') {
+            $working_dir = dirname($executable);
+        }
     }
 
     if (! $is_cmd) {
@@ -152,7 +164,24 @@ sub Jarvis::Login::Executable::check {
 
     # Execute the executable passing the username and password.
     &Jarvis::Error::debug ($jconfig, "Executing: '$executable' \"$username\" \"$password\".");
-    my $output = `$executable "$username" "$password"` || return ("Login Failed. Execution Error.");
+
+    # Switch working directory.
+    my $old_working_dir = getcwd();
+    chdir $working_dir or warn "Can't change directory to '$working_dir'.";
+
+    # Execute the executable in an eval to catch any exception/die thrown.
+    my $output;
+    eval {
+        $output = `$executable "$username" "$password"` || return ("Login Failed. Execution Error.");
+    }; warn $@ if $@;
+
+    # Switch working directory back.
+    chdir $old_working_dir or warn "Can't change directory to '$old_working_dir'.";
+
+    # If no output defined then there must be an internal error executing the file.
+    if (! defined $output) {
+        return ("Login Failed: Internal Error.");
+    }
 
     # This variable will hold the parsed result from the executable output.
     my $result;
