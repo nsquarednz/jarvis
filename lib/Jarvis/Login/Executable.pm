@@ -121,7 +121,7 @@ sub list_regexp {
 #               the master application XML file by the master Login class.
 #
 # Returns:
-#       ($error_string or "", $username or "", "group1,group2,group3...", %additional_safe or undef)
+#       ($error_string or "", $username or "", "group1,group2,group3...", %additional_safe or undef, %additional_cookies or undef)
 ####################################################################################################
 #
 sub Jarvis::Login::Executable::check {
@@ -236,8 +236,18 @@ sub Jarvis::Login::Executable::check {
     # Get any additional safe parameters.
     my $additional_safe = $result->{additional} || {};
 
+    # Get any additional cookies.
+    my $additional_cookies = undef;
+    if (defined $result->{cookies}) {
+        if (ref($result->{cookies}) eq 'HASH') {
+            $additional_cookies = $result->{cookies};
+        } else {
+            &Jarvis::Error::debug ($jconfig, "Expecting execution result cookies to be a hash.");
+        }
+    }
+
     &Jarvis::Error::debug ($jconfig, "Password check succeeded for user '$username'.");
-    return ("", $username, $group_list, $additional_safe);
+    return ("", $username, $group_list, $additional_safe, $additional_cookies);
 }
 
 1;
