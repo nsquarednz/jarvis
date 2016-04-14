@@ -34,6 +34,7 @@ package Jarvis::Login::Executable;
 use Cwd;
 use File::Basename 'dirname';
 use Jarvis::Error;
+use String::ShellQuote;
 use JSON::Parse 'parse_json';
 
 ####################################################################################################
@@ -121,7 +122,7 @@ sub list_regexp {
 #               the master application XML file by the master Login class.
 #
 # Returns:
-#       ($error_string or "", $username or "", "group1,group2,group3...", %additional_safe or undef)
+#       ($error_string or "", $username or "", "group1,group2,group3...", %additional_safe or undef, %additional_cookies or undef)
 ####################################################################################################
 #
 sub Jarvis::Login::Executable::check {
@@ -162,8 +163,16 @@ sub Jarvis::Login::Executable::check {
         }
     }
 
-    # Execute the executable passing the username and password.
-    &Jarvis::Error::debug ($jconfig, "Executing: '$executable' \"$username\" \"$password\".");
+    # Ensure parameters are safe for shell.
+    my %safe_params = ("username" => $username, "password" => $password);
+
+    # Note that we will take username and password parameters supplied
+    # by the user, so we need to watch out for any funny business.
+    foreach my $param ((keys %safe_params)) {
+        # Quote values for the shell.
+        my $param_value = shell_quote $safe_params{$param};
+        $safe_params{$param} = $param_value;
+    }
 
     # Switch working directory.
     my $old_working_dir = getcwd();
@@ -172,7 +181,8 @@ sub Jarvis::Login::Executable::check {
     # Execute the executable in an eval to catch any exception/die thrown.
     my $output;
     eval {
-        $output = `$executable "$username" "$password"` || return ("Login Failed. Execution Error.");
+        # Execute the executable passing the username and password getting back the output.
+        $output = `$executable $safe_params{username} $safe_params{password}` || return ("Login Failed. Execution Error.");
     }; warn $@ if $@;
 
     # Switch working directory back.
@@ -236,8 +246,18 @@ sub Jarvis::Login::Executable::check {
     # Get any additional safe parameters.
     my $additional_safe = $result->{additional} || {};
 
+    # Get any additional cookies.
+    my $additional_cookies = undef;
+    if (defined $result->{cookies}) {
+        if (ref($result->{cookies}) eq 'HASH') {
+            $additional_cookies = $result->{cookies};
+        } else {
+            &Jarvis::Error::debug ($jconfig, "Expecting execution result cookies to be a hash.");
+        }
+    }
+
     &Jarvis::Error::debug ($jconfig, "Password check succeeded for user '$username'.");
-    return ("", $username, $group_list, $additional_safe);
+    return ("", $username, $group_list, $additional_safe, $additional_cookies);
 }
 
 1;
