@@ -66,35 +66,36 @@ sub list_regexp {
 
 ####################################################################################################
 # Determines if we are "logged in".  In this case we look at CGI variables
-# for the existing user/pass.  We validate this by checking a table in the
-# currently open database.  The user and pass columns are both within this same
-# table.
+# for the specified user/pass.  We send these off to an executable file which
+# tells us a success or fail. It also tells us the users groups and may tell
+# additional information to be put into the additional_safe hash.
 #
 # To use this method, specify the following login parameters.
 #
-# <app format="json" debug="no">
+# <app format="json">
 #     ...
 #     <login module="Jarvis::Login::Executable">
-#     <parameter name="executable" value="/opt/amorini/webapps/amorini/application/cli_login.php"/>
-#     <parameter name="allowed_groups" value="superadmin,amorini,retail-head-office,chpl-merchant,qualified-consultant"/>
+#         <parameter name="executable" value="path to executable"/>
+#         <parameter name="allowed_groups" value="comma separated list of allowed user groups"/>
 #     </login>
 #     ...
 # </app>
 #
 #    Parameters:
 #    executable     - Absolute path to executable file for Authentication. <Required>
-#                   : You can specify a shell command by prefixing with a #. Eg: '#cat /tmp/response.json'.
-#    allowed_groups - Only allow login for users belonging to one of these groups. <Optional>
-#    result_type    - How to parse the result from the executable. Default: 'json'.
+#    working_dir    - The working directory to execute in.
+#                     Default: Directory the executable is in.
+#    allowed_groups - Only allow login for users belonging to one of these groups. <Optional> 
+#                     Defaults: All Groups '*'.
 #
-#
-#    Output of executable: Is expected to return in the configured format defaulting to json.
+#    Output of executable: Is expected to be json like so.
 #    Examples:
 #             // Success
 #             {
 #               "success": 1,
-#               "groups": [roles/usergroups]
-#               "additional": { ... }
+#               "groups": [roles/usergroups],
+#               "additional": { ... },
+#               "cookies": { ... }
 #             }
 #
 #             // Fail
@@ -103,16 +104,18 @@ sub list_regexp {
 #               "message": "Reason why it failed."
 #             }
 #
+#    -- Executable output breakdown --
 #    Key         | Description
 #    ----------  | ----------------------------------------------------------------------------
 #    success     | If successful then 1 otherwise 0 or undefined for fail. <Optional>
 #    message     | In the case of an unsuccessful login the reason can be specified. <Optional>
 #    groups      | An array of strings naming the user groups or roles applicable to the login.
-#                : Or a comma separated list of names. <Optional>
+#                  Or a comma separated list of names. <Optional>
 #    additional  | An object of key=values to assign to the session. <Optional>
-#                : Key names for safe parameters must start with __ and will be put into $jconfig->{additional_safe}.
-#    working_dir | The working directory to execute in. Default: Directory the executable is in or /tmp for # command.
-# 
+#                  Key names for safe parameters must start with __ and will be put into $jconfig->{additional_safe}.
+#    cookies     | An object of key=values to be turned into cookies on success login. <Optional>
+#                  It is up to the developer to ensure the key names are suitable for cookie key names.
+#                  Any cookies defined in this hash will be sent to the client in a cookie string.
 #
 # Params:
 #       $jconfig  - Jarvis::Config object
@@ -122,7 +125,7 @@ sub list_regexp {
 #               the master application XML file by the master Login class.
 #
 # Returns:
-#       ($error_string or "", $username or "", "group1,group2,group3...", %additional_safe or undef, %additional_cookies or undef)
+#       ($error_string or "", $username or "", "group1,group2,group3...", %additional_safe or undef, %cookies or undef)
 ####################################################################################################
 #
 sub Jarvis::Login::Executable::check {
@@ -130,37 +133,23 @@ sub Jarvis::Login::Executable::check {
 
     # Our user name login parameters are here...
     my $executable = $login_parameters{'executable'};
-    my $allowed_groups = $login_parameters{'allowed_groups'} || '';
-    my $result_type = $login_parameters{'result_type'} || 'json';
+    my $allowed_groups = $login_parameters{'allowed_groups'} || '*';
     my $working_dir = $login_parameters{'working_dir'} || '';
 
     # No info?
-    $username || return ("No username supplied.");
-    $password || return ("No password supplied.");
-
-    return ("Invalid username.") if $username !~ m/\w+/ || $username =~ m/^[\|]/;
-    return ("Invalid password.") if $password !~ m/\w+/ || $password =~ m/^[\|]/;
+    $username || return "No username supplied.";
+    $password || return "No password supplied.";
 
     # Sanity check on config.
-    $executable || return ("Missing 'executable' configuration for Login module Executable.");
+    $executable || return "Missing 'executable' configuration for Login module Executable.";
 
-    # Decide if executable is a shell command or an executable.
-    my $is_cmd = substr($executable,0, 1) eq '#';
-    if ($is_cmd) {
-        $executable = substr($executable, 1);
-        if ($working_dir eq '') {
-            $working_dir = '/tmp';
-        }
-    } else {
-        if ($working_dir eq '') {
-            $working_dir = dirname($executable);
-        }
+    if (! (-r $executable && -x _)) {
+        die "Unable to find the executable file configured for Login module Executable '$executable'.";
     }
 
-    if (! $is_cmd) {
-        if (! (-r $executable && -x _)) {
-            return ("Unable to find the executable file configured for Login module Executable.");
-        }
+    # Set the working directory to the executables dirname if the working_dir was not specified as a login parameter.
+    if ($working_dir eq '') {
+        $working_dir = dirname($executable);
     }
 
     # Ensure parameters are safe for shell.
@@ -168,51 +157,53 @@ sub Jarvis::Login::Executable::check {
 
     # Note that we will take username and password parameters supplied
     # by the user, so we need to watch out for any funny business.
-    foreach my $param ((keys %safe_params)) {
-        # Quote values for the shell.
+    foreach my $param (keys %safe_params) {
+        # Escape & Quote values for the shell to make them safe.
         my $param_value = shell_quote $safe_params{$param};
         $safe_params{$param} = $param_value;
     }
 
     # Switch working directory.
     my $old_working_dir = getcwd();
-    chdir $working_dir or warn "Can't change directory to '$working_dir'.";
+    chdir $working_dir or die "Can't change directory to '$working_dir'.";
 
     # Execute the executable in an eval to catch any exception/die thrown.
     my $output;
+
     eval {
+        # Temporarily remove die handlers for local block.
+        local $SIG{'__DIE__'};
         # Execute the executable passing the username and password getting back the output.
-        $output = `$executable $safe_params{username} $safe_params{password}` || return ("Login Failed. Execution Error.");
-    }; warn $@ if $@;
+        $output = `$executable $safe_params{username} $safe_params{password}` || return "Login Failed. Execution Error.";
+    }; return $@ if $@;
 
     # Switch working directory back.
-    chdir $old_working_dir or warn "Can't change directory to '$old_working_dir'.";
+    chdir $old_working_dir or die "Can't change directory to '$old_working_dir'.";
 
-    # If no output defined then there must be an internal error executing the file.
+    # If no output defined then there may be an internal error executing the file as it did not output the info we want.
     if (! defined $output) {
-        return ("Login Failed: Internal Error.");
+        return "Login Failed: Internal Error.";
     }
 
     # This variable will hold the parsed result from the executable output.
     my $result;
 
-    # Process the results by type.
-    if ($result_type eq 'json') {
+    # Do the parsing of the JSON.
+    eval {
+        local $SIG{'__DIE__'};
         $result = parse_json($output);
-    } else {
-        return ("Login Failed: Unhanded result type configured.");
-    }
+    } or die "Unable to parse JSON response from executable. $@";
 
     # If no result was found.
     if (! defined $result) {
-        return ("Login Failed: Result not defined.");
+        return "Login Failed: Result not defined.";
     }
 
     # Check that we got success.
-    if (defined $result->{success} && $result->{success} != 1 || ! defined $result->{success}) {
+    if (!defined $result->{success} || $result->{success} != 1) {
         my $message = $result->{message} || "";
         &Jarvis::Error::debug ($jconfig, "Failed login '$username' $message.");
-        return ("Login Failed. $message");
+        return "Login Failed. $message";
     }
 
     # Get the groups from the result.
@@ -229,35 +220,25 @@ sub Jarvis::Login::Executable::check {
     }
 
     # Get the group list string.
-    my $group_list = '';
-    foreach my $group (@$groups) {
-        $group_list .= ($group_list ? ',' : '') . $group;
-    }
+    my $group_list = join(',', @{$groups});
 
     # We got the group list, check if user is allowed.
     if ($allowed_groups) {
         my $allowed_groups_regexp = list_regexp($allowed_groups);
-        unless ( scalar(grep { $_ =~ /$allowed_groups_regexp/ } split(',', $group_list)) ) {
+        unless ( scalar(grep { $_ =~ /$allowed_groups_regexp/ } @$groups) ) {
             &Jarvis::Error::debug ($jconfig, "No allowed group for user '$username'.");
-            return ("Login Denied.");
+            return "Login Denied.";
         }
     }
 
     # Get any additional safe parameters.
     my $additional_safe = $result->{additional} || {};
 
-    # Get any additional cookies.
-    my $additional_cookies = undef;
-    if (defined $result->{cookies}) {
-        if (ref($result->{cookies}) eq 'HASH') {
-            $additional_cookies = $result->{cookies};
-        } else {
-            &Jarvis::Error::debug ($jconfig, "Expecting execution result cookies to be a hash.");
-        }
-    }
+    # Get any cookies.
+    my $cookies = $result->{cookies} || {};
 
     &Jarvis::Error::debug ($jconfig, "Password check succeeded for user '$username'.");
-    return ("", $username, $group_list, $additional_safe, $additional_cookies);
+    return ("", $username, $group_list, $additional_safe, $cookies);
 }
 
 1;

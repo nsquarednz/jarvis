@@ -18,3 +18,10 @@ minjs
 syntax: regexp
 .*\.orig$
 .*\.marks$
+syntax: glob
+docs/.~lock.jarvis_guide.odt#
+docs/.~lock.jarvis_guide.odt#
+docs/.~lock.jarvis_guide.odt#
+docs/.~lock.jarvis_guide.odt#
+docs/.~lock.jarvis_guide.odt#
+docs/.~lock.*
