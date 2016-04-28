@@ -136,9 +136,16 @@ sub Jarvis::Login::Executable::check {
     my $allowed_groups = $login_parameters{'allowed_groups'} || '*';
     my $working_dir = $login_parameters{'working_dir'} || '';
 
+    # Check if no password is require.
+    if ($login_parameters{'no_password'}) {
+        $login_parameters{'extra'} = 'no_password';
+        $password = '';
+    } else {
+      $password || return "No password supplied.";
+    }
+
     # No info?
     $username || return "No username supplied.";
-    $password || return "No password supplied.";
 
     # Sanity check on config.
     $executable || return "Missing 'executable' configuration for Login module Executable.";
@@ -152,8 +159,13 @@ sub Jarvis::Login::Executable::check {
         $working_dir = dirname($executable);
     }
 
+    my $extra = '';
+    if ($login_parameters{'no_password'}) {
+        $extra = 'no_password';
+    }
+
     # Ensure parameters are safe for shell.
-    my %safe_params = ("username" => $username, "password" => $password);
+    my %safe_params = ("username" => $username, "password" => $password, "extra" => $extra);
 
     # Note that we will take username and password parameters supplied
     # by the user, so we need to watch out for any funny business.
@@ -174,7 +186,7 @@ sub Jarvis::Login::Executable::check {
         # Temporarily remove die handlers for local block.
         local $SIG{'__DIE__'};
         # Execute the executable passing the username and password getting back the output.
-        $output = `$executable $safe_params{username} $safe_params{password}` || return "Login Failed. Execution Error.";
+        $output = `$executable $safe_params{username} $safe_params{password} $safe_params{extra}` || return "Login Failed. Execution Error.";
     }; return $@ if $@;
 
     # Switch working directory back.
@@ -205,7 +217,7 @@ sub Jarvis::Login::Executable::check {
         &Jarvis::Error::debug ($jconfig, "Failed login '$username' $message.");
         return "Login Failed. $message";
     }
-
+    
     # Get the groups from the result.
     my $groups;
     if (defined $result->{groups}) {
