@@ -275,7 +275,7 @@ sub check {
             }
         }
         (defined $additional_safe) || ($additional_safe = {});
-        (defined $additional_cookies || ($additional_cookies = []);
+        (defined $additional_cookies || ($additional_cookies = {});
 
         $username || ($username = '');
         $group_list || ($group_list = '');
@@ -360,7 +360,7 @@ sub check {
 
             # If there were additional cookies specified by a Login Module then add those as well.
             if (defined $additional_cookies && ref($additional_cookies) eq 'HASH') {
-                foreach my $key (keys %$additional_cookies) {
+                foreach my $key (keys %{$additional_cookies}) {
                     push(@$cookies, CGI::Cookie->new(
                         -name => $key,
                         -value => $additional_cookies->{$key},
