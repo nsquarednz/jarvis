@@ -59,7 +59,7 @@ use Jarvis::Text;
 #               session             The session object.
 #               sname               Name of the session cookie.  Default "CGISESSID".
 #               sid                 Session ID.  A big long number.
-#               cookie              CGI::Cookie objects to send back with session info
+#               cookie              CGI::Cookie objects to send back with session info.
 #
 #       $override_href - Optional hash of override parameters.
 #           username - Login with this username to use instead of CGI parameter
@@ -198,7 +198,7 @@ sub check {
     # and group_list to be undef, too many things depend on it having some value,
     # even if that is just ''.
     #
-    my ($error_string, $username, $group_list, $logged_in, $additional_safe) = ('', '', '', 0, undef);
+    my ($error_string, $username, $group_list, $logged_in, $additional_safe, $additional_cookies) = ('', '', '', 0, undef, undef);
     my $already_logged_in = 0;
 
     my $force_relogin = $override_href && $$override_href{'force_relogin'};
@@ -268,13 +268,15 @@ sub check {
         my $login_method = $login_module . "::check";
         {
             no strict 'refs';
-            ($error_string, $username, $group_list, $additional_safe) = &$login_method ($jconfig, $offered_username, $offered_password, %login_parameters);
+            ($error_string, $username, $group_list, $additional_safe, $additional_cookies) = &$login_method ($jconfig, $offered_username, $offered_password, %login_parameters);
             # login is likely to fail if URL username/password are deleted due to require_post
             if ($require_post_error) {
                 $error_string = ($error_string ? "$error_string ($require_post_error)" : "Login ok, but $require_post_error");
             }
         }
+
         (defined $additional_safe) || ($additional_safe = {});
+        (defined $additional_cookies) || ($additional_cookies = {});
 
         $username || ($username = '');
         $group_list || ($group_list = '');
@@ -350,10 +352,23 @@ sub check {
         # url based sessions. We get the best of both worlds.
         #
         if (!$jconfig->{'sid_source'} || $jconfig->{'sid_source'} eq 'cookie') {
-            $jconfig->{'cookie'} = [ CGI::Cookie->new (
+            my $cookies = [ CGI::Cookie->new (
                 -name => $jconfig->{'sname'},
                 -value => $jconfig->{'sid'},
                 -expires => $session_expiry) ];
+
+            $jconfig->{'cookie'} = $cookies;
+
+            # If there were additional cookies specified by a Login Module then add those as well.
+            if (defined $additional_cookies && ref($additional_cookies) eq 'HASH') {
+                foreach my $key (keys %{$additional_cookies}) {
+                    push($cookies, CGI::Cookie->new(
+                        -name => $key,
+                        -value => $additional_cookies->{$key},
+                        -expires => $session_expiry
+                    ))
+                }
+            }
         }
    }
 
@@ -592,3 +607,4 @@ sub check_access {
 }
 
 1;
+
