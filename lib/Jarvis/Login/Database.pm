@@ -83,8 +83,6 @@ use Jarvis::Error;
 # Note that for eksblowfish, the password is stored in the database in the
 # form:
 #   salt+encrypted_password
-# or:
-#   cost+salt+encrypted_password
 #
 # where the '+' is a distinct character. salt must be 16 characters.
 #
@@ -99,12 +97,6 @@ use Jarvis::Error;
 #       ($error_string or "", $username or "", "group1,group2,group3...")
 ################################################################################
 #
-
-sub Jarvis::Login::Database::BCRYPT_COST {
-    # Increase this every 2-3 years to increase strength of hashes
-    return 15;
-}
-
 sub Jarvis::Login::Database::check {
     my ($jconfig, $username, $password, %login_parameters) = @_;
 
@@ -124,7 +116,6 @@ sub Jarvis::Login::Database::check {
     my $group_username_column = $login_parameters{'group_username_column'};
     my $group_group_column = $login_parameters{'group_group_column'};
     my $dbname = $login_parameters{'dbname'} || 'default';
-    my $user_table_to_update = $login_parameters{'user_table_to_update'};
 
     # Does the database store plain text, a MD5 hash (in HEX format, we don't support binary), 
     # or a HEX formatted version of an Eksblowfish encrypted password?
@@ -171,57 +162,23 @@ sub Jarvis::Login::Database::check {
         }
 
     } elsif ($encryption eq "eksblowfish") {
-        my @password_parts = split /\+/, $stored_password;
-
-        my $cost = 0;
-        my $salt = 0;
-        my $p = 0;
-
-        # Old cost is fixed at 8, new hashes can have higher costs (stronger)
-        if ((scalar @password_parts) eq 2) {
-            $cost = 8;
-            $salt = $password_parts[0];
-            $p = $password_parts[1]; 
-        }
-        elsif ((scalar @password_parts) eq 3) {
-            $cost = $password_parts[0]; 
-            $salt = $password_parts[1];
-            $p = $password_parts[2]; 
-        }
-        else {
-            return "Unable to distinguish cost, salt and hash.";
-        }
-
         $salt_prefix_len = 16; # eksblowfish requires a salt of 16. 
-        if (length ($salt) ne $salt_prefix_len) {
+        if (length ($stored_password) <= $salt_prefix_len) {
             return ("Stored password length " . length ($stored_password) . " is invalid for Eksblowfish + salt");
         }
+        my $salt = substr ($stored_password, 0, $salt_prefix_len);
+        my $p = substr ($stored_password, $salt_prefix_len + 1); 
 
-        # Generate the hash of the provided password
         eval "use Crypt::Eksblowfish::Bcrypt qw(bcrypt_hash);";
         my $hash = &Crypt::Eksblowfish::Bcrypt::bcrypt_hash({
                 key_nul => 1,
-                cost => $cost,
+                cost => 8,
                 salt => $salt
         }, $password);
         my $checkVal = unpack("H*", $hash);
-
-        # Compare the hashed provided password against the stored hash
         &Jarvis::Error::debug ($jconfig, $checkVal . " vs " . $p);
         if ($checkVal ne $p) {
             return ("Incorrect password.");
-        }
-
-        # Attempt to update the stored hash if strength is low and user table (non-view) handle is defined.
-        if ($cost < BCRYPT_COST and defined $user_table_to_update) {
-            eval {
-                my $stronger_hash = getNewPassword($password);
-                my $sth = $dbh->prepare ("UPDATE $user_table_to_update SET $user_password_column = ? WHERE $user_username_column = ?");
-                my $result = $sth->execute($stronger_hash, $username);
-            };
-            if ($@) {
-                &Jarvis::Error::log ($jconfig, "Unable to update user password to new cost: $@");
-            }
         }
     } else {
         if ($stored_password ne $password) {
@@ -248,33 +205,4 @@ sub Jarvis::Login::Database::check {
     return ("", $username, $group_list, \%additional_safe);
 }
 
-# generateSalt and getNewPassword refactored to here to reduce code duplication
-sub generateSalt {
-    my $chars = [ qw/ a b c d e f g h i j k l m n o p q r s t u v w x y z
-                        A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
-                        1 2 3 4 5 6 7 8 9                                 / ];
-
-    open (DEV, "/dev/urandom") or die "Cannot open /dev/urandom: $!";
-    read (DEV, my $bytes, 16);
-
-    my $string;
-    my @randoms = split(//, $bytes);
-    foreach (@randoms) {
-        $string .= @{ $chars }[ ord($_) % @{ $chars } ];
-    }
-    return $string;
-}
-
-sub Jarvis::Login::Database::getNewPassword {
-    my $password = shift;
-    my $salt = generateSalt();
-    my $cost = BCRYPT_COST();
-    my $hash = bcrypt_hash({
-            key_nul => 1,
-            cost => $cost,
-            salt => $salt
-    }, $password);
-
-    return $cost . '+' . $salt . '+' . unpack("H*", $hash);
-}
 1;
