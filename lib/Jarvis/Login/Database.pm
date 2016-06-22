@@ -124,7 +124,7 @@ sub Jarvis::Login::Database::check {
     my $group_username_column = $login_parameters{'group_username_column'};
     my $group_group_column = $login_parameters{'group_group_column'};
     my $dbname = $login_parameters{'dbname'} || 'default';
-    my $user_table_to_update = $login_parameters{'user_table_to_update'};
+    my $password_cost_update_statement = $login_parameters{'password_cost_update_statement'};
 
     # Does the database store plain text, a MD5 hash (in HEX format, we don't support binary), 
     # or a HEX formatted version of an Eksblowfish encrypted password?
@@ -213,10 +213,12 @@ sub Jarvis::Login::Database::check {
         }
 
         # Attempt to update the stored hash if strength is low and user table (non-view) handle is defined.
-        if ($cost < BCRYPT_COST and defined $user_table_to_update) {
+        if ($cost < BCRYPT_COST() and defined $password_cost_update_statement) {
             eval {
+            	# $password_cost_update_statement should be of similar form to: 
+            	# "UPDATE user_table_name SET password_column_name = ? WHERE username_column_name = ? AND enabled = TRUE"
                 my $stronger_hash = getNewPassword($password);
-                my $sth = $dbh->prepare ("UPDATE $user_table_to_update SET $user_password_column = ? WHERE $user_username_column = ?");
+                my $sth = $dbh->prepare ($password_cost_update_statement);
                 my $result = $sth->execute($stronger_hash, $username);
             };
             if ($@) {
@@ -266,9 +268,10 @@ sub generateSalt {
 }
 
 sub Jarvis::Login::Database::getNewPassword {
-    my $password = shift;
+	my $password = shift;
     my $salt = generateSalt();
     my $cost = BCRYPT_COST();
+    eval "use Crypt::Eksblowfish::Bcrypt qw(bcrypt_hash);";
     my $hash = bcrypt_hash({
             key_nul => 1,
             cost => $cost,
