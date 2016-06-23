@@ -102,7 +102,7 @@ use Jarvis::Error;
 
 sub Jarvis::Login::Database::BCRYPT_COST {
     # Increase this every 2-3 years to increase strength of hashes
-    return 15;
+    return 13;
 }
 
 sub Jarvis::Login::Database::check {
