@@ -362,7 +362,7 @@ sub check {
             # If there were additional cookies specified by a Login Module then add those as well.
             if (defined $additional_cookies && ref($additional_cookies) eq 'HASH') {
                 foreach my $key (keys %{$additional_cookies}) {
-                    push($cookies, CGI::Cookie->new(
+                    push(@$cookies, CGI::Cookie->new(
                         -name => $key,
                         -value => $additional_cookies->{$key},
                         -expires => $session_expiry
