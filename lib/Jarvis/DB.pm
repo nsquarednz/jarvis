@@ -184,15 +184,16 @@ sub handle {
 #
 # Params:
 #       $jconfig - Jarvis::Config object (not used)
-#       $dbname - Connection name to disconnect.  (Default = all)
-#       $dbtype - Connection type to disconnect 'dbi' or 'sdp'.  (Default = both)
+#       $dbname - Connection name to disconnect.  (Default/undef = all)
+#       $dbtype - Connection type to disconnect 'dbi' or 'sdp'.  (Default/undef = all)
+#       $rollback - Call "rollback" before disconnecting?
 #
 # Returns:
 #       1
 ################################################################################
 #
 sub disconnect {
-    my ($jconfig, $dbname, $dbtype) = @_;
+    my ($jconfig, $dbname, $dbtype, $rollback) = @_;
 
     foreach my $dbt (sort (keys %dbhs)) {
         next if ((defined $dbtype) && ($dbtype ne $dbt));
@@ -200,12 +201,22 @@ sub disconnect {
         foreach my $dbn (sort (keys %{ $dbhs{$dbt} })) {
             next if ((defined $dbname) && ($dbname ne $dbn));
 
-            &Jarvis::Error::debug ($jconfig, "Disconnecting from database type = '$dbt', name = '$dbn'.");
+            &Jarvis::Error::debug ($jconfig, "Check Disconnect from database type = '%s', name = '%s'.  Rollback = %s.", 
+                $dbt, $dbn, $rollback ? "YES" : "NO");
+
             eval {
                 my $handler = $SIG{ __DIE__ };
                 $SIG{ __DIE__ } = 'IGNORE';
 
-                $dbhs{$dbt}{$dbn} && $dbhs{$dbt}{$dbn}->disconnect();
+                if ($dbhs{$dbt}{$dbn}) {
+                    if ($rollback) {
+                        $dbhs{$dbt}{$dbn}->rollback();    
+                    }
+                    $dbhs{$dbt}{$dbn}->disconnect();
+
+                } else {
+                    &Jarvis::Error::debug ($jconfig, "No Disconnect Required (handle undefined).");
+                }
 
                 $SIG{ __DIE__ } = $handler;
             };

@@ -170,7 +170,7 @@ sub error_handler {
 
     # We MUST ensure that ALL the cached database handles are removed.
     # Otherwise, under mod_perl, the next application would get OUR database handles!
-    &Jarvis::DB::disconnect ($jconfig);
+    &Jarvis::DB::disconnect ($jconfig, undef, undef, 1);
     
     # Under mod_perl this will be ModPerl::Util::exit (), which won't really end the process.
     # Under non-mod_perl, this will really exit the process.
