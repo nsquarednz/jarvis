@@ -11,7 +11,7 @@ use LWP::UserAgent;
 use HTTP::Cookies;
 use Data::Dumper;
 use JSON qw(encode_json decode_json);
-use URI::Encode qw(uri_encode uri_decode);
+use URI::Escape;
 use XML::Smart;
 
 # Jarvis base URL.
@@ -65,7 +65,7 @@ sub login_json {
 	# Username and password are sent.
 	my $password = $passwords{$username} || die "Unknown user: $username";
 	my %query_args = (username => $username, password => $password);
-	my $urlencoded_form = join ('&', map { uri_encode ($_) . '=' . uri_encode ($query_args{$_}) } (keys %query_args));
+	my $urlencoded_form = join ('&', map { uri_escape ($_) . '=' . uri_escape ($query_args{$_}) } (keys %query_args));
 
 	# Request is a POST with user/pass.
  	my $req = HTTP::Request->new (POST => "$base_url/__status");
@@ -99,8 +99,8 @@ sub fetch {
 	my ($url_parts, $query_args) = @_;
 
 	# Query args are sent to a restful url.
-	my $restful_url = join ('/', map { uri_encode ($_) } @$url_parts);
-	my $urlencoded_args = join ('&', map { uri_encode ($_) . '=' . uri_encode ($query_args->{$_}) } (keys %$query_args));
+	my $restful_url = join ('/', map { uri_escape ($_) } @$url_parts);
+	my $urlencoded_args = join ('&', map { uri_escape ($_) . '=' . uri_escape ($query_args->{$_}) } (keys %$query_args));
 
 	# Request is a GET with query args in the URL.
  	my $req = HTTP::Request->new (GET => "$base_url/$restful_url?$urlencoded_args");
@@ -174,8 +174,8 @@ sub store {
 	my ($url_parts, $query_args, $rows) = @_;
 
 	# Query args are sent to a restful url.
-	my $restful_url = join ('/', map { uri_encode ($_) } @$url_parts);
-	my $urlencoded_args = join ('&', map { uri_encode ($_) . '=' . uri_encode ($query_args->{$_}) } (keys %$query_args));
+	my $restful_url = join ('/', map { uri_escape ($_) } @$url_parts);
+	my $urlencoded_args = join ('&', map { uri_escape ($_) . '=' . uri_escape ($query_args->{$_}) } (keys %$query_args));
 	my $rows_json = encode_json ($rows);
 
 	# Request is a POST with query args in the URL and a content.

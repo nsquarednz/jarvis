@@ -10,8 +10,6 @@ use lib "./lib";
 use Test::More;
 use Test::Differences;
 use Data::Dumper;
-use Data::Hexdumper;
-use Data::Compare;
 
 use TestUtils;
 
