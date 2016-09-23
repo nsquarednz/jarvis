@@ -27,8 +27,6 @@ use strict;
 use warnings;
 
 use XML::Smart;
-use Text::CSV;
-use IO::String;
 
 package Jarvis::Dataset::SDP;
 

@@ -18,7 +18,7 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 %global __requires_exclude perl\\(
 
 #BuildRequires:
-Requires: httpd perl(Net::LDAP) perl(LWP::UserAgent) perl(IO::String) perl(HTTP::Cookies) perl(Digest::MD5) perl(DBD::SQLite) perl(CGI::Session) perl(CGI::Cookie) perl(CGI)  perl(XML::Parser) perl(Class::Inspector) perl(MIME::Types) perl(URI::Escape) perl(Text::CSV) perl(SOAP::Lite)
+Requires: httpd perl(CGI) perl(CGI::Session) perl(CGI::Cookie) perl(HTTP::Cookies) perl(MIME::Types) perl(DBI) perl(JSON) perl(XML::Parser) perl(SOAP::Lite) perl(Digest::MD5)
 
 %description
 Jarvis is "helper glue". It is designed to bridge the gap between your

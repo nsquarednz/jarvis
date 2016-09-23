@@ -32,7 +32,6 @@ use Data::Dumper;
 
 use Jarvis::Error;
 use Jarvis::Hook;
-use Jarvis::DB::SDP;
 
 ###############################################################################
 # Global variables.
@@ -167,7 +166,14 @@ sub handle {
         }
 
     # SDP is a SSAS DataPump pseudo-database.
+    # 
+    # NOTE: We load the DB::SDP module at runtime with a "require".  Why?  Because very few
+    #       sites actually use SDP, and hence they don't actually need SOAP::Lite as a 
+    #       dependency.
+    #
     } elsif ($dbtype eq "sdp") {
+        require Jarvis::DB::SDP;
+
         $dbconnect || die "Missing 'connect' parameter on SSAS DataPump database '$dbname'.";
         $dbhs{$dbtype}{$dbname} = Jarvis::DB::SDP->new ($jconfig, $dbconnect, $dbusername, $dbpassword, \%parameters);
 

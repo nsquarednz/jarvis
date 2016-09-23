@@ -37,8 +37,6 @@ package Jarvis::Dataset;
 use Data::Dumper;
 use JSON;
 use XML::Smart;
-use Text::CSV;
-use IO::String;
 
 use Jarvis::Text;
 use Jarvis::Error;
@@ -486,6 +484,14 @@ sub fetch {
     } elsif ($format eq "csv") {
         &Jarvis::Error::debug ($jconfig, "Encoding into CSV format ($format).");
 
+        # Dynamically load this module.
+        #
+        # NOTE: This is part of the standard Ubuntu distro, but isn't part of 
+        #       the standard RedHat/CentOS package list.
+        #           
+        require Text::CSV;
+        require IO::String;
+
         if (! $column_names_aref || ! (scalar @$column_names_aref)) {
             die "Data query did not return column names.  Cannot convert to CSV.";
         }
@@ -515,6 +521,9 @@ sub fetch {
         &Jarvis::Error::debug ($jconfig, "Encoding into XLSX format ($format).");
 
         # Dynamically load this module.
+        # 
+        # NOTE: This is CPAN only, not part of standard Debian or RedHat distros. 
+        #
         require Excel::Writer::XLSX;
 
         if (! $column_names_aref || ! (scalar @$column_names_aref)) {

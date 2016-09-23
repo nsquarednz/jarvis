@@ -26,8 +26,6 @@ use warnings;
 
 package Jarvis::Agent;
 
-use Apache2::RequestRec ();
-use Apache2::RequestIO ();
 use Apache2::Const -compile => qw(OK);
 
 use Jarvis::Main;
