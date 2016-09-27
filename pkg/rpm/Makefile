@@ -32,9 +32,10 @@ rpms: sdist
 install:
 	mkdir -p ${DESTDIR}/${ROOT}/
 	mkdir -p ${DESTDIR}/etc/httpd/conf.d/
-	mkdir -p ${DESTDIR}/etc/jarvis/
+	mkdir -p ${DESTDIR}/etc/jarvis/apache
 	tar xvf ${PACKAGE}.tar -C ${DESTDIR}/${ROOT}/
 	cp ${DESTDIR}/${ROOT}/etc/apache/jarvis.conf ${DESTDIR}/etc/httpd/conf.d/jarvis.conf
+	cp ${DESTDIR}/${ROOT}/etc/apache/startup.pl ${DESTDIR}/etc/jarvis/apache/startup.pl
 	touch ${DESTDIR}/etc/jarvis/jarvis-app-config-goes-here.txt
 
 
