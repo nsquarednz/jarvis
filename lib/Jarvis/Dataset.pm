@@ -697,7 +697,7 @@ sub fetch_rows {
 
     # Call the pre-fetch hook.
     my %safe_params = %params_copy;
-    &Jarvis::Hook::dataset_pre_fetch ($jconfig, $dsxml, $user_args);
+    &Jarvis::Hook::dataset_pre_fetch ($jconfig, $dsxml, \%safe_params);
 
     # Get a database handle.
     my $dbh = undef;
