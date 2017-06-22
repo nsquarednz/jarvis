@@ -525,6 +525,7 @@ sub fetch {
         # NOTE: This is CPAN only, not part of standard Debian or RedHat distros. 
         #
         require Excel::Writer::XLSX;
+        require IO::String;
 
         if (! $column_names_aref || ! (scalar @$column_names_aref)) {
             die "Data query did not return column names.  Cannot convert to XLSX.";
