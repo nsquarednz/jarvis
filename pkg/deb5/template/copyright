@@ -1,0 +1,18 @@
+This work was packaged for Debian by:
+
+    N-Squared Software <jarvis@nsquaredsoftware.com> on DATE
+
+Copyright:
+
+    Copyright (C) 2010 Jonathan Couper-Smartt, Jamie Love
+
+License:
+
+    This software is provided under the GNU LESSER GENERAL PUBLIC LICENSE.
+    A copy of this licence is present on your system in the following file:
+    /usr/share/common-licenses/LGPL-3
+
+The Debian packaging is:
+
+    Copyright (C) 2010 Jonathan Couper-Smartt <jarvis@nsquaredsoftware.com>
+    The packaging is included under the same license as the software itself.

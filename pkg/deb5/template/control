@@ -1,0 +1,23 @@
+Source: jarvis5
+Section: web
+Priority: extra
+Maintainer: N-Squared Software <jarvis@nsquaredsoftware.com>
+Build-Depends: debhelper (>= 7)
+Standards-Version: 3.8.4
+Homepage: http://www.nsquaredsoftware.com/
+
+Package: jarvis5
+Architecture: all
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${perl:Depends}, apache2, libcgi-session-perl, libtext-csv-perl, libmime-types-perl, libsoap-lite-perl, libxml-smart-perl, libdbi-perl, libjson-perl
+Description: Extensible RESTful server for any DBI-supported database.
+ Jarvis is a standalone server script which provides HTTP access to any
+ SQL-based database known to the Perl DBI library.  You can implement an
+ simple front end for secure, web-based (SELECT, INSERT, UPDATE, DELETE)
+ access to any database table by writing SQL statements with no code required.
+ For enhanced features you can write Perl "plugins" and "hooks" to suppliment
+ SQL functionality, and to add generic back-end enhancements such as auditing.
+ Jarvis can be used with any HTTP client.  It has been extensively tested with
+ jQuery, ExtJS and Flex clients in all major browsers.  An extensive PDF
+ documentation manual is provided.  It contains the package change log, and
+ how to integrate Jarvis with your web-based client software.  A complete
+ client/server demo is also included.

@@ -1,0 +1,7 @@
+cgi-bin usr/share/jarvis5
+demo usr/share/jarvis5
+docs/jarvis_guide.pdf usr/share/doc/jarvis5
+#etc/README.txt etc/jarvis5
+etc/apache etc/jarvis5
+htdocs usr/share/jarvis5
+lib usr/share/jarvis5
