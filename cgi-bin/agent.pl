@@ -28,15 +28,15 @@ use warnings;
 use Carp;
 $Carp::CarpLevel = 1;
 
-# If "/usr/share/jarvis" is not your root jarvis directory, then either change
+# If "/usr/share/jarvis5" is not your root jarvis directory, then either change
 # this script by hand, or preferably set the environment variable in your
 # webserver config.  E.g. in apache, add the following line (without the
 # leading hash).
 #
-# SetEnv JARVIS_ROOT "/path/to/jarvis"
+# SetEnv JARVIS_5_ROOT "/path/to/jarvis"
 #
 my $jarvis_root;
-BEGIN { $jarvis_root = $ENV{'JARVIS_ROOT'} || "/usr/share/jarvis" }
+BEGIN { $jarvis_root = $ENV{'JARVIS_5_ROOT'} || "/usr/share/jarvis5" }
 
 use lib "$jarvis_root/lib";
 

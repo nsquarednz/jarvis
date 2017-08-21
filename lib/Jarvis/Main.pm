@@ -166,23 +166,23 @@ sub do {
     $cgi = ($options && $options->{cgi}) || new CGI;
 
     # Environment variables.
-    my $jarvis_root = $ENV {'JARVIS_ROOT'};
+    my $jarvis_root = $ENV {'JARVIS_5_ROOT'};
     foreach my $inc (@INC) {
         last if $jarvis_root;
         if (-f "$inc/Jarvis/Main.pm") {
             $jarvis_root = dirname ($inc);
         }
     }
-    $jarvis_root || die "Cannot determine JARVIS_ROOT.";
+    $jarvis_root || die "Cannot determine JARVIS_5_ROOT.";
 
-    my $jarvis_etc = $ENV {'JARVIS_ETC'};
+    my $jarvis_etc = $ENV {'JARVIS_5_ETC'};
     foreach my $etc (@etc) {
         last if $jarvis_etc;
         if (-d $etc) {
             $jarvis_etc = $etc;
         }
     }
-    $jarvis_etc || die "Cannot determine JARVIS_ETC.";    
+    $jarvis_etc || die "Cannot determine JARVIS_5_ETC.";    
 
     ###############################################################################
     # Determine app name (and possibly data-set).
