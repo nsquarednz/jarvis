@@ -40,11 +40,6 @@ rm -f jarvis5_*.dsc
 rm -f jarvis5_*.build
 rm -f jarvis5_*.changes
 
-sed -i 's/JARVIS_ROOT/JARVIS_5_ROOT/g' "../../lib/Jarvis/Main.pm"
-sed -i 's/JARVIS_ETC/JARVIS_5_ETC/g' "../../lib/Jarvis/Main.pm"
-sed -i 's/JARVIS_ROOT/JARVIS_5_ROOT/g' "../../cgi-bin/agent.pl"
-sed -i 's/\/usr\/share\/jarvis/\/usr\/share\/jarvis5/g' "../../cgi-bin/agent.pl"
-
 # BUILD THE SOURCE TARBALL.
 tar zcf $TAR_ORIG "../../../$BASEDIR" \
     --exclude="$BASEDIR/pkg" \
