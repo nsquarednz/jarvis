@@ -40,6 +40,7 @@ use DBI;
 use XML::Smart;
 
 use Jarvis::Error;
+use Data::Dumper;
 
 %Jarvis::Config::yes_value = ('yes' => 1, 'true' => 1, 'on' => 1, '1' => 1);
 
@@ -97,6 +98,36 @@ sub new {
     ($xml->{jarvis}) || die "Missing <jarvis> tag in '$xml_filename'!\n";
 
     $self->{'xml'} = $xml;
+
+    ###############################################################################
+    # Get any included files that will contain extra config
+    # These files are parsed into the same XML object
+    # Example icluded file
+    #<?xml version="1.0" encoding="utf-8"?>
+    # <jarvis>
+    #     <app>
+    #         <routes>
+    #             <route path="/api/office" dataset="Franchise"/>
+    #         </routes>
+    #
+    #         <plugin dataset="TEST" access="*" module="Boris::TEST" add_headers="yes"/>
+    #     </app>
+    #</jarvis>
+    ###############################################################################
+    #
+    #Loop through all the include directives read the files and merge them at the top
+    #level back into the app xml so the rest of the config processing will include items
+    #from these files.
+    foreach my $include ($xml->{jarvis}{include}('@') ) {
+        my $filename = $include->{'file'}->content || die "Bad include filename!: $!.";
+        my $subXml = XML::Smart->new ($filename) || die "Cannot read '$filename': $!.";
+
+        #note we only merge in at the level of nodes directly below app.
+        foreach my $nodeName ($subXml->{jarvis}{app}->nodes_keys()){
+            $xml->{jarvis}{app}{$nodeName} = $subXml->{jarvis}{app}{$nodeName}->tree_pointer();
+        }
+    }
+
 
     ###############################################################################
     # Get the application config.  Note that we must NOT store this in our args
