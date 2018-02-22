@@ -61,6 +61,7 @@ use Data::Dumper;
 #               xml                Handle to an XML::Smart object of app config.
 #               cgi                Handle to a CGI object for this request.
 #               format             Format xml or json?
+#               retain_null        Retain nulls when outputting JSON?
 #               debug              Debug enabled for this app?
 #               dump               Dump (Detailed Debug) enabled for this app?
 #               log_format         Format for log and debug output.
@@ -154,6 +155,9 @@ sub new {
 
     # This is used by several things, so let's store it in our config.
     $self->{'format'} = lc ($self->{'cgi'}->param ('format') || $axml->{'format'}->content || "json");
+
+    # This is used to toggle on and off the ability to return nulls, default is off.
+    $self->{'retain_null'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'retain_null'}->content || "no")});
 
     # This is an optional METHOD overide parameter, similar to Ruby on Rails.
     # It bypasses a problem where non-proxied Flex can only send GET/POST requests.

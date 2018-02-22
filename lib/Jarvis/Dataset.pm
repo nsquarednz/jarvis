@@ -794,19 +794,26 @@ sub fetch_rows {
         }
     }
 
-    # Delete null (undef) values, otherwise JSON/XML will represent them as ''.
-    #
-    # Note that this must happen AFTER the transform step, for two reasons:
-    # (a) any preceding "notnull" transform (if specified for "fetch" on
-    #     this dataset) will have turned NULLs into "" by this stage, meaning that
-    #     we won't be deleting them here.
-    #
-    # (b) any preceding "null" transform will have set whitespace values to
-    #     undef, meaning that we will now delete them here.
-    #
-    foreach my $row (@$rows_aref) {
-        foreach my $key (keys %$row) {
-            (defined $$row{$key}) || delete $$row{$key};
+    
+    # 
+    # If the retain null flag has been set then we do not want to remove undef values from the return array.
+    # This will allow us to have null values in our JSON object.
+    # 
+    if (!$jconfig->{'retain_null'}) {
+        # Delete null (undef) values, otherwise JSON/XML will represent them as ''.
+        #
+        # Note that this must happen AFTER the transform step, for two reasons:
+        # (a) any preceding "notnull" transform (if specified for "fetch" on
+        #     this dataset) will have turned NULLs into "" by this stage, meaning that
+        #     we won't be deleting them here.
+        #
+        # (b) any preceding "null" transform will have set whitespace values to
+        #     undef, meaning that we will now delete them here.
+        #
+        foreach my $row (@$rows_aref) {
+            foreach my $key (keys %$row) {
+                (defined $$row{$key}) || delete $$row{$key};
+            }
         }
     }
 
