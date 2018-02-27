@@ -134,7 +134,7 @@ sub word2html {
     $text =~ s|\&\#8217\;|'|og;
 
     # We've done our best.  Brute force the rest.
-    sub hexchar { return "&" . (sprintf "%02x", ord (shift)) . ";" }
+    sub hexchar { return "&#x" . (sprintf "%02x", ord (shift)) . ";" }
     $text =~ s/([^\w\d\s!"#\$\%&'\(\)\*\+,\-\.\/:;<=>\?\@\[\\\]\^\`\{\|}~��������������������������������������������������������������������������������������������������������������������������])/hexchar($1)/esg;
 
     return $text;
