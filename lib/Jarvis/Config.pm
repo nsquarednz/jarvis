@@ -114,6 +114,14 @@ sub new {
     #         <plugin dataset="TEST" access="*" module="Boris::TEST" add_headers="yes"/>
     #     </app>
     #</jarvis>
+    #
+    # Example include in the jarvis config xml
+    #   <?xml version="1.0" encoding="utf-8"?>
+    #       <jarvis>
+    #
+    #           <include file="/home/dwalmsley/dev/porse/boris-angular.hg/etc/routes.xml"/>
+    #           ....
+    #
     ###############################################################################
     #
     #Loop through all the include directives read the files and merge them at the top
