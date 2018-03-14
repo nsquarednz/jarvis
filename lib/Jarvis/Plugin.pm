@@ -178,7 +178,7 @@ sub do {
             my $mime_types = MIME::Types->new;
             my $filename_type = $mime_types->mimeTypeOf ($filename);
             $mime_type = $filename_type ? $filename_type->type : 'text/plain';
-        } else {
+        } elsif( ! $mime_type) {
             $mime_type = 'text/plain';
         }
         &Jarvis::Error::debug ($jconfig, "Plugin returning mime type '$mime_type'");
