@@ -102,6 +102,27 @@ use XML::Smart;
 }
 
 ###############################################################################
+# Generate a random UUID. Avoid any reliance on 3rd party UUID generator
+# perl modules due to the difficulty in yum/apt installation procedures on
+# most target systems.
+#
+# This approach here is a UUID generated based on random numbers - and is based
+# off of Perl's UUID::Tiny module.
+###############################################################################
+#
+sub generate_uuid {
+    my $uuid = '';
+    for (1 .. 4) {
+        my $top = int(rand(65536)) % 65536;
+        my $bottom = int(rand(65536)) % 65536;
+        $uuid .= pack 'I', (($top << 16) | $bottom);
+    }
+    substr $uuid, 6, 1, chr(ord(substr($uuid, 6, 1)) & 0x0f);
+    substr $uuid, 8, 1, chr(ord(substr $uuid, 8, 1) & 0x3f | 0x80);
+    return join '-', map { unpack 'H*', $_ } map { substr $uuid, 0, $_, '' } ( 4, 2, 2, 2, 6 );
+}
+
+###############################################################################
 # Setup error handler.
 ###############################################################################
 #
@@ -156,10 +177,14 @@ sub error_handler {
     $jconfig->{status} = $jconfig->{status} || "500 Internal Server Error"; 
     my $status = $jconfig->{status};
     print $cgi->header(-status => $status, -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt");
-    print $msg;
+    if ($status =~ /^500/) {
+        print &Jarvis::Error::print_message ($jconfig, $jconfig->{error_response_format} || "[%T][%R] %M", 'fatal', $msg);
+    } else {
+        print $msg;
+    }
 
     # Print to error log.  Include stack trace if debug is enabled.
-    my $long_msg = &Jarvis::Error::print_message ($jconfig, 'fatal', $msg);
+    my $long_msg = &Jarvis::Error::print_log_message ($jconfig, 'fatal', $msg);
 
     # Print URI to log if not done already.
     if (! $jconfig->{debug}) {
@@ -304,6 +329,10 @@ sub do {
     # Determine client's IP.
     $jconfig->{client_ip} = $ENV{"HTTP_X_FORWARDED_FOR"} || $ENV{"HTTP_CLIENT_IP"} || $ENV{"REMOTE_ADDR"} || '';
 
+    # Determine a unique request ID for this request. Useful for tracing and auditing.
+    # This will later get expanded to incorporate the session ID, if we have one.
+    $jconfig->{request_id} = generate_uuid();
+
     # Debug can now occur, since we have called Config!
     &Jarvis::Error::debug ($jconfig, "URI = $ENV{REQUEST_URI}");
     &Jarvis::Error::debug ($jconfig, "Base Path = '$path'.");
@@ -393,9 +422,11 @@ sub do {
     # Login as required.
     &Jarvis::Login::check ($jconfig);
 
+    # Now we have some login data - lets expand our request UUID to be a unique session/request UUID
     &Jarvis::Error::debug ($jconfig, "User Name = '" . $jconfig->{username} . "'");
     &Jarvis::Error::debug ($jconfig, "Group List = '" . $jconfig->{group_list} . "'");
     &Jarvis::Error::debug ($jconfig, "Logged In = " . $jconfig->{logged_in});
+    &Jarvis::Error::debug ($jconfig, "Request ID = '" . $jconfig->{request_id} . "'.");
     &Jarvis::Error::debug ($jconfig, "Error String = '" . $jconfig->{error_string} . "'");
     &Jarvis::Error::debug ($jconfig, "Method = '" . $method . "'");
     &Jarvis::Error::debug ($jconfig, "Action = '" . $action . "'");

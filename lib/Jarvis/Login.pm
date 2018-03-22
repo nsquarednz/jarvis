@@ -145,12 +145,12 @@ sub check {
         if ($sid_store =~ /driver:file/ && $sid_params{'Directory'}) {
             if (-e $sid_params{'Directory'}) {
                 if (! -w $sid_params{'Directory'}) {
-                    die "Webserver user cannot write to CGI::Session directory '$sid_params{'Directory'}'.";
+                    die "Webserver user cannot write to CGI::Session directory '$sid_params{'Directory'}'.\n";
                 }
 
             } else {
                 if (! mkdir $sid_params{'Directory'}) {
-                    die "Webserver user cannot create CGI::Session directory '$sid_params{'Directory'}'.";
+                    die "Webserver user cannot create CGI::Session directory '$sid_params{'Directory'}'.\n";
                 }
             }
         }
@@ -318,7 +318,7 @@ sub check {
         # for next time (if we have a session, which we usually do).
         #
         foreach my $name (keys %$additional_safe) {
-            ($name =~ m/^__/) || die "Invalid additional safe parameter name '$name' returned by login module.";
+            ($name =~ m/^__/) || die "Invalid additional safe parameter name '$name' returned by login module.\n";
             my $value = $additional_safe->{$name};
             &Jarvis::Error::debug ($jconfig, "Login module and/or plugin returned additional safe param '$name'.");
 

@@ -63,6 +63,8 @@ use Jarvis::Error;
 #               debug              Debug enabled for this app?
 #               dump               Dump (Detailed Debug) enabled for this app?
 #               log_format         Format for log and debug output.
+#               error_response_format         
+#                                  The format of error messages sent to the client
 ################################################################################
 #
 sub new {
@@ -93,7 +95,7 @@ sub new {
     #
     # Process the global XML config file.
     my $xml_filename = $self->{'etc_dir'} . "/" . $self->{'app_name'} . ".xml";
-    my $xml = XML::Smart->new ("$xml_filename") || die "Cannot read '$xml_filename': $!.";
+    my $xml = XML::Smart->new ("$xml_filename") || die "Cannot read '$xml_filename': $!.\n";
     ($xml->{jarvis}) || die "Missing <jarvis> tag in '$xml_filename'!\n";
 
     $self->{'xml'} = $xml;
@@ -119,7 +121,10 @@ sub new {
     binmode STDERR, ":utf8";
 
     # This is used by both debug and log output.
-    $self->{'log_format'} = $axml->{'log_format'}->content || '[%P/%A/%U/%D] %M';
+    $self->{'log_format'} = $axml->{'log_format'}->content || '[%P/%A/%U/%D][%R] %M';
+
+    # This is what format we use when sending death messages back to the client
+    $self->{'error_response_format'} = $axml->{'error_response_format'}->content || '[%T][%R] %M';
 
     # This is used by several things, so let's store it in our config.
     $self->{'format'} = lc ($self->{'cgi'}->param ('format') || $axml->{'format'}->content || "json");
@@ -144,7 +149,7 @@ sub new {
     # Basic security check here.
     $self->{'require_https'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'require_https'}->content || "no")});
     if ($self->{'require_https'} && ! $self->{'cgi'}->https()) {
-        die "Client must access over HTTPS for this application.";
+        die "Client must access over HTTPS for this application.\n";
     }
 
     ###############################################################################

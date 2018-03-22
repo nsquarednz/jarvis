@@ -86,8 +86,8 @@ sub do {
 
             &Jarvis::Error::debug ($jconfig, "Found matching custom <exec> dataset '$dataset'.");
 
-            $allowed_groups = $exec->{access}->content || die "No 'access' defined for exec dataset '$dataset'";
-            $command = $exec->{command}->content || die "No 'command' defined for exec dataset '$dataset'";
+            $allowed_groups = $exec->{access}->content || die "No 'access' defined for exec dataset '$dataset'\n";
+            $command = $exec->{command}->content || die "No 'command' defined for exec dataset '$dataset'\n";
             $add_headers = defined ($Jarvis::Config::yes_value {lc ($exec->{add_headers}->content || "no")});
             $default_filename = $exec->{default_filename}->content;
             $filename_parameter = $exec->{filename_parameter}->content || 'filename';
@@ -116,7 +116,7 @@ sub do {
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
     if ($failure ne '') {
         $jconfig->{status} = "401 Unauthorized";
-        die "Wanted exec access: $failure";
+        die "Wanted exec access: $failure\n";
     }
 
     # Figure out a filename.  It's not mandatory, if we don't have a default
@@ -142,10 +142,10 @@ sub do {
     if ($use_tmpfile) {
         if ($tmp_directory) {
             if (-d $tmp_directory) {
-                -w $tmp_directory || die "Cannot write to Exec temporary directory '$tmp_directory'.";
+                -w $tmp_directory || die "Cannot write to Exec temporary directory '$tmp_directory'.\n";
 
             } else {
-                (mkdir $tmp_directory) || die "Cannot create Exec temporary directory '$tmp_directory'.";
+                (mkdir $tmp_directory) || die "Cannot create Exec temporary directory '$tmp_directory'.\n";
             }
         }
 
@@ -212,7 +212,7 @@ sub do {
 
         # Not safe to continue.
         } else {
-            die "Do not know how to escape Exec arguments for '$^O'.";
+            die "Do not know how to escape Exec arguments for '$^O'.\n";
         }
     }
 
@@ -229,7 +229,7 @@ sub do {
     if ($status != 0) {
         # log command in case we haven't done so already
         &Jarvis::Error::log ($jconfig, "Executed Command: $command") unless ($jconfig->{debug});
-        die "Command failed with status $status.\n$output";
+        die "Command failed with status $status.\n$output\n";
     }
 
     # Are we supposed to add headers?  Does that include a filename header?
@@ -285,7 +285,7 @@ sub do {
     #
     if ($use_tmpfile && ! $tmp_redirect) {
         &Jarvis::Error::debug ($jconfig, "Streaming temporary file content back to client.");
-        open(F, $tmp_file->filename) || die "Unable to open '" . $tmp_file->filename . "' to return output to the client.";
+        open(F, $tmp_file->filename) || die "Unable to open '" . $tmp_file->filename . "' to return output to the client.\n";
         binmode(F);
         my $buff;
         while (read(F, $buff, 8 * 2**10)) {
@@ -301,7 +301,7 @@ sub do {
     # cleans up old temporary files.
     #
     } elsif ($tmp_redirect) {
-        (-f $tmp_file->filename) || die "Report output failed, no file created.";
+        (-f $tmp_file->filename) || die "Report output failed, no file created.\n";
 
         my $url = "http://" . $ENV{"HTTP_HOST"} . "/" . $tmp_http_path . (($tmp_http_path =~ m|\/$|) ? "" : "/") . &File::Basename::basename ($tmp_file->filename);
         &Jarvis::Error::debug ($jconfig, "Redirect to: $url");

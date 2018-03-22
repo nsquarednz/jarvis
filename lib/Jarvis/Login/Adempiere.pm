@@ -169,7 +169,7 @@ sub Jarvis::Login::Adempiere::check {
         return ("Client '$client_name' not unique (" . (scalar @$result_aref). ").");         # Should never happen.
     }
     my $result_href = $$result_aref[0];
-    my $ad_client_id = $$result_href{'ad_client_id'} || die "Client '$client_name' has no ad_client_id.";
+    my $ad_client_id = $$result_href{'ad_client_id'} || die "Client '$client_name' has no ad_client_id.\n";
     &Jarvis::Error::debug ($jconfig, "Client ID = '$ad_client_id'.");
 
 
@@ -182,7 +182,7 @@ sub Jarvis::Login::Adempiere::check {
         return ("Org '$org_name' not unique (" . (scalar @$result_aref). ").");         # Should never happen.
     }
     $result_href = $$result_aref[0];
-    my $ad_org_id = $$result_href{'ad_org_id'} || die "Org '$org_name' has no ad_org_id.";
+    my $ad_org_id = $$result_href{'ad_org_id'} || die "Org '$org_name' has no ad_org_id.\n";
     &Jarvis::Error::debug ($jconfig, "Org ID = '$ad_org_id'.");
 
 
@@ -202,7 +202,7 @@ sub Jarvis::Login::Adempiere::check {
     if ($stored_password eq '') {
         return ("Account has no password.");
     }
-    $ad_user_id || die "No ad_user_id for user '$username'!";
+    $ad_user_id || die "No ad_user_id for user '$username'!\n";
 
     # Check the password.  Adempiere uses plain text.  No, seriously.
     if ($stored_password ne $password) {
@@ -317,7 +317,7 @@ RETURNING
         { Slice => {} },
         $ad_client_id, $ad_org_id, $ad_user_id, $ad_user_id, $remote_addr, $remote_host);
 
-    my $ad_session_id = $$result_aref[0]->{ad_session_id} || die "Cannot determine ad_session_id";
+    my $ad_session_id = $$result_aref[0]->{ad_session_id} || die "Cannot determine ad_session_id\n";
 
     &Jarvis::Error::debug ($jconfig, "Session ID = '$ad_session_id'.");
 
