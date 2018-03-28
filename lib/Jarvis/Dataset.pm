@@ -838,8 +838,12 @@ sub fetch_rows {
             # for single row requests, it could get real inefficient real fast.
             foreach my $row (@$rows_aref) {
 
-                # We copy across only the child args.
                 my %child_args = ();
+                # Copy user arguments across to the child arguments.
+                foreach my $user_arg (keys %{$user_args}) {
+                    $child_args{$user_arg} = $user_args->{$user_arg};
+                }
+                # We copy across only the child args.
                 foreach my $parent (keys %links) {
                     my $child = $links{$parent};
                     $child_args{$child} = $row->{$parent};
@@ -1252,8 +1256,12 @@ sub store_rows {
                 }
                 ((ref $child_rows_aref) eq 'ARRAY') || die "Parent dataset has child dataset field '$child_field' but it is not ARRAY.\n";
 
-                # Parent/Child links will be passed through from SUPPLIED and RETURNING parameters too.
                 my %child_args = ();
+                # Copy user arguments across to the child arguments.
+                foreach my $user_arg (keys %{$user_args}) {
+                    $child_args{$user_arg} = $user_args->{$user_arg};
+                }
+                # Parent/Child links will be passed through from SUPPLIED and RETURNING parameters too.
                 foreach my $parent (keys %links) {
                     my $child = $links{$parent};
 
