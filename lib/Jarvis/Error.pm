@@ -95,7 +95,7 @@ sub printable {
 #           '%A' -> Application
 #           '%P' -> Pid
 #           '%M' -> Message
-#           '%S' -> Request ID
+#           '%S' -> Session ID
 #           '%R' -> Request ID
 #
 #       Default dbmask is in Config.pm.
