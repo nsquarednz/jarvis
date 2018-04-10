@@ -191,7 +191,9 @@ sub error_handler {
         $long_msg = $long_msg . "        URI = $ENV{REQUEST_URI}";
     }
 
-    print STDERR ($jconfig->{debug} ? Carp::longmess $long_msg : Carp::shortmess $long_msg);
+    if ($status =~ /^500/) {
+        print STDERR ($jconfig->{debug} ? Carp::longmess $long_msg : Carp::shortmess $long_msg);
+    }
 
     # We MUST ensure that ALL the cached database handles are removed.
     # Otherwise, under mod_perl, the next application would get OUR database handles!
