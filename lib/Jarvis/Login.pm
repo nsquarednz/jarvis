@@ -37,6 +37,7 @@ package Jarvis::Login;
 
 use Jarvis::Error;
 use Jarvis::Text;
+use Jarvis::Main qw(generate_uuid);
 
 ################################################################################
 # Checks to see if we are logged in.  If permitted, we will create a new
@@ -128,6 +129,11 @@ sub check {
         my $err_handler = $SIG{__DIE__};
         $SIG{__DIE__} = sub {};
         my $session = new CGI::Session ($sid_store, $sid, \%sid_params);
+        # If we have CSRF Protection enabled and we are not logged in update the CSRF Token.
+        if ($jconfig->{csrf_protection} && !$session->param ('logged_in')) {
+            my $unique_token = Jarvis::Main::generate_uuid ();
+            $session->param ('csrf_token', $unique_token);
+        }
         $SIG{__DIE__} = $err_handler;
         if (! $session) {
             die "Error in creating CGI::Session: " . ($! || "Unknown Reason");
@@ -369,6 +375,18 @@ sub check {
                     ))
                 }
             }
+
+            # If we have CSRF Protection enabled our session will store a CSRF token. We need to send it to our client
+            # so that they can include it in the headers for subsequent requests.
+            if ($jconfig->{csrf_protection}) {
+                    # Add Cross Site Request Forgery token cookie.
+                    push(@$cookies, CGI::Cookie->new(
+                        -name => $jconfig->{csrf_cookie},
+                        -value => $jconfig->{session}->param ('csrf_token'),
+                        -Path => '/',
+                        -domain => $ENV{HTTP_HOST}
+                    ));
+            }
         }
    }
 
@@ -463,7 +481,7 @@ sub alter_session {
 
     my $err_handler = $SIG{__DIE__};
     $SIG{__DIE__} = sub {};
-    my $session = new CGI::Session ($sid_store, $sid, \%sid_params);
+    my $session = new CGI::Session ($sid_store, $sid, \%sid_params);    
     $SIG{__DIE__} = $err_handler;
     if (! $session) {
         die "Error in creating CGI::Session: " . ($! || "Unknown Reason");

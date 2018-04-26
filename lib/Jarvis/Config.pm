@@ -133,6 +133,14 @@ sub new {
     # It bypasses a problem where non-proxied Flex can only send GET/POST requests.
     $self->{'method_param'} = $self->{'cgi'}->param ('method_param') || "_method";
 
+    # Load settings for CSRF protection. Enabled flag, cookie name and header name.
+    $self->{'csrf_protection'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'csrf_protection'}->content || "no")});
+    $self->{'csrf_cookie'} = uc ($axml->{'csrf_cookie'}->content || "XSRF-TOKEN");
+    $self->{'csrf_header'} = uc ($axml->{'csrf_header'}->content || "X-XSRF-TOKEN");
+
+    # Check if XSRF protection is enabled. All JSON requests will be prefixed with ")]}',\n"
+    $self->{'xsrf_protection'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'xsrf_protection'}->content || "no")});
+
     # Pull out the list of default (Perl) library paths to use for perl plugins scripts
     # from the configuration, and store in an array in the config item.
     $self->{'default_libs'} = [];

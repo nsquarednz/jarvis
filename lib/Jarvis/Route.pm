@@ -71,13 +71,14 @@ sub find {
                 my $path = $route->{path}->content;
                 my $presentation = $route->{presentation} ? $route->{presentation}->content : "array";
                 ($presentation eq 'array') || ($presentation eq 'singleton') || die "Unsupported presentation '$presentation' in route.\n";
+                my $access = $route->{access} ? $route->{access}->content : "";
 
                 # Remove leading slash to expose the first path part.
                 ($path =~ m|^/|) || die "Route path does not begin with leading '/'.\n";
                 $path =~ s|^/||;
                 my (@parts) = map { s/^\s+//; s/\s+$//; $_; } split ( m|/|, $path, -1);
 
-                push (@routes, { dataset => $dataset, path => $path, parts => \@parts, presentation => $presentation });
+                push (@routes, { dataset => $dataset, path => $path, parts => \@parts, presentation => $presentation, access => $access});
             }
         }
         &Jarvis::Error::debug ($jconfig, "Loaded %d route(s).", scalar @routes);
@@ -143,7 +144,7 @@ sub find {
         if ($match) {
             my $dataset_name = $route->{dataset};
             &Jarvis::Error::debug ($jconfig, "Completed route match '%s' -> dataset '%s'.", $route->{path}, $dataset_name);
-            return ($dataset_name, \%rest_args, $route->{presentation});
+            return ($dataset_name, \%rest_args, $route->{presentation}, $route->{access});
         }
     }
 
@@ -151,7 +152,7 @@ sub find {
     my $dataset_name = $$path_parts[0];
     &Jarvis::Error::debug ($jconfig, "No route match.  Using arg0 as dataset_name '%s'.", $dataset_name);
 
-    return ($dataset_name, \%numbered_rest_args, "array");
+    return ($dataset_name, \%numbered_rest_args, "array", "");
 }
 
 1;
