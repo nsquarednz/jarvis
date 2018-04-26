@@ -229,8 +229,30 @@ sub do {
     # Optional mod-perl stream output variable
     my $mod_perl_io = $options && $options->{mod_perl_io};
     
+    # If we have a CGI parameters configuration file require it now to
+    # set any defined CGI parameters.
+    if (-f '/etc/jarvis/cgi_params.pm') {
+        require '/etc/jarvis/cgi_params.pm';
+    }
+
     # CGI object for all sorts of things.
     $cgi = ($options && $options->{cgi}) || new CGI;
+
+    # Check that the CGI does not exceed any globally configured parameters.
+    if (defined $cgi->cgi_error()) {
+        $jconfig->{status} = $cgi->cgi_error();
+        die  "\n";
+    }
+
+    # Perl CGI does not explicitly catch when file downloads are disabled. This causes
+    # Jarvis to die when the CGI object is not fully initialized. We need to catch this
+    # explicit case before we continue with any processing.
+    if ($CGI::DISABLE_UPLOADS) {
+        if (grep $cgi->param(), 'some_file') {
+            $jconfig->{status} = "400 Bad Request";
+            die "\n";
+        }
+    }
 
     # Environment variables.
     my $jarvis_root = $ENV {JARVIS_ROOT};
