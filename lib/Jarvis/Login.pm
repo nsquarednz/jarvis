@@ -144,6 +144,16 @@ sub check {
         $jconfig->{'sid'} = $session->id();
         $jconfig->{'sid_param'} = $sid_cookie_name;
 
+        # If the user has specified a Domain or a Path store those values on the Jconfig object.
+        # Default the path to /jarvis-agent/
+        $jconfig->{'session_path'} = (defined $sid_params{'Path'} ? $sid_params{'Path'} : '/jarvis-agent/');
+
+        # Default the domain to the HTTP_HOST domain this is our best guess. Proxied hosts will require an explicit domain definition.
+        $jconfig->{'session_domain'} = (defined $sid_params{'Domain'} ? $sid_params{'Domain'} : $ENV{HTTP_HOST});
+
+        # Check if the session cookie transmission should only be completed over HTTPS channels.
+        $jconfig->{'session_secure'} = (defined $sid_params{'Secure'} ? defined ($Jarvis::Config::yes_value {lc ($sid_params{'Secure'} || "no")}) : 0);
+
         # CGI::Session does not appear to warn us if the CGI session is file based,
         # and the directory being written to is not writable. Put a check in here to
         # check for a writable session directory (otherwise you end up constantly
@@ -348,44 +358,57 @@ sub check {
         $session->expire ($session_expiry);
         $session->flush ();
 
-        # Store the new cookie in the context, whoever returns the result should return this.
-        #
-        # We only send the cookie back to the user if the source of our sid was a cookie.
-        # This ensures that we don't trample a pre-existing cookie if the sid came from
-        # a URL.
-        #
-        # This in turn allows us to have both a cookie based session alongside one or more
-        # url based sessions. We get the best of both worlds.
-        #
-        if (!$jconfig->{'sid_source'} || $jconfig->{'sid_source'} eq 'cookie') {
-            my $cookies = [ CGI::Cookie->new (
-                -name => $jconfig->{'sname'},
-                -value => $jconfig->{'sid'},
-                -expires => $session_expiry) ];
+        # If we arent logged in dont send the user a session.
+        if ($jconfig->{logged_in}) {
 
-            $jconfig->{'cookie'} = $cookies;
+            # Store the new cookie in the context, whoever returns the result should return this.
+            #
+            # We only send the cookie back to the user if the source of our sid was a cookie.
+            # This ensures that we don't trample a pre-existing cookie if the sid came from
+            # a URL.
+            #
+            # This in turn allows us to have both a cookie based session alongside one or more
+            # url based sessions. We get the best of both worlds.
+            #
+            if (!$jconfig->{'sid_source'} || $jconfig->{'sid_source'} eq 'cookie') {
+                my $cookies = [ CGI::Cookie->new (
+                    -name => $jconfig->{'sname'},
+                    -value => $jconfig->{'sid'},
+                    -HttpOnly => 1,
+                    -Path => $jconfig->{'session_path'},
+                    -domain => $jconfig->{'session_domain'},
+                    -secure => $jconfig->{'session_secure'}
+                )];
 
-            # If there were additional cookies specified by a Login Module then add those as well.
-            if (defined $additional_cookies && ref($additional_cookies) eq 'HASH') {
-                foreach my $key (keys %{$additional_cookies}) {
-                    push(@$cookies, CGI::Cookie->new(
-                        -name => $key,
-                        -value => $additional_cookies->{$key},
-                        -expires => $session_expiry
-                    ))
+                $jconfig->{'cookie'} = $cookies;
+
+                # If there were additional cookies specified by a Login Module then add those as well.
+                if (defined $additional_cookies && ref($additional_cookies) eq 'HASH') {
+                    foreach my $key (keys %{$additional_cookies}) {
+                        push(@$cookies, CGI::Cookie->new(
+                            -name => $key,
+                            -value => $additional_cookies->{$key},
+                            -HttpOnly => 1,
+                            -Path => $jconfig->{'session_path'},
+                            -domain => $jconfig->{'session_domain'},
+                            -secure => $jconfig->{'session_secure'}
+                        ))
+                    }
                 }
-            }
 
-            # If we have CSRF Protection enabled our session will store a CSRF token. We need to send it to our client
-            # so that they can include it in the headers for subsequent requests.
-            if ($jconfig->{csrf_protection}) {
+                # If we have CSRF Protection enabled our session will store a CSRF token. We need to send it to our client
+                # so that they can include it in the headers for subsequent requests.
+                if ($jconfig->{csrf_protection}) {
                     # Add Cross Site Request Forgery token cookie.
+                    # Path must be '/' as we are not making a Jarvis request to validate cross site protection.
                     push(@$cookies, CGI::Cookie->new(
                         -name => $jconfig->{csrf_cookie},
                         -value => $jconfig->{session}->param ('csrf_token'),
                         -Path => '/',
-                        -domain => $ENV{HTTP_HOST}
+                        -domain => $jconfig->{'session_domain'},
+                        -secure => $jconfig->{'session_secure'}
                     ));
+                }
             }
         }
    }
