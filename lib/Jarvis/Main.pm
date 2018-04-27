@@ -256,8 +256,10 @@ sub do {
     
     # If we have a CGI parameters configuration file require it now to
     # set any defined CGI parameters.
-    if (-f '/etc/jarvis/cgi_params.pm') {
-        require '/etc/jarvis/cgi_params.pm';
+    foreach my $etc (@etc) {
+        if (-f "$etc/cgi_params.pm") {
+            require "$etc/cgi_params.pm";
+        }
     }
 
     # CGI object for all sorts of things.
@@ -484,7 +486,7 @@ sub do {
     if ($jconfig->{cross_origin_protection}) {
         # If the Origin header is present verify it matches the target origin.
         # Use the user specified session domain when comparing the referer or origin addresses. 
-        my $host = $jconfig->{session_domain};
+        my $host = $jconfig->{scookie_domain};
         if (defined ($ENV{HTTP_ORIGIN})) {
             my $raw_origin = ($ENV{HTTP_ORIGIN} =~ /^(?:.*:\/\/)?(.*?)(?:\/.*)?$/g)[0];
             if ($host ne $raw_origin) {
@@ -605,7 +607,7 @@ sub do {
 
         # If we have XSRF Protection enabled then we prefix all JSON responses with ")]}',\n" This prevents executable JSON being
         # being passed to JSON clients.
-        if ($jconfig->{xsrf_protection} && ($jconfig->{format} eq 'json' || $jconfig->{format} eq 'json.rest' || $jconfig->{format} eq 'json.array')) {
+        if ($jconfig->{xsrf_protection} && $jconfig->{format} =~ /^json/) {
             print ")]}',\n" . $return_text;    
         } else {
             print $return_text;

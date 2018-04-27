@@ -146,13 +146,13 @@ sub check {
 
         # If the user has specified a Domain or a Path store those values on the Jconfig object.
         # Default the path to /jarvis-agent/
-        $jconfig->{'session_path'} = (defined $sid_params{'Path'} ? $sid_params{'Path'} : '/jarvis-agent/');
+        $jconfig->{'scookie_path'} = (defined $sid_params{'Path'} ? $sid_params{'Path'} : '/jarvis-agent/');
 
         # Default the domain to the HTTP_HOST domain this is our best guess. Proxied hosts will require an explicit domain definition.
-        $jconfig->{'session_domain'} = (defined $sid_params{'Domain'} ? $sid_params{'Domain'} : $ENV{HTTP_HOST});
+        $jconfig->{'scookie_domain'} = (defined $sid_params{'Domain'} ? $sid_params{'Domain'} : $ENV{HTTP_HOST});
 
         # Check if the session cookie transmission should only be completed over HTTPS channels.
-        $jconfig->{'session_secure'} = (defined $sid_params{'Secure'} ? defined ($Jarvis::Config::yes_value {lc ($sid_params{'Secure'} || "no")}) : 0);
+        $jconfig->{'scookie_secure'} = (defined $sid_params{'Secure'} ? defined ($Jarvis::Config::yes_value {lc ($sid_params{'Secure'} || "no")}) : 0);
 
         # CGI::Session does not appear to warn us if the CGI session is file based,
         # and the directory being written to is not writable. Put a check in here to
@@ -375,9 +375,9 @@ sub check {
                     -name => $jconfig->{'sname'},
                     -value => $jconfig->{'sid'},
                     -HttpOnly => 1,
-                    -Path => $jconfig->{'session_path'},
-                    -domain => $jconfig->{'session_domain'},
-                    -secure => $jconfig->{'session_secure'}
+                    -Path => $jconfig->{'scookie_path'},
+                    -domain => $jconfig->{'scookie_domain'},
+                    -secure => $jconfig->{'scookie_secure'}
                 )];
 
                 $jconfig->{'cookie'} = $cookies;
@@ -389,9 +389,9 @@ sub check {
                             -name => $key,
                             -value => $additional_cookies->{$key},
                             -HttpOnly => 1,
-                            -Path => $jconfig->{'session_path'},
-                            -domain => $jconfig->{'session_domain'},
-                            -secure => $jconfig->{'session_secure'}
+                            -Path => $jconfig->{'scookie_path'},
+                            -domain => $jconfig->{'scookie_domain'},
+                            -secure => $jconfig->{'scookie_secure'}
                         ))
                     }
                 }
@@ -405,8 +405,8 @@ sub check {
                         -name => $jconfig->{csrf_cookie},
                         -value => $jconfig->{session}->param ('csrf_token'),
                         -Path => '/',
-                        -domain => $jconfig->{'session_domain'},
-                        -secure => $jconfig->{'session_secure'}
+                        -domain => $jconfig->{'scookie_domain'},
+                        -secure => $jconfig->{'scookie_secure'}
                     ));
                 }
             }
