@@ -684,6 +684,9 @@ sub fetch_rows {
     # Check the allowed groups.
     my $allowed_groups = $dsxml->{dataset}{"read"};
 
+    # Perform CSRF checks.
+    Jarvis::Main::check_csrf_protection ($jconfig, $allowed_groups);
+
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
     if ($failure ne '') {
         $jconfig->{status} = "401 Unauthorized";

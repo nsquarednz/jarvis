@@ -138,6 +138,9 @@ sub new {
     $self->{'csrf_cookie'} = uc ($axml->{'csrf_cookie'}->content || "XSRF-TOKEN");
     $self->{'csrf_header'} = uc ($axml->{'csrf_header'}->content || "X-XSRF-TOKEN");
 
+    # Check if cross origin protection is enabled. All incoming requests will have their referer or origin compared to the host configuration.
+    $self->{'cross_origin_protection'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'cross_origin_protection'}->content || "no")});
+
     # Check if XSRF protection is enabled. All JSON requests will be prefixed with ")]}',\n"
     $self->{'xsrf_protection'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'xsrf_protection'}->content || "no")});
 

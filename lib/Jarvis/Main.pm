@@ -213,6 +213,31 @@ sub jconfig {
 }
 
 ###############################################################################
+# Perform CSRF protection checks for any non global request.
+###############################################################################
+#
+sub check_csrf_protection {
+
+    my ($jconfig, $allowed_groups) = @_;
+
+    # If we have CSRF Protection enabled validate requests that do no have global '**' access.
+    if ($jconfig->{csrf_protection} && $allowed_groups ne '**') {
+        # Load the CSRF header from the request.
+        my $token  = $cgi->http($jconfig->{csrf_header});
+
+        # Load the stored session CSRF token.
+        my $session_token = $jconfig->{session}->param ('csrf_token');
+
+        # If the stored session token and the provided token do not match then do not continue the request.
+        if (!defined $token || !defined $session_token || $token ne $session_token) {
+            $jconfig->{status} = "401 Unauthorized";
+            die "Unauthorized Request.\n";
+        }
+    }
+}
+
+
+###############################################################################
 # Main "do" method.
 #
 # This method is called by either:
@@ -370,7 +395,7 @@ sub do {
     ###############################################################################
 
     # Now parse the rest of the args and apply our router.  This gives us dataset name too.
-    my ($dataset_name, $user_args, $presentation, $access_level) = &Jarvis::Route::find ($jconfig, \@path_parts);
+    my ($dataset_name, $user_args, $presentation) = &Jarvis::Route::find ($jconfig, \@path_parts);
 
     # Store this for debugging.
     $jconfig->{dataset_name} = $dataset_name;
@@ -456,9 +481,10 @@ sub do {
     &Jarvis::Error::debug ($jconfig, "Action = '" . $action . "'");
 
     # If we have CSRF Protection enabled check that the origin and target locations match for all requests.
-    if ($jconfig->{csrf_protection}) {
+    if ($jconfig->{cross_origin_protection}) {
         # If the Origin header is present verify it matches the target origin.
-        my $host = $ENV{HTTP_HOST};
+        # Use the user specified session domain when comparing the referer or origin addresses. 
+        my $host = $jconfig->{session_domain};
         if (defined ($ENV{HTTP_ORIGIN})) {
             my $raw_origin = ($ENV{HTTP_ORIGIN} =~ /^(?:.*:\/\/)?(.*?)(?:\/.*)?$/g)[0];
             if ($host ne $raw_origin) {
@@ -476,21 +502,6 @@ sub do {
             # If neither are specified then stop further execution as we cant be sure that we aren't protecting against CSRF.
             $jconfig->{status} = "400 Bad Request";
             die "Window Origin or Referer not Defined.\n";
-        }
-    }
-   
-    # If we have CSRF Protection enabled validate each non special restricted access requests.
-    if ($jconfig->{csrf_protection} && $dataset_name !~ m/^__/ && $access_level ne '**') {
-        # Load the CSRF header from the request.
-        my $token  = $cgi->http($jconfig->{csrf_header});
-
-        # Load the stored session CSRF token.
-        my $session_token = $jconfig->{session}->param ('csrf_token');
-
-        # If the stored session token and the provided token do not match then do not continue the request.
-        if (!defined $token || !defined $session_token || $token ne $session_token) {
-            $jconfig->{status} = "401 Unauthorized";
-            die "Unauthorized Request.\n";
         }
     }
 
