@@ -36,6 +36,7 @@ install:
 	tar xvf ${PACKAGE}.tar -C ${DESTDIR}/${ROOT}/
 	cp ${DESTDIR}/${ROOT}/etc/apache/jarvis.conf ${DESTDIR}/etc/httpd/conf.d/jarvis.conf
 	cp ${DESTDIR}/${ROOT}/etc/apache/startup.pl ${DESTDIR}/etc/jarvis/apache/startup.pl
+	cp ${DESTDIR}/${ROOT}/etc/jarvis/cgi_params.pm ${DESTDIR}/etc/jarvis/cgi_params.pl
 	touch ${DESTDIR}/etc/jarvis/jarvis-app-config-goes-here.txt
 
 

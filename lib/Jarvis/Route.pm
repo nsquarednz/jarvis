@@ -77,7 +77,7 @@ sub find {
                 $path =~ s|^/||;
                 my (@parts) = map { s/^\s+//; s/\s+$//; $_; } split ( m|/|, $path, -1);
 
-                push (@routes, { dataset => $dataset, path => $path, parts => \@parts, presentation => $presentation });
+                push (@routes, { dataset => $dataset, path => $path, parts => \@parts, presentation => $presentation});
             }
         }
         &Jarvis::Error::debug ($jconfig, "Loaded %d route(s).", scalar @routes);

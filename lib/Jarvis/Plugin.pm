@@ -128,6 +128,9 @@ sub do {
     # If no match, that's fine.  Just say we couldn't do it.
     $module || return 0;
 
+    # Perform CSRF checks.
+    Jarvis::Main::check_csrf_protection ($jconfig, $allowed_groups);
+
     # Check security.
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
     if ($failure ne '') {

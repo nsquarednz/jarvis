@@ -3,5 +3,6 @@ demo usr/share/jarvisNew
 docs/jarvis_guide.pdf usr/share/doc/jarvisNew
 #etc/README.txt etc/jarvisNew
 etc/apache etc/jarvisNew
+etc/jarvis/cgi_params.pm etc/jarvisNew
 htdocs usr/share/jarvisNew
 lib usr/share/jarvisNew

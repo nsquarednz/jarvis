@@ -213,6 +213,31 @@ sub jconfig {
 }
 
 ###############################################################################
+# Perform CSRF protection checks for any non global request.
+###############################################################################
+#
+sub check_csrf_protection {
+
+    my ($jconfig, $allowed_groups) = @_;
+
+    # If we have CSRF Protection enabled validate requests that do no have global '**' access.
+    if ($jconfig->{csrf_protection} && $allowed_groups ne '**') {
+        # Load the CSRF header from the request.
+        my $token  = $cgi->http($jconfig->{csrf_header});
+
+        # Load the stored session CSRF token.
+        my $session_token = $jconfig->{session}->param ('csrf_token');
+
+        # If the stored session token and the provided token do not match then do not continue the request.
+        if (!defined $token || !defined $session_token || $token ne $session_token) {
+            $jconfig->{status} = "401 Unauthorized";
+            die "Unauthorized Request.\n";
+        }
+    }
+}
+
+
+###############################################################################
 # Main "do" method.
 #
 # This method is called by either:
@@ -229,8 +254,32 @@ sub do {
     # Optional mod-perl stream output variable
     my $mod_perl_io = $options && $options->{mod_perl_io};
     
+    # If we have a CGI parameters configuration file require it now to
+    # set any defined CGI parameters.
+    foreach my $etc (@etc) {
+        if (-f "$etc/cgi_params.pm") {
+            require "$etc/cgi_params.pm";
+        }
+    }
+
     # CGI object for all sorts of things.
     $cgi = ($options && $options->{cgi}) || new CGI;
+
+    # Check that the CGI does not exceed any globally configured parameters.
+    if (defined $cgi->cgi_error()) {
+        $jconfig->{status} = $cgi->cgi_error();
+        die  "\n";
+    }
+
+    # Perl CGI does not explicitly catch when file downloads are disabled. This causes
+    # Jarvis to die when the CGI object is not fully initialized. We need to catch this
+    # explicit case before we continue with any processing.
+    if ($CGI::DISABLE_UPLOADS) {
+        if (grep $cgi->param(), 'some_file') {
+            $jconfig->{status} = "400 Bad Request";
+            die "\n";
+        }
+    }
 
     # Environment variables.
     my $jarvis_root = $ENV {JARVIS_ROOT};
@@ -433,6 +482,31 @@ sub do {
     &Jarvis::Error::debug ($jconfig, "Method = '" . $method . "'");
     &Jarvis::Error::debug ($jconfig, "Action = '" . $action . "'");
 
+    # If we have CSRF Protection enabled check that the origin and target locations match for all requests.
+    if ($jconfig->{cross_origin_protection}) {
+        # If the Origin header is present verify it matches the target origin.
+        # Use the user specified session domain when comparing the referer or origin addresses. 
+        my $host = $jconfig->{scookie_domain};
+        if (defined ($ENV{HTTP_ORIGIN})) {
+            my $raw_origin = ($ENV{HTTP_ORIGIN} =~ /^(?:.*:\/\/)?(.*?)(?:\/.*)?$/g)[0];
+            if ($host ne $raw_origin) {
+                $jconfig->{status} = "400 Bad Request";
+                die "Target origin does not match window's origin.\n";
+            }
+        } elsif (defined ($ENV{HTTP_REFERER})) {
+            # If the Origin header is not present verify that the HTTP Referrer matches the target origin.
+            my $raw_referer = ($ENV{HTTP_REFERER} =~ /^(?:.*:\/\/)?(.*?)(?:\/.*)?$/g)[0];
+            if ($host ne $raw_referer) {
+                $jconfig->{status} = "400 Bad Request";
+                die "Target origin does not match window's origin.\n";
+            }
+        } else {
+            # If neither are specified then stop further execution as we cant be sure that we aren't protecting against CSRF.
+            $jconfig->{status} = "400 Bad Request";
+            die "Window Origin or Referer not Defined.\n";
+        }
+    }
+
     # What kind of dataset?  Used by the tracker only.
     # 's' = sql, 'i' = internal, 'p' = plugin, 'e' = exec, undef for undetermined.
     $jconfig->{dataset_type} = undef;
@@ -522,7 +596,7 @@ sub do {
                 -cookie => $jconfig->{cookie},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             );
-            
+            ;
         } else {
             print $cgi->header(
                 -type => "text/plain; charset=UTF-8",
@@ -530,7 +604,14 @@ sub do {
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             );
         }
-        print $return_text;
+
+        # If we have XSRF Protection enabled then we prefix all JSON responses with ")]}',\n" This prevents executable JSON being
+        # being passed to JSON clients.
+        if ($jconfig->{xsrf_protection} && $jconfig->{format} =~ /^json/) {
+            print ")]}',\n" . $return_text;    
+        } else {
+            print $return_text;
+        }       
 
     # Modify a regular dataset.
     } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete") || ($action eq "mixed")) {
