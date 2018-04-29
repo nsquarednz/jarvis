@@ -378,7 +378,7 @@ sub check {
                     -Path => $jconfig->{'scookie_path'},
                     -domain => $jconfig->{'scookie_domain'},
                     -secure => $jconfig->{'scookie_secure'},
-                    -samesite => 'Strict'
+                    -samesite => 'Strict'   # Note - only supported on 4.29 of CGI::Cookie or later
                 )];
 
                 $jconfig->{'cookie'} = $cookies;
@@ -393,7 +393,7 @@ sub check {
                             -Path => $jconfig->{'scookie_path'},
                             -domain => $jconfig->{'scookie_domain'},
                             -secure => $jconfig->{'scookie_secure'},
-                            -samesite => 'Strict'
+                            -samesite => 'Strict'   # Note - only supported on 4.29 of CGI::Cookie or later
                         ))
                     }
                 }
@@ -403,13 +403,14 @@ sub check {
                 if ($jconfig->{csrf_protection}) {
                     # Add Cross Site Request Forgery token cookie.
                     # Path must be '/' as we are not making a Jarvis request to validate cross site protection.
+                    # Also not just "HttpOnly" as javascript needs access to this Cookie.
                     push(@$cookies, CGI::Cookie->new(
                         -name => $jconfig->{csrf_cookie},
                         -value => $jconfig->{session}->param ('csrf_token'),
-                        -Path => '/',
+                        -Path => '/',           # Note, left as / as many clients use differing URLs to access applications, and apps are from /
                         -domain => $jconfig->{'scookie_domain'},
                         -secure => $jconfig->{'scookie_secure'},
-                        -samesite => 'Strict'
+                        -samesite => 'Strict'   # Note - only supported on 4.29 of CGI::Cookie or later
                     ));
                 }
             }
