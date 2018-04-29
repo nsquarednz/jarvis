@@ -377,7 +377,8 @@ sub check {
                     -HttpOnly => 1,
                     -Path => $jconfig->{'scookie_path'},
                     -domain => $jconfig->{'scookie_domain'},
-                    -secure => $jconfig->{'scookie_secure'}
+                    -secure => $jconfig->{'scookie_secure'},
+                    -samesite => 'Strict'
                 )];
 
                 $jconfig->{'cookie'} = $cookies;
@@ -391,7 +392,8 @@ sub check {
                             -HttpOnly => 1,
                             -Path => $jconfig->{'scookie_path'},
                             -domain => $jconfig->{'scookie_domain'},
-                            -secure => $jconfig->{'scookie_secure'}
+                            -secure => $jconfig->{'scookie_secure'},
+                            -samesite => 'Strict'
                         ))
                     }
                 }
@@ -406,7 +408,8 @@ sub check {
                         -value => $jconfig->{session}->param ('csrf_token'),
                         -Path => '/',
                         -domain => $jconfig->{'scookie_domain'},
-                        -secure => $jconfig->{'scookie_secure'}
+                        -secure => $jconfig->{'scookie_secure'},
+                        -samesite => 'Strict'
                     ));
                 }
             }
