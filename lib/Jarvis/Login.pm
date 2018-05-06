@@ -146,7 +146,7 @@ sub check {
 
         # If the user has specified a Domain or a Path store those values on the Jconfig object.
         # Default the path to /jarvis-agent/
-        $jconfig->{'scookie_path'} = (defined $sid_params{'Path'} ? $sid_params{'Path'} : '/jarvis-agent/');
+        $jconfig->{'scookie_path'} = (defined $sid_params{'Path'} ? $sid_params{'Path'} : '/');
 
         # Default the domain to the HTTP_HOST domain this is our best guess. Proxied hosts will require an explicit domain definition.
         $jconfig->{'scookie_domain'} = (defined $sid_params{'Domain'} ? $sid_params{'Domain'} : $ENV{HTTP_HOST});
