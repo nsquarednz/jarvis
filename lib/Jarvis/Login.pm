@@ -372,16 +372,11 @@ sub check {
             #
             if (!$jconfig->{'sid_source'} || $jconfig->{'sid_source'} eq 'cookie') {
 
-                # Get the session cookie domain. In some non standard cases this can contain a port number which we 
-                # cannot include in the cookie domain so we need to strip this accodingly
-                my $session_cookie_domain = ($jconfig->{'scookie_domain'} =~ /^([^:^\/]*)(:\\d*)?(.*)?$/gm)[0];
-
                 my $cookies = [ CGI::Cookie->new (
                     -name => $jconfig->{'sname'},
                     -value => $jconfig->{'sid'},
                     -HttpOnly => 1,
                     -Path => $jconfig->{'scookie_path'},
-                    -domain => $session_cookie_domain,
                     -secure => $jconfig->{'scookie_secure'},
                     -samesite => 'Strict'   # Note - only supported on 4.29 of CGI::Cookie or later
                 )];
@@ -396,7 +391,6 @@ sub check {
                             -value => $additional_cookies->{$key},
                             -HttpOnly => 1,
                             -Path => $jconfig->{'scookie_path'},
-                            -domain => $session_cookie_domain,
                             -secure => $jconfig->{'scookie_secure'},
                             -samesite => 'Strict'   # Note - only supported on 4.29 of CGI::Cookie or later
                         ))
@@ -413,7 +407,6 @@ sub check {
                         -name => $jconfig->{csrf_cookie},
                         -value => $jconfig->{session}->param ('csrf_token'),
                         -Path => '/',           # Note, left as / as many clients use differing URLs to access applications, and apps are from /
-                        -domain => $session_cookie_domain,
                         -secure => $jconfig->{'scookie_secure'},
                         -samesite => 'Strict'   # Note - only supported on 4.29 of CGI::Cookie or later
                     ));
