@@ -554,9 +554,10 @@ sub fetch {
             $col = 0;
             my @columns = map { $$row{$_} } @$column_names_aref;
             foreach my $value (@columns) {
-                if ($value){
-                    $worksheet->write ($row_num, $col++, $value, $default_format);
+                if (defined $value){
+                    $worksheet->write ($row_num, $col, $value, $default_format);
                 }
+                $col ++;
             }
             $row_num++;
         }
