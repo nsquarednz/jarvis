@@ -51,8 +51,8 @@ rm -rf %{buildroot}
 %defattr(-,root,root,-)
 %{Root}
 %docdir /usr/share/jarvis/docs/
-%config /etc/httpd/conf.d/jarvis.conf
-%config /etc/jarvis/
+%config(noreplace) /etc/httpd/conf.d/jarvis.conf
+%config(noreplace) /etc/jarvis/
 
 %changelog
 
