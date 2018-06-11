@@ -490,6 +490,7 @@ sub do {
         if (defined ($ENV{HTTP_ORIGIN})) {
             my $raw_origin = ($ENV{HTTP_ORIGIN} =~ /^(?:.*:\/\/)?(.*?)(?:\/.*)?$/g)[0];
             if ($host ne $raw_origin) {
+                &Jarvis::Error::log ($jconfig, "Host HTTP Origin: '$raw_origin' does not match expected host: '$host'");
                 $jconfig->{status} = "400 Bad Request";
                 die "Target origin does not match window's origin.\n";
             }
@@ -497,11 +498,13 @@ sub do {
             # If the Origin header is not present verify that the HTTP Referrer matches the target origin.
             my $raw_referer = ($ENV{HTTP_REFERER} =~ /^(?:.*:\/\/)?(.*?)(?:\/.*)?$/g)[0];
             if ($host ne $raw_referer) {
+                &Jarvis::Error::log ($jconfig, "Host Referer: '$raw_referer' does not match expected host: '$host'");
                 $jconfig->{status} = "400 Bad Request";
                 die "Target origin does not match window's origin.\n";
             }
         } else {
             # If neither are specified then stop further execution as we cant be sure that we aren't protecting against CSRF.
+            &Jarvis::Error::log ($jconfig, "No HTTP_REFERER or HTTP_ORIGIN provided by client.");
             $jconfig->{status} = "400 Bad Request";
             die "Window Origin or Referer not Defined.\n";
         }
