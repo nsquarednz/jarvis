@@ -91,6 +91,9 @@ sub new {
     $self->{'etc_dir'} = $args{'etc_dir'} || "../etc" || die "Missing parameter 'etc_dir'\n";
     (-d $self->{'etc_dir'}) || die "Parameter 'etc_dir' does not specify a directory.\n";
 
+    # Setup http headers
+    $self->{'http_headers'} = {};
+
     ###############################################################################
     # Load our global configuration.
     ###############################################################################
@@ -346,6 +349,44 @@ sub safe_variables {
     }
 
     return %safe_params;
+}
+
+
+################################################################################
+#  We need to be able to set headers in hooks to do this we need to store the
+#  headers before they are sent. The best place is inside the $jconfig
+#
+#   When ever printing headers the should be printed like this
+#
+#             &Jarvis::Config::add_http_headers($jconfig, {
+#                -type => "text/plain; charset=UTF-8",
+#                -cookie => $jconfig->{cookie},
+#                'Cache-Control' => 'no-store, no-cache, must-revalidate'
+#            });
+#
+#            print $cgi->header($jconfig->{http_headers});
+#
+#   - Additional Safe parameters (e.g. from hooks, session store, etc.)
+#
+# Params:
+#       $jconfig - Jarvis::Config object
+#
+#
+#       $header - Hash of the header key values paris
+# Returns:
+#       1
+################################################################################
+#
+
+sub add_http_headers {
+    my ($jconfig, $header) = @_;
+
+    my @keys = keys %{ $header };
+
+    for my $key (@keys) {
+        $jconfig->{'http_headers'}->{$key} = $header->{$key};
+        &Jarvis::Error::debug ($jconfig,"Adding header $key = " . $header->{$key} );
+    }
 }
 
 1;
