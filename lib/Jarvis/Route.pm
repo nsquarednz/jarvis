@@ -65,19 +65,19 @@ sub find {
         my $rxml = $jconfig->{'xml'}{'jarvis'}{'app'}{'router'};
         if ($rxml && $rxml->{'route'}) {
             foreach my $route ($rxml->{'route'}('@')) {
-                (defined $route->{dataset}) || die "Router has route with no dataset.";
-                (defined $route->{path}) || die "Router has route with no path.";
+                (defined $route->{dataset}) || die "Router has route with no dataset.\n";
+                (defined $route->{path}) || die "Router has route with no path.\n";
                 my $dataset = $route->{dataset}->content;
                 my $path = $route->{path}->content;
                 my $presentation = $route->{presentation} ? $route->{presentation}->content : "array";
-                ($presentation eq 'array') || ($presentation eq 'singleton') || die "Unsupported presentation '$presentation' in route.";
+                ($presentation eq 'array') || ($presentation eq 'singleton') || die "Unsupported presentation '$presentation' in route.\n";
 
                 # Remove leading slash to expose the first path part.
-                ($path =~ m|^/|) || die "Route path does not begin with leading '/'.";
+                ($path =~ m|^/|) || die "Route path does not begin with leading '/'.\n";
                 $path =~ s|^/||;
                 my (@parts) = map { s/^\s+//; s/\s+$//; $_; } split ( m|/|, $path, -1);
 
-                push (@routes, { dataset => $dataset, path => $path, parts => \@parts, presentation => $presentation });
+                push (@routes, { dataset => $dataset, path => $path, parts => \@parts, presentation => $presentation});
             }
         }
         &Jarvis::Error::debug ($jconfig, "Loaded %d route(s).", scalar @routes);

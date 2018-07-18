@@ -98,9 +98,9 @@ sub do {
             next if (($dataset ne $plugin_ds) && ($dataset !~ m/^$plugin_ds\./));
             &Jarvis::Error::debug ($jconfig, "Found matching custom <plugin> dataset '$dataset'.");
 
-            $allowed_groups = $plugin->{access}->content || die "No 'access' defined for plugin dataset '$dataset'";
+            $allowed_groups = $plugin->{access}->content || die "No 'access' defined for plugin dataset '$dataset'\n";
             $lib = $plugin->{lib}->content if $plugin->{lib};
-            $module = $plugin->{module}->content || die "No 'module' defined for plugin dataset '$dataset'";
+            $module = $plugin->{module}->content || die "No 'module' defined for plugin dataset '$dataset'\n";
             $add_headers = defined ($Jarvis::Config::yes_value {lc ($plugin->{add_headers}->content || "no")});
             $default_filename = $plugin->{default_filename}->content;
             $filename_parameter = $plugin->{filename_parameter}->content || 'filename';
@@ -128,11 +128,14 @@ sub do {
     # If no match, that's fine.  Just say we couldn't do it.
     $module || return 0;
 
+    # Perform CSRF checks.
+    Jarvis::Main::check_csrf_protection ($jconfig, $allowed_groups);
+
     # Check security.
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
     if ($failure ne '') {
         $jconfig->{status} = "401 Unauthorized";
-        die "Wanted plugin access: $failure";
+        die "Wanted plugin access: $failure\n"; # the \n supresses the die's normal at ... Plugin.pm line 135 output
     }
 
     # Figure out a filename.  It's not mandatory, if we don't have a default

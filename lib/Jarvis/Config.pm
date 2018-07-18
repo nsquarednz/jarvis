@@ -65,6 +65,8 @@ use Data::Dumper;
 #               debug              Debug enabled for this app?
 #               dump               Dump (Detailed Debug) enabled for this app?
 #               log_format         Format for log and debug output.
+#               error_response_format         
+#                                  The format of error messages sent to the client
 ################################################################################
 #
 sub new {
@@ -95,7 +97,7 @@ sub new {
     #
     # Process the global XML config file.
     my $xml_filename = $self->{'etc_dir'} . "/" . $self->{'app_name'} . ".xml";
-    my $xml = XML::Smart->new ("$xml_filename") || die "Cannot read '$xml_filename': $!.";
+    my $xml = XML::Smart->new ("$xml_filename") || die "Cannot read '$xml_filename': $!.\n";
     ($xml->{jarvis}) || die "Missing <jarvis> tag in '$xml_filename'!\n";
 
     $self->{'xml'} = $xml;
@@ -159,7 +161,10 @@ sub new {
     binmode STDERR, ":utf8";
 
     # This is used by both debug and log output.
-    $self->{'log_format'} = $axml->{'log_format'}->content || '[%P/%A/%U/%D] %M';
+    $self->{'log_format'} = $axml->{'log_format'}->content || '[%P/%A/%U/%D][%R] %M';
+
+    # This is what format we use when sending death messages back to the client
+    $self->{'error_response_format'} = $axml->{'error_response_format'}->content || '[%T][%R] %M';
 
     # This is used by several things, so let's store it in our config.
     $self->{'format'} = lc ($self->{'cgi'}->param ('format') || $axml->{'format'}->content || "json");
@@ -170,6 +175,17 @@ sub new {
     # This is an optional METHOD overide parameter, similar to Ruby on Rails.
     # It bypasses a problem where non-proxied Flex can only send GET/POST requests.
     $self->{'method_param'} = $self->{'cgi'}->param ('method_param') || "_method";
+
+    # Load settings for CSRF protection. Enabled flag, cookie name and header name.
+    $self->{'csrf_protection'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'csrf_protection'}->content || "no")});
+    $self->{'csrf_cookie'} = uc ($axml->{'csrf_cookie'}->content || "XSRF-TOKEN");
+    $self->{'csrf_header'} = uc ($axml->{'csrf_header'}->content || "X-XSRF-TOKEN");
+
+    # Check if cross origin protection is enabled. All incoming requests will have their referer or origin compared to the host configuration.
+    $self->{'cross_origin_protection'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'cross_origin_protection'}->content || "no")});
+
+    # Check if XSRF protection is enabled. All JSON requests will be prefixed with ")]}',\n"
+    $self->{'xsrf_protection'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'xsrf_protection'}->content || "no")});
 
     # Pull out the list of default (Perl) library paths to use for perl plugins scripts
     # from the configuration, and store in an array in the config item.
@@ -187,7 +203,7 @@ sub new {
     # Basic security check here.
     $self->{'require_https'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'require_https'}->content || "no")});
     if ($self->{'require_https'} && ! $self->{'cgi'}->https()) {
-        die "Client must access over HTTPS for this application.";
+        die "Client must access over HTTPS for this application.\n";
     }
 
     ###############################################################################

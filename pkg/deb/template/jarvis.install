@@ -2,5 +2,6 @@ cgi-bin usr/share/jarvis
 demo usr/share/jarvis
 docs/jarvis_guide.pdf usr/share/doc/jarvis
 etc/apache etc/jarvis
+etc/jarvis/cgi_params.pm etc/jarvis
 htdocs usr/share/jarvis
 lib usr/share/jarvis

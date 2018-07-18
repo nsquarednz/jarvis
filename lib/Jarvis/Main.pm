@@ -102,6 +102,27 @@ use XML::Smart;
 }
 
 ###############################################################################
+# Generate a random UUID. Avoid any reliance on 3rd party UUID generator
+# perl modules due to the difficulty in yum/apt installation procedures on
+# most target systems.
+#
+# This approach here is a UUID generated based on random numbers - and is based
+# off of Perl's UUID::Tiny module.
+###############################################################################
+#
+sub generate_uuid {
+    my $uuid = '';
+    for (1 .. 4) {
+        my $top = int(rand(65536)) % 65536;
+        my $bottom = int(rand(65536)) % 65536;
+        $uuid .= pack 'I', (($top << 16) | $bottom);
+    }
+    substr $uuid, 6, 1, chr(ord(substr($uuid, 6, 1)) & 0x0f);
+    substr $uuid, 8, 1, chr(ord(substr $uuid, 8, 1) & 0x3f | 0x80);
+    return join '-', map { unpack 'H*', $_ } map { substr $uuid, 0, $_, '' } ( 4, 2, 2, 2, 6 );
+}
+
+###############################################################################
 # Setup error handler.
 ###############################################################################
 #
@@ -156,17 +177,23 @@ sub error_handler {
     $jconfig->{status} = $jconfig->{status} || "500 Internal Server Error"; 
     my $status = $jconfig->{status};
     print $cgi->header(-status => $status, -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt");
-    print $msg;
+    if ($status =~ /^500/) {
+        print &Jarvis::Error::print_message ($jconfig, $jconfig->{error_response_format} || "[%T][%R] %M", 'fatal', $msg);
+    } else {
+        print $msg;
+    }
 
     # Print to error log.  Include stack trace if debug is enabled.
-    my $long_msg = &Jarvis::Error::print_message ($jconfig, 'fatal', $msg);
+    my $long_msg = &Jarvis::Error::print_log_message ($jconfig, 'fatal', $msg);
 
     # Print URI to log if not done already.
     if (! $jconfig->{debug}) {
         $long_msg = $long_msg . "        URI = $ENV{REQUEST_URI}";
     }
 
-    print STDERR ($jconfig->{debug} ? Carp::longmess $long_msg : Carp::shortmess $long_msg);
+    if ($status =~ /^500/) {
+        print STDERR ($jconfig->{debug} ? Carp::longmess $long_msg : Carp::shortmess $long_msg);
+    }
 
     # We MUST ensure that ALL the cached database handles are removed.
     # Otherwise, under mod_perl, the next application would get OUR database handles!
@@ -186,6 +213,31 @@ sub jconfig {
 }
 
 ###############################################################################
+# Perform CSRF protection checks for any non global request.
+###############################################################################
+#
+sub check_csrf_protection {
+
+    my ($jconfig, $allowed_groups) = @_;
+
+    # If we have CSRF Protection enabled validate requests that do no have global '**' access.
+    if ($jconfig->{csrf_protection} && $allowed_groups ne '**') {
+        # Load the CSRF header from the request.
+        my $token  = $cgi->http($jconfig->{csrf_header});
+
+        # Load the stored session CSRF token.
+        my $session_token = $jconfig->{session}->param ('csrf_token');
+
+        # If the stored session token and the provided token do not match then do not continue the request.
+        if (!defined $token || !defined $session_token || $token ne $session_token) {
+            $jconfig->{status} = "401 Unauthorized";
+            die "Unauthorized Request.\n";
+        }
+    }
+}
+
+
+###############################################################################
 # Main "do" method.
 #
 # This method is called by either:
@@ -202,8 +254,32 @@ sub do {
     # Optional mod-perl stream output variable
     my $mod_perl_io = $options && $options->{mod_perl_io};
     
+    # If we have a CGI parameters configuration file require it now to
+    # set any defined CGI parameters.
+    foreach my $etc (@etc) {
+        if (-f "$etc/cgi_params.pm") {
+            require "$etc/cgi_params.pm";
+        }
+    }
+
     # CGI object for all sorts of things.
     $cgi = ($options && $options->{cgi}) || new CGI;
+
+    # Check that the CGI does not exceed any globally configured parameters.
+    if (defined $cgi->cgi_error()) {
+        $jconfig->{status} = $cgi->cgi_error();
+        die  "\n";
+    }
+
+    # Perl CGI does not explicitly catch when file downloads are disabled. This causes
+    # Jarvis to die when the CGI object is not fully initialized. We need to catch this
+    # explicit case before we continue with any processing.
+    if ($CGI::DISABLE_UPLOADS) {
+        if (grep $cgi->param(), 'some_file') {
+            $jconfig->{status} = "400 Bad Request";
+            die "\n";
+        }
+    }
 
     # Environment variables.
     my $jarvis_root = $ENV {JARVIS_ROOT};
@@ -304,6 +380,10 @@ sub do {
     # Determine client's IP.
     $jconfig->{client_ip} = $ENV{"HTTP_X_FORWARDED_FOR"} || $ENV{"HTTP_CLIENT_IP"} || $ENV{"REMOTE_ADDR"} || '';
 
+    # Determine a unique request ID for this request. Useful for tracing and auditing.
+    # This will later get expanded to incorporate the session ID, if we have one.
+    $jconfig->{request_id} = generate_uuid();
+
     # Debug can now occur, since we have called Config!
     &Jarvis::Error::debug ($jconfig, "URI = $ENV{REQUEST_URI}");
     &Jarvis::Error::debug ($jconfig, "Base Path = '$path'.");
@@ -393,12 +473,42 @@ sub do {
     # Login as required.
     &Jarvis::Login::check ($jconfig);
 
+    # Now we have some login data - lets expand our request UUID to be a unique session/request UUID
     &Jarvis::Error::debug ($jconfig, "User Name = '" . $jconfig->{username} . "'");
     &Jarvis::Error::debug ($jconfig, "Group List = '" . $jconfig->{group_list} . "'");
     &Jarvis::Error::debug ($jconfig, "Logged In = " . $jconfig->{logged_in});
+    &Jarvis::Error::debug ($jconfig, "Request ID = '" . $jconfig->{request_id} . "'.");
     &Jarvis::Error::debug ($jconfig, "Error String = '" . $jconfig->{error_string} . "'");
     &Jarvis::Error::debug ($jconfig, "Method = '" . $method . "'");
     &Jarvis::Error::debug ($jconfig, "Action = '" . $action . "'");
+
+    # If we have CSRF Protection enabled check that the origin and target locations match for all requests.
+    if ($jconfig->{cross_origin_protection}) {
+        # If the Origin header is present verify it matches the target origin.
+        # Use the user specified session domain when comparing the referer or origin addresses. 
+        my $host = $jconfig->{scookie_domain};
+        if (defined ($ENV{HTTP_ORIGIN})) {
+            my $raw_origin = ($ENV{HTTP_ORIGIN} =~ /^(?:.*:\/\/)?(.*?)(?:\/.*)?$/g)[0];
+            if ($host ne $raw_origin) {
+                &Jarvis::Error::log ($jconfig, "Host HTTP Origin: '$raw_origin' does not match expected host: '$host'");
+                $jconfig->{status} = "400 Bad Request";
+                die "Target origin does not match window's origin.\n";
+            }
+        } elsif (defined ($ENV{HTTP_REFERER})) {
+            # If the Origin header is not present verify that the HTTP Referrer matches the target origin.
+            my $raw_referer = ($ENV{HTTP_REFERER} =~ /^(?:.*:\/\/)?(.*?)(?:\/.*)?$/g)[0];
+            if ($host ne $raw_referer) {
+                &Jarvis::Error::log ($jconfig, "Host Referer: '$raw_referer' does not match expected host: '$host'");
+                $jconfig->{status} = "400 Bad Request";
+                die "Target origin does not match window's origin.\n";
+            }
+        } else {
+            # If neither are specified then stop further execution as we cant be sure that we aren't protecting against CSRF.
+            &Jarvis::Error::log ($jconfig, "No HTTP_REFERER or HTTP_ORIGIN provided by client.");
+            $jconfig->{status} = "400 Bad Request";
+            die "Window Origin or Referer not Defined.\n";
+        }
+    }
 
     # What kind of dataset?  Used by the tracker only.
     # 's' = sql, 'i' = internal, 'p' = plugin, 'e' = exec, undef for undetermined.
@@ -489,7 +599,7 @@ sub do {
                 -cookie => $jconfig->{cookie},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             );
-            
+            ;
         } else {
             print $cgi->header(
                 -type => "text/plain; charset=UTF-8",
@@ -497,7 +607,14 @@ sub do {
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             );
         }
-        print $return_text;
+
+        # If we have XSRF Protection enabled then we prefix all JSON responses with ")]}',\n" This prevents executable JSON being
+        # being passed to JSON clients.
+        if ($jconfig->{xsrf_protection} && $jconfig->{format} =~ /^json/) {
+            print ")]}',\n" . $return_text;    
+        } else {
+            print $return_text;
+        }       
 
     # Modify a regular dataset.
     } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete") || ($action eq "mixed")) {

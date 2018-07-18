@@ -148,7 +148,7 @@ sub load_global {
     if ($axml->{hook}) {
         foreach my $hook (@{ $axml->{hook} }) {
             my $lib = $hook->{lib} ? $hook->{lib}->content : undef;
-            my $module = $hook->{module}->content || die "Invalid global hook configuration, <hook> configured with no 'module' attribute.";
+            my $module = $hook->{module}->content || die "Invalid global hook configuration, <hook> configured with no 'module' attribute.\n";
 
             &Jarvis::Error::debug ($jconfig, "Loading (level 0) global <hook> with module '$module'.");
 
@@ -196,7 +196,7 @@ sub unload_global {
     foreach my $hook (@{ $jconfig->{hooks} }) {
 
         # All our dataset-level hooks should have been unloaded already.
-        $hook->{level} && die "Dataset Hook remains at global hook unload time.  Impossible.";
+        $hook->{level} && die "Dataset Hook remains at global hook unload time.  Impossible.\n";
 
         # Invoke the finish method with no extra parameters.
         &Jarvis::Error::debug ($jconfig, "Finishing global <hook> with module '%s'.", $hook->{module});
@@ -230,7 +230,7 @@ sub load_dataset {
     if ($dsxml->{dataset}{hook}) {
         foreach my $hook (@{ $dsxml->{dataset}{hook} }) {
             my $lib = $hook->{lib} ? $hook->{lib}->content : undef;
-            my $module = $hook->{module}->content || die "Invalid dataset hook configuration, <hook> configured with no module.";
+            my $module = $hook->{module}->content || die "Invalid dataset hook configuration, <hook> configured with no module.\n";
 
             &Jarvis::Error::debug ($jconfig, "Loading (level $hook_level) dataset-specific <hook> with module '$module'.");
 

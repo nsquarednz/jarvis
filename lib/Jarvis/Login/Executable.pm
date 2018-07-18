@@ -151,7 +151,7 @@ sub Jarvis::Login::Executable::check {
     $executable || return "Missing 'executable' configuration for Login module Executable.";
 
     if (! (-r $executable && -x _)) {
-        die "Unable to find the executable file configured for Login module Executable '$executable'.";
+        die "Unable to find the executable file configured for Login module Executable '$executable'.\n";
     }
 
     # Set the working directory to the executables dirname if the working_dir was not specified as a login parameter.
@@ -177,7 +177,7 @@ sub Jarvis::Login::Executable::check {
 
     # Switch working directory.
     my $old_working_dir = getcwd();
-    chdir $working_dir or die "Can't change directory to '$working_dir'.";
+    chdir $working_dir or die "Can't change directory to '$working_dir'.\n";
 
     # Execute the executable in an eval to catch any exception/die thrown.
     my $output;
@@ -190,7 +190,7 @@ sub Jarvis::Login::Executable::check {
     }; return $@ if $@;
 
     # Switch working directory back.
-    chdir $old_working_dir or die "Can't change directory to '$old_working_dir'.";
+    chdir $old_working_dir or die "Can't change directory to '$old_working_dir'.\n";
 
     # If no output defined then there may be an internal error executing the file as it did not output the info we want.
     if (! defined $output) {
@@ -204,7 +204,7 @@ sub Jarvis::Login::Executable::check {
     eval {
         local $SIG{'__DIE__'};
         $result = parse_json($output);
-    } or die "Unable to parse JSON response from executable. $@";
+    } or die "Unable to parse JSON response from executable. $@\n";
 
     # If no result was found.
     if (! defined $result) {

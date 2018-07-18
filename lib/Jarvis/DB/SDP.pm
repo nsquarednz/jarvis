@@ -116,18 +116,18 @@ sub fetchall {
     );
     
     # Check for errors.
-    my $response = XML::Smart->new ($rxml) || die "Malformed XML on SDP response.";
-    $response->{'soap:Envelope'}->{'soap:Body'} || die "No soap:Envelope/soap:Body found in SDP response.";
+    my $response = XML::Smart->new ($rxml) || die "Malformed XML on SDP response.\n";
+    $response->{'soap:Envelope'}->{'soap:Body'} || die "No soap:Envelope/soap:Body found in SDP response.\n";
     
     if ($response->{'soap:Envelope'}->{'soap:Body'}->{'soap:Fault'}) {
         my $description = $response->{'soap:Envelope'}->{'soap:Body'}->{'soap:Fault'}->{'detail'}->{'Error'}->{'Description'}->content || 'SOAP Fault returned from SDP request.';
         my $error_code = $response->{'soap:Envelope'}->{'soap:Body'}->{'soap:Fault'}->{'detail'}->{'Error'}->{'ErrorCode'}->content || 'unknown';
         my $source = $response->{'soap:Envelope'}->{'soap:Body'}->{'soap:Fault'}->{'detail'}->{'Error'}->{'Source'}->content || 'SSAS DataPump';
-        die "$source returned error $error_code: $description";
+        die "$source returned error $error_code: $description\n";
     }
     
     return $response->{'soap:Envelope'}->{'soap:Body'}->{'ExecuteResponse'}->{'return'}->{'root'} 
-        || die "Missing ExecuteResponse/return/root in SDP response.";
+        || die "Missing ExecuteResponse/return/root in SDP response.\n";
 }
     
 ################################################################################
@@ -158,7 +158,7 @@ sub fetchall_arrayref {
     if ($root->{'Exception'}) {
         my $code = $root->{'Messages'}->{'Error'}->{'ErrorCode'} || '???';
         my $description  = $root->{'Messages'}->{'Error'}->{'Description'} || '???';
-        die "An MDX error $code occured: $description";
+        die "An MDX error $code occured: $description\n";
     }
     
     # Otherwise, assume we have data.
@@ -169,7 +169,7 @@ sub fetchall_arrayref {
     foreach my $axis_name (@axis_names) {
         &Jarvis::Error::debug ($jconfig, "Axis: $axis_name");        
     }
-    (scalar @axis_names == 2) || die "Require exactly two (non-Slice) Axes for 2D tuple encoding.  Got " . (scalar @axis_names) . ".";
+    (scalar @axis_names == 2) || die "Require exactly two (non-Slice) Axes for 2D tuple encoding.  Got " . (scalar @axis_names) . ".\n";
 
     # What are the names for the column/row axes?    
     my $column_axis_label = $root->{'OlapInfo'}->{'AxesInfo'}->{'AxisInfo'}[0]->{'HierarchyInfo'}->{'name'}->content || "Unknown Axis0 Name";
@@ -178,8 +178,8 @@ sub fetchall_arrayref {
     &Jarvis::Error::debug ($jconfig, "Row Axis Label = $row_axis_label");
     
     # What are the tuple names?
-    ($root->{'Axes'}->{'Axis'}[0]->{'name'}->content eq 'Axis0') || die "Inconsistent Axis0 Name";
-    ($root->{'Axes'}->{'Axis'}[1]->{'name'}->content eq 'Axis1') || die "Inconsistent Axis1 Name";
+    ($root->{'Axes'}->{'Axis'}[0]->{'name'}->content eq 'Axis0') || die "Inconsistent Axis0 Name\n";
+    ($root->{'Axes'}->{'Axis'}[1]->{'name'}->content eq 'Axis1') || die "Inconsistent Axis1 Name\n";
 
     my @column_names = map { my $x = $_->{'Member'}->{'Caption'}->content; $x; } $root->{'Axes'}->{'Axis'}[0]->{'Tuples'}{'Tuple'}('@');
 
@@ -248,7 +248,7 @@ sub fetchall_hashref_3d {
     foreach my $axis_name (@axis_names) {
         &Jarvis::Error::debug ($jconfig, "Axis: $axis_name");        
     }
-    (scalar @axis_names == 3) || die "Require exactly three (non-Slice) Axes for 3D tuple encoding.  Got " . (scalar @axis_names) . ".";
+    (scalar @axis_names == 3) || die "Require exactly three (non-Slice) Axes for 3D tuple encoding.  Got " . (scalar @axis_names) . ".\n";
 
     # What are the names for the column/row axes?    
     my $column_axis_label = $root->{'OlapInfo'}->{'AxesInfo'}->{'AxisInfo'}[0]->{'HierarchyInfo'}->{'name'}->content || "Unknown Axis0 Name";
@@ -259,9 +259,9 @@ sub fetchall_hashref_3d {
     &Jarvis::Error::debug ($jconfig, "Page Axis Label = $page_axis_label");
     
     # What are the tuple names?
-    ($root->{'Axes'}->{'Axis'}[0]->{'name'}->content eq 'Axis0') || die "Inconsistent Axis0 Name";
-    ($root->{'Axes'}->{'Axis'}[1]->{'name'}->content eq 'Axis1') || die "Inconsistent Axis1 Name";
-    ($root->{'Axes'}->{'Axis'}[2]->{'name'}->content eq 'Axis2') || die "Inconsistent Axis2 Name";
+    ($root->{'Axes'}->{'Axis'}[0]->{'name'}->content eq 'Axis0') || die "Inconsistent Axis0 Name\n";
+    ($root->{'Axes'}->{'Axis'}[1]->{'name'}->content eq 'Axis1') || die "Inconsistent Axis1 Name\n";
+    ($root->{'Axes'}->{'Axis'}[2]->{'name'}->content eq 'Axis2') || die "Inconsistent Axis2 Name\n";
     
     my @column_names = map { $_->{'Member'}->{'Caption'}->content } $root->{'Axes'}->{'Axis'}[0]->{'Tuples'}{'Tuple'}('@');
     my $num_columns = scalar @column_names;

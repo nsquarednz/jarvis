@@ -304,7 +304,7 @@ sub parse_statement {
         local $dbh->{RaiseError};
         local $dbh->{PrintError};
         $stm->{sth} = $dbh->prepare ($sql_with_substitutions, \%prepare_attr) ||
-            die "Couldn't prepare statement for $ttype on '$dataset_name'.\nSQL ERROR = '" . $dbh->errstr . "'.";
+            die "Couldn't prepare statement for $ttype on '$dataset_name'.\nSQL ERROR = '" . $dbh->errstr . "'.\n";
     }
 
     # NOTE: "nolog" : Report back to client.  Do not log. 
@@ -545,14 +545,14 @@ sub fetch_inner {
     
     # Get our STM.  This has everything attached.
     my $stm = &parse_statement ($jconfig, $dataset_name, $dsxml, $dbh, 'select', $safe_params) ||
-        die "Dataset '$dataset_name' has no SQL of type 'select'.";
+        die "Dataset '$dataset_name' has no SQL of type 'select'.\n";
 
     # Convert the parameter names to corresponding values.
     my @args = &Jarvis::Dataset::names_to_values ($jconfig, $stm->{vnames_aref}, $safe_params);
 
     # Execute Select, return on error
     &statement_execute ($jconfig, $stm, \@args);
-    $stm->{error} && die $stm->{error};
+    $stm->{error} && die $stm->{error} . "\n";
 
     # Fetch the data.
     my $rows_aref = $stm->{sth}->fetchall_arrayref({});
@@ -612,7 +612,7 @@ sub store_inner {
 
     # Check we have an stm for this row.
     my $stm = $stms->{$row_ttype} ||
-        die "Dataset '$dataset_name' has no SQL of type '$row_ttype'.";
+        die "Dataset '$dataset_name' has no SQL of type '$row_ttype'.\n";
 
     # Determine our argument values.
     my @arg_values = &Jarvis::Dataset::names_to_values ($jconfig, $stm->{vnames_aref}, $safe_params);

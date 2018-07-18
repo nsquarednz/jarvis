@@ -206,7 +206,7 @@ sub fetch_inner {
     
     # Get our STM.  This has everything attached.
     my $mdx = &parse_mdx ($jconfig, $dsxml, $safe_params_href) ||
-        die "Dataset '$subset_name' (type 'sdp') has no MDX query.";
+        die "Dataset '$subset_name' (type 'sdp') has no MDX query.\n";
 
     # What key will we use to store the row labels?
     my $row_label = $dsxml->{dataset}{mdx}{row_label}->content || 'row_label';

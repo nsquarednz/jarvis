@@ -98,8 +98,8 @@ sub load_dsxml {
     # Determine the raw dataset name, before "." translation.
     &Jarvis::Error::debug ($jconfig, "Loading DSXML for '$dataset_name'.");
 
-    ($dataset_name =~ m/^\./) && die "Leading '.' not permitted on dataset name '$dataset_name'";
-    ($dataset_name =~ m/\.$/) && die "Trailing '.' not permitted on dataset name '$dataset_name'";
+    ($dataset_name =~ m/^\./) && die "Leading '.' not permitted on dataset name '$dataset_name'\n";
+    ($dataset_name =~ m/\.$/) && die "Trailing '.' not permitted on dataset name '$dataset_name'\n";
 
     # Find the best-matching "dataset_dir" prefix and use that directory.
     my $dsxml_filename = undef;
@@ -114,13 +114,13 @@ sub load_dsxml {
     # match are treated as subdirectories inside the dataset dir.
     #
     my $axml = $jconfig->{xml}{jarvis}{app};
-    $axml->{dataset_dir} || die "Missing configuration for mandatory element(s) 'dataset_dir'.";
+    $axml->{dataset_dir} || die "Missing configuration for mandatory element(s) 'dataset_dir'.\n";
 
     # Check for duplicate prefixes.
     my %prefix_seen = ();
 
     foreach my $dsdir ($axml->{dataset_dir}('@')) {
-        my $dir = $dsdir->content || die "Missing directory in 'dataset_dir' element.";
+        my $dir = $dsdir->content || die "Missing directory in 'dataset_dir' element.\n";
         my $type = $dsdir->{type}->content || 'dbi';
         my $prefix = $dsdir->{prefix}->content || '';
         my $dbname = $dsdir->{dbname}->content || 'default';
@@ -131,7 +131,7 @@ sub load_dsxml {
         }
         my $prefix_len = length ($prefix);
 
-        $prefix_seen{$prefix}++ && die "Duplicate dataset_dir entries for prefix '$prefix' are defined.";
+        $prefix_seen{$prefix}++ && die "Duplicate dataset_dir entries for prefix '$prefix' are defined.\n";
 
         &Jarvis::Error::debug ($jconfig, "Dataset Directory: '$dir', type '$type', prefix '$prefix', dbname '$dbname'.");
         if ($dataset_name =~ m/^$prefix(.*)$/) {
@@ -150,7 +150,7 @@ sub load_dsxml {
             }
         }
     }
-    $dsxml_filename || die "No dataset_dir defined with prefix matching dataset '$dataset_name'.";
+    $dsxml_filename || die "No dataset_dir defined with prefix matching dataset '$dataset_name'.\n";
 
     # Load the dataset-specific XML file and double-check it has top-level <dataset> tag.
     &Jarvis::Error::debug ($jconfig, "Opening DSXML file '$dsxml_filename', type '$dbtype'.");
@@ -158,7 +158,7 @@ sub load_dsxml {
     # Check it exists.
     if (! -f $dsxml_filename) {
         $jconfig->{status} = '404 Not Found';
-        die "No such DSXML file '$dataset_name.xml' for application '" . $jconfig->{app_name} . "'";
+        die "No such DSXML file '$dataset_name.xml' for application '" . $jconfig->{app_name} . "'.\n";
     }
 
     my $dsxml = XML::Smart->new ("$dsxml_filename") || die "Cannot read '$dsxml_filename': $!\n";
@@ -418,7 +418,7 @@ sub fetch {
         ($format ne 'json') && ($format ne 'json.array') && ($format ne 'json.rest') &&
         ($format ne 'csv') && ($format ne 'xlsx')) {
 
-        die "No implementation for fetch format '$format', dataset '$dataset_name'.";
+        die "No implementation for fetch format '$format', dataset '$dataset_name'.\n";
     }
 
     # Get the ROWS inner content for the dataset.
@@ -554,9 +554,10 @@ sub fetch {
             $col = 0;
             my @columns = map { $$row{$_} } @$column_names_aref;
             foreach my $value (@columns) {
-                if ($value){
-                    $worksheet->write ($row_num, $col++, $value, $default_format);
+                if (defined $value){
+                    $worksheet->write ($row_num, $col, $value, $default_format);
                 }
+                $col ++;
             }
             $row_num++;
         }
@@ -627,7 +628,7 @@ sub fetch {
 
     # Nothing else supported.
     } else {
-        die "No return representation for format '$format', dataset '$dataset_name'.";
+        die "No return representation for format '$format', dataset '$dataset_name'.\n";
     }
 
     # Debug/Dump.
@@ -684,6 +685,9 @@ sub fetch_rows {
     # Check the allowed groups.
     my $allowed_groups = $dsxml->{dataset}{"read"};
 
+    # Perform CSRF checks.
+    Jarvis::Main::check_csrf_protection ($jconfig, $allowed_groups);
+
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
     if ($failure ne '') {
         $jconfig->{status} = "401 Unauthorized";
@@ -727,7 +731,7 @@ sub fetch_rows {
         ($rows_aref, $column_names_aref)
             = &Jarvis::Dataset::SDP::fetch_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%safe_params);
     } else {
-        die "Unsupported dataset type '$dbtype'.";
+        die "Unsupported dataset type '$dbtype'.\n";
     }
 
     # Now we have an array of hash objects.  Apply post-processing.
@@ -824,8 +828,8 @@ sub fetch_rows {
         foreach my $child (@{ $dsxml->{dataset}{child} }) {
 
             # What dataset do we use to get child data, and where do we store it?
-            $child->{field} || die "Invalid dataset child configuration, <child> with no 'field' attribute.";
-            $child->{dataset} || die "Invalid dataset child configuration, <child> with no 'dataset' attribute.";
+            $child->{field} || die "Invalid dataset child configuration, <child> with no 'field' attribute.\n";
+            $child->{dataset} || die "Invalid dataset child configuration, <child> with no 'dataset' attribute.\n";
             my $child_field = $child->{field}->content;
             my $child_dataset = $child->{dataset}->content;
             &Jarvis::Error::debug ($jconfig, "Processing child dataset '$child_dataset' to store as field '$child_field'.");
@@ -835,8 +839,8 @@ sub fetch_rows {
             my %links = ();
             if ($child->{link}) {
                 foreach my $link (@{ $child->{link} }) {
-                    $link->{parent} || die "Invalid dataset child link configuration, <link> with no 'parent' attribute.";
-                    $link->{child} || die "Invalid dataset child link configuration, <link> with no 'child' attribute.";
+                    $link->{parent} || die "Invalid dataset child link configuration, <link> with no 'parent' attribute.\n";
+                    $link->{child} || die "Invalid dataset child link configuration, <link> with no 'child' attribute.\n";
                     $links{$link->{parent}->content} = $link->{child}->content;
                 }
             }
@@ -845,8 +849,12 @@ sub fetch_rows {
             # for single row requests, it could get real inefficient real fast.
             foreach my $row (@$rows_aref) {
 
-                # We copy across only the child args.
                 my %child_args = ();
+                # Copy user arguments across to the child arguments.
+                foreach my $user_arg (keys %{$user_args}) {
+                    $child_args{$user_arg} = $user_args->{$user_arg};
+                }
+                # We copy across only the child args.
                 foreach my $parent (keys %links) {
                     my $child = $links{$parent};
                     $child_args{$child} = $row->{$parent};
@@ -986,7 +994,7 @@ sub store {
     my $ttype = $jconfig->{action};
     &Jarvis::Error::debug ($jconfig, "Transaction Type = '$ttype'");
     ($ttype eq "delete") || ($ttype eq "update") || ($ttype eq "insert") || ($ttype eq "mixed") ||
-        die "Unsupported transaction type '$ttype'.";
+        die "Unsupported transaction type '$ttype'.\n";
 
     # Store the row content for the top-level dataset.  This may push out to child sets.
     my $extra_href = {};
@@ -1102,13 +1110,13 @@ sub store_rows {
     my ($jconfig, $dataset_name, $ttype, $user_args, $rows_aref, $extra_href) = @_;
 
     # Read the dataset config file.  This changes debug level as a side-effect.
-    my $dataset = &load_dsxml ($jconfig, $dataset_name) || die "Cannot load configuration for dataset '$dataset_name'.";
+    my $dataset = &load_dsxml ($jconfig, $dataset_name) || die "Cannot load configuration for dataset '$dataset_name'.\n";
     my $dsxml = $dataset->{dsxml};
     my $dbtype = $dataset->{dbtype};
     my $dbname = $dataset->{dbname};
 
     # Check that we are DBI only.
-    ($dbtype eq 'dbi') || die "Datasets of type '$dbtype' do not support store operations.";
+    ($dbtype eq 'dbi') || die "Datasets of type '$dbtype' do not support store operations.\n";
 
     # Load/Start dataset specific hooks.
     &Jarvis::Hook::load_dataset ($jconfig, $dsxml);
@@ -1202,7 +1210,7 @@ sub store_rows {
 
         # Figure out which statement type we will use for this row.
         my $row_ttype = $safe_params{_ttype} || $ttype;
-        ($row_ttype eq 'mixed') && die "Transaction Type 'mixed', but no '_ttype' field present in row.";
+        ($row_ttype eq 'mixed') && die "Transaction Type 'mixed', but no '_ttype' field present in row.\n";
 
         # Hand off to DBI code for the actual store.  This will also perform our "returning" logic.
         my $row_result = &Jarvis::Dataset::DBI::store_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%stms, $row_ttype, \%safe_params, $fields_href);
@@ -1234,8 +1242,8 @@ sub store_rows {
             foreach my $child (@{ $dsxml->{dataset}{child} }) {
 
                 # What dataset do we use to get child data, and where do we store it?
-                $child->{field} || die "Invalid dataset child configuration, <child> with no 'field' attribute.";
-                $child->{dataset} || die "Invalid dataset child configuration, <child> with no 'dataset' attribute.";
+                $child->{field} || die "Invalid dataset child configuration, <child> with no 'field' attribute.\n";
+                $child->{dataset} || die "Invalid dataset child configuration, <child> with no 'dataset' attribute.\n";
                 my $child_field = $child->{field}->content;
                 my $child_dataset = $child->{dataset}->content;
                 &Jarvis::Error::debug ($jconfig, "Processing child dataset '$child_dataset' to store as field '$child_field'.");
@@ -1245,8 +1253,8 @@ sub store_rows {
                 my %links = ();
                 if ($child->{link}) {
                     foreach my $link (@{ $child->{link} }) {
-                        $link->{parent} || die "Invalid dataset child link configuration, <link> with no 'parent' attribute.";
-                        $link->{child} || die "Invalid dataset child link configuration, <link> with no 'child' attribute.";
+                        $link->{parent} || die "Invalid dataset child link configuration, <link> with no 'parent' attribute.\n";
+                        $link->{child} || die "Invalid dataset child link configuration, <link> with no 'child' attribute.\n";
                         $links{$link->{parent}->content} = $link->{child}->content;
                     }
                 }
@@ -1257,10 +1265,14 @@ sub store_rows {
                     &Jarvis::Error::debug ($jconfig, "No supplied rows for '$child_field' in parent.  Skip child dataset.");
                     next;
                 }
-                ((ref $child_rows_aref) eq 'ARRAY') || die "Parent dataset has child dataset field '$child_field' but it is not ARRAY.";
+                ((ref $child_rows_aref) eq 'ARRAY') || die "Parent dataset has child dataset field '$child_field' but it is not ARRAY.\n";
 
-                # Parent/Child links will be passed through from SUPPLIED and RETURNING parameters too.
                 my %child_args = ();
+                # Copy user arguments across to the child arguments.
+                foreach my $user_arg (keys %{$user_args}) {
+                    $child_args{$user_arg} = $user_args->{$user_arg};
+                }
+                # Parent/Child links will be passed through from SUPPLIED and RETURNING parameters too.
                 foreach my $parent (keys %links) {
                     my $child = $links{$parent};
 

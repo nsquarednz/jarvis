@@ -77,11 +77,12 @@ sub printable {
 }
 
 ################################################################################
-# Makes a standard message to print out.
+# Generates an error message to send to the client over HTTP.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
-#           READ: username, app_name, dataset_name, dbgfmt
+#           READ: username, app_name, dataset_name
+#       $format - The format to use when formatting our response message
 #       $msg - User message string. We will extend with extra info from $jconfig.
 #       $level - "log", "error", etc.
 #       @params - Optional params to be "sprintf" written into $msg.
@@ -94,15 +95,17 @@ sub printable {
 #           '%A' -> Application
 #           '%P' -> Pid
 #           '%M' -> Message
+#           '%S' -> Session ID
+#           '%R' -> Request ID
 #
 #       Default dbmask is in Config.pm.
 #
 # Returns:
-#       dies
+#       The error string to present to the client.
 ################################################################################
 #
 sub print_message {
-    my ($jconfig, $level, $msg, @params) = @_;
+    my ($jconfig, $format, $level, $msg, @params) = @_;
 
     use integer;
     my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime();
@@ -118,7 +121,7 @@ sub print_message {
     }
     $msg =~ s/\s*$/\n/;
 
-    my @bits = split ( /\%([THLUDAPM])/i, ($jconfig->{'log_format'} || '[%P/%A/%U/%D] %M'));
+    my @bits = split ( /\%([THLUDAPMRS])/i, ($format || '[%P/%A/%U/%D][%R] %M'));
     my $output = '';
 
     foreach my $idx (0 .. $#bits) {
@@ -146,8 +149,13 @@ sub print_message {
 
             } elsif ($bits[$idx] eq 'M') {
                 $output .= $msg;
-            }
 
+            } elsif ($bits[$idx] eq 'R') {
+                $output .= $jconfig->{request_id} || '';
+            
+            } elsif ($bits[$idx] eq 'S') {
+                $output .= $jconfig->{sid} || '';
+            }
         } else {
             $output .= $bits[$idx];
         }
@@ -156,12 +164,37 @@ sub print_message {
     return $output;
 }
 
+################################################################################
+# Makes a standard message to print out. Uses the log_format from the Jarvis
+# config. Uses print_message 
+#
+# Params:
+#       $jconfig - Jarvis::Config object
+#           READ: username, app_name, dataset_name, log_format
+#       $msg - User message string. We will extend with extra info from $jconfig.
+#       $level - "log", "error", etc.
+#       @params - Optional params to be "sprintf" written into $msg.
+#
+#       log_format contains specifies the headers to include. See print_message
+#       for more information
+#
+#       Default dbmask is in Config.pm.
+#
+# Returns:
+#       The error string to present to the client.
+################################################################################
+#
+sub print_log_message {
+    my ($jconfig, $level, $msg, @params) = @_;
+    return &print_message ($jconfig, $jconfig->{log_format}, $level, $msg, @params);
+}
+
 ###############################################################################
 # Public Functions
 ###############################################################################
 
 ################################################################################
-# Generate debug/dump/log output.  Uses print_message.
+# Generate debug/dump/log output.  Uses print_log_message.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -176,18 +209,18 @@ sub debug {
     my ($jconfig, $msg, @params) = @_;
 
     $jconfig->{'debug'} || return;
-    print STDERR &print_message ($jconfig, 'debug', $msg, @params);
+    print STDERR &print_log_message ($jconfig, 'debug', $msg, @params);
 }
 sub dump {
     my ($jconfig, $msg, @params) = @_;
 
     $jconfig->{'dump'} || return;
-    print STDERR &print_message ($jconfig, 'dump', $msg, @params);
+    print STDERR &print_log_message ($jconfig, 'dump', $msg, @params);
 }
 sub log {
     my ($jconfig, $msg, @params) = @_;
 
-    print STDERR &print_message ($jconfig, 'log', $msg, @params);
+    print STDERR &print_log_message ($jconfig, 'log', $msg, @params);
 }
 
 ################################################################################
@@ -224,7 +257,7 @@ sub print_var {
     my $dumper = Data::Dumper->new([$var]);
     my $var_dump = $dumper->Useqq(1)->Terse(1)->Indent(1)->Sortkeys(1)->Dump ();
     foreach my $msg (split ("\n", $var_dump)) {
-        print STDERR &print_message ($jconfig, $level, $msg);
+        print STDERR &print_log_message ($jconfig, $level, $msg);
     }
 }
 
@@ -260,13 +293,13 @@ sub print_hex {
     my ($jconfig, $level, $msg) = @_;
     
     if (! defined $msg) {
-        print STDERR &print_message ($jconfig, $level, "  <undef>");
+        print STDERR &print_log_message ($jconfig, $level, "  <undef>");
         
     } else {
         my $msglen = length ($msg);
         for (my $pos = 0; $pos < $msglen; $pos = $pos + 16) {
             my $hex = join (" ", unpack ("(H2)*", substr ($msg, $pos, 16)));
-            print STDERR &print_message ($jconfig, $level, "  " . $hex);
+            print STDERR &print_log_message ($jconfig, $level, "  " . $hex);
         }
     }
 }

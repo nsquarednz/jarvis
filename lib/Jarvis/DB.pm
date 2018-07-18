@@ -74,8 +74,8 @@ sub db_config {
 
     # Find the specific database config we need.
     my @dbs = grep { (($_->{'name'}->content || 'default') eq $dbname) && (($_->{'type'}->content || 'dbi') eq $dbtype) } @{ $axml->{'database'} };
-    (scalar @dbs) || die "No database with name '$dbname', type '$dbtype' is currently configured in Jarvis.";
-    ((scalar @dbs) == 1) || die "Multiple databases with name '$dbname', type '$dbtype' are currently configured in Jarvis.";
+    (scalar @dbs) || die "No database with name '$dbname', type '$dbtype' is currently configured in Jarvis.\n";
+    ((scalar @dbs) == 1) || die "Multiple databases with name '$dbname', type '$dbtype' are currently configured in Jarvis.\n";
 
     return $dbs[0];
 }
@@ -159,10 +159,10 @@ sub handle {
         }
 
         my $dbh = $dbhs{$dbtype}{$dbname} = DBI->connect ($dbconnect, $dbusername, $dbpassword, $dbh_attributes) ||
-            die "Cannot connect to DBI database '$dbname': " . DBI::errstr;
+            die "Cannot connect to DBI database '$dbname': " . DBI::errstr . "\n";
         if ($post_connect) {
             &Jarvis::Error::debug ($jconfig, "DB PostConnect = '$post_connect'");
-            $dbh->do($post_connect) or die "Error Executing PostConnect: " . DBI::errstr;
+            $dbh->do($post_connect) or die "Error Executing PostConnect: " . DBI::errstr . "\n";
         }
 
     # SDP is a SSAS DataPump pseudo-database.
@@ -174,11 +174,11 @@ sub handle {
     } elsif ($dbtype eq "sdp") {
         require Jarvis::DB::SDP;
 
-        $dbconnect || die "Missing 'connect' parameter on SSAS DataPump database '$dbname'.";
+        $dbconnect || die "Missing 'connect' parameter on SSAS DataPump database '$dbname'.\n";
         $dbhs{$dbtype}{$dbname} = Jarvis::DB::SDP->new ($jconfig, $dbconnect, $dbusername, $dbpassword, \%parameters);
 
     } else {
-        die "Unsupported Database Type '$dbtype'.";
+        die "Unsupported Database Type '$dbtype'.\n";
     }
     return $dbhs{$dbtype}{$dbname};
 }

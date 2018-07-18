@@ -154,7 +154,7 @@ sub Jarvis::Login::Drupal6::check {
                     $uid = undef;
 
                 } else {
-                    $username = $$result_href{'name'} || die "No uid for sid '$cookie_value'!";
+                    $username = $$result_href{'name'} || die "No uid for sid '$cookie_value'!\n";
                     $logged_in = 1;
                     last;
                 }
@@ -186,7 +186,7 @@ sub Jarvis::Login::Drupal6::check {
             return ("User '$username' not unique (" . (scalar @$result_aref). ").");         # Should never happen.
         }
         my $result_href = $$result_aref[0];
-        $uid = $$result_href{'uid'} || die "No uid for user '$username'!";
+        $uid = $$result_href{'uid'} || die "No uid for user '$username'!\n";
         my $stored_password = $$result_href{'pass'} || '';
 
         if ($stored_password eq '') {
@@ -214,7 +214,7 @@ sub Jarvis::Login::Drupal6::check {
         $logged_in = 1;
 
     } else {
-        die "Unrecognised Drupal6 login_type '$login_type'";
+        die "Unrecognised Drupal6 login_type '$login_type'\n";
     }
 
     # By now we MUST have logged in.
