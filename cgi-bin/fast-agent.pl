@@ -48,8 +48,8 @@ use Jarvis::Main;
 # Main Program
 ###############################################################################
 #
-while (CGI::Fast->new) {
-    &Jarvis::Main::do ();
+while (my $cgi = CGI::Fast->new ()) {
+    &Jarvis::Main::do ({ cgi => $cgi });
 }
 
 1;
