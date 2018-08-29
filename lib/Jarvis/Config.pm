@@ -385,7 +385,7 @@ sub add_http_headers {
 
     for my $key (@keys) {
         $jconfig->{'http_headers'}->{$key} = $header->{$key};
-        &Jarvis::Error::debug ($jconfig,"Adding header $key = " . $header->{$key} );
+        &Jarvis::Error::debug ($jconfig,"Adding header $key = " . ($header->{$key} || '') );
     }
 }
 
