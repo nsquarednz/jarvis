@@ -39,6 +39,7 @@ use JSON;
 use XML::Smart;
 use Text::CSV;
 use IO::String;
+use URI::Escape;
 
 use Jarvis::Text;
 use Jarvis::Error;
@@ -363,7 +364,7 @@ sub get_post_data {
 #
 sub fetch {
     my ($jconfig, $rest_args_aref) = @_;
-    
+
     my $format = $jconfig->{'format'};
     
     # Handle multiple subsets, possibly.
@@ -816,10 +817,19 @@ sub fetch {
             $col = 0;
             my @columns = map { $$row_href{$_} } @$column_names_aref;
             foreach my $value (@columns) {
-                $worksheet->write ($row, $col++, $value, $default_format);
+                # When writing data to the Excel spreadsheet there are a number of limitations.
+                # Issue #13308 we are unable to write encoded URLS longer than 255 characters so we need to check
+                # if that case if occuring useing the same check logic the inferred write function uses.
+                if (defined $value && $value =~ m/^[fh]tt?ps?:\/\//g && length (uri_escape ($value)) > 255) {
+                    # Use the explicit string write function.
+                    $worksheet->write_string ($row, $col++, $value, $default_format);
+                } else {
+                    # Use the automatic "magic" writing function.
+                    $worksheet->write ($row, $col++, $value, $default_format);
+                }                
             }
             $row++;
-        }        
+        }    
         $workbook->close(); 
         
         $return_value = $xlsx_return_text;
