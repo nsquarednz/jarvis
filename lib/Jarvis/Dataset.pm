@@ -37,6 +37,7 @@ package Jarvis::Dataset;
 use Data::Dumper;
 use JSON;
 use XML::Smart;
+use URI::Escape;
 
 use Jarvis::Text;
 use Jarvis::Error;
@@ -555,7 +556,16 @@ sub fetch {
             my @columns = map { $$row{$_} } @$column_names_aref;
             foreach my $value (@columns) {
                 if (defined $value){
-                    $worksheet->write ($row_num, $col, $value, $default_format);
+                    # When writing data to the Excel spreadsheet there are a number of limitations.
+                    # Issue #13308 we are unable to write encoded URLS longer than 255 characters so we need to check
+                    # if that case if occuring useing the same check logic the inferred write function uses.
+                    if ($value =~ m/^[fh]tt?ps?:\/\//g && length (uri_escape ($value)) > 255) {
+                        # Use the explicit string write function.
+                        $worksheet->write_string ($row_num, $col, $value, $default_format);
+                    } else {
+                        # Use the automatic "magic" writing function.
+                        $worksheet->write ($row_num, $col, $value, $default_format);
+                    }
                 }
                 $col ++;
             }
