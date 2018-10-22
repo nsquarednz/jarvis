@@ -31,4 +31,4 @@ Jarvis is distributed in the hope that it will be useful, but WITHOUT ANY WARRAN
 
 You should have received a copy of the GNU Lesser General Public License along with Jarvis.  If not, see <http://www.gnu.org/licenses/>.
 
-This software (including documentation) is Copyright 2011 by Jonathan Couper-Smartt.
+This software (including documentation) is Copyright 2018 N-Squared Software (NZ) Ltd.
