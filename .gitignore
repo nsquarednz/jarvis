@@ -1,0 +1,5 @@
+# Package working files.
+pkg/deb/jarvis*
+
+# Working files that can exist anywhere.
+docs/.~lock.*

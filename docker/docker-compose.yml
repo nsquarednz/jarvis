@@ -1,0 +1,33 @@
+version: '3'
+services:
+  jarvis:
+    image: nsquarednz/jarvis:latest
+    ports:
+      - 5080:80
+      - 5443:443
+    environment:
+      ### Permissions
+      # 
+      # Declare the UID and GID to run the process as
+      # In a development environment this should be the same user as your development
+      # environment is owned by. This will give you full RW access to your files.
+      # To find your UID and GID, simply run "id -a"
+      - PUID=1000
+      - PGID=1000
+
+      ### Logging Prefix
+      # 
+      # Specify a prefix to add to your process' logs
+      - APACHE_SUFFIX=Jarvis
+    volumes:
+      - jarvis-applications:/opt/applications
+      - jarvis-configs:/etc/jarvis
+      - jarvis-data:/mnt/data
+      - jarvis-temp:/tmp
+
+
+volumes:
+  jarvis-applications:
+  jarvis-configs:
+  jarvis-data:
+  jarvis-temp:
