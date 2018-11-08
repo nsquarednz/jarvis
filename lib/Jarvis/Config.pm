@@ -133,7 +133,10 @@ sub new {
     #level back into the app xml so the rest of the config processing will include items
     #from these files.
     foreach my $include ($xml->{jarvis}{include}('@') ) {
-        my $filename = $include->{'file'}->content || die "Bad include filename!: $!.";
+        defined $include->{'file'} || die "Missing attribute 'file' on <include> within '$app_name'.";
+        my $filename = $include->{'file'}->content;
+        length $filename > 0 || die "Filename for <include> '$app_name' is not defined.";
+        -r $filename || die "Application '$app_name' include file '$filename' is not readable.";
         my $subXml = XML::Smart->new ($filename) || die "Cannot read '$filename': $!.";
 
         #note we only merge in at the level of nodes directly below app.
