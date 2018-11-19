@@ -80,10 +80,6 @@ COPY etc/apache                 /etc/jarvis/apache
 COPY etc/apache/jarvis.conf     /etc/apache2/conf-available/jarvis.conf
 
 
-### Add local files
-COPY docker/root/ /
-
-
 ### Configure default environment variables
 ENV \
     APACHE_SUFFIX=""
