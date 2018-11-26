@@ -107,16 +107,15 @@ sub new {
 
     ###############################################################################
     # Get any included files that will contain extra config
-    # These files are parsed into the same XML object
-    # Example icluded file
+    # These files are parsed into the same XML object. Example included file
     #<?xml version="1.0" encoding="utf-8"?>
     # <jarvis>
     #     <app>
     #         <routes>
-    #             <route path="/api/office" dataset="Franchise"/>
+    #             <route path="/api/boats" dataset="boats-list"/>
     #         </routes>
     #
-    #         <plugin dataset="TEST" access="*" module="Boris::TEST" add_headers="yes"/>
+    #         <plugin dataset="TransformBoats" access="*" module="Boats::TransformBoats" add_headers="yes"/>
     #     </app>
     #</jarvis>
     #
@@ -124,7 +123,7 @@ sub new {
     #   <?xml version="1.0" encoding="utf-8"?>
     #       <jarvis>
     #
-    #           <include file="/home/dwalmsley/dev/porse/boris-angular.hg/etc/routes.xml"/>
+    #           <include file="/usr/share/boats/etc/routes.xml"/>
     #           ....
     #
     ###############################################################################
