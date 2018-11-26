@@ -176,7 +176,8 @@ sub error_handler {
     # since that is a potential security weakness.
     $jconfig->{status} = $jconfig->{status} || "500 Internal Server Error"; 
     my $status = $jconfig->{status};
-    print $cgi->header(-status => $status, -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt");
+    &Jarvis::Config::add_http_headers($jconfig,{ -status => $status, -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt" });
+    print $cgi->header($jconfig->{http_headers});
     if ($status =~ /^500/) {
         print &Jarvis::Error::print_message ($jconfig, $jconfig->{error_response_format} || "[%T][%R] %M", 'fatal', $msg);
     } else {
@@ -312,7 +313,8 @@ sub do {
     #
     # We don't suppport OPTIONS requests, so return a 501 Not Implemented.
     if ($method eq "OPTIONS") {
-        print $cgi->header(-status => '501 Not Implemented', -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt");
+        &Jarvis::Config::add_http_headers($jconfig, {-status => '501 Not Implemented', -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt"});
+        print $cgi->header($jconfig->{http_headers});
         return;
     }
 
@@ -547,8 +549,8 @@ sub do {
         } else {
             die "Unknown special dataset '$dataset_name'!\n";
         }
-
-        print $cgi->header(-type => "text/plain; charset=UTF-8", -cookie => $jconfig->{cookie}, 'Cache-Control' => 'no-store, no-cache, must-revalidate');
+        &Jarvis::Config::add_http_headers($jconfig, {-type => "text/plain; charset=UTF-8", -cookie => $jconfig->{cookie}, 'Cache-Control' => 'no-store, no-cache, must-revalidate'});
+        print $cgi->header($jconfig->{http_headers});
         print $return_text;
 
     # A custom exec for this application?  We hand off entirely for this case,
@@ -583,51 +585,60 @@ sub do {
         if ($jconfig->{format} eq "csv") {
             my $filename = $jconfig->{return_filename} || $dataset_name . ".csv";
             $filename =~ s/"/\\"/g;
-            print $cgi->header(
+            &Jarvis::Config::add_http_headers($jconfig, {
                 -type => 'text/csv; charset=UTF-8; name="' . $filename . '"',
                 'Content-Disposition' => 'attachment; filename="' . $filename . '"',
                 -cookie => $jconfig->{cookie},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
-            );
-            
+            });
         } elsif ($jconfig->{format} eq "xlsx") {
             my $filename = $jconfig->{return_filename} || $dataset_name . ".xlsx";
             $filename =~ s/"/\\"/g;
-            print $cgi->header(
+            &Jarvis::Config::add_http_headers($jconfig, {
                 -type => 'application/vnd.ms-excel; name="' . $filename . '"',
                 'Content-Disposition' => 'attachment; filename="' . $filename . '"',
                 -cookie => $jconfig->{cookie},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
-            );
-            ;
+            });
         } else {
-            print $cgi->header(
-                -type => "text/plain; charset=UTF-8",
+
+            my $type = "text/plain; charset=UTF-8";
+            if ($jconfig->{format} =~ /json/i ) {
+                $type = 'application/json; charset=UTF-8"';
+            } elsif ($jconfig->{format} =~ /XML/i ) {
+                $type=  'application/xml; charset=UTF-8"';
+            }
+
+            &Jarvis::Config::add_http_headers($jconfig,  {
+                -type => $type,
                 -cookie => $jconfig->{cookie},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
-            );
+            });
         }
+
+        print $cgi->header($jconfig->{http_headers});
 
         # If we have XSRF Protection enabled then we prefix all JSON responses with ")]}',\n" This prevents executable JSON being
         # being passed to JSON clients.
         if ($jconfig->{xsrf_protection} && $jconfig->{format} =~ /^json/) {
-            print ")]}',\n" . $return_text;    
+            print ")]}',\n" . $return_text;
         } else {
             print $return_text;
-        }       
+        }
 
     # Modify a regular dataset.
     } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete") || ($action eq "mixed")) {
 
         $jconfig->{dataset_type} = 's';
         my $return_text = &Jarvis::Dataset::store ($jconfig, $dataset_name, $user_args);
-
-        print $cgi->header(-type => "text/plain; charset=UTF-8", -cookie => $jconfig->{cookie});
+        &Jarvis::Config::add_http_headers($jconfig, {-type => "text/plain; charset=UTF-8", -cookie => $jconfig->{cookie}});
+        print $cgi->header($jconfig->{http_headers});
         print $return_text;
 
     # It's the end of the world as we know it.
     } else {
-        print $cgi->header(-status => '501 Not Implemented', -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt");
+        &Jarvis::Config::add_http_headers($jconfig, {-status => '501 Not Implemented', -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt"});
+        print $cgi->header($jconfig->{http_headers});
         print "The $method method (action $action) is not recognised by Jarvis.";
     }
 

@@ -40,6 +40,7 @@ use DBI;
 use XML::Smart;
 
 use Jarvis::Error;
+use Data::Dumper;
 
 %Jarvis::Config::yes_value = ('yes' => 1, 'true' => 1, 'on' => 1, '1' => 1);
 
@@ -60,6 +61,7 @@ use Jarvis::Error;
 #               xml                Handle to an XML::Smart object of app config.
 #               cgi                Handle to a CGI object for this request.
 #               format             Format xml or json?
+#               retain_null        Retain nulls when outputting JSON?
 #               debug              Debug enabled for this app?
 #               dump               Dump (Detailed Debug) enabled for this app?
 #               log_format         Format for log and debug output.
@@ -89,6 +91,9 @@ sub new {
     $self->{'etc_dir'} = $args{'etc_dir'} || "../etc" || die "Missing parameter 'etc_dir'\n";
     (-d $self->{'etc_dir'}) || die "Parameter 'etc_dir' does not specify a directory.\n";
 
+    # Setup http headers
+    $self->{'http_headers'} = {};
+
     ###############################################################################
     # Load our global configuration.
     ###############################################################################
@@ -99,6 +104,46 @@ sub new {
     ($xml->{jarvis}) || die "Missing <jarvis> tag in '$xml_filename'!\n";
 
     $self->{'xml'} = $xml;
+
+    ###############################################################################
+    # Get any included files that will contain extra config
+    # These files are parsed into the same XML object. Example included file
+    #<?xml version="1.0" encoding="utf-8"?>
+    # <jarvis>
+    #     <app>
+    #         <routes>
+    #             <route path="/api/boats" dataset="boats-list"/>
+    #         </routes>
+    #
+    #         <plugin dataset="TransformBoats" access="*" module="Boats::TransformBoats" add_headers="yes"/>
+    #     </app>
+    #</jarvis>
+    #
+    # Example include in the jarvis config xml
+    #   <?xml version="1.0" encoding="utf-8"?>
+    #       <jarvis>
+    #
+    #           <include file="/usr/share/boats/etc/routes.xml"/>
+    #           ....
+    #
+    ###############################################################################
+    #
+    #Loop through all the include directives read the files and merge them at the top
+    #level back into the app xml so the rest of the config processing will include items
+    #from these files.
+    foreach my $include ($xml->{jarvis}{include}('@') ) {
+        defined $include->{'file'} || die "Missing attribute 'file' on <include> within '$app_name'.";
+        my $filename = $include->{'file'}->content;
+        length $filename > 0 || die "Filename for <include> '$app_name' is not defined.";
+        -r $filename || die "Application '$app_name' include file '$filename' is not readable.";
+        my $subXml = XML::Smart->new ($filename) || die "Cannot read '$filename': $!.";
+
+        #note we only merge in at the level of nodes directly below app.
+        foreach my $nodeName ($subXml->{jarvis}{app}->nodes_keys()){
+            $xml->{jarvis}{app}{$nodeName} = $subXml->{jarvis}{app}{$nodeName}->tree_pointer();
+        }
+    }
+
 
     ###############################################################################
     # Get the application config.  Note that we must NOT store this in our args
@@ -128,6 +173,9 @@ sub new {
 
     # This is used by several things, so let's store it in our config.
     $self->{'format'} = lc ($self->{'cgi'}->param ('format') || $axml->{'format'}->content || "json");
+
+    # This is used to toggle on and off the ability to return nulls, default is off.
+    $self->{'retain_null'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'retain_null'}->content || "no")});
 
     # This is an optional METHOD overide parameter, similar to Ruby on Rails.
     # It bypasses a problem where non-proxied Flex can only send GET/POST requests.
@@ -303,6 +351,44 @@ sub safe_variables {
     }
 
     return %safe_params;
+}
+
+
+################################################################################
+#  We need to be able to set headers in hooks to do this we need to store the
+#  headers before they are sent. The best place is inside the $jconfig
+#
+#   When ever printing headers the should be printed like this
+#
+#             &Jarvis::Config::add_http_headers($jconfig, {
+#                -type => "text/plain; charset=UTF-8",
+#                -cookie => $jconfig->{cookie},
+#                'Cache-Control' => 'no-store, no-cache, must-revalidate'
+#            });
+#
+#            print $cgi->header($jconfig->{http_headers});
+#
+#   - Additional Safe parameters (e.g. from hooks, session store, etc.)
+#
+# Params:
+#       $jconfig - Jarvis::Config object
+#
+#
+#       $header - Hash of the header key values paris
+# Returns:
+#       1
+################################################################################
+#
+
+sub add_http_headers {
+    my ($jconfig, $header) = @_;
+
+    my @keys = keys %{ $header };
+
+    for my $key (@keys) {
+        $jconfig->{'http_headers'}->{$key} = $header->{$key};
+        &Jarvis::Error::debug ($jconfig,"Adding header $key = " . ($header->{$key} || '') );
+    }
 }
 
 1;
