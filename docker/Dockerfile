@@ -40,11 +40,13 @@ RUN \
             apache2-data \
             apache2-dev \
             apache2-utils \
+            libapache2-mod-perl2 \
     && \
     echo "**** Configure Apache ****" \
         && a2enmod ssl \
         && a2enmod rewrite \
         && a2enmod cgi \
+        && a2enmod perl \
     && \
     echo "**** Install Jarvis dependencies ****" \
         && apt-get install -y \
@@ -53,6 +55,7 @@ RUN \
             libxml-smart-perl \
             libdbi-perl \
             libjson-perl \
+            libapache-dbi-perl \
     && \
     echo "**** Configure Jarvis ****" \
         && cd /etc/apache2/conf-enabled \
@@ -77,7 +80,7 @@ COPY htdocs                     /usr/share/jarvis/htdocs
 COPY lib                        /usr/share/jarvis/lib
 COPY etc/jarvis                 /etc/jarvis
 COPY etc/apache                 /etc/jarvis/apache
-COPY etc/apache/jarvis.conf     /etc/apache2/conf-available/jarvis.conf
+COPY etc/apache/jarvis-mod-perl.conf     /etc/apache2/conf-available/jarvis.conf
 
 
 ### Configure default environment variables
