@@ -16,7 +16,7 @@ LABEL maintainer="N-Squared Software <support@nsquared.nz>"
 ### Config:
 ###
 # set version for s6 overlay
-ARG S6_INIT_SCRIPTS_VERSION="v0.3"
+ARG S6_INIT_SCRIPTS_VERSION="v0.5"
 ARG SERVICES="apache2 openssl"
 
 
@@ -41,12 +41,14 @@ RUN \
             apache2-dev \
             apache2-utils \
             libapache2-mod-perl2 \
+            libapache2-mod-fcgid \
     && \
     echo "**** Configure Apache ****" \
         && a2enmod ssl \
         && a2enmod rewrite \
-        && a2enmod cgi \
-        && a2enmod perl \
+        && a2dismod cgi \
+        && a2dismod perl \
+        && a2dismod fcgid \
     && \
     echo "**** Install Jarvis dependencies ****" \
         && apt-get install -y \
@@ -56,10 +58,6 @@ RUN \
             libdbi-perl \
             libjson-perl \
             libapache-dbi-perl \
-    && \
-    echo "**** Configure Jarvis ****" \
-        && cd /etc/apache2/conf-enabled \
-        && ln -s ../conf-available/jarvis.conf jarvis.conf \
     && \
     echo "**** Install init process ****" \
         && curl -L "https://github.com/nsquarednz/s6-init/archive/${S6_INIT_SCRIPTS_VERSION}.tar.gz" -o /tmp/s6-init.tar.gz \
@@ -74,13 +72,17 @@ RUN \
         && rm -rf /run/apache*
 
 
+### Add local files
+COPY docker/root/               /
+
+
 ### Install Jarvis
 COPY cgi-bin                    /usr/share/jarvis/cgi-bin
 COPY htdocs                     /usr/share/jarvis/htdocs
 COPY lib                        /usr/share/jarvis/lib
 COPY etc/jarvis                 /etc/jarvis
 COPY etc/apache                 /etc/jarvis/apache
-COPY etc/apache/jarvis-mod-perl.conf     /etc/apache2/conf-available/jarvis.conf
+COPY etc/apache/*.conf          /etc/apache2/conf-available/
 
 
 ### Configure default environment variables

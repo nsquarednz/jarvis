@@ -1,0 +1,49 @@
+#!/usr/bin/with-contenv bash
+#
+# NOTE!
+# Apache cont-init.d is 50-apache2. This script migrates apache configs to /config/etc/apache2
+# This script must run after 50-apache2 (so must have a higer prefix).
+
+SCRIPT_NAME=$(basename $BASH_SOURCE);
+
+# Set apache config dir (configs are moved from /etc/apache2 -> /config/etc/apache2)
+APACHE_CONFDIR=/config/etc/apache2
+
+jarvis_config() {
+    ### Configure Apache module
+    echo "**** (${SCRIPT_NAME} - jarvis_config) Configuring apache for Jarvis ****";
+
+    # Validate the APACHE_PERL_CONF variable
+    if [[ -z ${APACHE_PERL_CONF} ]]; then
+        # If ${APACHE_PERL_CONF} is empty, default to cgi
+        APACHE_PERL_CONF='cgi'
+    fi
+    if [[ "cgi fcgi modperl" != *"${APACHE_PERL_CONF}"* ]]; then
+        # If ${APACHE_PERL_CONF} is not valid, default to cgi
+        echo APACHE_PERL_CONF='cgi'
+    fi
+    
+    # Set the correct module and jarvis config
+    if [[ ${APACHE_PERL_CONF} == 'cgi' ]]; then
+        echo "**** (${SCRIPT_NAME} - jarvis_config) Enable Apache CGI module  ****";
+        a2enmod cgi
+        JARVIS_APACHE_CONFIG=jarvis.conf
+    fi
+    if [[ ${APACHE_PERL_CONF} == 'fcgi' ]]; then
+        echo "**** (${SCRIPT_NAME} - jarvis_config) Enable Apache Fast CGI module  ****";
+        a2enmod fcgid
+        JARVIS_APACHE_CONFIG=jarvis-fast-cgi.conf
+    fi
+    if [[ ${APACHE_PERL_CONF} == 'modperl' ]]; then
+        echo "**** (${SCRIPT_NAME} - jarvis_config) Enable Apache Mod Perl module  ****";
+        a2enmod perl
+        JARVIS_APACHE_CONFIG=jarvis-mod-perl.conf
+    fi
+    echo "**** (${SCRIPT_NAME} - jarvis_config) Enable Jarvis config ${JARVIS_APACHE_CONFIG} ****";
+    cd ${APACHE_CONFDIR}/conf-enabled
+    rm -f jarvis.conf
+    ln -s ../conf-available/${JARVIS_APACHE_CONFIG} jarvis.conf
+}
+
+
+jarvis_config;
