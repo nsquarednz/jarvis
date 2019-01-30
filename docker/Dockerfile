@@ -16,7 +16,7 @@ LABEL maintainer="N-Squared Software <support@nsquared.nz>"
 ### Config:
 ###
 # set version for s6 overlay
-ARG S6_INIT_SCRIPTS_VERSION="v0.5"
+ARG S6_INIT_SCRIPTS_VERSION="v0.6"
 ARG SERVICES="apache2 openssl"
 
 
