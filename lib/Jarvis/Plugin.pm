@@ -90,38 +90,40 @@ sub do {
     # Start with the <default_parameters>, and add/replace any per-plugin configured parameters.
     my %plugin_parameters = &Jarvis::Config::default_parameters ($jconfig);         
 
-    my $axml = $jconfig->{xml}{jarvis}{app};
-    if ($axml->{plugin}) {
-        foreach my $plugin (@{ $axml->{plugin} }) {
-            my $plugin_ds = $plugin->{dataset}->content;
-            &Jarvis::Error::dump ($jconfig, "Comparing '$dataset' to '$plugin_ds'.");
-            next if (($dataset ne $plugin_ds) && ($dataset !~ m/^$plugin_ds\./));
-            &Jarvis::Error::debug ($jconfig, "Found matching custom <plugin> dataset '$dataset'.");
+    # Process the 'plugin' entries across the main jarvis file AND THEN any <include> files.
+    ALL_PLUGINS: foreach my $axml ($jconfig->{xml}{jarvis}{app}, @{ $jconfig->{iaxmls} }) {
+        if ($axml->{plugin}) {
+            foreach my $plugin (@{ $axml->{plugin} }) {
+                my $plugin_ds = $plugin->{dataset}->content;
+                &Jarvis::Error::dump ($jconfig, "Comparing '$dataset' to '$plugin_ds'.");
+                next if (($dataset ne $plugin_ds) && ($dataset !~ m/^$plugin_ds\./));
+                &Jarvis::Error::debug ($jconfig, "Found matching custom <plugin> dataset '$dataset'.");
 
-            $allowed_groups = $plugin->{access}->content || die "No 'access' defined for plugin dataset '$dataset'\n";
-            $lib = $plugin->{lib}->content if $plugin->{lib};
-            $module = $plugin->{module}->content || die "No 'module' defined for plugin dataset '$dataset'\n";
-            $add_headers = defined ($Jarvis::Config::yes_value {lc ($plugin->{add_headers}->content || "no")});
-            $default_filename = $plugin->{default_filename}->content;
-            $filename_parameter = $plugin->{filename_parameter}->content || 'filename';
-            $mime_type = $plugin->{mime_type}->content;
+                $allowed_groups = $plugin->{access}->content || die "No 'access' defined for plugin dataset '$dataset'\n";
+                $lib = $plugin->{lib}->content if $plugin->{lib};
+                $module = $plugin->{module}->content || die "No 'module' defined for plugin dataset '$dataset'\n";
+                $add_headers = defined ($Jarvis::Config::yes_value {lc ($plugin->{add_headers}->content || "no")});
+                $default_filename = $plugin->{default_filename}->content;
+                $filename_parameter = $plugin->{filename_parameter}->content || 'filename';
+                $mime_type = $plugin->{mime_type}->content;
 
-            $jconfig->{dump} = $jconfig->{dump} || defined ($Jarvis::Config::yes_value {lc ($plugin->{dump}->content || "no")});
-            $jconfig->{debug} = $jconfig->{dump} || $jconfig->{debug} || defined ($Jarvis::Config::yes_value {lc ($plugin->{debug}->content || "no")});
+                $jconfig->{dump} = $jconfig->{dump} || defined ($Jarvis::Config::yes_value {lc ($plugin->{dump}->content || "no")});
+                $jconfig->{debug} = $jconfig->{dump} || $jconfig->{debug} || defined ($Jarvis::Config::yes_value {lc ($plugin->{debug}->content || "no")});
 
-            # Get our parameters.  These are the configured parameters from the XML file,
-            # which we handily load up for you, to avoid duplicating this code in every
-            # module.  If you want CGI parameters from within your module, then you can access
-            # the $jconfig->{cgi} CGI object.  Ditto for anything else you might want from
-            # the $jconfig->{xml} XML::Smartt object.
-            #
-            if ($plugin->{parameter}) {
-                foreach my $parameter ($plugin->{parameter}('@')) {
-                    &Jarvis::Error::debug ($jconfig, "Plugin Parameter: " . $parameter->{name}->content . " -> " . $parameter->{value}->content);
-                    $plugin_parameters {$parameter->{name}->content} = $parameter->{value}->content;
+                # Get our parameters.  These are the configured parameters from the XML file,
+                # which we handily load up for you, to avoid duplicating this code in every
+                # module.  If you want CGI parameters from within your module, then you can access
+                # the $jconfig->{cgi} CGI object.  Ditto for anything else you might want from
+                # the $jconfig->{xml} XML::Smartt object.
+                #
+                if ($plugin->{parameter}) {
+                    foreach my $parameter ($plugin->{parameter}('@')) {
+                        &Jarvis::Error::debug ($jconfig, "Plugin Parameter: " . $parameter->{name}->content . " -> " . $parameter->{value}->content);
+                        $plugin_parameters {$parameter->{name}->content} = $parameter->{value}->content;
+                    }
                 }
+                last ALL_PLUGINS;
             }
-            last;
         }
     }
 

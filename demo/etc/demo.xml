@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <jarvis>
+    <include file="/usr/share/jarvis/demo/etc/include1.xml"/>
+    <include file="/usr/share/jarvis/demo/etc/include2.xml"/>
+
     <app format="json" debug="yes" dump="no">
         <!-- This is where our <dataset>.xml are all stored -->
 	    <dataset_dir>/usr/share/jarvis/demo/dataset</dataset_dir>
@@ -25,6 +28,7 @@
         -->
         <router>
             <route path="/file_download/:boat_class" dataset="FileDownload"/>
+            <route path="/file_download3/:boat_class" dataset="FileDownload3"/>
             <route path="/boat_object/:id" dataset="boat_object" presentation="singleton"/>
             <route path="/boat_class/:boat_class" dataset="boat_class"/>
             <route path="/boat_singleton/:id" dataset="boat" presentation="singleton"/>
@@ -81,8 +85,13 @@
         <!-- This plugin is used to allow admin users to reset any user's password. -->
         <plugin dataset="SetPassword" access="*" lib="/usr/share/jarvis/demo" module="plugin::SetPassword" add_headers="yes"/>
 
-        <!-- This is a simple file download demo plugin. -->
+        <!-- This is a simple file download demo plugin, exists only in the main demo.xml. -->
         <plugin dataset="FileDownload" access="**" lib="/usr/share/jarvis/demo" module="plugin::FileDownload" add_headers="yes" mime_type="text/plain">
+            <parameter name="interview" value="Cross-Sectional"/>
+        </plugin>
+
+        <!-- This one exist in demo.xml and include.xml, but this one will take priority. -->
+        <plugin dataset="FileDownload3" access="**" lib="/usr/share/jarvis/demo" module="plugin::FileDownload" add_headers="yes" mime_type="text/plain">
             <parameter name="interview" value="Cross-Sectional"/>
         </plugin>
 

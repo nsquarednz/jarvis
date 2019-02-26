@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<jarvis>
+    <app>
+        <!-- This is a simple file download demo plugin defined in this file only. -->
+        <plugin dataset="FileDownload2" access="**" lib="/usr/share/jarvis/demo" module="plugin::FileDownload" add_headers="yes" mime_type="text/plain">
+            <parameter name="interview" value="Secondary Alternative"/>
+        </plugin>
+
+        <!-- This one exist in demo.xml and include.xml, but this one is over-ridden. -->
+        <plugin dataset="FileDownload3" access="**" lib="/usr/share/jarvis/demo" module="plugin::FileDownload" add_headers="yes" mime_type="text/plain">
+            <parameter name="interview" value="Value Ignored"/>
+        </plugin>
+
+        <router>
+            <route path="/file_download3/:boat_class" dataset="FileDownloadNotExist"/>
+        </router>
+    </app>
+</jarvis>
