@@ -211,6 +211,7 @@ sub new {
         (length ($filename) > 0) or die "Filename for <include> '$app_name' is empty.";
 
         &Jarvis::Error::debug ($self, "Include File: '%s'.", $filename);
+        (-e $filename) or die "Application '$app_name' include file '$filename' does not exist.";
         (-r $filename) or die "Application '$app_name' include file '$filename' is not readable.";
         
         my $ixml = XML::Smart->new ($filename) or die "Cannot read '$filename': $!.";
