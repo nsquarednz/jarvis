@@ -516,6 +516,15 @@ sub do {
     # 's' = sql, 'i' = internal, 'p' = plugin, 'e' = exec, undef for undetermined.
     $jconfig->{dataset_type} = undef;
 
+    # This is the type we use for anything that has structured content JSOn or XML.
+    my $object_content_type = "text/plain; charset=UTF-8";
+    if ($jconfig->{format} =~ /json/i ) {
+        $object_content_type = 'application/json; charset=UTF-8"';
+
+    } elsif ($jconfig->{format} =~ /XML/i ) {
+        $object_content_type =  'application/xml; charset=UTF-8"';
+    }   
+
     # All special datasets start with "__".
     #
     # Note that our Plugin and Execs may expect "/appname/<something-else>" so
@@ -549,8 +558,12 @@ sub do {
         } else {
             die "Unknown special dataset '$dataset_name'!\n";
         }
-        &Jarvis::Config::add_http_headers($jconfig, {-type => "text/plain; charset=UTF-8", -cookie => $jconfig->{cookie}, 'Cache-Control' => 'no-store, no-cache, must-revalidate'});
-        print $cgi->header($jconfig->{http_headers});
+        &Jarvis::Config::add_http_headers ($jconfig, {
+            -type => $object_content_type, 
+            -cookie => $jconfig->{cookie}, 
+            'Cache-Control' => 'no-store, no-cache, must-revalidate'
+        });
+        print $cgi->header ($jconfig->{http_headers});
         print $return_text;
 
     # A custom exec for this application?  We hand off entirely for this case,
@@ -591,6 +604,7 @@ sub do {
                 -cookie => $jconfig->{cookie},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             });
+
         } elsif ($jconfig->{format} eq "xlsx") {
             my $filename = $jconfig->{return_filename} || $dataset_name . ".xlsx";
             $filename =~ s/"/\\"/g;
@@ -600,17 +614,10 @@ sub do {
                 -cookie => $jconfig->{cookie},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             });
+
         } else {
-
-            my $type = "text/plain; charset=UTF-8";
-            if ($jconfig->{format} =~ /json/i ) {
-                $type = 'application/json; charset=UTF-8"';
-            } elsif ($jconfig->{format} =~ /XML/i ) {
-                $type=  'application/xml; charset=UTF-8"';
-            }
-
             &Jarvis::Config::add_http_headers($jconfig,  {
-                -type => $type,
+                -type => $object_content_type,
                 -cookie => $jconfig->{cookie},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             });

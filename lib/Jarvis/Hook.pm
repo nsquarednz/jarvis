@@ -144,31 +144,33 @@ sub load_global {
     # Set the hook nesting level to 0 (global hooks only).
     $jconfig->{hook_level} = 0;
 
-    my $axml = $jconfig->{xml}{jarvis}{app};
-    if ($axml->{hook}) {
-        foreach my $hook (@{ $axml->{hook} }) {
-            my $lib = $hook->{lib} ? $hook->{lib}->content : undef;
-            my $module = $hook->{module}->content || die "Invalid global hook configuration, <hook> configured with no 'module' attribute.\n";
+    # Process the 'hook' entries across the main jarvis file AND THEN any <include> files.
+    foreach my $axml ($jconfig->{xml}{jarvis}{app}, @{ $jconfig->{iaxmls} }) {
+        if ($axml->{hook}) {
+            foreach my $hook (@{ $axml->{hook} }) {
+                my $lib = $hook->{lib} ? $hook->{lib}->content : undef;
+                my $module = $hook->{module}->content || die "Invalid global hook configuration, <hook> configured with no 'module' attribute.\n";
 
-            &Jarvis::Error::debug ($jconfig, "Loading (level 0) global <hook> with module '$module'.");
+                &Jarvis::Error::debug ($jconfig, "Loading (level 0) global <hook> with module '$module'.");
 
-            my %hook_parameter = ();
-            if ($hook->{parameter}) {
-                foreach my $parameter ($hook->{parameter}('@')) {
-                    &Jarvis::Error::debug ($jconfig, "Hook Parameter: " . $parameter->{name}->content . " -> " . $parameter->{value}->content);
-                    $hook_parameter {$parameter->{name}->content} = $parameter->{value}->content;
+                my %hook_parameter = ();
+                if ($hook->{parameter}) {
+                    foreach my $parameter ($hook->{parameter}('@')) {
+                        &Jarvis::Error::debug ($jconfig, "Hook Parameter: " . $parameter->{name}->content . " -> " . $parameter->{value}->content);
+                        $hook_parameter {$parameter->{name}->content} = $parameter->{value}->content;
+                    }
                 }
-            }
 
-            my %hook_def = ('module' => $module, 'lib' => $lib, 'parameters' => \%hook_parameter, level => 0);
-            push (@{ $jconfig->{hooks} }, \%hook_def);
-            &load_module ($jconfig, \%hook_def);
+                my %hook_def = ('module' => $module, 'lib' => $lib, 'parameters' => \%hook_parameter, level => 0);
+                push (@{ $jconfig->{hooks} }, \%hook_def);
+                &load_module ($jconfig, \%hook_def);
 
-            my $method = $module . "::start";
-            {
-                no strict 'refs';
-                exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
-                exists &$method && &$method ($jconfig, \%hook_parameter);
+                my $method = $module . "::start";
+                {
+                    no strict 'refs';
+                    exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
+                    exists &$method && &$method ($jconfig, \%hook_parameter);
+                }
             }
         }
     }

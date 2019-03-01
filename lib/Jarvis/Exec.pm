@@ -77,35 +77,37 @@ sub do {
     my $tmp_redirect = 0;               # Are we going to redirect the user to the results?
     my $cleanup_after = 0;              # Cleanup after how many minutes?  0 = NEVER CLEANUP.
 
-    my $axml = $jconfig->{xml}{jarvis}{app};
-    if ($axml->{exec}) {
-        foreach my $exec (@{ $axml->{exec} }) {
-            my $exec_ds = $exec->{dataset}->content;
-            &Jarvis::Error::dump ($jconfig, "Comparing '$dataset' to '$exec_ds'.");
-            next if (($dataset ne $exec_ds) && ($dataset !~ m/^$exec_ds\./));
+    # Process the 'exec' entries across the main jarvis file AND THEN any <include> files.
+    ALL_EXECS: foreach my $axml ($jconfig->{xml}{jarvis}{app}, @{ $jconfig->{iaxmls} }) {
+        if ($axml->{exec}) {
+            foreach my $exec (@{ $axml->{exec} }) {
+                my $exec_ds = $exec->{dataset}->content;
+                &Jarvis::Error::dump ($jconfig, "Comparing '$dataset' to '$exec_ds'.");
+                next if (($dataset ne $exec_ds) && ($dataset !~ m/^$exec_ds\./));
 
-            &Jarvis::Error::debug ($jconfig, "Found matching custom <exec> dataset '$dataset'.");
+                &Jarvis::Error::debug ($jconfig, "Found matching custom <exec> dataset '$dataset'.");
 
-            $allowed_groups = $exec->{access}->content || die "No 'access' defined for exec dataset '$dataset'\n";
-            $command = $exec->{command}->content || die "No 'command' defined for exec dataset '$dataset'\n";
-            $add_headers = defined ($Jarvis::Config::yes_value {lc ($exec->{add_headers}->content || "no")});
-            $default_filename = $exec->{default_filename}->content;
-            $filename_parameter = $exec->{filename_parameter}->content || 'filename';
-            $mime_type = $exec->{mime_type}->content;
-            $cleanup_after = $exec->{cleanup_after}->content || 0;
+                $allowed_groups = $exec->{access}->content || die "No 'access' defined for exec dataset '$dataset'\n";
+                $command = $exec->{command}->content || die "No 'command' defined for exec dataset '$dataset'\n";
+                $add_headers = defined ($Jarvis::Config::yes_value {lc ($exec->{add_headers}->content || "no")});
+                $default_filename = $exec->{default_filename}->content;
+                $filename_parameter = $exec->{filename_parameter}->content || 'filename';
+                $mime_type = $exec->{mime_type}->content;
+                $cleanup_after = $exec->{cleanup_after}->content || 0;
 
-            # If HTTP redirection URL is specified, then use of tmp files is forced.
-            $tmp_directory = $exec->{tmp_directory}->content;
-            $tmp_http_path = $exec->{tmp_http_path}->content;
+                # If HTTP redirection URL is specified, then use of tmp files is forced.
+                $tmp_directory = $exec->{tmp_directory}->content;
+                $tmp_http_path = $exec->{tmp_http_path}->content;
 
-            $use_tmpfile = $tmp_http_path || $tmp_directory || defined ($Jarvis::Config::yes_value {lc ($exec->{use_tmpfile}->content || "no")});
-            $tmp_redirect = $tmp_http_path;
+                $use_tmpfile = $tmp_http_path || $tmp_directory || defined ($Jarvis::Config::yes_value {lc ($exec->{use_tmpfile}->content || "no")});
+                $tmp_redirect = $tmp_http_path;
 
-            # Override debug/dump.  Won't get much, but at least we'll see what is produced.
-            $jconfig->{dump} = $jconfig->{dump} || defined ($Jarvis::Config::yes_value {lc ($exec->{dump}->content || "no")});
-            $jconfig->{debug} = $jconfig->{dump} || $jconfig->{debug} || defined ($Jarvis::Config::yes_value {lc ($exec->{debug}->content || "no")});
+                # Override debug/dump.  Won't get much, but at least we'll see what is produced.
+                $jconfig->{dump} = $jconfig->{dump} || defined ($Jarvis::Config::yes_value {lc ($exec->{dump}->content || "no")});
+                $jconfig->{debug} = $jconfig->{dump} || $jconfig->{debug} || defined ($Jarvis::Config::yes_value {lc ($exec->{debug}->content || "no")});
 
-            last;
+                last ALL_EXECS;
+            }
         }
     }
 

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<jarvis>
+    <app>
+        <hook module="Global2">
+            <parameter name="sideband" value="Special Include"/>
+        </hook>
+
+        <exec dataset="echo2" access="**" command="echo" add_headers="yes" filename_parameter="filename"  mime_type="text/plain"/>
+
+        <router>
+            <route path="/file_download2/:boat_class" dataset="FileDownload2"/>
+        </router>
+    </app>
+</jarvis>

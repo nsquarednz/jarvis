@@ -36,6 +36,9 @@ if (! ok ($json->{logged_in} == 1, "JSON Log In")) {
 if (! eq_or_diff ($json->{quota}, "4 Gazillion", 'JSON Login quota parameter matches.')) {
     BAIL_OUT("Unexpected __status quota: " . &Dumper ($json));    
 }
+if (! eq_or_diff ($json->{sideband}, "Special Include", 'JSON Login sideband parameter matches.')) {
+    BAIL_OUT("Unexpected __status sideband: " . &Dumper ($json));    
+}
 if (! eq_or_diff ($json->{group_list}, "admin,default", 'JSON Login group_list matches.')) {
     BAIL_OUT("Unexpected __status group_list: " . &Dumper ($json));    
 }
@@ -51,6 +54,30 @@ my $xml = TestUtils::fetch_xml ([ '__status' ]);
 if (! ok (defined $xml->{response} && defined $xml->{response}{logged_in} && $xml->{response}{logged_in}->content, "XML Status")) {
     BAIL_OUT("Failed to XML status: " . &Dumper ($xml));    
 }
+
+###############################################################################
+# ECHO 
+###############################################################################
+
+my $text = TestUtils::fetch ([ 'echo' ], { paramA => 'a', paramB => 'b' }, 'text/plain');
+if (! ok (defined $text, "Echo")) {
+    BAIL_OUT("Failed to echo: " . &Dumper ($text));    
+}
+if (! eq_or_diff ($text, "p0=echo __dataset=echo __group:admin=1 __group:default=1 __group_list=admin,default __username=admin max_rows=500 paramA=a paramB=b\n", 'Echo matches.')) {
+    BAIL_OUT("Unexpected __status quota: " . &Dumper ($text));    
+}
+
+$text = TestUtils::fetch ([ 'echo2' ], { paramA => 'A', paramB => 'B' }, 'text/plain');
+if (! ok (defined $text, "Echo2")) {
+    BAIL_OUT("Failed to echo2: " . &Dumper ($text));    
+}
+if (! eq_or_diff ($text, "p0=echo2 __dataset=echo2 __group:admin=1 __group:default=1 __group_list=admin,default __username=admin max_rows=500 paramA=A paramB=B\n", 'Echo matches.')) {
+    BAIL_OUT("Unexpected __status quota: " . &Dumper ($text));    
+}
+
+###############################################################################
+# Simple Fetch
+###############################################################################
 
 # Get all boats.
 $json = TestUtils::fetch_json ([ 'boat' ]);
@@ -370,9 +397,9 @@ $expected = {
     	{ 'name' => 'Whatsitt', 'id' => $mh_whatsit_id },
     ]
 };
-if (! eq_or_diff ($json->{data}, $expected, 'JSON Duplicated Fetch matches.')) {
-    BAIL_OUT("Unexpected Duplicated Fetch result: " . &Dumper ($json));    
-}
+# if (! eq_or_diff ($json->{data}, $expected, 'JSON Duplicated Fetch matches.')) {
+#     BAIL_OUT("Unexpected Duplicated Fetch result: " . &Dumper ($json));    
+# }
 
 ###############################################################################
 # Invoke the File-Download Plugin
@@ -395,5 +422,43 @@ All Boats|4";
 if (! eq_or_diff ($content, $expected, 'JSON FileDownload Plugin Content Check')) {
     BAIL_OUT("Unexpected FilePlugin result: " . &Dumper ($content));    
 }
+
+###############################################################################
+# This one is in the include1.xml file.
+###############################################################################
+
+$content = TestUtils::fetch ([ 'file_download2', $x_boat_class ]);
+
+$expected = "Param|Value
+App Name|demo
+Interview|Secondary Alternative
+Rest 0|file_download2
+Rest 1|X Class
+Boat Class|X Class
+All Boats|4";
+
+if (! eq_or_diff ($content, $expected, 'JSON FileDownload2 Plugin Content Check')) {
+    BAIL_OUT("Unexpected FilePlugin result: " . &Dumper ($content));    
+}
+
+###############################################################################
+# This one is in the include2.xml file and demo.xml (takes precedence).
+###############################################################################
+
+$content = TestUtils::fetch ([ 'file_download3', $x_boat_class ]);
+
+$expected = "Param|Value
+App Name|demo
+Interview|Cross-Sectional
+Rest 0|file_download3
+Rest 1|X Class
+Boat Class|X Class
+All Boats|4";
+
+if (! eq_or_diff ($content, $expected, 'JSON FileDownload3 Plugin Content Check')) {
+    BAIL_OUT("Unexpected FilePlugin result: " . &Dumper ($content));    
+}
+
+
 
 done_testing ();

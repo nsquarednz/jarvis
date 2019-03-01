@@ -40,7 +40,7 @@ sub logout_json {
  	# Check request succeeded, and result is interpretable as JSON.
  	my $res = $ua->request ($req);
  	($res->is_success) || die "Failed: __status: " . $res->status_line . "\n" . $res->content;
- 	($res->header ('Content-Type') =~ m|^text/plain|) || die "Wrong Content-Type: " . $res->header ('Content-Type');
+ 	($res->header ('Content-Type') =~ m|^application/json|) || die "Wrong Content-Type: " . $res->header ('Content-Type');
  	my $json = decode_json ($res->content ());
 
  	# Check this looks like a valid response.
@@ -75,7 +75,7 @@ sub login_json {
  	# Check request succeeded, and result is interpretable as JSON.
  	my $res = $ua->request ($req);
  	($res->is_success) || die "Failed: __status: " . $res->status_line . "\n" . $res->content;
- 	($res->header ('Content-Type') =~ m|^text/plain|) || die "Wrong Content-Type: " . $res->header ('Content-Type');
+ 	($res->header ('Content-Type') =~ m|^application/json|) || die "Wrong Content-Type: " . $res->header ('Content-Type');
  	my $json = decode_json ($res->content ());
 
  	# Check this looks like a valid response.
@@ -96,7 +96,7 @@ sub login_json {
 ################################################################################
 #
 sub fetch {
-	my ($url_parts, $query_args) = @_;
+	my ($url_parts, $query_args, $content_type) = @_;
 
 	# Query args are sent to a restful url.
 	my $restful_url = join ('/', map { uri_escape ($_) } @$url_parts);
@@ -108,7 +108,8 @@ sub fetch {
   	# Check request succeeded, and result is interpretable as JSON.
 	my $res = $ua->request ($req);
  	($res->is_success) || die "Failed: $restful_url: " . $res->status_line . "\n" . $res->content;
- 	($res->header ('Content-Type') =~ m|^text/plain|) || die "Wrong Content-Type: " . $res->header ('Content-Type');
+ 	my $expected_content_type = $content_type // 'text/plain';
+ 	($res->header ('Content-Type') =~ m|^$expected_content_type|) || die "Wrong Content-Type: " . $res->header ('Content-Type');
 
  	return $res->content ();
 }
@@ -127,7 +128,7 @@ sub fetch {
 sub fetch_json {
 	my ($url_parts, $query_args) = @_;
 
-	my $content = &fetch ($url_parts, $query_args);
+	my $content = &fetch ($url_parts, $query_args, 'application/json');
 
  	my $json = decode_json ($content);
  	(defined $json->{logged_in}) || die "Missing 'logged_in' in response: " . &Dumper ($json);
@@ -150,7 +151,7 @@ sub fetch_xml {
 	my ($url_parts, $query_args) = @_;
 
 	$query_args->{format} = 'xml';
-	my $content = &fetch ($url_parts, $query_args);
+	my $content = &fetch ($url_parts, $query_args, 'application/xml');
 
  	my $xml = XML::Smart->new ($content);
  	(defined $xml->{response}{logged_in}) || die "Missing 'logged_in' in response: " . &Dumper ($xml);

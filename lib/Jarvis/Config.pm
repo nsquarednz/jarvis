@@ -106,46 +106,6 @@ sub new {
     $self->{'xml'} = $xml;
 
     ###############################################################################
-    # Get any included files that will contain extra config
-    # These files are parsed into the same XML object. Example included file
-    #<?xml version="1.0" encoding="utf-8"?>
-    # <jarvis>
-    #     <app>
-    #         <routes>
-    #             <route path="/api/boats" dataset="boats-list"/>
-    #         </routes>
-    #
-    #         <plugin dataset="TransformBoats" access="*" module="Boats::TransformBoats" add_headers="yes"/>
-    #     </app>
-    #</jarvis>
-    #
-    # Example include in the jarvis config xml
-    #   <?xml version="1.0" encoding="utf-8"?>
-    #       <jarvis>
-    #
-    #           <include file="/usr/share/boats/etc/routes.xml"/>
-    #           ....
-    #
-    ###############################################################################
-    #
-    #Loop through all the include directives read the files and merge them at the top
-    #level back into the app xml so the rest of the config processing will include items
-    #from these files.
-    foreach my $include ($xml->{jarvis}{include}('@') ) {
-        defined $include->{'file'} || die "Missing attribute 'file' on <include> within '$app_name'.";
-        my $filename = $include->{'file'}->content;
-        length $filename > 0 || die "Filename for <include> '$app_name' is not defined.";
-        -r $filename || die "Application '$app_name' include file '$filename' is not readable.";
-        my $subXml = XML::Smart->new ($filename) || die "Cannot read '$filename': $!.";
-
-        #note we only merge in at the level of nodes directly below app.
-        foreach my $nodeName ($subXml->{jarvis}{app}->nodes_keys()){
-            $xml->{jarvis}{app}{$nodeName} = $subXml->{jarvis}{app}{$nodeName}->tree_pointer();
-        }
-    }
-
-
-    ###############################################################################
     # Get the application config.  Note that we must NOT store this in our args
     # hashref because XML::Smart->DESTROY gets confused if it attempts to clean up
     # XML::Smart objects at different points in the tree.
@@ -204,7 +164,6 @@ sub new {
         }
     }
 
-
     # Basic security check here.
     $self->{'require_https'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'require_https'}->content || "no")});
     if ($self->{'require_https'} && ! $self->{'cgi'}->https()) {
@@ -217,6 +176,92 @@ sub new {
     ###############################################################################
     my %additional_safe = ();
     $self->{'additional_safe'} = \%additional_safe;
+
+    ###############################################################################
+    # Get any included files that will contain extra config
+    # These files are parsed into the same XML object. Example included file
+    #<?xml version="1.0" encoding="utf-8"?>
+    # <jarvis>
+    #     <app>
+    #         <routes>
+    #             <route path="/api/boats" dataset="boats-list"/>
+    #         </routes>
+    #
+    #         <plugin dataset="TransformBoats" access="*" module="Boats::TransformBoats" add_headers="yes"/>
+    #     </app>
+    #</jarvis>
+    #
+    # Example include in the jarvis config xml
+    #   <?xml version="1.0" encoding="utf-8"?>
+    #       <jarvis>
+    #
+    #           <include file="/usr/share/boats/etc/routes.xml"/>
+    #           ....
+    #
+    ###############################################################################
+    #
+    # Load each file referenced in <include> as an XML::Smart object so that other
+    # config loading code (e.g. Plugin, Hook, Exec, Route) can load from include
+    # files as well as from the primary file.
+    # 
+    my @iaxmls = ();
+    foreach my $include ($xml->{jarvis}{include}('@') ) {
+        (defined $include->{file}) or die "Missing attribute 'file' on <include> within '$app_name'.";
+        my $filename = $include->{file}->content;        
+        (length ($filename) > 0) or die "Filename for <include> '$app_name' is empty.";
+
+        &Jarvis::Error::debug ($self, "Include File: '%s'.", $filename);
+        (-e $filename) or die "Application '$app_name' include file '$filename' does not exist.";
+        (-r $filename) or die "Application '$app_name' include file '$filename' is not readable.";
+        
+        my $ixml = XML::Smart->new ($filename) or die "Cannot read '$filename': $!.";
+
+        # This is a sanity check for any stray content which the user might have 
+        # put into the include file thinking that it will be read when it won't.
+        #
+        # All that we read from <include> files is:
+        #
+        # <jarvis>
+        #   <app>
+        #       <plugin *.../>
+        #       <hook *.../>
+        #       <exec *.../>
+        #       <router>
+        #           <route *.../>
+        #
+        foreach my $arg ($ixml->args ()) {
+            &Jarvis::Error::log ($self, "Unsupported <xml> arg '%s' in <include> '%s'.", $arg, $filename);
+        }
+        foreach my $node_key ($ixml->nodes_keys ()) {
+            if ($node_key ne 'jarvis') {
+                &Jarvis::Error::log ($self, "Unsupported <xml> node key '%s' in <include> '%s'.", $node_key, $filename);
+            }
+        }
+        foreach my $node_key ($ixml->{jarvis}->nodes_keys ()) {
+            if ($node_key ne 'app') {
+                &Jarvis::Error::log ($self, "Unsupported <xml><jarvis> node key '%s' in <include> '%s'.", $node_key, $filename);
+            }
+        }
+        if ($ixml->{jarvis}{app}) {
+            foreach my $node_key ($ixml->{jarvis}{app}->nodes_keys ()) {
+                if (($node_key ne 'plugin') && ($node_key ne 'hook') && ($node_key ne 'exec') && ($node_key ne 'router')) {
+                    &Jarvis::Error::log ($self, "Unsupported <xml><jarvis><app> node key '%s' in <include> '%s'.", $node_key, $filename);
+                }
+            }
+            if ($ixml->{jarvis}{app}{router}) {
+                foreach my $arg ($ixml->{jarvis}{app}{router}->args ()) {
+                    &Jarvis::Error::log ($self, "Unsupported <xml><jarvis><app><router> arg '%s' in <include> '%s'.", $arg, $filename);
+                }
+                foreach my $node_key ($ixml->{jarvis}{app}{router}->nodes_keys ()) {
+                    if ($node_key ne 'route') {
+                        &Jarvis::Error::log ($self, "Unsupported <xml><jarvis><app><router> node key '%s' in <include> '%s'.", $node_key, $filename);
+                    }
+                }
+            }
+            push (@iaxmls, $ixml->{jarvis}{app});
+        }
+    }
+    $self->{iaxmls} = \@iaxmls;
 
     return $self;
 }
