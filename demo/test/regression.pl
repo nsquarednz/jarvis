@@ -397,9 +397,9 @@ $expected = {
     	{ 'name' => 'Whatsitt', 'id' => $mh_whatsit_id },
     ]
 };
-# if (! eq_or_diff ($json->{data}, $expected, 'JSON Duplicated Fetch matches.')) {
-#     BAIL_OUT("Unexpected Duplicated Fetch result: " . &Dumper ($json));    
-# }
+if (! eq_or_diff ($json->{data}, $expected, 'JSON Duplicated Fetch matches.')) {
+    BAIL_OUT("Unexpected Duplicated Fetch result: " . &Dumper ($json));    
+}
 
 ###############################################################################
 # Invoke the File-Download Plugin
