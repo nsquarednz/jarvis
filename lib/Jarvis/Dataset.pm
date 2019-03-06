@@ -1093,6 +1093,9 @@ sub store {
 # Performs an update to the specified table underlying the named dataset.
 # This is currently only supported for DBI datasets.
 #
+# NOTE: THIS IS AN OFFICIAL, PUBLICALLY AVAILABLE METHOD DOCUMENTED IN THE
+#       JARVIS GUIDE AND USED BY MANY PLUGINS.  DO NOT MODIFY ITS INTERFACE!
+#
 # Params:
 #       $jconfig - Jarvis::Config object
 #       $dataset_name - Dataset name we parsed/routed to (or child dataset).
