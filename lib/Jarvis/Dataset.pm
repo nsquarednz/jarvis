@@ -1106,7 +1106,7 @@ sub store {
 #       $extra_href - Top-level return values we can add to.
 #
 # Returns:
-#       ($success, $message, $results_aref)
+#       ($success, $message, $modified, $results_aref)
 #           $success - 1/0 did all inserts fail.
 #           $message - "Error message" on soft error (duplicate key, etc.).
 #           $modified - Number of top-level rows modified.
