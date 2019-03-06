@@ -45,6 +45,7 @@ use Jarvis::DB;
 use Jarvis::Hook;
 use Jarvis::Dataset::DBI;
 use Jarvis::Dataset::SDP;
+use Jarvis::Login;
 
 ###############################################################################
 # Internal Functions
