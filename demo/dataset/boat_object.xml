@@ -2,6 +2,7 @@
     <hook module="Boat">
         <parameter name="index" value="Checked"/>
     </hook>
+    <hook module="Foo"/>
     <child field="parts" dataset="boat_part">
         <link parent="id" child="boat_id"/>
     </child>

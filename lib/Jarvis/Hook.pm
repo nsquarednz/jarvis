@@ -296,7 +296,8 @@ sub unload_dataset {
 sub return_status {
     my ($jconfig, $extra_href, $return_text_ref) = @_;
 
-    foreach my $hook (grep { ! $_->{level} } @{ $jconfig->{hooks} }) {
+    foreach my $hook (@{ $jconfig->{hooks} }) {
+        last if ($hook->{level} > 0);
         &invoke ($jconfig, $hook, "return_status", $extra_href, $return_text_ref);
     }
     return 1;
@@ -304,7 +305,8 @@ sub return_status {
 sub return_fetch {
     my ($jconfig, $user_args_aref, $rows_aref, $extra_href, $return_text_ref) = @_;
 
-    foreach my $hook (grep { ! $_->{level} } @{ $jconfig->{hooks} }) {
+    foreach my $hook (@{ $jconfig->{hooks} }) {
+        last if ($hook->{level} > 0);
         &invoke ($jconfig, $hook, "return_fetch", $user_args_aref, $rows_aref, $extra_href, $return_text_ref);
     }
     return 1;
@@ -312,7 +314,8 @@ sub return_fetch {
 sub return_store {
     my ($jconfig, $dsxml, $user_args_aref, $results_aref, $extra_href, $return_text_ref) = @_;
 
-    foreach my $hook (grep { ! $_->{level} } @{ $jconfig->{hooks} }) {
+    foreach my $hook (@{ $jconfig->{hooks} }) {
+        last if ($hook->{level} > 0);
         &invoke ($jconfig, $hook, "return_store", $user_args_aref, $results_aref, $extra_href, $return_text_ref);
     }
     return 1;
@@ -325,7 +328,8 @@ sub return_store {
 sub after_login {
     my ($jconfig, $additional_safe_href) = @_;
 
-    foreach my $hook (grep { ! $_->{level} } @{ $jconfig->{hooks} }) {
+    foreach my $hook (@{ $jconfig->{hooks} }) {
+        last if ($hook->{level} > 0);
         &invoke ($jconfig, $hook, "after_login", $additional_safe_href);
     }
     return 1;
@@ -333,7 +337,8 @@ sub after_login {
 sub before_logout {
     my ($jconfig) = @_;
 
-    foreach my $hook (grep { ! $_->{level} } @{ $jconfig->{hooks} }) {
+    foreach my $hook (@{ $jconfig->{hooks} }) {
+        last if ($hook->{level} > 0);
         &invoke ($jconfig, $hook, "before_logout");
     }
     return 1;
@@ -341,7 +346,8 @@ sub before_logout {
 sub pre_connect {
     my ($jconfig, $dbname, $dbtype, $dbconnect_ref, $dbusername_ref, $dbpassword_ref, $parameters_href) = @_;
 
-    foreach my $hook (grep { ! $_->{level} } @{ $jconfig->{hooks} }) {
+    foreach my $hook (@{ $jconfig->{hooks} }) {
+        last if ($hook->{level} > 0);
         &invoke ($jconfig, $hook, "pre_connect", $dbname, $dbtype, $dbconnect_ref, $dbusername_ref, $dbpassword_ref, $parameters_href);
     }
     return 1;
@@ -355,6 +361,7 @@ sub dataset_pre_fetch {
     my ($jconfig, $dsxml, $safe_params_href) = @_;
 
     foreach my $hook (@{ $jconfig->{hooks} }) {
+        next if (($hook->{level} > 0) && ($hook->{level} != $jconfig->{hook_level}));
         &invoke ($jconfig, $hook, "dataset_pre_fetch", $dsxml, $safe_params_href);
     }
     return 1;
@@ -363,6 +370,7 @@ sub dataset_pre_store {
     my ($jconfig, $dsxml, $safe_params_href, $rows_aref) = @_;
 
     foreach my $hook (@{ $jconfig->{hooks} }) {
+        next if (($hook->{level} > 0) && ($hook->{level} != $jconfig->{hook_level}));
         &invoke ($jconfig, $hook, "dataset_pre_store", $dsxml, $safe_params_href, $rows_aref);
     }
     return 1;
@@ -371,6 +379,7 @@ sub before_all {
     my ($jconfig, $dsxml, $safe_params_href, $fields_aref) = @_;
 
     foreach my $hook (@{ $jconfig->{hooks} }) {
+        next if (($hook->{level} > 0) && ($hook->{level} != $jconfig->{hook_level}));
         &invoke ($jconfig, $hook, "before_all", $dsxml, $safe_params_href, $fields_aref);
     }
     return 1;
@@ -379,6 +388,7 @@ sub after_all {
     my ($jconfig, $dsxml, $safe_params_href, $fields_aref, $results_aref) = @_;
 
     foreach my $hook (@{ $jconfig->{hooks} }) {
+        next if (($hook->{level} > 0) && ($hook->{level} != $jconfig->{hook_level}));
         &invoke ($jconfig, $hook, "after_all", $dsxml, $safe_params_href, $fields_aref, $results_aref);
     }
     return 1;
@@ -387,6 +397,7 @@ sub dataset_fetched {
     my ($jconfig, $dsxml, $safe_params_href, $rows_aref, $extra_href, $column_names_aref) = @_;
 
     foreach my $hook (@{ $jconfig->{hooks} }) {
+        next if (($hook->{level} > 0) && ($hook->{level} != $jconfig->{hook_level}));
         &invoke ($jconfig, $hook, "dataset_fetched", $dsxml, $safe_params_href, $rows_aref, $extra_href, $column_names_aref);
     }
     return 1;
@@ -395,6 +406,7 @@ sub dataset_stored {
     my ($jconfig, $dsxml, $safe_params_href, $results_aref, $extra_href) = @_;
 
     foreach my $hook (@{ $jconfig->{hooks} }) {
+        next if (($hook->{level} > 0) && ($hook->{level} != $jconfig->{hook_level}));
         &invoke ($jconfig, $hook, "dataset_stored", $dsxml, $safe_params_href, $results_aref, $extra_href);
     }
     return 1;
@@ -408,6 +420,7 @@ sub before_one {
     my ($jconfig, $dsxml, $safe_row_params_href) = @_;
 
     foreach my $hook (@{ $jconfig->{hooks} }) {
+        next if (($hook->{level} > 0) && ($hook->{level} != $jconfig->{hook_level}));
         &invoke ($jconfig, $hook, "before_one", $dsxml, $safe_row_params_href);
     }
     return 1;
@@ -416,6 +429,7 @@ sub after_one {
     my ($jconfig, $dsxml, $safe_row_params_href, $row_result_href) = @_;
 
     foreach my $hook (@{ $jconfig->{hooks} }) {
+        next if (($hook->{level} > 0) && ($hook->{level} != $jconfig->{hook_level}));
         &invoke ($jconfig, $hook, "after_one", $dsxml, $safe_row_params_href, $row_result_href);
     }
 }
