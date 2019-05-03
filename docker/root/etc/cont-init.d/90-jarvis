@@ -7,6 +7,7 @@
 SCRIPT_NAME=$(basename $BASH_SOURCE);
 
 # Set apache config dir (configs are moved from /etc/apache2 -> /config/etc/apache2)
+# This happens prior to this script running as Apache currently runs as 50-apache2
 APACHE_CONFDIR=/config/etc/apache2
 
 jarvis_config() {
@@ -34,7 +35,7 @@ jarvis_config() {
         a2enmod fcgid
         JARVIS_APACHE_CONFIG=jarvis-fast-cgi.conf
         if [[ ! -z ${APACHE_FCGID_MAX_REQUESTLEN} ]]; then
-            sed -i -e "s|FcgidMaxRequestLen .*$|FcgidMaxRequestLen ${APACHE_FCGID_MAX_REQUESTLEN}|" /config/etc/apache2/jarvis.conf;
+            sed -i -e "s|FcgidMaxRequestLen .*$|FcgidMaxRequestLen ${APACHE_FCGID_MAX_REQUESTLEN}|" ${APACHE_CONFDIR}/conf-available/${JARVIS_APACHE_CONFIG};
         fi
     elif [[ ${APACHE_PERL_CONF} == 'modperl' ]]; then
         echo "**** (${SCRIPT_NAME} - jarvis_config) Enable Apache Mod Perl module  ****";
