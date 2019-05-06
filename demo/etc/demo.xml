@@ -3,7 +3,7 @@
     <include file="/usr/share/jarvis/demo/etc/include1.xml"/>
     <include file="/usr/share/jarvis/demo/etc/include2.xml"/>
 
-    <app format="json" debug="yes" dump="no">
+    <app format="json" debug="yes" dump="no" return_json_as_text="yes">
         <!-- This is where our <dataset>.xml are all stored -->
 	    <dataset_dir>/usr/share/jarvis/demo/dataset</dataset_dir>
 
@@ -81,6 +81,9 @@
 
         <!-- This defines our database connection.  SQLite in our case. -->
         <database connect="dbi:SQLite:dbname=/var/lib/jarvis/demo/demo.db" username="" password="" post_connect="PRAGMA foreign_keys = ON"/>
+
+        <!-- And a secondary mongoDB database. -->
+        <database type="mongo" name="mdb" connect="dbi:SQLite:dbname=/var/lib/jarvis/demo/demo.db" username="" password=""/>
 
         <!-- This plugin is used to allow admin users to reset any user's password. -->
         <plugin dataset="SetPassword" access="*" lib="/usr/share/jarvis/demo" module="plugin::SetPassword" add_headers="yes"/>

@@ -1,4 +1,4 @@
-<dataset read="*" write="*" key_list="id">
+<dataset read="*" write="*">
     <hook module="Boat">
         <parameter name="index" value="Checked"/>
     </hook>

@@ -1,5 +1,6 @@
-<dataset read="*" write="*" key_list="id">
+<dataset read="*" write="*">
     <transform fetch="notnull" store="trim,null" />
+    <hook module="Bar"/>
     <select>
 SELECT id, name
 FROM boat_part

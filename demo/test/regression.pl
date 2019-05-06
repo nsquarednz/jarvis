@@ -391,13 +391,14 @@ $expected = {
     'class' => 'Makkleson',
     'id' => $mh_boat_id,
     'description' => '',
+    'foo' => 'Foo',
     'parts' => [
-    	{ 'name' => 'Hoosit', 'id' => $mh_hoosit_id },
-    	{ 'name' => 'Thingey', 'id' => $mh_thingey_id },
-    	{ 'name' => 'Whatsitt', 'id' => $mh_whatsit_id },
+    	{ 'name' => 'Hoosit', 'id' => $mh_hoosit_id, 'bar' => 'Bar' },
+    	{ 'name' => 'Thingey', 'id' => $mh_thingey_id, 'bar' => 'Bar' },
+    	{ 'name' => 'Whatsitt', 'id' => $mh_whatsit_id, 'bar' => 'Bar' },
     ]
 };
-if (! eq_or_diff ($json->{data}, $expected, 'JSON Duplicated Fetch matches.')) {
+if (! eq_or_diff ($json->{data}, $expected, 'JSON Object Fetch matches.')) {
     BAIL_OUT("Unexpected Duplicated Fetch result: " . &Dumper ($json));    
 }
 
