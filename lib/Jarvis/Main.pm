@@ -516,10 +516,12 @@ sub do {
     # 's' = sql, 'i' = internal, 'p' = plugin, 'e' = exec, undef for undetermined.
     $jconfig->{dataset_type} = undef;
 
-    # This is the type we use for anything that has structured content JSOn or XML.
+    # This is the type we use for anything that has structured content JSON or XML.
     my $object_content_type = "text/plain; charset=UTF-8";
     if ($jconfig->{format} =~ /json/i ) {
-        $object_content_type = 'application/json; charset=UTF-8"';
+        if (! $jconfig->{return_json_as_text}) {
+            $object_content_type = 'application/json; charset=UTF-8"';
+        }
 
     } elsif ($jconfig->{format} =~ /XML/i ) {
         $object_content_type =  'application/xml; charset=UTF-8"';

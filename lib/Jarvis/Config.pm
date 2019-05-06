@@ -137,6 +137,9 @@ sub new {
     # This is used to toggle on and off the ability to return nulls, default is off.
     $self->{'retain_null'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'retain_null'}->content || "no")});
 
+    # This is used for backwards compatibility with old Jarvis versions.
+    $self->{'return_json_as_text'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'return_json_as_text'}->content || "no")});
+
     # This is an optional METHOD overide parameter, similar to Ruby on Rails.
     # It bypasses a problem where non-proxied Flex can only send GET/POST requests.
     $self->{'method_param'} = $self->{'cgi'}->param ('method_param') || "_method";

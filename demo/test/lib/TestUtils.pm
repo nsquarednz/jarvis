@@ -18,6 +18,11 @@ use XML::Smart;
 my $base_url = "http://localhost/jarvis-agent/demo";
 my %passwords = ("admin" => "admin", "guest" => "guest");
 
+my $JSON_SENT_MIME_TYPE = "application/json";
+
+#my $JSON_RETURNED_MIME_TYPE = "application/json";
+my $JSON_RETURNED_MIME_TYPE = "text/plain";
+
 # This user agent will perform all our tests.
 my $ua = LWP::UserAgent->new;
 $ua->cookie_jar (HTTP::Cookies->new (file => "cookies.txt", autosave => 1));
@@ -40,7 +45,7 @@ sub logout_json {
  	# Check request succeeded, and result is interpretable as JSON.
  	my $res = $ua->request ($req);
  	($res->is_success) || die "Failed: __status: " . $res->status_line . "\n" . $res->content;
- 	($res->header ('Content-Type') =~ m|^application/json|) || die "Wrong Content-Type: " . $res->header ('Content-Type');
+ 	($res->header ('Content-Type') =~ m|^$JSON_RETURNED_MIME_TYPE|) || die "Wrong Content-Type: " . $res->header ('Content-Type');
  	my $json = decode_json ($res->content ());
 
  	# Check this looks like a valid response.
@@ -75,7 +80,7 @@ sub login_json {
  	# Check request succeeded, and result is interpretable as JSON.
  	my $res = $ua->request ($req);
  	($res->is_success) || die "Failed: __status: " . $res->status_line . "\n" . $res->content;
- 	($res->header ('Content-Type') =~ m|^application/json|) || die "Wrong Content-Type: " . $res->header ('Content-Type');
+ 	($res->header ('Content-Type') =~ m|^$JSON_RETURNED_MIME_TYPE|) || die "Wrong Content-Type: " . $res->header ('Content-Type');
  	my $json = decode_json ($res->content ());
 
  	# Check this looks like a valid response.
@@ -96,7 +101,7 @@ sub login_json {
 ################################################################################
 #
 sub fetch {
-	my ($url_parts, $query_args, $content_type) = @_;
+	my ($url_parts, $query_args, $returned_content_type) = @_;
 
 	# Query args are sent to a restful url.
 	my $restful_url = join ('/', map { uri_escape ($_) } @$url_parts);
@@ -108,7 +113,7 @@ sub fetch {
   	# Check request succeeded, and result is interpretable as JSON.
 	my $res = $ua->request ($req);
  	($res->is_success) || die "Failed: $restful_url: " . $res->status_line . "\n" . $res->content;
- 	my $expected_content_type = $content_type // 'text/plain';
+ 	my $expected_content_type = $returned_content_type // 'text/plain';
  	($res->header ('Content-Type') =~ m|^$expected_content_type|) || die "Wrong Content-Type: " . $res->header ('Content-Type');
 
  	return $res->content ();
@@ -128,7 +133,7 @@ sub fetch {
 sub fetch_json {
 	my ($url_parts, $query_args) = @_;
 
-	my $content = &fetch ($url_parts, $query_args, 'application/json');
+	my $content = &fetch ($url_parts, $query_args, $JSON_RETURNED_MIME_TYPE);
 
  	my $json = decode_json ($content);
  	(defined $json->{logged_in}) || die "Missing 'logged_in' in response: " . &Dumper ($json);
@@ -181,8 +186,8 @@ sub store {
 
 	# Request is a POST with query args in the URL and a content.
  	my $req = HTTP::Request->new (POST => "$base_url/$restful_url?$urlencoded_args");
-    $req->content_type ('application/json');
-    $req->content ($rows_json); 	
+    $req->content_type ($JSON_SENT_MIME_TYPE);
+    $req->content ($rows_json);
 
   	# Check request succeeded, and result is interpretable as JSON.
 	my $res = $ua->request ($req);
