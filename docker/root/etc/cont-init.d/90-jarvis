@@ -7,6 +7,7 @@
 SCRIPT_NAME=$(basename $BASH_SOURCE);
 
 # Set apache config dir (configs are moved from /etc/apache2 -> /config/etc/apache2)
+# This happens prior to this script running as Apache currently runs as 50-apache2
 APACHE_CONFDIR=/config/etc/apache2
 
 jarvis_config() {
@@ -18,23 +19,25 @@ jarvis_config() {
         # If ${APACHE_PERL_CONF} is empty, default to cgi
         APACHE_PERL_CONF='cgi'
     fi
+
     if [[ "cgi fcgi modperl" != *"${APACHE_PERL_CONF}"* ]]; then
         # If ${APACHE_PERL_CONF} is not valid, default to cgi
         echo APACHE_PERL_CONF='cgi'
     fi
-    
+
     # Set the correct module and jarvis config
     if [[ ${APACHE_PERL_CONF} == 'cgi' ]]; then
         echo "**** (${SCRIPT_NAME} - jarvis_config) Enable Apache CGI module  ****";
         a2enmod cgi
         JARVIS_APACHE_CONFIG=jarvis.conf
-    fi
-    if [[ ${APACHE_PERL_CONF} == 'fcgi' ]]; then
+    elif [[ ${APACHE_PERL_CONF} == 'fcgi' ]]; then
         echo "**** (${SCRIPT_NAME} - jarvis_config) Enable Apache Fast CGI module  ****";
         a2enmod fcgid
         JARVIS_APACHE_CONFIG=jarvis-fast-cgi.conf
-    fi
-    if [[ ${APACHE_PERL_CONF} == 'modperl' ]]; then
+        if [[ ! -z ${APACHE_FCGID_MAX_REQUESTLEN} ]]; then
+            sed -i -e "s|FcgidMaxRequestLen .*$|FcgidMaxRequestLen ${APACHE_FCGID_MAX_REQUESTLEN}|" ${APACHE_CONFDIR}/conf-available/${JARVIS_APACHE_CONFIG};
+        fi
+    elif [[ ${APACHE_PERL_CONF} == 'modperl' ]]; then
         echo "**** (${SCRIPT_NAME} - jarvis_config) Enable Apache Mod Perl module  ****";
         a2enmod perl
         JARVIS_APACHE_CONFIG=jarvis-mod-perl.conf
