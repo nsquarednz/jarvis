@@ -83,7 +83,9 @@
         <database connect="dbi:SQLite:dbname=/var/lib/jarvis/demo/demo.db" username="" password="" post_connect="PRAGMA foreign_keys = ON"/>
 
         <!-- And a secondary mongoDB database. -->
-        <database type="mongo" name="mdb" connect="dbi:SQLite:dbname=/var/lib/jarvis/demo/demo.db" username="" password=""/>
+        <database type="mongo" name="shipdb" connect="mongodb://localhost" username="" password="">
+            <parameter name ="db_name" value="demo"/>
+        </database>
 
         <!-- This plugin is used to allow admin users to reset any user's password. -->
         <plugin dataset="SetPassword" access="*" lib="/usr/share/jarvis/demo" module="plugin::SetPassword" add_headers="yes"/>

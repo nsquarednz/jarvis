@@ -27,8 +27,9 @@ use strict;
 use warnings;
 
 use XML::Smart;
+use JSON;
 
-package Jarvis::Dataset::SDP;
+package Jarvis::Dataset::MongoDB;
 
 use Jarvis::Text;
 use Jarvis::Error;
@@ -36,6 +37,8 @@ use Jarvis::DB;
 use Jarvis::Hook;
 
 use sort 'stable';      # Don't mix up records when server-side sorting
+
+my $json = JSON->new ();
 
 ################################################################################
 # Expand the MDX:
@@ -149,29 +152,25 @@ sub mdx_with_substitutions {
 #
 # Params:
 #       $jconfig - Jarvis::Config object
-#       $dsxml - Dataset XML object
+#       $oxml - Dataset XML object at a point within the tree.
 #       $args_href - Hash of args to substitute.
 #
 # Returns:
 #       $mdx statement with args substituted.
 ################################################################################
 #
-sub parse_mdx {
-    my ($jconfig, $dsxml, $args_href) = @_;
+sub parse_object {
+    my ($jconfig, $oxml, $args_href) = @_;
 
-    # Get the raw values.
-    my $raw_mdx = $dsxml->{dataset}{'mdx'}->content || return undef;
-    $raw_mdx =~ s/^\s*\-\-.*$//gm;   # Remove comments
-    $raw_mdx = &trim ($raw_mdx);
+    # Get the raw JSON.
+    my $object_json = $oxml->content // return undef;
 
-    # Perform textual substitution... being vary careful about injection!    
-    &Jarvis::Error::dump ($jconfig, "MDX as read from XML = " . $raw_mdx);
+    # Convert to perl object.
+    my $object = $json->decode ($object_json);
 
-    # Get our MDX with placeholders and prepare it.
-    my $mdx = &mdx_with_substitutions ($jconfig, $raw_mdx, $args_href);
-    &Jarvis::Error::dump ($jconfig, "MDX after substition = " . $mdx);
+    # TODO!  ALL THE HARD WORK OF VARIABLES!
 
-    return $mdx;
+    return $object;
 }
 
 ################################################################################
@@ -202,18 +201,34 @@ sub parse_mdx {
 #
 sub fetch_inner {
     my ($jconfig, $subset_name, $dsxml, $dbh, $safe_params_href) = @_;
+
+    # Start with the collection.  This is at the top level of the datasets.
+    # TODO: Maybe allow different operations to override the collection name?
+    $dsxml->{dataset}{collection} or die "Dataset '$subset_name' (type 'mongo') has no 'collection' defined.\n";
+    my $collection_name = $dsxml->{dataset}{collection}->content;
+
+    # We must also have a <find> block present in the dataset.  
+    # It MUST be present for find to be supported, EVEN IF IT IS EMPTY.
+    $dsxml->{dataset}{find} or die "Dataset '$subset_name' (type 'mongo') has no 'find' present.\n";
+
+    # Do we have a filter?  It can be undef, it's purely optional.
+    my $filter = undef;
+    if ($dsxml->{dataset}{find}{filter}) {
+        $filter = &parse_object ($jconfig, $dsxml->{dataset}{find}{filter}, $safe_params_href);
+    }
+
+    # This is the collection handle.
+    my $collection = $dbh->ns ($collection_name);
     
-    # Get our STM.  This has everything attached.
-    my $mdx = &parse_mdx ($jconfig, $dsxml, $safe_params_href) ||
-        die "Dataset '$subset_name' (type 'sdp') has no MDX query.\n";
+    # Find one row.
+    my $cursor = $collection->find ($filter);    
+    my $rows_aref = [];
 
-    # What key will we use to store the row labels?
-    my $row_label = $dsxml->{dataset}{mdx}{row_label}->content || 'row_label';
-        
-    # Execute Fetch in 2D tuple format.
-    my ($rows_aref, $column_names_aref) = $dbh->fetchall_arrayref ($jconfig, $mdx, $row_label);    
+    while (my $document = $cursor->next ) {
+        push (@$rows_aref, $document);
+    }
 
-    return ($rows_aref, $column_names_aref); 
+    return ($rows_aref); 
 }
 
 1;

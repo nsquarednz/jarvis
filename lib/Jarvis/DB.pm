@@ -177,6 +177,20 @@ sub handle {
         $dbconnect || die "Missing 'connect' parameter on SSAS DataPump database '$dbname'.\n";
         $dbhs{$dbtype}{$dbname} = Jarvis::DB::SDP->new ($jconfig, $dbconnect, $dbusername, $dbpassword, \%parameters);
 
+    # MongoDB is a non-relational database with its own driver API.
+    # 
+    # NOTE: We load the DB::MongoDB module at runtime with a "require".  Why?  Because very few
+    #       sites actually use SDP, and hence they don't actually need SOAP::Lite as a 
+    #       dependency.
+    #
+    } elsif ($dbtype eq "mongo") {
+        require MongoDB;
+
+        $dbconnect || die "Missing 'connect' parameter on MongoDB DataPump database '$dbname'.\n";
+        &Jarvis::Error::debug ($jconfig, "MongoDB Options");
+        &Jarvis::Error::debug_var ($jconfig, \%parameters);
+        $dbhs{$dbtype}{$dbname} = MongoDB->connect ($dbconnect, \%parameters);
+
     } else {
         die "Unsupported Database Type '$dbtype'.\n";
     }
