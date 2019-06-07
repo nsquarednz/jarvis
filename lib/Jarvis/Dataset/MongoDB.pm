@@ -168,7 +168,54 @@ sub parse_object {
     # Convert to perl object.
     my $object = $json->decode ($object_json);
 
-    # TODO!  ALL THE HARD WORK OF VARIABLES!
+    # Iterate and replace {$VARNAME} with the variable.
+    sub expand_vars {
+        my ($jconfig, $var_ref, $args_href) = @_;
+
+        # undef - no change.
+        if (! defined $$var_ref) {
+            # Do nothing.
+
+        # SCALAR ... this is where we expand!
+        } elsif (ref ($$var_ref) eq '') {
+            if ($$var_ref =~ m/^\{\$([\.a-zA-Z0-9_\-:\|]+(?:\![a-z]+)*)\}/) {
+
+                # Here's the arg name.  For now it has flags.
+                my $argname = $1;
+
+                # Strip all the !flag from the tail.
+                # By the way, we don't actually SUPPORT any flags yet!
+                my %flags = ();
+                while ($argname =~ m/^(.*)(\![a-z]+)$/) {
+                    $argname = $1;
+                    my $flag = lc ($2);
+                    $flag =~ s/[^a-z]//g;
+                    $flags {$flag} = 1;
+                }
+
+                my $value = $$var_ref = $args_href->{$argname};
+                &Jarvis::Error::debug ($jconfig, "Expanding: '%s' %s -> '%s'.", $argname, (scalar %flags ? ("[" . join (",", keys %flags) . "] ") : ""), $value);
+            }
+
+        # ARRAY
+        } elsif (ref ($$var_ref) eq 'ARRAY') {
+            foreach my $var (@{ $$var_ref }) {
+                &expand_vars ($jconfig, \$var, $args_href);
+            }
+
+        # HASH
+        } elsif (ref ($$var_ref) eq 'HASH') {
+            foreach my $key (keys %{ $$var_ref }) {
+                &expand_vars ($jconfig, \$$var_ref->{$key}, $args_href);
+            }
+
+        # ¯\_(ツ)_/¯
+        } else {
+            # Do nothing.
+        }
+        return;
+    }
+    &expand_vars ($jconfig, \$object, $args_href);
 
     return $object;
 }

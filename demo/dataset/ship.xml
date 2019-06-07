@@ -4,7 +4,7 @@
     </hook>
     <transform fetch="notnull" store="trim,null" />
     <find>
-        <filter>{ "line": "White Star" }</filter>
+        <filter>{ "line": "{$line}" }</filter>
     </find>
     <update>
 UPDATE boat
