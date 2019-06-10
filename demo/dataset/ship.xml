@@ -4,7 +4,8 @@
     </hook>
     <transform fetch="notnull" store="trim,null" />
     <find>
-        <filter>{ "line": "{$line}" }</filter>
+        <filter>{ "line": $line }</filter>
+        <options>{ "limit": 1 }</options>
     </find>
     <update>
 UPDATE boat
