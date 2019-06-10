@@ -23,6 +23,7 @@
 #
 use strict;
 use warnings;
+use utf8;
 
 use lib "../../../lib";
 
@@ -33,6 +34,7 @@ use Test::More;
 use Test::Differences;
 use Data::Dumper;
 use Data::Compare;
+use Data::Hexdumper;
 use Getopt::Long;
 
 XSLoader::load ('Jarvis::JSON::Utils');
@@ -61,6 +63,17 @@ my @tests = (
     { name => 'fraction', json => "  7234.123423142 ", expected => 7234.123423142 },
     { name => 'exp1', json => " -1234.44e12 ", expected => -1234.44e12 },
     { name => 'exp2', json => " 0.34243E-4 ", expected => 0.34243E-4 },
+    { name => 'empty', json => '""', expected => '' },
+    { name => 'simple', json => '" A simple String "', expected => ' A simple String ' },
+    { name => 'utf8', json => '" UTF sö € string𝄞"', expected => ' UTF sö € string𝄞' },
+    { name => 'multi-line', json => '" UTF sö € 
+multi-line string
+"', expected => ' UTF sö € 
+multi-line string
+' },
+    { name => 'escapes1', json => '" \\\\ \\" \\/ "', expected => ' \\ " / ' },
+    { name => 'escapes2', json => '" \\b \\f \\r \\n \\t "', expected => " \b \f \r \n \t " },
+    { name => 'escapes3', json => '"\\u003A\\u00D6\\u0FD0\\uD2Cf\\U01D11e"', expected => ":Ö࿐틏𝄞" },
 );
 
 my $ntests = 0;
@@ -111,6 +124,7 @@ foreach my $test (@tests) {
             print STDERR &Dumper ($result);
         }
     }
+    $result and print STDERR hexdump ($result, { suppress_warnings => 1 }) . "\n";
     $ntests++;
 }
 

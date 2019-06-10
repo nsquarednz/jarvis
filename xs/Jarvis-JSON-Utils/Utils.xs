@@ -30,10 +30,14 @@
 #include <unistd.h>
 #include <math.h>
 
-#define DEBUG_ON 1
+#define DEBUG_ON 0
 #define DEBUG(...) if (DEBUG_ON) { fprintf (stderr, __VA_ARGS__); }
 
-#define MAX_NUMBER_LEN 50
+#define MAX_NUMBER_LEN 64
+#define DEFAULT_STRING_LEN 256
+
+// Converts '0'-'9','a'-'f','A'-'F' into a number 0..15.
+#define HEX_VALUE(x) (((x >= '0') && (x <= '9')) ? (x - '0') : (10 + ((x) | 0x20) - 'a'))
 
 /******************************************************************************
  * JSON TO PERL
@@ -68,6 +72,12 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
 #define SPACE 32
 #define NEXT_LINE 133
 
+#define BACKSLASH 92
+#define FRONTSLASH 47
+#define DOUBLE_QUOTE 34
+
+#define BACKSPACE 8
+
     // Assume we're at the start of an object/sub-object.
     // Keep absorbing whitespace until we get to something real.
     //
@@ -80,7 +90,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
 
         I32 len = UTF8SKIP (&json[*offset]);
         if (*offset + len > nbytes) {
-            croak ("UTF-8 overflow at offset %d.", *offset);
+            croak ("UTF-8 overflow at byte offset %ld.", *offset);
         }
 
         // We don't support UTF-8 whitespace!
@@ -185,14 +195,14 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
         // Ugh, let's copy this into a temporary buffer just in case.
         char tmp[MAX_NUMBER_LEN + 1];
         if ((*offset - start) > MAX_NUMBER_LEN) {
-            croak ("Number too long (> %d chars) at offset %d.", MAX_NUMBER_LEN, start);
+            croak ("Number too long (> %d chars) at byte offset %ld.", MAX_NUMBER_LEN, start);
         }
         strncpy (tmp, &json[start], *offset - start);
-        tmp[*offset - start] = '\0';
+        tmp[*offset - start] = 0;
 
         double n = strtold (tmp, NULL);
         if (! isfinite (n)) {
-            croak ("Number overflow at offset %d.", start);
+            croak ("Number overflow at byte offset %ld.", start);
         }
 
         if (is_integer) {
@@ -202,24 +212,235 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
             return newSVnv (n);
         }
 
-        /*
+    // Strings are per RFC7159 section 7. Strings
+    //
+    // Note that JSON strings must be in double quotes, and we respect that.
+    // I did contemplate supporting single quotes as a variant, but it seems pointless.
+    //
+    } else if (ch == DOUBLE_QUOTE) {
 
-    // Convert to a string.  Note that the string may contain CHR(0).
-    } else if (lua_isstring (L, -1)) {
-        STRLEN str_len;
-        const char *str = lua_tolstring (L, -1, &str_len);        
+        STRLEN start = *offset;
 
-        // Translate the NIL marker string into an UNDEF?
-        if (SvPOK (nil_sv)) {
-            STRLEN nil_bytes_len;
-            unsigned char *bytes = (unsigned char *) SvPV (nil_sv, nil_bytes_len);        
+        // Consume the starting ". 
+        *offset = *offset + 1;
 
-            if ((nil_bytes_len == str_len) && ! strncmp ((const char *) bytes, str, nil_bytes_len)) {
-                return &PL_sv_undef;
+        // Assign this as the default string size.  We will re-malloc if and when we outgrow this.
+        char *str = (char *) malloc (DEFAULT_STRING_LEN);
+        STRLEN max_len = DEFAULT_STRING_LEN;
+        STRLEN str_len = 0;
+        int is_utf8 = 0;
+
+        while (1) {
+
+            // Nothing left.
+            if (*offset >= nbytes) {
+                croak ("Unterminated string began at byte offset %ld.", start);
+            }
+
+            ch = json[*offset];
+
+            // Terminating ", we're done!
+            if (ch == DOUBLE_QUOTE) {
+                *offset = *offset + 1;
+                break;
+
+            // A backslash.
+            } else if (ch == BACKSLASH) {
+                *offset = *offset + 1;
+
+                // The sequence to append.
+                char seq[6];
+                STRLEN len;
+
+                // Double backslash?
+                if ((*offset < nbytes) && (json[*offset] == BACKSLASH)) {
+                    seq[0] = BACKSLASH;
+                    *offset = *offset + (len = 1);
+
+                // Escaped double quote?
+                } else if ((*offset < nbytes) && (json[*offset] == DOUBLE_QUOTE)) {
+                    seq[0] = DOUBLE_QUOTE;
+                    *offset = *offset + (len = 1);
+
+                // Escaped frontslash?
+                } else if ((*offset < nbytes) && (json[*offset] == FRONTSLASH)) {
+                    seq[0] = FRONTSLASH;
+                    *offset = *offset + (len = 1);
+
+                // \b, \f, \n, \r, \t
+                } else if ((*offset < nbytes) && (json[*offset] == 'b')) {
+                    seq[0] = BACKSPACE;
+                    *offset = *offset + (len = 1);
+
+                } else if ((*offset < nbytes) && (json[*offset] == 'f')) {
+                    seq[0] = FORM_FEED;
+                    *offset = *offset + (len = 1);
+
+                } else if ((*offset < nbytes) && (json[*offset] == 'n')) {
+                    seq[0] = LINE_FEED;
+                    *offset = *offset + (len = 1);
+
+                } else if ((*offset < nbytes) && (json[*offset] == 'r')) {
+                    seq[0] = CARRIAGE_RETURN;
+                    *offset = *offset + (len = 1);
+
+                } else if ((*offset < nbytes) && (json[*offset] == 't')) {
+                    seq[0] = CHARACTER_TABULATION;
+                    *offset = *offset + (len = 1);
+
+                // \u0000
+                } else if (((*offset + 5) < nbytes) && (json[*offset] == 'u')
+                        && isxdigit (json[*offset + 1]) && isxdigit (json[*offset + 2])
+                        && isxdigit (json[*offset + 3]) && isxdigit (json[*offset + 4])) {
+
+                    // The UTF-8 code point.
+                    long code_point = 
+                        (HEX_VALUE(json[*offset + 1]) << 12) + (HEX_VALUE(json[*offset + 2]) << 8) +
+                        (HEX_VALUE(json[*offset + 3]) << 4)  + (HEX_VALUE(json[*offset + 4]));
+
+                    DEBUG ("Escape '%.6s' code point = 0x%04lx.\n", &json[*offset - 1], code_point)
+
+                    // We do NOT support UTF-16 surrogates.
+                    // If you want code points above 0xFFFF use the non-standard \Uxxxxxx below.
+                    //
+                    if (code_point <= 0x007F) {
+                        seq[0] = code_point & 0x7f;
+                        len = 1;
+
+                    } else if (code_point <= 0x07FF) {
+                        seq[0] =  0xc0 | ((code_point >> 6) & 0x1f);
+                        seq[1] =  0x80 |  (code_point       & 0x3f);
+                        len = 2;
+                        is_utf8 = 1;
+
+                    } else {
+                        seq[0] =  0xe0 | ((code_point >> 12) & 0x0f);
+                        seq[1] =  0x80 | ((code_point >> 6)  & 0x3f);
+                        seq[2] =  0x80 |  (code_point        & 0x3f);
+                        len = 3;
+                        is_utf8 = 1;
+                    }
+                    *offset = *offset + 5;
+
+                // \U000000
+                } else if (((*offset + 7) < nbytes) && (json[*offset] == 'U')
+                        && isxdigit (json[*offset + 1]) && isxdigit (json[*offset + 2])
+                        && isxdigit (json[*offset + 3]) && isxdigit (json[*offset + 4])
+                        && isxdigit (json[*offset + 5]) && isxdigit (json[*offset + 6])) {
+
+                    // The UTF-8 code point.
+                    long code_point = 
+                        (HEX_VALUE(json[*offset + 1]) << 20) + (HEX_VALUE(json[*offset + 2]) << 16) +
+                        (HEX_VALUE(json[*offset + 3]) << 12) + (HEX_VALUE(json[*offset + 4]) << 8) +
+                        (HEX_VALUE(json[*offset + 5]) << 4)  + (HEX_VALUE(json[*offset + 6]));
+
+                    DEBUG ("Escape '%.8s' code point = 0x%06lx.\n", &json[*offset - 1], code_point)
+
+                    if (code_point <= 0x007F) {
+                        seq[0] = code_point & 0x7f;
+                        len = 1;
+
+                    } else if (code_point <= 0x07FF) {
+                        seq[0] =  0xc0 | ((code_point >> 6) & 0x1f);
+                        seq[1] =  0x80 |  (code_point       & 0x3f);
+                        len = 2;
+                        is_utf8 = 1;
+
+                    } else if (code_point <= 0xFFFF) {
+                        seq[0] =  0xe0 | ((code_point >> 12) & 0x0f);
+                        seq[1] =  0x80 | ((code_point >> 6)  & 0x3f);
+                        seq[2] =  0x80 |  (code_point        & 0x3f);
+                        len = 3;
+                        is_utf8 = 1;
+
+                    } else {
+                        seq[0] =  0xf0 | ((code_point >> 18) & 0x03);
+                        seq[1] =  0x80 | ((code_point >> 12) & 0x3f);
+                        seq[2] =  0x80 | ((code_point >> 6)  & 0x3f);
+                        seq[3] =  0x80 |  (code_point        & 0x3f);
+                        len = 4;
+                        is_utf8 = 1;
+                    }
+                    *offset = *offset + 7;
+
+                // Else no good.
+                } else {
+                    croak ("Unsupported escape sequence at byte offset %ld.", *offset - 1);
+                }
+
+                // Do we need to re-alloc our string buffer?
+                if ((str_len + len) > max_len) {
+                    if ((len > 1) && ! is_utf8) {
+                        DEBUG ("String contains UTF-8 characters.\n");
+                        is_utf8 = 1;
+                    }
+                    DEBUG ("Growing string buffer up to %d bytes.\n", DEFAULT_STRING_LEN * 4)
+                    char *str2 = (char *) malloc (DEFAULT_STRING_LEN * 4);
+                    memcpy (str2, str, str_len);
+                    max_len = DEFAULT_STRING_LEN * 4;
+                    free (str);
+                    str = str2;
+                }
+
+                // Copy the byte(s) for this character.
+                for (I32 i = 0; i < len; i++) {
+                    str[str_len + i] = seq[i];
+                }
+                str_len = str_len + len;
+
+                // NOTE: Offset was adjusted earlier.
+
+            // Any other characters "as is", including inline UTF-8 (which JSON doesn't officially support).
+            } else {
+                I32 len = UTF8SKIP (&json[*offset]);
+                if (*offset + len > nbytes) {
+                    croak ("UTF-8 overflow at byte offset %ld.", *offset);
+                }
+
+                // Do we need to re-alloc our string buffer?
+                if ((str_len + len) > max_len) {
+                    if ((len > 1) && ! is_utf8) {
+                        DEBUG ("String contains UTF-8 characters.\n");
+                        is_utf8 = 1;
+                    }
+                    DEBUG ("Growing string buffer up to %d bytes.\n", DEFAULT_STRING_LEN * 4)
+                    char *str2 = (char *) malloc (DEFAULT_STRING_LEN * 4);
+                    memcpy (str2, str, str_len);
+                    max_len = DEFAULT_STRING_LEN * 4;
+                    free (str);
+                    str = str2;
+                }
+
+                // Copy the byte(s) for this character.
+                for (I32 i = 0; i < len; i++) {
+                    str[str_len + i] = json[*offset + i];
+                    if (json[*offset + i] && 0x80) {
+                        is_utf8 = 1;
+                    }
+                }
+                str_len = str_len + len;
+
+                // Finall adjust the offset.
+                *offset = *offset + len;
             }
         }
 
-        return newSVpv (str, str_len);
+        DEBUG ("Returned string is %ld bytes.\n", str_len)
+        // A len = 0 tells perl to use strlen to get the length.  That's not what we want.
+        if (str_len == 0) {
+            str[0] = 0;
+        }
+
+        SV *str_sv = newSVpv (str, str_len);
+        if (is_utf8) {
+            SvUTF8_on (str_sv);
+        }
+
+        // NOTE: Do not call free (str).  It is handled by Perl reference counting now.
+
+        return (str_sv);
+
+        /*
 
     // Handle Tables (and sequences)
     } else if (lua_istable (L, -1)) {
@@ -322,7 +543,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
     // Unsupported syntax.
     // TODO: Print the character (if printable).
     } else {
-        croak ("Unexpected character '%c' at offset %d.\n", json[*offset], *offset);
+        croak ("Unexpected character '%c' at byte offset %ld.\n", json[*offset], *offset);
     }
 }
 
