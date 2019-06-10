@@ -232,12 +232,13 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
         STRLEN max_len = DEFAULT_STRING_LEN;
         STRLEN str_len = 0;
         int is_utf8 = 0;
+        int is_binary = 0;
 
         while (1) {
 
             // Nothing left.
             if (*offset >= nbytes) {
-                croak ("Unterminated string began at byte offset %ld.", start);
+                croak ("Unterminated string beginning at byte offset %ld.", start);
             }
 
             ch = json[*offset];
@@ -291,6 +292,8 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
                     seq[0] = CHARACTER_TABULATION;
                     *offset = *offset + (len = 1);
 
+                // NOTE: Use of \x does NOT activate UTF-8!
+                //
                 // \x00
                 } else if (((*offset + 3) < nbytes) && (json[*offset] == 'x')
                         && isxdigit (json[*offset + 1]) && isxdigit (json[*offset + 2])) {
@@ -303,17 +306,8 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
 
                     seq[0] = code_point;
                     len = 1;
+                    is_binary = 1;
 
-                    if (code_point <= 0x007F) {
-                        seq[0] = code_point & 0x7f;
-                        len = 1;
-
-                    } else {
-                        seq[0] =  0xc0 | ((code_point >> 6) & 0x1f);
-                        seq[1] =  0x80 |  (code_point       & 0x3f);
-                        len = 2;
-                        is_utf8 = 1;
-                    }
                     *offset = *offset + 3;
 
                 // \u0000
@@ -451,6 +445,11 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
                 // Finall adjust the offset.
                 *offset = *offset + len;
             }
+        }
+
+        // Cannot mix UTF-8 and \x formatting.
+        if (is_utf8 && is_binary) {
+            croak ("Forbidden mix of \\x (binary) with UTF-8 content in string starting at byte offset %d.", start);
         }
 
         DEBUG ("Returned string is %ld bytes.\n", str_len)

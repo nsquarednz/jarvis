@@ -63,6 +63,7 @@ my @tests = (
     { name => 'exp1', json => " -1234.44e12 ", expected => -1234.44e12 },
     { name => 'exp2', json => " 0.34243E-4 ", expected => 0.34243E-4 },
     { name => 'empty', json => '""', expected => '' },
+    { name => 'unterminated', json => ' "Unterminated\n String', error => "Unterminated string beginning at byte offset 1." },
     { name => 'simple', json => '" A simple String "', expected => ' A simple String ' },
     { name => 'utf8', json => '" UTF sö € string𝄞"', expected => ' UTF sö € string𝄞' },
     { name => 'multi-line', json => '" UTF sö € 
@@ -74,6 +75,7 @@ multi-line string
     { name => 'escapes2', json => '" \\b \\f \\r \\n \\t "', expected => " \b \f \r \n \t " },
     { name => 'escapes3', json => '"\\x0D\\x3a\\xd6\\x20"', expected => "\r:Ö " },
     { name => 'escapes4', json => '"\\u003A\\u00D6\\u0FD0\\uD2Cf\\U01D11e"', expected => ":Ö࿐틏𝄞" },
+    { name => 'mixed', json => ' "\\u003A\\u00D6\\u0FD0\\uD2Cf\\U01D11e\\x01"', error => "Forbidden mix of \\x (binary) with UTF-8 content in string starting at byte offset 1." },
 );
 
 my $ntests = 0;
@@ -98,7 +100,7 @@ foreach my $test (@tests) {
     };
     if ($@) {
         $error = $@;
-        $error =~ s/ at .*\.pl line \d+\..*$//s;
+        $error =~ s/ at \w+\.pl line \d+\..*$//s;
     }
 
     if (! $leak) {
@@ -119,7 +121,8 @@ foreach my $test (@tests) {
             }
         }
     }
-    #$result and print STDERR hexdump ($result, { suppress_warnings => 1 }) . "\n";
+    utf8::is_utf8 ($result) and print STDERR "String is UTF-8.\n";
+    $result and print STDERR hexdump ($result, { suppress_warnings => 1 }) . "\n";
     $ntests++;
 }
 
