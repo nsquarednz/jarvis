@@ -52,9 +52,8 @@ if ($leak) { use Devel::Leak; };
 # Load LUA.
 ################################################################################
 
-my $JSON_TEST_1A = "\n \t\r\n  ";
-
 my @tests = (
+    { name => 'empty', json => "\n \t\r\n  ", error => "No JSON content found." },
     { name => 'null', json => "\n null  \t\r\n", expected => undef },
     { name => 'true', json => " true", expected => boolean::true },
     { name =>'false', json => " \nfalse ", expected => boolean::false },
@@ -73,7 +72,8 @@ multi-line string
 ' },
     { name => 'escapes1', json => '" \\\\ \\" \\/ "', expected => ' \\ " / ' },
     { name => 'escapes2', json => '" \\b \\f \\r \\n \\t "', expected => " \b \f \r \n \t " },
-    { name => 'escapes3', json => '"\\u003A\\u00D6\\u0FD0\\uD2Cf\\U01D11e"', expected => ":Ö࿐틏𝄞" },
+    { name => 'escapes3', json => '"\\x0D\\x3a\\xd6\\x20"', expected => "\r:Ö " },
+    { name => 'escapes4', json => '"\\u003A\\u00D6\\u0FD0\\uD2Cf\\U01D11e"', expected => ":Ö࿐틏𝄞" },
 );
 
 my $ntests = 0;
@@ -85,56 +85,47 @@ my $ntests = 0;
 my $count = $leak && Devel::Leak::NoteSV (my $handle);
 
 ################################################################################
-# TEST 1A - nothing.
-################################################################################
-
-my $expected = "No JSON content found.";
-
-eval {
-    Jarvis::JSON::Utils::decode ($JSON_TEST_1A);
-};
-my $result = $@;
-defined ($result) or die "Unexpected Success!";
-$result =~ s/ at .*\.pl line \d+\..*$//s;
-
-if (! $leak) {
-    if (!ok (&Compare ($expected, $result), "TEST 1A (empty)")) {
-        printf STDERR "Result does not match, expected = ";
-        print STDERR &Dumper ($expected);
-        printf STDERR "What we got = ";
-        print STDERR &Dumper ($result);
-    }
-}
-$ntests++;
-
-################################################################################
 # ALL THE OTHER TESTS
 ################################################################################
 
 foreach my $test (@tests) {
-    $expected = $test->{expected};
+    my $result = undef;
+    my $error = undef;
+    undef $@;
 
-    $result = Jarvis::JSON::Utils::decode ($test->{json});
+    eval {
+        $result = Jarvis::JSON::Utils::decode ($test->{json});
+    };
+    if ($@) {
+        $error = $@;
+        $error =~ s/ at .*\.pl line \d+\..*$//s;
+    }
 
     if (! $leak) {
-        if (!ok (&Compare ($expected, $result), "TEST ($test->{name})")) {
-            printf STDERR "Result does not match, expected = ";
-            print STDERR &Dumper ($expected);
-            printf STDERR "What we got = ";
-            print STDERR &Dumper ($result);
+        if (defined $error) {
+            if (!ok (&Compare ($test->{error}, $error), "TEST ($test->{name})")) {
+                printf STDERR "Error does not match, expected = ";
+                print STDERR "$test->{error}\n";
+                printf STDERR "What we got = ";
+                print STDERR "$error\n";
+            }
+
+        } else {
+            if (!ok (&Compare ($test->{expected}, $result), "TEST ($test->{name})")) {
+                printf STDERR "Result does not match, expected = ";
+                $test->{expected} and print STDERR hexdump ($test->{expected}, { suppress_warnings => 1 }) . "\n";
+                printf STDERR "What we got = ";
+                $result and print STDERR hexdump ($result, { suppress_warnings => 1 }) . "\n";
+            }
         }
     }
-    $result and print STDERR hexdump ($result, { suppress_warnings => 1 }) . "\n";
+    #$result and print STDERR hexdump ($result, { suppress_warnings => 1 }) . "\n";
     $ntests++;
 }
 
 ################################################################################
 # Finish Testing
 ################################################################################
-
-undef $result;
-undef $expected;
-undef $@;
 
 $leak || done_testing ($ntests);
 

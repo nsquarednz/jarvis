@@ -217,6 +217,9 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
     // Note that JSON strings must be in double quotes, and we respect that.
     // I did contemplate supporting single quotes as a variant, but it seems pointless.
     //
+    // Note: We don't support any magic with UTF-16 surrogates.
+    // Each \uXXXX is standalone and generates a UTF-8 sequence of 1-3 bytes.
+    //
     } else if (ch == DOUBLE_QUOTE) {
 
         STRLEN start = *offset;
@@ -287,6 +290,31 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
                 } else if ((*offset < nbytes) && (json[*offset] == 't')) {
                     seq[0] = CHARACTER_TABULATION;
                     *offset = *offset + (len = 1);
+
+                // \x00
+                } else if (((*offset + 3) < nbytes) && (json[*offset] == 'x')
+                        && isxdigit (json[*offset + 1]) && isxdigit (json[*offset + 2])) {
+
+                    // The hex value.
+                    long code_point = 
+                        (HEX_VALUE(json[*offset + 1]) << 4)  + (HEX_VALUE(json[*offset + 2]));
+
+                    DEBUG ("Escape '%.4s' code point = 0x%02lx.\n", &json[*offset - 1], code_point)
+
+                    seq[0] = code_point;
+                    len = 1;
+
+                    if (code_point <= 0x007F) {
+                        seq[0] = code_point & 0x7f;
+                        len = 1;
+
+                    } else {
+                        seq[0] =  0xc0 | ((code_point >> 6) & 0x1f);
+                        seq[1] =  0x80 |  (code_point       & 0x3f);
+                        len = 2;
+                        is_utf8 = 1;
+                    }
+                    *offset = *offset + 3;
 
                 // \u0000
                 } else if (((*offset + 5) < nbytes) && (json[*offset] == 'u')
