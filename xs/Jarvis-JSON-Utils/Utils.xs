@@ -1,27 +1,23 @@
 /******************************************************************************
- * Description: n2svcd LUA Handler utilities.  These allow a Perl process to
- *              drive a LUA coroutine, performing asynchronous requests on 
- *              behalf of multiple LUA handlers all within a single-threaded
- *              environment.
+ * Description: Jarvis JSON decoder compatible with RFC-7159.
  *
- *              Of course, a LUA script which goes into an infinite loop will
- *              still bring down the whole process, so don't do that, OK?
+ * Licence:
+ *       This file is part of the Jarvis WebApp/Database gateway utility.
  *
- *              NOTE: We need LUA 5.2 for this to work.
+ *       Jarvis is free software: you can redistribute it and/or modify
+ *       it under the terms of the GNU General Public License as published by
+ *       the Free Software Foundation, either version 3 of the License, or
+ *       (at your option) any later version.
  *
- * Licence:     (c) 2012 by N-Squared Software (NZ) Limited.       
- *              All Rights Reserved.
- *              
- *              All information contained herein is, and remains
- *              the property of N-Squared Software (NZ) Limited.  
+ *       Jarvis is distributed in the hope that it will be useful,
+ *       but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *       GNU General Public License for more details.
  *
- *              The intellectual and technical concepts contained herein are 
- *              proprietary to N-Squared Software (NZ) Limited, and are 
- *              protected by trade secret or copyright law. 
+ *       You should have received a copy of the GNU General Public License
+ *       along with Jarvis.  If not, see <http://www.gnu.org/licenses/>.
  *
- *              Dissemination of this information or reproduction of this 
- *              material is strictly forbidden unless prior written permission 
- *              is obtained from N-Squared Software (NZ) Limited.
+ *       This software is Copyright 2019 by Jonathan Couper-Smartt.
  ******************************************************************************
  */
  
@@ -32,9 +28,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <math.h>
 
 #define DEBUG_ON 1
 #define DEBUG(...) if (DEBUG_ON) { fprintf (stderr, __VA_ARGS__); }
+
+#define MAX_NUMBER_LEN 50
 
 /******************************************************************************
  * JSON TO PERL
@@ -81,7 +80,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
 
         I32 len = UTF8SKIP (&json[*offset]);
         if (*offset + len > nbytes) {
-            croak ("UTF-8 overflow at %d bytes in JSON string.", *offset);
+            croak ("UTF-8 overflow at offset %d.", *offset);
         }
 
         // We don't support UTF-8 whitespace!
@@ -100,17 +99,22 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
         break;
     }
 
-    DEBUG ("Content[%d]: (%ld bytes remain)\n", json[*offset], nbytes - *offset);
+    char ch = json[*offset];
+    DEBUG ("Content[%d]: (%ld bytes remain)\n", ch, nbytes - *offset);
 
-    // null -> undef
+    // null is per RFC7159 section 3. Values.
     //
-    if (((nbytes - *offset) >= 4) && ! strncmp (&json[*offset], "null", 4)) {
+    // We map to the Perl undef.
+    //
+    if (((nbytes - *offset) >= 4) && (ch == 'n') && ! strncmp (&json[*offset], "null", 4)) {
         return &PL_sv_undef;
 
-    // true/false -> boolean::true/false
+    // true/false are per RFC7159 section 3. Values.
     //
-    } else if ((((nbytes - *offset) >= 4) && ! strncmp (&json[*offset], "true", 4)) ||
-               (((nbytes - *offset) >= 5) && ! strncmp (&json[*offset], "false", 5))) {
+    // We map to the standard Perl boolean::true/false.
+    //
+    } else if ((((nbytes - *offset) >= 4) && (ch == 't') && ! strncmp (&json[*offset], "true", 4)) ||
+               (((nbytes - *offset) >= 5) && (ch == 'f') && ! strncmp (&json[*offset], "false", 5))) {
 
         // Mark the stack and push the $self object pointer onto it.
         dSP;
@@ -140,23 +144,65 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
 
         return  (tf_sv);
 
-        /*
+    // Numbers are per RFC7159 section 6. Numbers
+    //
+    // Note that we hand off to the "strtold" C built-in function, which is (hopefully) at least
+    // as flexible as the RFC.
+    //
+    } else if (((ch >= '0') && (ch <= '9')) || (ch == '-')) {
 
-    // LUA doesn't have the concept of integer, everything is number
-    // We use Perl integer if the value has no decimal part.
-    //
-    // NOTE: The test we use here is NOT identical to lua_isnumber ().
-    // lua_isnumber will also return true if the variable is a string
-    // that LOOKS like a number.  We don't want that.  Hence lua_type.
-    //
-    } else if (lua_type (L, -1) == LUA_TNUMBER) {
-        double n = lua_tonumber (L, -1);
-        if (n == (long) n) {
+        STRLEN start = *offset;
+
+        int is_integer = 1;
+
+        // Negative marker.
+        if (ch == '-') {
+            *offset = *offset + 1;
+        }
+        // int part
+        while ((*offset < nbytes) && ((json[*offset] >= '0') && (json[*offset] <= '9'))) {
+            *offset = *offset + 1;
+        }
+        // frac part
+        if ((*offset < nbytes) && (json[*offset] == '.')) {
+            *offset = *offset + 1;
+            while ((*offset < nbytes) && ((json[*offset] >= '0') && (json[*offset] <= '9'))) {
+                *offset = *offset + 1;
+                is_integer = 0;
+            }        
+        }
+        // exponent
+        if ((*offset < nbytes) && ((json[*offset] == 'e') || (json[*offset] == 'E'))) {
+            *offset = *offset + 1;
+            if ((*offset < nbytes) && ((json[*offset] == '-') || (json[*offset] == '+'))) {
+                *offset = *offset + 1;
+            }        
+            while ((*offset < nbytes) && ((json[*offset] >= '0') && (json[*offset] <= '9'))) {
+                *offset = *offset + 1;
+            }        
+        }
+
+        // Ugh, let's copy this into a temporary buffer just in case.
+        char tmp[MAX_NUMBER_LEN + 1];
+        if ((*offset - start) > MAX_NUMBER_LEN) {
+            croak ("Number too long (> %d chars) at offset %d.", MAX_NUMBER_LEN, start);
+        }
+        strncpy (tmp, &json[start], *offset - start);
+        tmp[*offset - start] = '\0';
+
+        double n = strtold (tmp, NULL);
+        if (! isfinite (n)) {
+            croak ("Number overflow at offset %d.", start);
+        }
+
+        if (is_integer) {
             return newSViv ((long) n);
 
         } else {
             return newSVnv (n);
         }
+
+        /*
 
     // Convert to a string.  Note that the string may contain CHR(0).
     } else if (lua_isstring (L, -1)) {
@@ -276,7 +322,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
     // Unsupported syntax.
     // TODO: Print the character (if printable).
     } else {
-        croak ("Unexpected character '%c' at %d.\n", json[*offset], *offset);
+        croak ("Unexpected character '%c' at offset %d.\n", json[*offset], *offset);
     }
 }
 
