@@ -48,7 +48,11 @@ my @tests = (
     { name => 'empty_junk', json => " {\n \n} JUNK\n\n", error => "Trailing non-whitespace begins at byte offset 7." },
     { name => 'endless', json => " {\n ", error => "Object element starting at byte offset 1 has no matching '}'." },
     { name => 'basic', json => ' { "ABC": 34 } ', expected => { ABC => 34 } },
-    { name => 'double', json => ' { "ABC": 34, "ç": "é", "asdf-\x67": "asdf-\x67", "yes": true, "NO!": false, "maybe?": null } ', expected => { ABC => 34 } },
+    { name => 'utf8', json => '{ "ç": "é" }', expected => { "ç" => "é" }, },
+    { name => 'multikey', json => ' { "ABC": 34, "ç": "é", "asdf-\x67": "asdf-\x97", "yes": true, "NO!": false, "maybe?": null } ', 
+        expected => { "ABC" => 34, "ç" => "é", "asdf-\x67" => "asdf-\x97", "yes" => boolean::true, "NO!" => boolean::false, "maybe?" => undef } },
+    { name => 'nested', json => '{ "ABC": { "DOWN": "UNDER", "go": "west", }, "__test": [], "ANOTHER": { "B": "\x01\x02", "D": "\u0001\u0002" } }', 
+        expected => { "ABC" => { "DOWN" => "UNDER", "go" => "west", }, "__test" => [], "ANOTHER" => { "B" => "\x01\x02", "D" => "\x01\x02" } }, },
 );
 
 my $ntests = 0;
@@ -107,6 +111,16 @@ foreach my $test (@tests) {
             }
         }
     }
+    # print "EXPECTED KEYS\n";
+    # foreach my $key (sort (keys %{ $test->{expected} })) {
+    #     print ">> KEY '$key' " . (utf8::is_utf8 ($key) ? "IS UTF-8" : "not") . "\n";
+    # }
+
+    # print "ACTUAL KEYS\n";
+    # foreach my $key (sort (keys %$result)) {
+    #     print ">> KEY '$key' " . (utf8::is_utf8 ($key) ? "IS UTF-8" : "not") . "\n";
+    # }
+
     #utf8::is_utf8 ($result) and print STDERR "String is UTF-8.\n";
     #$result and print &Dumper ($result);
     $ntests++;

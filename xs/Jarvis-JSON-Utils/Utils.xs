@@ -30,7 +30,7 @@
 #include <unistd.h>
 #include <math.h>
 
-#define DEBUG_ON 1
+#define DEBUG_ON 0
 #define DEBUG(...) if (DEBUG_ON) { fprintf (stderr, __VA_ARGS__); }
 
 // Some ASCII codes.
@@ -295,6 +295,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
                     *offset = *offset + (len = 1);
 
                 // NOTE: Use of \x does NOT activate UTF-8!
+                // In fact, \x 8-bit characters are NOT permitted in conjunction with UTF-8 8-bit characters.
                 //
                 // \x00
                 } else if (((*offset + 3) < nbytes) && (json[*offset] == 'x')
@@ -308,7 +309,11 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
 
                     seq[0] = code_point;
                     len = 1;
-                    is_binary = 1;
+
+                    if ((code_point > 0x007F) && ! is_binary) {
+                        DEBUG (">> \\x 8-bit character turns BINARY ON AT byte offset %ld.\n", *offset)
+                        is_binary = 1;
+                    }
 
                     *offset = *offset + 3;
 
@@ -331,18 +336,22 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
                         seq[0] = code_point & 0x7f;
                         len = 1;
 
-                    } else if (code_point <= 0x07FF) {
-                        seq[0] =  0xc0 | ((code_point >> 6) & 0x1f);
-                        seq[1] =  0x80 |  (code_point       & 0x3f);
-                        len = 2;
-                        is_utf8 = 1;
-
                     } else {
-                        seq[0] =  0xe0 | ((code_point >> 12) & 0x0f);
-                        seq[1] =  0x80 | ((code_point >> 6)  & 0x3f);
-                        seq[2] =  0x80 |  (code_point        & 0x3f);
-                        len = 3;
-                        is_utf8 = 1;
+                        if (code_point <= 0x07FF) {
+                            seq[0] =  0xc0 | ((code_point >> 6) & 0x1f);
+                            seq[1] =  0x80 |  (code_point       & 0x3f);
+                            len = 2;
+
+                        } else {
+                            seq[0] =  0xe0 | ((code_point >> 12) & 0x0f);
+                            seq[1] =  0x80 | ((code_point >> 6)  & 0x3f);
+                            seq[2] =  0x80 |  (code_point        & 0x3f);
+                            len = 3;
+                        }
+                        if (! is_utf8) {
+                            DEBUG (">> \\u %ld-byte code point turns UTF-8 ON AT byte offset %ld.\n", len, *offset)
+                            is_utf8 = 1;
+                        }
                     }
                     *offset = *offset + 5;
 
@@ -364,26 +373,29 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
                         seq[0] = code_point & 0x7f;
                         len = 1;
 
-                    } else if (code_point <= 0x07FF) {
-                        seq[0] =  0xc0 | ((code_point >> 6) & 0x1f);
-                        seq[1] =  0x80 |  (code_point       & 0x3f);
-                        len = 2;
-                        is_utf8 = 1;
-
-                    } else if (code_point <= 0xFFFF) {
-                        seq[0] =  0xe0 | ((code_point >> 12) & 0x0f);
-                        seq[1] =  0x80 | ((code_point >> 6)  & 0x3f);
-                        seq[2] =  0x80 |  (code_point        & 0x3f);
-                        len = 3;
-                        is_utf8 = 1;
-
                     } else {
-                        seq[0] =  0xf0 | ((code_point >> 18) & 0x03);
-                        seq[1] =  0x80 | ((code_point >> 12) & 0x3f);
-                        seq[2] =  0x80 | ((code_point >> 6)  & 0x3f);
-                        seq[3] =  0x80 |  (code_point        & 0x3f);
-                        len = 4;
-                        is_utf8 = 1;
+                        if (code_point <= 0x07FF) {
+                            seq[0] =  0xc0 | ((code_point >> 6) & 0x1f);
+                            seq[1] =  0x80 |  (code_point       & 0x3f);
+                            len = 2;
+
+                        } else if (code_point <= 0xFFFF) {
+                            seq[0] =  0xe0 | ((code_point >> 12) & 0x0f);
+                            seq[1] =  0x80 | ((code_point >> 6)  & 0x3f);
+                            seq[2] =  0x80 |  (code_point        & 0x3f);
+                            len = 3;
+
+                        } else {
+                            seq[0] =  0xf0 | ((code_point >> 18) & 0x03);
+                            seq[1] =  0x80 | ((code_point >> 12) & 0x3f);
+                            seq[2] =  0x80 | ((code_point >> 6)  & 0x3f);
+                            seq[3] =  0x80 |  (code_point        & 0x3f);
+                            len = 4;
+                        }
+                        if (! is_utf8) {
+                            DEBUG (">> \\U %ld-byte code point turns UTF-8 ON AT byte offset %ld.\n", len, *offset)
+                            is_utf8 = 1;
+                        }
                     }
                     *offset = *offset + 7;
 
@@ -393,8 +405,34 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
                     croak ("Unsupported escape sequence at byte offset %ld.", *offset - 1);
                 }
 
+                // Do we need to re-alloc our string buffer?
+                if ((str_len + len) > max_len) {
+                    DEBUG ("Growing string buffer up to %d bytes.\n", DEFAULT_STRING_LEN * 4)
+                    char *str2 = (char *) malloc (DEFAULT_STRING_LEN * 4);
+                    memcpy (str2, str, str_len);
+                    max_len = DEFAULT_STRING_LEN * 4;
+                    free (str);
+                    str = str2;
+                }
+
+                // Copy the byte(s) for this character.
+                for (STRLEN i = 0; i < len; i++) {
+                    str[str_len + i] = seq[i];
+                }
+                str_len = str_len + len;
+
+                // NOTE: Offset was adjusted earlier.
+
+            // Any other characters "as is", including inline UTF-8 (which JSON doesn't officially support).
+            } else {
+                STRLEN len = UTF8SKIP (&json[*offset]);
+                if (*offset + len > nbytes) {
+                    free (str);
+                    croak ("UTF-8 overflow at byte offset %ld.", *offset);
+                }
+
                 if ((len > 1) && ! is_utf8) {
-                    DEBUG ("String contains UTF-8 characters.\n");
+                    DEBUG (">> UTF-8 %ld-byte inline character turns UTF-8 ON AT byte offset %ld.\n", len, *offset)
                     is_utf8 = 1;
                 }
 
@@ -409,41 +447,9 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
                 }
 
                 // Copy the byte(s) for this character.
-                for (I32 i = 0; i < len; i++) {
-                    str[str_len + i] = seq[i];
-                }
-                str_len = str_len + len;
-
-                // NOTE: Offset was adjusted earlier.
-
-            // Any other characters "as is", including inline UTF-8 (which JSON doesn't officially support).
-            } else {
-                I32 len = UTF8SKIP (&json[*offset]);
-                if (*offset + len > nbytes) {
-                    free (str);
-                    croak ("UTF-8 overflow at byte offset %ld.", *offset);
-                }
-
-                // Do we need to re-alloc our string buffer?
-                if ((str_len + len) > max_len) {
-                    if ((len > 1) && ! is_utf8) {
-                        DEBUG ("String contains UTF-8 characters.\n");
-                        is_utf8 = 1;
-                    }
-                    DEBUG ("Growing string buffer up to %d bytes.\n", DEFAULT_STRING_LEN * 4)
-                    char *str2 = (char *) malloc (DEFAULT_STRING_LEN * 4);
-                    memcpy (str2, str, str_len);
-                    max_len = DEFAULT_STRING_LEN * 4;
-                    free (str);
-                    str = str2;
-                }
-
-                // Copy the byte(s) for this character.
-                for (I32 i = 0; i < len; i++) {
+                // Assume this is faster than memcpy for 1-2 byte strings.
+                for (STRLEN i = 0; i < len; i++) {
                     str[str_len + i] = json[*offset + i];
-                    if (json[*offset + i] && 0x80) {
-                        is_utf8 = 1;
-                    }
                 }
                 str_len = str_len + len;
 
@@ -455,11 +461,13 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
         // Cannot mix UTF-8 and \x formatting.
         if (is_utf8 && is_binary) {
             free (str);
-            croak ("Forbidden mix of \\x (binary) with UTF-8 content in string starting at byte offset %d.", start);
+            croak ("Forbidden mix of \\x (binary) with UTF-8 content in string starting at byte offset %ld.", start);
         }
 
+        // A len = 0 tells perl to use strlen to get the length.  
+        // Force a NUL terminator so that empty strings work properly.
+        //
         DEBUG ("Returned string is %ld bytes.\n", str_len)
-        // A len = 0 tells perl to use strlen to get the length.  That's not what we want.
         if (str_len == 0) {
             str[0] = 0;
         }
@@ -604,7 +612,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
 
         // End of input, array is still open.
         if (*offset >= nbytes) {
-            croak ("Array element starting at byte offset %d has no matching ']'.", start);
+            croak ("Array element starting at byte offset %ld has no matching ']'.", start);
         }
 
         // Get all the elements.
@@ -644,7 +652,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
 
             // End of input, array is still open.
             if (*offset >= nbytes) {
-                croak ("Array element starting at byte offset %d has no matching ']'.", start);
+                croak ("Array element starting at byte offset %ld has no matching ']'.", start);
             }
 
             // Now there must be either a ']' or ','.
@@ -657,7 +665,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
 
             // Consume the ',' which must be present.
             if (ch != ',') {
-                croak ("Expected ',' array element separator at byte offset %d, got '%c'.", *offset, ch);
+                croak ("Expected ',' array element separator at byte offset %ld, got '%c'.", *offset, ch);
             }
             *offset = *offset + 1;
 
@@ -666,7 +674,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
 
             // End of input, array is still open.
             if (*offset >= nbytes) {
-                croak ("Array starting at byte offset %d has no matching ']'.", start);
+                croak ("Array starting at byte offset %ld has no matching ']'.", start);
             }
         }                
 
@@ -693,7 +701,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
 
         // End of input, object is still open.
         if (*offset >= nbytes) {
-            croak ("Object element starting at byte offset %d has no matching '}'.", start);
+            croak ("Object element starting at byte offset %ld has no matching '}'.", start);
         }
 
         // Get all the attribute elements.
@@ -712,20 +720,21 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
             }
 
             // OK, first we MUST have a member name (string).
-            SV *name_sv = json_to_perl_inner (json, nbytes, offset, flags | FLAG_STRING_ONLY);
+            // This is mortal, it is used only as the hash key then is gone.
+            SV *name_sv = sv_2mortal (json_to_perl_inner (json, nbytes, offset, flags | FLAG_STRING_ONLY));
 
             // Consume trailing whitespace.
             eat_space (json, nbytes, offset);
 
             // End of input, array is still open.
             if (*offset >= nbytes) {
-                croak ("Object member starting at byte offset %d has no value.", start);
+                croak ("Object member starting at byte offset %ld has no value.", start);
             }
 
             // Consume the ':' which must be present.
             ch = json[*offset];
             if (ch != ':') {
-                croak ("Expected ':' object member separator at byte offset %d, got '%c'.", *offset, ch);
+                croak ("Expected ':' object member separator at byte offset %ld, got '%c'.", *offset, ch);
             }
             *offset = *offset + 1;
 
@@ -733,17 +742,15 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
             SV *value_sv = json_to_perl_inner (json, nbytes, offset, flags);
 
             // STORE the HASH ENTRY.
-            STRLEN key_len;
-            char *key = SvPV (name_sv, key_len);
-
-            hv_store (hv, key, key_len, value_sv, 0);
+            // Using hv_store_ent allows us to retain the UTF-8 flag on the key.
+            hv_store_ent (hv, name_sv, value_sv, 0);
 
             // Consume trailing whitespace.
             eat_space (json, nbytes, offset);
 
             // End of input, object is still open.
             if (*offset >= nbytes) {
-                croak ("Object starting at byte offset %d has no matching '}'.", start);
+                croak ("Object starting at byte offset %ld has no matching '}'.", start);
             }
 
             // Now there must be either a '}' or ','.
@@ -756,7 +763,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
 
             // Consume the ',' which must be present.
             if (ch != ',') {
-                croak ("Expected ',' object member separator at byte offset %d, got '%c'.", *offset, ch);
+                croak ("Expected ',' object member separator at byte offset %ld, got '%c'.", *offset, ch);
             }
             *offset = *offset + 1;
 
@@ -765,7 +772,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
 
             // End of input, object is still open.
             if (*offset >= nbytes) {
-                croak ("Object starting at byte offset %d has no matching '}'.", start);
+                croak ("Object starting at byte offset %ld has no matching '}'.", start);
             }
         }                
 
@@ -810,7 +817,7 @@ PPCODE:
     // Check for trailing non-whitespace.
     if (offset < json_len) {
         sv_2mortal (results);
-        croak ("Trailing non-whitespace begins at byte offset %d.", offset);
+        croak ("Trailing non-whitespace begins at byte offset %ld.", offset);
     }
 
     // Should we return an <undef> here?
