@@ -30,7 +30,7 @@
 #include <unistd.h>
 #include <math.h>
 
-#define DEBUG_ON 1
+#define DEBUG_ON 0
 #define DEBUG(...) if (DEBUG_ON) { fprintf (stderr, __VA_ARGS__); }
 
 // Some ASCII codes.
@@ -122,13 +122,49 @@ void eat_space (char *json, STRLEN nbytes, STRLEN *offset) {
                 }
 
                 // End of line.
-                if ((len == 1) && (json[*offset] == LINE_FEED)) {
+                ch = json[*offset];
+                if ((len == 1) && (ch == LINE_FEED)) {
                     *offset = *offset + 1;
                     break;
                 }
 
                 // Otherwise keep on moving.
                 *offset = *offset + len;
+            }
+        }
+
+        // /* ... Comment Block ... */
+        if ((ch == '/') && ((*offset + 1) < nbytes) && (json[*offset + 1] == '*')) {
+
+            STRLEN start = *offset;
+            DEBUG ("Starting Multi-Line Comment[/*] at byte offset %ld\n", start);
+
+            // Absorb the second comment-start character.
+            *offset = *offset + 1;
+
+            // Now continue until end of block or end of file.
+            int in_comment = 1;
+            while (*offset < nbytes) {
+                I32 len = UTF8SKIP (&json[*offset]);
+                if (*offset + len > nbytes) {
+                    croak ("UTF-8 overflow at byte offset %ld.", *offset);
+                }
+
+                // End of block.
+                ch = json[*offset];
+                if ((len == 1) && (ch == '*') && ((*offset + 1) < nbytes) && (json[*offset + 1] == '/')) {
+                    *offset = *offset + 2;
+                    DEBUG ("Content restarts at Multi-Line Comment[*/] at byte offset %ld\n", *offset);
+                    in_comment = 0;
+                    break;
+                }
+
+                // Otherwise keep on moving.
+                *offset = *offset + len;
+            }
+
+            if (in_comment) {
+                croak ("Multi-line comment starting at byte offset %ld was not terminated.", start);
             }
         }
         

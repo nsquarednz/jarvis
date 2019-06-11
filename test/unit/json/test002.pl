@@ -62,10 +62,25 @@ my @tests = (
         name => 'array_nested_comment1', json => 
 "#Comment in Perl Style
 [ 34,// CSTYLE ça va comme ca?
-[ 7, true, null ], -- SQL STYLE comment --
+[ 7, true, /* THIS IS A
+    MULTI-LINE BLOCK OF COMMENTS.
+    */ 
+ null ], -- SQL STYLE comment --
 \"YES -- No Comment  
 OR NO\" ] ", 
         expected => [ 34, [ 7, boolean::true, undef ], "YES -- No Comment  \nOR NO" ] 
+    },
+    {   
+        name => 'array_nested_comment1', json => 
+"#Comment in Perl Style
+[ 34,// CSTYLE ça va comme ca?
+[ 7, true, /* THIS IS A
+    MULTI-LINE BLOCK OF COMMENTS.
+    * /
+ null ], -- SQL STYLE comment --
+\"YES -- No Comment  
+OR NO\" ] ", 
+        error => "Multi-line comment starting at byte offset 66 was not terminated." 
     },
 );
 
