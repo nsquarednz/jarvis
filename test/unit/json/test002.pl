@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 ###############################################################################
-# Description:  SCALAR test cases for our custom XS JSON codec.
+# Description:  ARRAY test cases for our custom XS JSON codec.
+#               Also tests for comments.
 #
 # Licence:
 #       This file is part of the Jarvis WebApp/Database gateway utility.
@@ -53,30 +54,19 @@ if ($leak) { use Devel::Leak; };
 ################################################################################
 
 my @tests = (
-    { name => 'empty', json => "\n \t\r\n  ", error => "No JSON content found." },
-    { name => 'null', json => "\n null  \t\r\n", expected => undef },
-    { name => 'true', json => " true", expected => boolean::true },
-    { name => 'false', json => " \nfalse ", expected => boolean::false },
-    { name => 'false_junk', json => " \nfalse\n JUNK ", error => "Trailing non-whitespace begins at byte offset 9." },
-    { name => 'integer', json => "3 ", expected => 3 },
-    { name => 'negative', json => "-732344 ", expected => -732344 },
-    { name => 'fraction', json => "  7234.123423142 ", expected => 7234.123423142 },
-    { name => 'exp1', json => " -1234.44e12 ", expected => -1234.44e12 },
-    { name => 'exp2', json => " 0.34243E-4 ", expected => 0.34243E-4 },
-    { name => 'empty', json => '""', expected => '' },
-    { name => 'unterminated', json => ' "Unterminated\n String', error => "Unterminated string beginning at byte offset 1." },
-    { name => 'simple', json => '" A simple String "', expected => ' A simple String ' },
-    { name => 'utf8', json => '" UTF sö € string𝄞"', expected => ' UTF sö € string𝄞' },
-    { name => 'multi-line', json => '" UTF sö € 
-multi-line string
-"', expected => ' UTF sö € 
-multi-line string
-' },
-    { name => 'escapes1', json => '" \\\\ \\" \\/ "', expected => ' \\ " / ' },
-    { name => 'escapes2', json => '" \\b \\f \\r \\n \\t "', expected => " \b \f \r \n \t " },
-    { name => 'escapes3', json => '"\\x0D\\x3a\\xd6\\x20"', expected => "\r:Ö " },
-    { name => 'escapes4', json => '"\\u003A\\u00D6\\u0FD0\\uD2Cf\\U01D11e"', expected => ":Ö࿐틏𝄞" },
-    { name => 'mixed', json => ' "\\u003A\\u00D6\\u0FD0\\uD2Cf\\U01D11e\\x01"', error => "Forbidden mix of \\x (binary) with UTF-8 content in string starting at byte offset 1." },
+    { name => 'empty', json => " [\n\n] ", expected => [] },
+    { name => 'empty_junk', json => " [\n \n] JUNK\n\n", error => "Trailing non-whitespace begins at byte offset 7." },
+    { name => 'array', json => " [ 34, 7, \"YES\nOR NO\" ] ", expected => [ 34, 7, "YES\nOR NO" ] },
+    { name => 'array_nested', json => " [ 34, [ 7, true, null ], \"YES\nOR NO\" ] ", expected => [ 34, [ 7, boolean::true, undef ], "YES\nOR NO" ] },
+    {   
+        name => 'array_nested_comment1', json => 
+"#Comment in Perl Style
+[ 34,// CSTYLE ça va comme ca?
+[ 7, true, null ], -- SQL STYLE comment --
+\"YES -- No Comment  
+OR NO\" ] ", 
+        expected => [ 34, [ 7, boolean::true, undef ], "YES -- No Comment  \nOR NO" ] 
+    },
 );
 
 my $ntests = 0;
@@ -116,15 +106,15 @@ foreach my $test (@tests) {
         } else {
             if (!ok (&Compare ($test->{expected}, $result), "TEST ($test->{name})")) {
                 printf STDERR "Result does not match, expected = ";
-                $test->{expected} and print STDERR hexdump ($test->{expected}, { suppress_warnings => 1 }) . "\n";
+                print STDERR &Dumper ($test->{expected});
                 printf STDERR "What we got = ";
-                $result and print STDERR hexdump ($result, { suppress_warnings => 1 }) . "\n";
+                print STDERR &Dumper ($result);
                 $error and print STDERR "$error\n";
             }
         }
     }
     utf8::is_utf8 ($result) and print STDERR "String is UTF-8.\n";
-    $result and print STDERR hexdump ($result, { suppress_warnings => 1 }) . "\n";
+    $result and print &Dumper ($result);
     $ntests++;
 }
 

@@ -30,14 +30,114 @@
 #include <unistd.h>
 #include <math.h>
 
-#define DEBUG_ON 0
+#define DEBUG_ON 1
 #define DEBUG(...) if (DEBUG_ON) { fprintf (stderr, __VA_ARGS__); }
 
+// Some ASCII codes.
+#define CHARACTER_TABULATION 9
+#define LINE_FEED 10
+#define LINE_TABULATION 11
+#define FORM_FEED 12
+#define CARRIAGE_RETURN 13
+#define SPACE 32
+#define NEXT_LINE 133
+
+#define BACKSLASH 92
+#define FRONTSLASH 47
+#define DOUBLE_QUOTE 34
+
+#define BACKSPACE 8
+
+// Some buffer sizings.
 #define MAX_NUMBER_LEN 64
 #define DEFAULT_STRING_LEN 256
 
 // Converts '0'-'9','a'-'f','A'-'F' into a number 0..15.
 #define HEX_VALUE(x) (((x >= '0') && (x <= '9')) ? (x - '0') : (10 + ((x) | 0x20) - 'a'))
+
+/******************************************************************************
+ * EAT SPACE
+ *      Consumes any whitespace (including comments).
+ * 
+ * Parameters:
+ *      json - Pointer to the JSON raw bytes input
+ *      nbytes - Total number of bytes in that JSON
+ *      offset - Number of bytes remaining
+ *
+ * Returns:
+ *      void
+ *****************************************************************************/
+void eat_space (char *json, STRLEN nbytes, STRLEN *offset) {
+
+    // Keep absorbing whitespace until we get to something real.
+    while (1) {
+
+        // Nothing left.
+        if (*offset >= nbytes) {
+            return;
+        }
+
+        I32 len = UTF8SKIP (&json[*offset]);
+        if (*offset + len > nbytes) {
+            croak ("UTF-8 overflow at byte offset %ld.", *offset);
+        }
+
+        // We don't support UTF-8 whitespace!
+        if (len > 1) {
+            break;
+        }
+
+        // Single character whitespace.
+        char ch = json[*offset];
+        if ((ch == CHARACTER_TABULATION) || (ch == LINE_FEED) || (ch == LINE_TABULATION) || 
+            (ch == FORM_FEED) || (ch == CARRIAGE_RETURN) || (ch == SPACE) || (ch == NEXT_LINE)) {
+
+            DEBUG ("Whitespace[%d]: %ld\n", ch, *offset);
+            *offset = *offset + 1;
+            continue;
+        }
+
+        // Comment up to next "\n" end of line (including UTF-8 chars).
+        //
+        //  # Perl comments.
+        //  // C-Style single line comments.
+        //  -- SQL-Style single line comments.
+        //
+        if ((ch == '#') ||
+            ((ch == '/') && ((*offset + 1) < nbytes) && (json[*offset + 1] == '/')) ||
+            ((ch == '-') && ((*offset + 1) < nbytes) && (json[*offset + 1] == '-'))) {
+
+            DEBUG ("Starting Single-Line Comment[%c] at byte offset %ld\n", ch, *offset);
+
+            // Absorb the second comment-start character if present
+            if ((ch = '/') || (ch = '-')) {
+                *offset = *offset + 1;
+            }
+
+            // Now continue until end of line or end of file.
+            while (*offset < nbytes) {
+                I32 len = UTF8SKIP (&json[*offset]);
+                if (*offset + len > nbytes) {
+                    croak ("UTF-8 overflow at byte offset %ld.", *offset);
+                }
+
+                // End of line.
+                if ((len == 1) && (json[*offset] == LINE_FEED)) {
+                    *offset = *offset + 1;
+                    break;
+                }
+
+                // Otherwise keep on moving.
+                *offset = *offset + len;
+            }
+        }
+        
+        // Not whitespace.
+        break;
+    }
+
+    return;
+}
 
 /******************************************************************************
  * JSON TO PERL
@@ -63,50 +163,12 @@
  *****************************************************************************/
 SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
 
+    // Consume leading whitespace.
+    eat_space (json, nbytes, offset);
 
-#define CHARACTER_TABULATION 9
-#define LINE_FEED 10
-#define LINE_TABULATION 11
-#define FORM_FEED 12
-#define CARRIAGE_RETURN 13
-#define SPACE 32
-#define NEXT_LINE 133
-
-#define BACKSLASH 92
-#define FRONTSLASH 47
-#define DOUBLE_QUOTE 34
-
-#define BACKSPACE 8
-
-    // Assume we're at the start of an object/sub-object.
-    // Keep absorbing whitespace until we get to something real.
-    //
-    while (1) {
-
-        // Nothing left.
-        if (*offset >= nbytes) {
-            return NULL;
-        }
-
-        I32 len = UTF8SKIP (&json[*offset]);
-        if (*offset + len > nbytes) {
-            croak ("UTF-8 overflow at byte offset %ld.", *offset);
-        }
-
-        // We don't support UTF-8 whitespace!
-        if (len > 1) {
-            break;
-        }
-
-        char ch = json[*offset];
-        if ((ch == CHARACTER_TABULATION) || (ch == LINE_FEED) || (ch == LINE_TABULATION) || (ch == FORM_FEED) || (ch == CARRIAGE_RETURN) || (ch == SPACE) || (ch == NEXT_LINE)) {
-            DEBUG ("Whitespace[%d]: %ld\n", ch, *offset);
-            *offset = *offset + 1;
-            continue;
-        }
-        
-        // Not whitespace.
-        break;
+    // End of input, no content found.
+    if (*offset >= nbytes) {
+        return NULL;
     }
 
     char ch = json[*offset];
@@ -117,6 +179,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
     // We map to the Perl undef.
     //
     if (((nbytes - *offset) >= 4) && (ch == 'n') && ! strncmp (&json[*offset], "null", 4)) {
+        *offset = *offset + 4;
         return &PL_sv_undef;
 
     // true/false are per RFC7159 section 3. Values.
@@ -137,6 +200,8 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
         PUTBACK;
 
         char *subname = (json[*offset] == 't') ? "boolean::true" : "boolean::false";
+        *offset = *offset + ((json[*offset] == 't') ? 4 : 5);
+
         int rcount = call_pv (subname, G_SCALAR);
         SPAGAIN;
 
@@ -224,7 +289,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
 
         STRLEN start = *offset;
 
-        // Consume the starting ". 
+        // Consume the starting '"'. 
         *offset = *offset + 1;
 
         // Assign this as the default string size.  We will re-malloc if and when we outgrow this.
@@ -243,7 +308,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
 
             ch = json[*offset];
 
-            // Terminating ", we're done!
+            // Terminating '"', we're done!
             if (ch == DOUBLE_QUOTE) {
                 *offset = *offset + 1;
                 break;
@@ -467,43 +532,91 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
 
         return (str_sv);
 
-        /*
+    // ARRAY
+    } else if (ch == '[') {
 
-    // Handle Tables (and sequences)
-    } else if (lua_istable (L, -1)) {
+        STRLEN start = *offset;
 
-        // Len > 0 indicates a sequence.  Translate into a Perl Array.
-        int table_len = luaL_len (L, -1);
-        if (table_len > 0) {
+        // Consume the starting '['. 
+        *offset = *offset + 1;
 
-            // Initialise a new Array.  AV's reference count is 1.
-            AV *av = newAV ();
-            SvGETMAGIC ((SV *) av);   
+        // Initialise a new Array.  AV's reference count is 1.
+        AV *av = newAV ();
+        SvGETMAGIC ((SV *) av);   
 
-            // Key = nil indicates a fresh iteration.
-            lua_pushnil (L);
+        // Consume leading whitespace.
+        eat_space (json, nbytes, offset);
 
-            // Iterate each element in the table/sequence.  
-            // Our table/sequence is now at -2 because the iterator is at the top of the stack.
+        // End of input, array is still open.
+        if (*offset >= nbytes) {
+            croak ("Array element starting at byte offset %d has no matching ']'.", start);
+        }
+
+        // Get all the elements.
+        int num_elements = 0;
+        while (1) {
+            DEBUG ("Looking for element [%d] at byte offset %ld.\n", num_elements, *offset);
+
+            // End of array element?
+            ch = json[*offset];
+
+            // Terminating "]", we're done!
+            // Note that we allow trailing "," in our JSON arrays.
+            if (ch == ']') {
+                *offset = *offset + 1;
+                break;
+            }
+
+            // OK, then we MUST have an element.
+            SV *element_sv = json_to_perl_inner (json, nbytes, offset);
+
+            // I don't think it's possible that we can run out of input here.
+            // We already ate all the space and checked for not end-of-input.
+            // Either we find something, or we croak.  We can't return NULL.
             //
-            while (lua_next (L, -2) != 0) {
+            assert (element_sv);
 
-                // Now the value is at -1 (top) and the key is at -2.  
-                // Recurse to encode the value into a perl SV.
-                //
-                SV *value_sv = lua_to_perl (L, nil_sv);
+            // Push the SV onto the array.
+            // The SV already has reference count 1 so no need to increment when we push.
+            //
+            av_push (av, element_sv);
+            num_elements = num_elements + 1;
 
-                // Pop the lua value off the top.  Keep the key on the stack for the next iteration.
-                lua_pop (L, 1);
+            // Consume trailing whitespace.
+            eat_space (json, nbytes, offset);
 
-                // Push the SV onto the array.
-                // The SV already has reference count 1 so no need to increment when we push.
-                //
-                av_push (av, value_sv);
-            }                
+            // End of input, array is still open.
+            if (*offset >= nbytes) {
+                croak ("Array element starting at byte offset %d has no matching ']'.", start);
+            }
 
-            // The array already has a reference count of 1 so no increment required.
-            return newRV_noinc ((SV *) av);
+            // Now there must be either a ']' or ','.
+            // Bracket simply ends the array.
+            ch = json[*offset];
+            if (ch == ']') {
+                *offset = *offset + 1;
+                break;
+            }
+
+            // Consume the ',' which must be present.
+            if (ch != ',') {
+                croak ("Expected ',' array element separator at byte offset %d, got '%c'.", *offset, ch);
+            }
+            *offset = *offset + 1;
+
+            // Consume trailing whitespace after the comma then go back for more elements.
+            eat_space (json, nbytes, offset);
+
+            // End of input, array is still open.
+            if (*offset >= nbytes) {
+                croak ("Array element starting at byte offset %d has no matching ']'.", start);
+            }
+        }                
+
+        // The array already has a reference count of 1 so no increment required.
+        return newRV_noinc ((SV *) av);
+
+        /*
 
         // Otherwise use Perl Hash.
         } else {
@@ -598,6 +711,14 @@ PPCODE:
 
     STRLEN offset = 0;
     SV *results = json_to_perl_inner (json, json_len, &offset);
+
+    // Consume trailing whitespace.
+    eat_space (json, json_len, &offset);
+
+    // Check for trailing non-whitespace.
+    if (offset < json_len) {
+        croak ("Trailing non-whitespace begins at byte offset %d.", offset);
+    }
 
     // Should we return an <undef> here?
     if (! results) {
