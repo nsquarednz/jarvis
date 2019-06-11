@@ -41,16 +41,7 @@ use Getopt::Long;
 XSLoader::load ('Jarvis::JSON::Utils');
 
 ################################################################################
-# Trace and flags.
-################################################################################
-
-my $leak = 0;
-&Getopt::Long::GetOptions ("leak" => \$leak) || die "usage: perl $0 [--leak]";
-
-if ($leak) { use Devel::Leak; };
-
-################################################################################
-# Load LUA.
+# TEST CASES
 ################################################################################
 
 my @tests = (
@@ -86,6 +77,18 @@ OR NO\" ] ",
 
 my $ntests = 0;
 
+# Use s/// once so that its buffer is allocated.
+$ntests =~ s/AB/B/;
+
+################################################################################
+# Trace and flags.
+################################################################################
+
+my $leak = 0;
+&Getopt::Long::GetOptions ("leak" => \$leak) || die "usage: perl $0 [--leak]";
+
+if ($leak) { use Devel::Leak; };
+
 ################################################################################
 # Initialise Leak Checker
 ################################################################################
@@ -96,10 +99,10 @@ my $count = $leak && Devel::Leak::NoteSV (my $handle);
 # ALL THE OTHER TESTS
 ################################################################################
 
+foreach my $i (1 .. ($leak ? 5 : 1)) {
 foreach my $test (@tests) {
     my $result = undef;
     my $error = undef;
-    undef $@;
 
     eval {
         $result = Jarvis::JSON::Utils::decode ($test->{json});
@@ -128,9 +131,10 @@ foreach my $test (@tests) {
             }
         }
     }
-    utf8::is_utf8 ($result) and print STDERR "String is UTF-8.\n";
-    $result and print &Dumper ($result);
+    #utf8::is_utf8 ($result) and print STDERR "String is UTF-8.\n";
+    #$result and print &Dumper ($result);
     $ntests++;
+}
 }
 
 ################################################################################
@@ -139,6 +143,9 @@ foreach my $test (@tests) {
 
 $leak || done_testing ($ntests);
 
-$leak && Devel::Leak::CheckSV ($handle);
+if ($leak) {
+    my $count2 = Devel::Leak::CheckSV ($handle);
+    print "GAINED: " . ($count2 - $count) . "\n";
+}
 
 1;

@@ -40,23 +40,14 @@ use Getopt::Long;
 XSLoader::load ('Jarvis::JSON::Utils');
 
 ################################################################################
-# Trace and flags.
-################################################################################
-
-my $leak = 0;
-&Getopt::Long::GetOptions ("leak" => \$leak) || die "usage: perl $0 [--leak]";
-
-if ($leak) { use Devel::Leak; };
-
-################################################################################
-# Load LUA.
+# TEST CASES
 ################################################################################
 
 my @tests = (
     { name => 'empty', json => "\n \t\r\n  ", error => "No JSON content found." },
     { name => 'null', json => "\n null  \t\r\n", expected => undef },
-    { name => 'true', json => " true", expected => boolean::true },
-    { name => 'false', json => " \nfalse ", expected => boolean::false },
+    { name => 'true', json => " true", expected => 1 },
+    { name => 'false', json => " \nfalse ", expected => 0 },
     { name => 'false_junk', json => " \nfalse\n JUNK ", error => "Trailing non-whitespace begins at byte offset 9." },
     { name => 'integer', json => "3 ", expected => 3 },
     { name => 'negative', json => "-732344 ", expected => -732344 },
@@ -81,6 +72,18 @@ multi-line string
 
 my $ntests = 0;
 
+# Use s/// once so that its buffer is allocated.
+$ntests =~ s/AB/B/;
+
+################################################################################
+# Trace and flags.
+################################################################################
+
+my $leak = 0;
+&Getopt::Long::GetOptions ("leak" => \$leak) || die "usage: perl $0 [--leak]";
+
+if ($leak) { use Devel::Leak; };
+
 ################################################################################
 # Initialise Leak Checker
 ################################################################################
@@ -91,17 +94,17 @@ my $count = $leak && Devel::Leak::NoteSV (my $handle);
 # ALL THE OTHER TESTS
 ################################################################################
 
+foreach my $i (1 .. ($leak ? 5 : 1)) {
 foreach my $test (@tests) {
     my $result = undef;
     my $error = undef;
-    undef $@;
 
     eval {
         $result = Jarvis::JSON::Utils::decode ($test->{json});
     };
     if ($@) {
         $error = $@;
-        $error =~ s/ at \w+\.pl line \d+\..*$//s;
+        #$error =~ s/ at \w+\.pl line \d+\..*$//s;
     }
 
     if (! $leak) {
@@ -123,9 +126,11 @@ foreach my $test (@tests) {
             }
         }
     }
-    utf8::is_utf8 ($result) and print STDERR "String is UTF-8.\n";
-    $result and print STDERR hexdump ($result, { suppress_warnings => 1 }) . "\n";
+    #utf8::is_utf8 ($result) and print STDERR "String is UTF-8.\n";
+    #$result and print STDERR hexdump ($result, { suppress_warnings => 1 }) . "\n";
+    #$error and print STDERR "ERROR = $error\n";
     $ntests++;
+}
 }
 
 ################################################################################
@@ -134,6 +139,9 @@ foreach my $test (@tests) {
 
 $leak || done_testing ($ntests);
 
-$leak && Devel::Leak::CheckSV ($handle);
+if ($leak) {
+    my $count2 = Devel::Leak::CheckSV ($handle);
+    print "GAINED: " . ($count2 - $count) . "\n";
+}
 
 1;

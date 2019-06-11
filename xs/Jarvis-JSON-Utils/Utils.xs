@@ -225,24 +225,29 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
     } else if ((((nbytes - *offset) >= 4) && (ch == 't') && ! strncmp (&json[*offset], "true", 4)) ||
                (((nbytes - *offset) >= 5) && (ch == 'f') && ! strncmp (&json[*offset], "false", 5))) {
 
+        int bv = (json[*offset] == 't') ? 1 : 0;
+        *offset = *offset + ((json[*offset] == 't') ? 4 : 5);
+
+        return bv ? newSViv (1) : newSViv (0);
+
+        /*
+
         // Mark the stack and push the $self object pointer onto it.
         dSP;
 
         ENTER;
         SAVETMPS;
 
-        // No arguments.
         PUSHMARK (SP);
+        XPUSHs (sv_2mortal (newSVpv ("boolean", 0)));
+        XPUSHs (sv_2mortal (newSViv (bv)));
         PUTBACK;
 
-        char *subname = (json[*offset] == 't') ? "boolean::true" : "boolean::false";
-        *offset = *offset + ((json[*offset] == 't') ? 4 : 5);
-
-        int rcount = call_pv (subname, G_SCALAR);
+        int rcount = call_method ("boolean", G_SCALAR);
         SPAGAIN;
 
         if (rcount != 1) {
-            croak ("%s returned bad value count %d", subname, rcount);
+            croak ("boolean returned bad value count %d", rcount);
         }
 
         // Take a copy before using it.  POPs is a macro and we only want to execute it ONCE.
@@ -253,7 +258,8 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
         FREETMPS;
         LEAVE;
 
-        return  (tf_sv);
+        return tf_sv;
+        */
 
     // Numbers are per RFC7159 section 6. Numbers
     //
@@ -339,6 +345,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
 
             // Nothing left.
             if (*offset >= nbytes) {
+                free (str);
                 croak ("Unterminated string beginning at byte offset %ld.", start);
             }
 
@@ -488,6 +495,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
 
                 // Else no good.
                 } else {
+                    free (str);
                     croak ("Unsupported escape sequence at byte offset %ld.", *offset - 1);
                 }
 
@@ -517,6 +525,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
             } else {
                 I32 len = UTF8SKIP (&json[*offset]);
                 if (*offset + len > nbytes) {
+                    free (str);
                     croak ("UTF-8 overflow at byte offset %ld.", *offset);
                 }
 
@@ -550,6 +559,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
 
         // Cannot mix UTF-8 and \x formatting.
         if (is_utf8 && is_binary) {
+            free (str);
             croak ("Forbidden mix of \\x (binary) with UTF-8 content in string starting at byte offset %d.", start);
         }
 
@@ -577,8 +587,11 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
         *offset = *offset + 1;
 
         // Initialise a new Array.  AV's reference count is 1.
-        AV *av = newAV ();
-        SvGETMAGIC ((SV *) av);   
+        // Also make it mortal so that it doesn't leak on croak.
+        AV* av = newAV ();
+        SvGETMAGIC ((SV *) av);
+
+        SAVEMORTALIZESV (av);
 
         // Consume leading whitespace.
         eat_space (json, nbytes, offset);
@@ -615,6 +628,8 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
             // Push the SV onto the array.
             // The SV already has reference count 1 so no need to increment when we push.
             //
+            // TODO: It's mortalized, so maybe it does?
+            //
             av_push (av, element_sv);
             num_elements = num_elements + 1;
 
@@ -649,8 +664,8 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
             }
         }                
 
-        // The array already has a reference count of 1 so no increment required.
-        return newRV_noinc ((SV *) av);
+        // Increment the reference count because we'll lose one reference as it's mortal.
+        return newRV_inc ((SV *) av);
 
         /*
 
@@ -753,6 +768,7 @@ PPCODE:
 
     // Check for trailing non-whitespace.
     if (offset < json_len) {
+        sv_2mortal (results);
         croak ("Trailing non-whitespace begins at byte offset %d.", offset);
     }
 
