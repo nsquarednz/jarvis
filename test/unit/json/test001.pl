@@ -46,8 +46,8 @@ XSLoader::load ('Jarvis::JSON::Utils');
 my @tests = (
     { name => 'empty', json => "\n \t\r\n  ", error => "No JSON content found." },
     { name => 'null', json => "\n null  \t\r\n", expected => undef },
-    { name => 'true', json => " true", expected => 1 },
-    { name => 'false', json => " \nfalse ", expected => 0 },
+    { name => 'true', json => " true", expected => boolean::true },
+    { name => 'false', json => " \nfalse ", expected => boolean::false },
     { name => 'false_junk', json => " \nfalse\n JUNK ", error => "Trailing non-whitespace begins at byte offset 9." },
     { name => 'integer', json => "3 ", expected => 3 },
     { name => 'negative', json => "-732344 ", expected => -732344 },
@@ -104,7 +104,7 @@ foreach my $test (@tests) {
     };
     if ($@) {
         $error = $@;
-        #$error =~ s/ at \w+\.pl line \d+\..*$//s;
+        $error =~ s/ at \w+\.pl line \d+\..*$//s;
     }
 
     if (! $leak) {

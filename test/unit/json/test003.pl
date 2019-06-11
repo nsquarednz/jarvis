@@ -1,7 +1,6 @@
 #!/usr/bin/perl
 ###############################################################################
-# Description:  ARRAY test cases for our custom XS JSON codec.
-#               Also tests for comments.
+# Description:  HASH test cases for our custom XS JSON codec.
 #
 # Licence:
 #       This file is part of the Jarvis WebApp/Database gateway utility.
@@ -45,35 +44,11 @@ XSLoader::load ('Jarvis::JSON::Utils');
 ################################################################################
 
 my @tests = (
-    { name => 'empty', json => " [\n\n] ", expected => [] },
-    { name => 'empty_junk', json => " [\n \n] JUNK\n\n", error => "Trailing non-whitespace begins at byte offset 7." },
-    { name => 'array', json => " [ 34, 7, \"YES\nOR NO\" ] ", expected => [ 34, 7, "YES\nOR NO" ] },
-    { name => 'array_nested', json => " [ 34, [ 7, true, null ], \"YES\nOR NO\" ] ", expected => [ 34, [ 7, boolean::true, undef ], "YES\nOR NO" ] },
-    { name => 'deep_fail', json => " [ 34, [ 7, true, null [ \"YES\nOR NO\" [ -- NO MORE ", error => "Expected ',' array element separator at byte offset 23, got '['." },
-    {   
-        name => 'array_nested_comment1', json => 
-"#Comment in Perl Style
-[ 34,// CSTYLE ça va comme ca?
-[ 7, true, /* THIS IS A
-    MULTI-LINE BLOCK OF COMMENTS.
-    */ 
- null ], -- SQL STYLE comment --
-\"YES -- No Comment  
-OR NO\" ] ", 
-        expected => [ 34, [ 7, boolean::true, undef ], "YES -- No Comment  \nOR NO" ] 
-    },
-    {   
-        name => 'array_nested_comment1', json => 
-"#Comment in Perl Style
-[ 34,// CSTYLE ça va comme ca?
-[ 7, true, /* THIS IS A
-    MULTI-LINE BLOCK OF COMMENTS.
-    * /
- null ], -- SQL STYLE comment --
-\"YES -- No Comment  
-OR NO\" ] ", 
-        error => "Multi-line comment starting at byte offset 66 was not terminated." 
-    },
+    { name => 'empty', json => " {} ", expected => {} },
+    { name => 'empty_junk', json => " {\n \n} JUNK\n\n", error => "Trailing non-whitespace begins at byte offset 7." },
+    { name => 'endless', json => " {\n ", error => "Object element starting at byte offset 1 has no matching '}'." },
+    { name => 'basic', json => ' { "ABC": 34 } ', expected => { ABC => 34 } },
+    { name => 'double', json => ' { "ABC": 34, "ç": "é", "asdf-\x67": "asdf-\x67", "yes": true, "NO!": false, "maybe?": null } ', expected => { ABC => 34 } },
 );
 
 my $ntests = 0;

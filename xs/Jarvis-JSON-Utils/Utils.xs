@@ -30,7 +30,7 @@
 #include <unistd.h>
 #include <math.h>
 
-#define DEBUG_ON 0
+#define DEBUG_ON 1
 #define DEBUG(...) if (DEBUG_ON) { fprintf (stderr, __VA_ARGS__); }
 
 // Some ASCII codes.
@@ -54,6 +54,9 @@
 
 // Converts '0'-'9','a'-'f','A'-'F' into a number 0..15.
 #define HEX_VALUE(x) (((x >= '0') && (x <= '9')) ? (x - '0') : (10 + ((x) | 0x20) - 'a'))
+
+#define FLAG_STRING_ONLY 0x01
+#define FLAG_ALLOW_VARS 0x02
 
 /******************************************************************************
  * EAT SPACE
@@ -197,7 +200,7 @@ void eat_space (char *json, STRLEN nbytes, STRLEN *offset) {
  *           Reference count will be 1 (non-mortalised)
  *           Internal Array/Hash elements also have reference count 1 (non-mortalised)
  *****************************************************************************/
-SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
+SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
 
     // Consume leading whitespace.
     eat_space (json, nbytes, offset);
@@ -210,115 +213,6 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
     char ch = json[*offset];
     DEBUG ("Content[%d]: (%ld bytes remain)\n", ch, nbytes - *offset);
 
-    // null is per RFC7159 section 3. Values.
-    //
-    // We map to the Perl undef.
-    //
-    if (((nbytes - *offset) >= 4) && (ch == 'n') && ! strncmp (&json[*offset], "null", 4)) {
-        *offset = *offset + 4;
-        return &PL_sv_undef;
-
-    // true/false are per RFC7159 section 3. Values.
-    //
-    // We map to the standard Perl boolean::true/false.
-    //
-    } else if ((((nbytes - *offset) >= 4) && (ch == 't') && ! strncmp (&json[*offset], "true", 4)) ||
-               (((nbytes - *offset) >= 5) && (ch == 'f') && ! strncmp (&json[*offset], "false", 5))) {
-
-        int bv = (json[*offset] == 't') ? 1 : 0;
-        *offset = *offset + ((json[*offset] == 't') ? 4 : 5);
-
-        return bv ? newSViv (1) : newSViv (0);
-
-        /*
-
-        // Mark the stack and push the $self object pointer onto it.
-        dSP;
-
-        ENTER;
-        SAVETMPS;
-
-        PUSHMARK (SP);
-        XPUSHs (sv_2mortal (newSVpv ("boolean", 0)));
-        XPUSHs (sv_2mortal (newSViv (bv)));
-        PUTBACK;
-
-        int rcount = call_method ("boolean", G_SCALAR);
-        SPAGAIN;
-
-        if (rcount != 1) {
-            croak ("boolean returned bad value count %d", rcount);
-        }
-
-        // Take a copy before using it.  POPs is a macro and we only want to execute it ONCE.
-        SV *tf_sv = POPs;
-        tf_sv = newSVsv (tf_sv);
-
-        PUTBACK;
-        FREETMPS;
-        LEAVE;
-
-        return tf_sv;
-        */
-
-    // Numbers are per RFC7159 section 6. Numbers
-    //
-    // Note that we hand off to the "strtold" C built-in function, which is (hopefully) at least
-    // as flexible as the RFC.
-    //
-    } else if (((ch >= '0') && (ch <= '9')) || (ch == '-')) {
-
-        STRLEN start = *offset;
-
-        int is_integer = 1;
-
-        // Negative marker.
-        if (ch == '-') {
-            *offset = *offset + 1;
-        }
-        // int part
-        while ((*offset < nbytes) && ((json[*offset] >= '0') && (json[*offset] <= '9'))) {
-            *offset = *offset + 1;
-        }
-        // frac part
-        if ((*offset < nbytes) && (json[*offset] == '.')) {
-            *offset = *offset + 1;
-            while ((*offset < nbytes) && ((json[*offset] >= '0') && (json[*offset] <= '9'))) {
-                *offset = *offset + 1;
-                is_integer = 0;
-            }        
-        }
-        // exponent
-        if ((*offset < nbytes) && ((json[*offset] == 'e') || (json[*offset] == 'E'))) {
-            *offset = *offset + 1;
-            if ((*offset < nbytes) && ((json[*offset] == '-') || (json[*offset] == '+'))) {
-                *offset = *offset + 1;
-            }        
-            while ((*offset < nbytes) && ((json[*offset] >= '0') && (json[*offset] <= '9'))) {
-                *offset = *offset + 1;
-            }        
-        }
-
-        // Ugh, let's copy this into a temporary buffer just in case.
-        char tmp[MAX_NUMBER_LEN + 1];
-        if ((*offset - start) > MAX_NUMBER_LEN) {
-            croak ("Number too long (> %d chars) at byte offset %ld.", MAX_NUMBER_LEN, start);
-        }
-        strncpy (tmp, &json[start], *offset - start);
-        tmp[*offset - start] = 0;
-
-        double n = strtold (tmp, NULL);
-        if (! isfinite (n)) {
-            croak ("Number overflow at byte offset %ld.", start);
-        }
-
-        if (is_integer) {
-            return newSViv ((long) n);
-
-        } else {
-            return newSVnv (n);
-        }
-
     // Strings are per RFC7159 section 7. Strings
     //
     // Note that JSON strings must be in double quotes, and we respect that.
@@ -327,7 +221,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
     // Note: We don't support any magic with UTF-16 surrogates.
     // Each \uXXXX is standalone and generates a UTF-8 sequence of 1-3 bytes.
     //
-    } else if (ch == DOUBLE_QUOTE) {
+    if (ch == DOUBLE_QUOTE) {
 
         STRLEN start = *offset;
 
@@ -499,12 +393,13 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
                     croak ("Unsupported escape sequence at byte offset %ld.", *offset - 1);
                 }
 
+                if ((len > 1) && ! is_utf8) {
+                    DEBUG ("String contains UTF-8 characters.\n");
+                    is_utf8 = 1;
+                }
+
                 // Do we need to re-alloc our string buffer?
                 if ((str_len + len) > max_len) {
-                    if ((len > 1) && ! is_utf8) {
-                        DEBUG ("String contains UTF-8 characters.\n");
-                        is_utf8 = 1;
-                    }
                     DEBUG ("Growing string buffer up to %d bytes.\n", DEFAULT_STRING_LEN * 4)
                     char *str2 = (char *) malloc (DEFAULT_STRING_LEN * 4);
                     memcpy (str2, str, str_len);
@@ -577,6 +472,117 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
         // NOTE: Do not call free (str).  It is handled by Perl reference counting now.
 
         return (str_sv);
+    }
+
+    // String only?  Stop here!
+    if (flags & FLAG_STRING_ONLY) {
+        return NULL;
+    }
+
+    // null is per RFC7159 section 3. Values.
+    //
+    // We map to the Perl undef.
+    //
+    if (((nbytes - *offset) >= 4) && (ch == 'n') && ! strncmp (&json[*offset], "null", 4)) {
+        *offset = *offset + 4;
+        return &PL_sv_undef;
+
+    // true/false are per RFC7159 section 3. Values.
+    //
+    // We map to the standard Perl boolean::true/false.
+    //
+    } else if ((((nbytes - *offset) >= 4) && (ch == 't') && ! strncmp (&json[*offset], "true", 4)) ||
+               (((nbytes - *offset) >= 5) && (ch == 'f') && ! strncmp (&json[*offset], "false", 5))) {
+
+        int bv = (json[*offset] == 't') ? 1 : 0;
+        *offset = *offset + ((json[*offset] == 't') ? 4 : 5);
+
+        // Mark the stack and push the $self object pointer onto it.
+        dSP;
+
+        ENTER;
+        SAVETMPS;
+
+        PUSHMARK (SP);
+        // XPUSHs (sv_2mortal (newSVpv ("boolean", 0)));
+        XPUSHs (sv_2mortal (newSViv (bv)));
+        PUTBACK;
+
+        // int rcount = call_method ("boolean", G_SCALAR);
+        int rcount = call_pv ("boolean::boolean", G_SCALAR);
+        SPAGAIN;
+
+        if (rcount != 1) {
+            croak ("boolean returned bad value count %d", rcount);
+        }
+
+        // Take a copy before using it.  POPs is a macro and we only want to execute it ONCE.
+        SV *tf_sv = POPs;
+        tf_sv = newSVsv (tf_sv);
+
+        PUTBACK;
+        FREETMPS;
+        LEAVE;
+
+        return tf_sv;
+
+    // Numbers are per RFC7159 section 6. Numbers
+    //
+    // Note that we hand off to the "strtold" C built-in function, which is (hopefully) at least
+    // as flexible as the RFC.
+    //
+    } else if (((ch >= '0') && (ch <= '9')) || (ch == '-')) {
+
+        STRLEN start = *offset;
+
+        int is_integer = 1;
+
+        // Negative marker.
+        if (ch == '-') {
+            *offset = *offset + 1;
+        }
+        // int part
+        while ((*offset < nbytes) && ((json[*offset] >= '0') && (json[*offset] <= '9'))) {
+            *offset = *offset + 1;
+        }
+        // frac part
+        if ((*offset < nbytes) && (json[*offset] == '.')) {
+            *offset = *offset + 1;
+            while ((*offset < nbytes) && ((json[*offset] >= '0') && (json[*offset] <= '9'))) {
+                *offset = *offset + 1;
+                is_integer = 0;
+            }        
+        }
+        // exponent
+        if ((*offset < nbytes) && ((json[*offset] == 'e') || (json[*offset] == 'E'))) {
+            *offset = *offset + 1;
+            if ((*offset < nbytes) && ((json[*offset] == '-') || (json[*offset] == '+'))) {
+                *offset = *offset + 1;
+            }        
+            while ((*offset < nbytes) && ((json[*offset] >= '0') && (json[*offset] <= '9'))) {
+                *offset = *offset + 1;
+            }        
+        }
+
+        // Ugh, let's copy this into a temporary buffer just in case.
+        char tmp[MAX_NUMBER_LEN + 1];
+        if ((*offset - start) > MAX_NUMBER_LEN) {
+            croak ("Number too long (> %d chars) at byte offset %ld.", MAX_NUMBER_LEN, start);
+        }
+        strncpy (tmp, &json[start], *offset - start);
+        tmp[*offset - start] = 0;
+
+        double n = strtold (tmp, NULL);
+        if (! isfinite (n)) {
+            croak ("Number overflow at byte offset %ld.", start);
+        }
+
+        if (is_integer) {
+            return newSViv ((long) n);
+
+        } else {
+            return newSVnv (n);
+        }
 
     // ARRAY
     } else if (ch == '[') {
@@ -587,7 +593,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
         *offset = *offset + 1;
 
         // Initialise a new Array.  AV's reference count is 1.
-        // Also make it mortal so that it doesn't leak on croak.
+        // Also make it special-style mortal so that it doesn't leak on croak.
         AV* av = newAV ();
         SvGETMAGIC ((SV *) av);
 
@@ -617,7 +623,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
             }
 
             // OK, then we MUST have an element.
-            SV *element_sv = json_to_perl_inner (json, nbytes, offset);
+            SV *element_sv = json_to_perl_inner (json, nbytes, offset, flags);
 
             // I don't think it's possible that we can run out of input here.
             // We already ate all the space and checked for not end-of-input.
@@ -660,76 +666,111 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset) {
 
             // End of input, array is still open.
             if (*offset >= nbytes) {
-                croak ("Array element starting at byte offset %d has no matching ']'.", start);
+                croak ("Array starting at byte offset %d has no matching ']'.", start);
             }
         }                
 
         // Increment the reference count because we'll lose one reference as it's mortal.
         return newRV_inc ((SV *) av);
 
-        /*
+    // OBJECT
+    } else if (ch == '{') {
 
-        // Otherwise use Perl Hash.
-        } else {
+        STRLEN start = *offset;
 
-            // Initialise a new Hash.  HV's reference count is 1.
-            HV *hv = newHV ();
-            SvGETMAGIC ((SV *) hv);   
+        // Consume the starting '{'. 
+        *offset = *offset + 1;
 
-            // Key = nil indicates a fresh iteration.
-            lua_pushnil (L);
+        // Initialise a new HASH.  HV's reference count is 1.
+        // Also make it special-style mortal so that it doesn't leak on croak.
+        HV *hv = newHV ();
+        SvGETMAGIC ((SV *) hv);   
 
-            // Iterate each element in the table/sequence.  
-            // Our table/sequence is now at -2 because the iterator is at the top of the stack.
-            //
-            while (lua_next (L, -2) != 0) {
+        SAVEMORTALIZESV (hv);
 
-                // Now the value is at -1 (top) and the key is at -2.  
-                // Recurse to encode the value into a perl SV.
-                //
-                SV *value_sv = lua_to_perl (L, nil_sv);
+        // Consume leading whitespace.
+        eat_space (json, nbytes, offset);
 
-                // Pop the lua value off the top.  Keep the key on the stack for the next iteration.
-                lua_pop (L, 1);
-
-                // The key is now at the top of the stack.  
-                // Store the SV in the hash with the associated key value.
-                // The SV already has reference count 1 so no need to increment when we store.
-                //
-                // NOTE: We need to be careful here!
-                //
-                // We cannot use lua_tostring on a number key in this context because it 
-                // modifies the stack and interferes with lua_next.
-                //
-                if (lua_type (L, -1) == LUA_TSTRING) {
-                    STRLEN key_len;
-                    const char *key = lua_tolstring (L, -1, &key_len);        
-
-                    hv_store (hv, key, key_len, value_sv, 0);
-
-                // Number key we will handle separately.  
-                // We do not support real floating-point number keys.  
-                // If you REALLY want floating point keys, specify them as a string with quotes in LUA.
-                //
-                } else if (lua_type (L, -1) == LUA_TNUMBER) {
-                    char key[256];
-                    sprintf (key, "%ld", lround (lua_tonumber (L, -1)));
-
-                    hv_store (hv, key, strlen (key), value_sv, 0);
-
-                // Otherwise we have a problem.  Cannot encode this key.
-                // The SV has a reference count of 1, need to reduce it to zero so it can be collected.
-                //
-                } else {
-                    SvREFCNT_dec (value_sv);
-                }
-            }                
-
-            // The hash already has a reference count of 1 so no increment required.
-            return newRV_noinc ((SV *) hv);
+        // End of input, object is still open.
+        if (*offset >= nbytes) {
+            croak ("Object element starting at byte offset %d has no matching '}'.", start);
         }
 
-        */
+        // Get all the attribute elements.
+        int num_members = 0;
+        while (1) {
+            DEBUG ("Looking for member [%d] at byte offset %ld.\n", num_members, *offset);
+
+            // End of object member?
+            ch = json[*offset];
+
+            // Terminating "}", we're done!
+            // Note that we allow trailing "," in our JSON objects.
+            if (ch == '}') {
+                *offset = *offset + 1;
+                break;
+            }
+
+            // OK, first we MUST have a member name (string).
+            SV *name_sv = json_to_perl_inner (json, nbytes, offset, flags | FLAG_STRING_ONLY);
+
+            // Consume trailing whitespace.
+            eat_space (json, nbytes, offset);
+
+            // End of input, array is still open.
+            if (*offset >= nbytes) {
+                croak ("Object member starting at byte offset %d has no value.", start);
+            }
+
+            // Consume the ':' which must be present.
+            ch = json[*offset];
+            if (ch != ':') {
+                croak ("Expected ':' object member separator at byte offset %d, got '%c'.", *offset, ch);
+            }
+            *offset = *offset + 1;
+
+            // Now we MUST have a member value (string).
+            SV *value_sv = json_to_perl_inner (json, nbytes, offset, flags);
+
+            // STORE the HASH ENTRY.
+            STRLEN key_len;
+            char *key = SvPV (name_sv, key_len);
+
+            hv_store (hv, key, key_len, value_sv, 0);
+
+            // Consume trailing whitespace.
+            eat_space (json, nbytes, offset);
+
+            // End of input, object is still open.
+            if (*offset >= nbytes) {
+                croak ("Object starting at byte offset %d has no matching '}'.", start);
+            }
+
+            // Now there must be either a '}' or ','.
+            // Bracket simply ends the object.
+            ch = json[*offset];
+            if (ch == '}') {
+                *offset = *offset + 1;
+                break;
+            }
+
+            // Consume the ',' which must be present.
+            if (ch != ',') {
+                croak ("Expected ',' object member separator at byte offset %d, got '%c'.", *offset, ch);
+            }
+            *offset = *offset + 1;
+
+            // Consume trailing whitespace after the comma then go back for more members.
+            eat_space (json, nbytes, offset);
+
+            // End of input, object is still open.
+            if (*offset >= nbytes) {
+                croak ("Object starting at byte offset %d has no matching '}'.", start);
+            }
+        }                
+
+        // Increment the reference count because we'll lose one reference as it's mortal.
+        return newRV_inc ((SV *) hv);
 
     // Unsupported syntax.
     // TODO: Print the character (if printable).
@@ -761,7 +802,7 @@ PPCODE:
     char *json = SvPV (json_sv, json_len);
 
     STRLEN offset = 0;
-    SV *results = json_to_perl_inner (json, json_len, &offset);
+    SV *results = json_to_perl_inner (json, json_len, &offset, 0);
 
     // Consume trailing whitespace.
     eat_space (json, json_len, &offset);
