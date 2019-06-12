@@ -95,7 +95,6 @@ void eat_space (char *json, STRLEN nbytes, STRLEN *offset) {
         if ((ch == CHARACTER_TABULATION) || (ch == LINE_FEED) || (ch == LINE_TABULATION) || 
             (ch == FORM_FEED) || (ch == CARRIAGE_RETURN) || (ch == SPACE) || (ch == NEXT_LINE)) {
 
-            DEBUG ("Whitespace[%d]: %ld\n", ch, *offset);
             *offset = *offset + 1;
             continue;
         }
@@ -191,16 +190,19 @@ void eat_space (char *json, STRLEN nbytes, STRLEN *offset) {
  *      Also extracts references to $vars.
  * 
  * Parameters:
+ *      level - Nested level starting from 0.
  *      json - Pointer to the JSON raw bytes input
  *      nbytes - Total number of bytes in that JSON
  *      offset - Number of bytes remaining
+ *      vars_av - Array reference to vars we are collecting (may be NULL if not collecting)      
+ *      flags - Special flags that control our handling.
  *
  * Returns:
  *      sv - Scalar Value from top-of-stack.
  *           Reference count will be 1 (non-mortalised)
  *           Internal Array/Hash elements also have reference count 1 (non-mortalised)
  *****************************************************************************/
-SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
+SV * json_to_perl_inner (int level, char *json, STRLEN nbytes, STRLEN *offset, AV *vars_av, int flags) {
 
     // Consume leading whitespace.
     eat_space (json, nbytes, offset);
@@ -223,6 +225,7 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
     //
     if (ch == DOUBLE_QUOTE) {
 
+        // DEBUG ("String capture beginning at byte offset %ld.\n", *offset);
         STRLEN start = *offset;
 
         // Consume the starting '"'. 
@@ -249,14 +252,15 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
             if (ch == DOUBLE_QUOTE) {
                 *offset = *offset + 1;
                 break;
+            }
+
+            // The sequence to append.
+            char seq[6];
+            STRLEN len = 0;
 
             // A backslash.
-            } else if (ch == BACKSLASH) {
+            if (ch == BACKSLASH) {
                 *offset = *offset + 1;
-
-                // The sequence to append.
-                char seq[6];
-                STRLEN len;
 
                 // Double backslash?
                 if ((*offset < nbytes) && (json[*offset] == BACKSLASH)) {
@@ -405,27 +409,10 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
                     croak ("Unsupported escape sequence at byte offset %ld.", *offset - 1);
                 }
 
-                // Do we need to re-alloc our string buffer?
-                if ((str_len + len) > max_len) {
-                    DEBUG ("Growing string buffer up to %d bytes.\n", DEFAULT_STRING_LEN * 4)
-                    char *str2 = (char *) malloc (DEFAULT_STRING_LEN * 4);
-                    memcpy (str2, str, str_len);
-                    max_len = DEFAULT_STRING_LEN * 4;
-                    free (str);
-                    str = str2;
-                }
-
-                // Copy the byte(s) for this character.
-                for (STRLEN i = 0; i < len; i++) {
-                    str[str_len + i] = seq[i];
-                }
-                str_len = str_len + len;
-
-                // NOTE: Offset was adjusted earlier.
-
             // Any other characters "as is", including inline UTF-8 (which JSON doesn't officially support).
             } else {
-                STRLEN len = UTF8SKIP (&json[*offset]);
+
+                len = UTF8SKIP (&json[*offset]);
                 if (*offset + len > nbytes) {
                     free (str);
                     croak ("UTF-8 overflow at byte offset %ld.", *offset);
@@ -436,32 +423,36 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
                     is_utf8 = 1;
                 }
 
-                // Do we need to re-alloc our string buffer?
-                if ((str_len + len) > max_len) {
-                    DEBUG ("Growing string buffer up to %d bytes.\n", DEFAULT_STRING_LEN * 4)
-                    char *str2 = (char *) malloc (DEFAULT_STRING_LEN * 4);
-                    memcpy (str2, str, str_len);
-                    max_len = DEFAULT_STRING_LEN * 4;
-                    free (str);
-                    str = str2;
-                }
-
-                // Copy the byte(s) for this character.
-                // Assume this is faster than memcpy for 1-2 byte strings.
                 for (STRLEN i = 0; i < len; i++) {
-                    str[str_len + i] = json[*offset + i];
+                    seq[i] = json[*offset + i];
                 }
-                str_len = str_len + len;
 
-                // Finall adjust the offset.
+                // Adjust the offset.
                 *offset = *offset + len;
             }
+
+            // Do we need to re-alloc our string buffer?
+            if ((str_len + len) > max_len) {
+                DEBUG ("Growing string buffer up to %d bytes.\n", DEFAULT_STRING_LEN * 4)
+                char *str2 = (char *) malloc (DEFAULT_STRING_LEN * 4);
+                memcpy (str2, str, str_len);
+                max_len = DEFAULT_STRING_LEN * 4;
+                free (str);
+                str = str2;
+            }
+
+            // Copy the byte(s) for this character.
+            // Assume this is faster than memcpy for 1-2 byte strings.
+            for (STRLEN i = 0; i < len; i++) {
+                str[str_len + i] = seq[i];
+            }
+            str_len = str_len + len;
         }
 
         // Cannot mix UTF-8 and \x formatting.
         if (is_utf8 && is_binary) {
             free (str);
-            croak ("Forbidden mix of \\x (binary) with UTF-8 content in string starting at byte offset %ld.", start);
+            croak ("Forbidden mix of 8-bit \\x (binary) with UTF-8 content in string starting at byte offset %ld.", start);
         }
 
         // A len = 0 tells perl to use strlen to get the length.  
@@ -485,6 +476,150 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
     // String only?  Stop here!
     if (flags & FLAG_STRING_ONLY) {
         return NULL;
+    }
+
+    // May it be a variable starting with "$" and followed by a non-whitespace string?
+    if (ch == '$') {
+
+        // Be nice, if variable capture is not enabled give them a clue.
+        if (! vars_av) {
+            croak ("Variable not permitted here starting at byte offset %ld.", *offset);
+        }
+
+        // Top-level variables don't work because the scalar is passed back by copy.  Sorry.
+        if (level == 0) {
+            croak ("Variable not permitted at top level, starting at byte offset %ld.", *offset);
+        }
+
+        // Note that "--", "//", "/*" will NOT be detected as the start of comment if they form part of a variable specifier.
+        // Note that backspace characters will NOT be interpreted when they form part of a variable specifier.
+        // Note that inline UTF-8 characters WILL be interpreted when they form part of a variable specifier.
+        //
+        DEBUG ("Variable capture beginning at byte offset %ld.\n", *offset);
+        STRLEN start = *offset;
+
+        // Consume the starting '$'. 
+        *offset = *offset + 1;
+
+        // Assign this as the default string size.  We will re-malloc if and when we outgrow this.
+        char *str = (char *) malloc (DEFAULT_STRING_LEN);
+        STRLEN max_len = DEFAULT_STRING_LEN;
+        STRLEN str_len = 0;
+        int is_utf8 = 0;
+
+        // Keep absorbing non-whitespace.
+        while (1) {
+
+            // Nothing left.
+            if (*offset >= nbytes) {
+                free (str);
+                croak ("Unterminated variable specifier beginning at byte offset %ld.", start);
+            }
+
+            // Terminating '$', we're done!
+            ch = json[*offset];
+            if (ch == '$') {
+                *offset = *offset + 1;
+                break;
+            }
+
+            // The sequence to append.
+            char seq[6];
+            STRLEN len = 0;
+
+
+            // A backslash.
+            if (ch == BACKSLASH) {
+                *offset = *offset + 1;
+
+                // Double backslash?
+                if ((*offset < nbytes) && (json[*offset] == BACKSLASH)) {
+                    seq[0] = BACKSLASH;
+                    *offset = *offset + (len = 1);
+
+                // Escaped double quote?
+                } else if ((*offset < nbytes) && (json[*offset] == '$')) {
+                    seq[0] = '$';
+                    *offset = *offset + (len = 1);
+
+                // Else no good.
+                } else {
+                    free (str);
+                    croak ("Unsupported escape sequence at byte offset %ld.", *offset - 1);
+                }
+
+            } else {
+
+                // Any other characters "as is", including inline UTF-8 (which JSON doesn't officially support).
+                // Also including space.
+                len = UTF8SKIP (&json[*offset]);
+                if (*offset + len > nbytes) {
+                    free (str);
+                    croak ("UTF-8 overflow at byte offset %ld.", *offset);
+                }
+
+                if ((len > 1) && ! is_utf8) {
+                    DEBUG (">> UTF-8 %ld-byte inline character turns UTF-8 ON AT byte offset %ld.\n", len, *offset)
+                    is_utf8 = 1;
+                }
+
+                for (STRLEN i = 0; i < len; i++) {
+                    seq[i] = json[*offset + i];
+                }
+
+                // Adjust the offset.
+                *offset = *offset + len;                
+            }
+
+            // Do we need to re-alloc our string buffer?
+            if ((str_len + len) > max_len) {
+                DEBUG ("Growing string buffer up to %d bytes.\n", DEFAULT_STRING_LEN * 4)
+                char *str2 = (char *) malloc (DEFAULT_STRING_LEN * 4);
+                memcpy (str2, str, str_len);
+                max_len = DEFAULT_STRING_LEN * 4;
+                free (str);
+                str = str2;
+            }
+
+            // Copy the byte(s) for this character.
+            // Assume this is faster than memcpy for 1-2 byte strings.
+            for (STRLEN i = 0; i < len; i++) {
+                str[str_len + i] = seq[i];
+            }
+            str_len = str_len + len;
+
+            // NOTE: Offset was adjusted earlier.
+        }
+
+        // Empty variable specifiers are NOT valid.
+        if (str_len == 0) {
+            croak ("Empty variable specifier detected at byte offset %ld.", start);
+        }
+
+        SV *str_sv = newSVpv (str, str_len);
+        if (is_utf8) {
+            SvUTF8_on (str_sv);
+        }
+
+        // The initial value of the variable is undef.
+        SV *value_sv = newSVsv (&PL_sv_undef);
+
+        // Initialise a new HASH.  HV's reference count is 1.
+        // Also make it special-style mortal so that it doesn't leak on croak.
+        HV *hv = newHV ();
+        SvGETMAGIC ((SV *) hv);   
+
+        // Fill the HASH with the name and value (reference).
+        hv_store (hv, "name", 4, str_sv, 0);
+        hv_store (hv, "vref", 4, newRV_inc (value_sv), 0);
+
+        // Push the hash onto the AV.
+        av_push (vars_av, newRV_noinc ((SV *) hv));
+
+        // NOTE: Do not call free (str).  It is handled by Perl reference counting now.
+
+        // The initial value of the varible is undef.
+        return (value_sv);
     }
 
     // null is per RFC7159 section 3. Values.
@@ -630,8 +765,8 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
                 break;
             }
 
-            // OK, then we MUST have an element.
-            SV *element_sv = json_to_perl_inner (json, nbytes, offset, flags);
+            // OK, then we MUST have an element.  It may be a variable.
+            SV *element_sv = json_to_perl_inner (level + 1, json, nbytes, offset, vars_av, flags);
 
             // I don't think it's possible that we can run out of input here.
             // We already ate all the space and checked for not end-of-input.
@@ -719,9 +854,9 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
                 break;
             }
 
-            // OK, first we MUST have a member name (string).
+            // OK, first we MUST have a member name (string).  Variables are NOT allowed.
             // This is mortal, it is used only as the hash key then is gone.
-            SV *name_sv = sv_2mortal (json_to_perl_inner (json, nbytes, offset, flags | FLAG_STRING_ONLY));
+            SV *name_sv = sv_2mortal (json_to_perl_inner (level + 1, json, nbytes, offset, NULL, flags | FLAG_STRING_ONLY));
 
             // Consume trailing whitespace.
             eat_space (json, nbytes, offset);
@@ -738,8 +873,8 @@ SV * json_to_perl_inner (char *json, STRLEN nbytes, STRLEN *offset, int flags) {
             }
             *offset = *offset + 1;
 
-            // Now we MUST have a member value (string).
-            SV *value_sv = json_to_perl_inner (json, nbytes, offset, flags);
+            // Now we MUST have a member value (string).  It may be a variable.
+            SV *value_sv = json_to_perl_inner (level + 1, json, nbytes, offset, vars_av, flags);
 
             // STORE the HASH ENTRY.
             // Using hv_store_ent allows us to retain the UTF-8 flag on the key.
@@ -795,21 +930,34 @@ MODULE = Jarvis::JSON::Utils PACKAGE = Jarvis::JSON::Utils
 #
 # Parameters:
 #       json_sv - JSON string to parse.
+#       vars_av - Optional AV reference to which we will capture vars.
 #
 # Returns:
 #       object - The Perl object that we parsed from the JSON
 #       args - Reference to an array of extracted RHS that begin with "$"
 #               [ { name => <part-after-$>, ref => <ref-to-SV> } ]
 ###############################################################################  
-void decode (json_sv)
+void decode (json_sv, ...)
     SV * json_sv;
 PPCODE:
+
+    AV * vars_av = NULL;
+    if (items >= 2) {
+        SV *vars_sv = ST(1);
+
+        if (SvROK (vars_sv) && (SvTYPE (SvRV (vars_sv)) == SVt_PVAV)) {
+            vars_av = (AV *) SvRV (vars_sv);
+
+        } else {
+            croak ("If present, vars must be ARRAY reference.");
+        }
+    }
 
     STRLEN json_len;
     char *json = SvPV (json_sv, json_len);
 
     STRLEN offset = 0;
-    SV *results = json_to_perl_inner (json, json_len, &offset, 0);
+    SV *results = json_to_perl_inner (0, json, json_len, &offset, vars_av, 0);
 
     // Consume trailing whitespace.
     eat_space (json, json_len, &offset);

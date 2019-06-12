@@ -53,12 +53,10 @@ my @tests = (
         expected => { "ABC" => 34, "ç" => "é", "asdf-\x67" => "asdf-\x97", "yes" => boolean::true, "NO!" => boolean::false, "maybe?" => undef } },
     { name => 'nested', json => '{ "ABC": { "DOWN": "UNDER", "go": "west", }, "__test": [], "ANOTHER": { "B": "\x01\x02", "D": "\u0001\u0002" } }', 
         expected => { "ABC" => { "DOWN" => "UNDER", "go" => "west", }, "__test" => [], "ANOTHER" => { "B" => "\x01\x02", "D" => "\x01\x02" } }, },
+    { name => 'empty', json => " \$ ", error => "Variable not permitted here starting at byte offset 1." },
 );
 
 my $ntests = 0;
-
-# Use s/// once so that its buffer is allocated.
-$ntests =~ s/AB/B/;
 
 ################################################################################
 # Trace and flags.
@@ -107,7 +105,6 @@ foreach my $test (@tests) {
                 print STDERR &Dumper ($test->{expected});
                 printf STDERR "What we got = ";
                 print STDERR &Dumper ($result);
-                $error and print STDERR "$error\n";
             }
         }
     }

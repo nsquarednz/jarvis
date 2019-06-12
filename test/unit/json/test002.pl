@@ -78,9 +78,6 @@ OR NO\" ] ",
 
 my $ntests = 0;
 
-# Use s/// once so that its buffer is allocated.
-$ntests =~ s/AB/B/;
-
 ################################################################################
 # Trace and flags.
 ################################################################################
@@ -128,7 +125,6 @@ foreach my $test (@tests) {
                 print STDERR &Dumper ($test->{expected});
                 printf STDERR "What we got = ";
                 print STDERR &Dumper ($result);
-                $error and print STDERR "$error\n";
             }
         }
     }

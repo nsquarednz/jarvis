@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 ###############################################################################
-# Description:  SCALAR test cases for our custom XS JSON codec.
+# Description:  Variable substitution tests.
 #
 # Licence:
 #       This file is part of the Jarvis WebApp/Database gateway utility.
@@ -43,31 +43,30 @@ XSLoader::load ('Jarvis::JSON::Utils');
 # TEST CASES
 ################################################################################
 
+# Some random variables to substitute.
+my $values = {
+    ABC => 34,
+    # -234.6,
+    # "ç",
+    # "\x01\x02",
+    # [ 1, 2, 3 ],
+    # { k => 'v' },
+    # undef,
+    "çimple!true!NI" => boolean::true,
+    "(ABC.FALSE)" => boolean::false,
+};
+
 my @tests = (
-    { name => 'empty', json => "\n \t\r\n  ", error => "No JSON content found." },
-    { name => 'null', json => "\n null  \t\r\n", expected => undef },
-    { name => 'true', json => " true", expected => boolean::true },
-    { name => 'false', json => " \nfalse ", expected => boolean::false },
-    { name => 'false_junk', json => " \nfalse\n JUNK ", error => "Trailing non-whitespace begins at byte offset 9." },
-    { name => 'integer', json => "3 ", expected => 3 },
-    { name => 'negative', json => "-732344 ", expected => -732344 },
-    { name => 'fraction', json => "  7234.123423142 ", expected => 7234.123423142 },
-    { name => 'exp1', json => " -1234.44e12 ", expected => -1234.44e12 },
-    { name => 'exp2', json => " 0.34243E-4 ", expected => 0.34243E-4 },
-    { name => 'empty', json => '""', expected => '' },
-    { name => 'unterminated', json => ' "Unterminated\n String', error => "Unterminated string beginning at byte offset 1." },
-    { name => 'simple', json => '" A simple String "', expected => ' A simple String ' },
-    { name => 'utf8', json => '" UTF sö € string𝄞"', expected => ' UTF sö € string𝄞' },
-    { name => 'multi-line', json => '" UTF sö € 
-multi-line string
-"', expected => ' UTF sö € 
-multi-line string
-' },
-    { name => 'escapes1', json => '" \\\\ \\" \\/ "', expected => ' \\ " / ' },
-    { name => 'escapes2', json => '" \\b \\f \\r \\n \\t "', expected => " \b \f \r \n \t " },
-    { name => 'escapes3', json => '"\\x0D\\x3a\\xd6\\x20"', expected => "\r:Ö " },
-    { name => 'escapes4', json => '"\\u003A\\u00D6\\u0FD0\\uD2Cf\\U01D11e"', expected => ":Ö࿐틏𝄞" },
-    { name => 'mixed', json => ' "\\u003A\\u00D6\\u0FD0\\uD2Cf\\U01D11e\\x91"', error => "Forbidden mix of 8-bit \\x (binary) with UTF-8 content in string starting at byte offset 1." },
+    { name => 'topvar', json => " \$ABC ", expected => "ABC", error => "Variable not permitted at top level, starting at byte offset 1." },
+    { name => 'empty', json => " [ \$\$ ] ", error => "Empty variable specifier detected at byte offset 3." },
+    { name => 'unterm_var1', json => " [ \n\$asdf", error => "Unterminated variable specifier beginning at byte offset 4." },
+    { name => 'unterm_var2', json => ' [ $asdf', error => "Unterminated variable specifier beginning at byte offset 3." },
+    { name => 'unterm_array', json => ' [ $asdf$', error => "Array element starting at byte offset 1 has no matching ']'." },
+    { name => 'aref', json => ' [ $ABC$ ] ', expected => [ undef ], evars => [ { name => "ABC", vref => \undef } ], after => [ 34 ] },
+    { name => 'nested', json => ' [ { "FROG": $çimple!true!NI$, "ANT": $(ABC.FALSE)$, } ] ', 
+        expected => [ { "FROG" => undef, "ANT" => undef } ], 
+        evars => [ { name => "çimple!true!NI", vref => \undef }, { name => "(ABC.FALSE)", vref => \undef } ], 
+    after => [ { "FROG" => boolean::true, "ANT" => boolean::false } ] },
 );
 
 my $ntests = 0;
@@ -95,9 +94,10 @@ foreach my $i (1 .. ($leak ? 5 : 1)) {
 foreach my $test (@tests) {
     my $result = undef;
     my $error = undef;
+    my $vars = [];
 
     eval {
-        $result = Jarvis::JSON::Utils::decode ($test->{json});
+        $result = Jarvis::JSON::Utils::decode ($test->{json}, $vars);
     };
     if ($@) {
         $error = $@;
@@ -106,6 +106,7 @@ foreach my $test (@tests) {
 
     if (! $leak) {
         if (defined $error) {
+            $ntests++;
             if (!ok (&Compare ($test->{error}, $error), "TEST ($test->{name})")) {
                 printf STDERR "Error does not match, expected = ";
                 print STDERR $test->{error} ? "$test->{error}\n" : "NO ERROR\n";
@@ -114,18 +115,55 @@ foreach my $test (@tests) {
             }
 
         } else {
-            if (!ok (&Compare ($test->{expected}, $result), "TEST ($test->{name})")) {
+            $ntests++;
+            if (!ok (&Compare ($test->{expected}, $result), "TEST ($test->{name}) Returned")) {
                 printf STDERR "Result does not match, expected = ";
-                $test->{expected} and print STDERR hexdump ($test->{expected}, { suppress_warnings => 1 }) . "\n";
+                print STDERR &Dumper ($test->{expected});
                 printf STDERR "What we got = ";
-                $result and print STDERR hexdump ($result, { suppress_warnings => 1 }) . "\n";
+                print STDERR &Dumper ($result);
+            }
+
+            if (defined $test->{evars}) {
+                $ntests++;
+                if (!ok (&Compare ($test->{evars}, $vars), "TEST ($test->{name}) Vars")) {
+                    printf STDERR "Result does not match, expected vars = ";
+                    print STDERR &Dumper ($test->{evars});
+                    printf STDERR "What we got = ";
+                    print STDERR &Dumper ($vars);
+                }
+            }
+
+            # Now substitute.
+            foreach my $var (@$vars) {
+                my $name = $var->{name};
+                my $replacement = $values->{$name};
+                my $vref = $var->{vref};
+                #print "OLD VARIABLE '$name' => " . &Dumper ($$vref) . "\n";
+                $$vref = $replacement;
+                #print "NEW VARIABLE '$name' => " . &Dumper ($replacement) . "\n";
+            }
+
+            $ntests++;
+            if (!ok (&Compare ($test->{after}, $result), "TEST ($test->{name}) After")) {
+                printf STDERR "Result does not match, expected vars = ";
+                print STDERR &Dumper ($test->{after});
+                printf STDERR "What we got = ";
+                print STDERR &Dumper ($result);
             }
         }
     }
+    # print "EXPECTED KEYS\n";
+    # foreach my $key (sort (keys %{ $test->{expected} })) {
+    #     print ">> KEY '$key' " . (utf8::is_utf8 ($key) ? "IS UTF-8" : "not") . "\n";
+    # }
+
+    # print "ACTUAL KEYS\n";
+    # foreach my $key (sort (keys %$result)) {
+    #     print ">> KEY '$key' " . (utf8::is_utf8 ($key) ? "IS UTF-8" : "not") . "\n";
+    # }
+
     #utf8::is_utf8 ($result) and print STDERR "String is UTF-8.\n";
-    #$result and print STDERR hexdump ($result, { suppress_warnings => 1 }) . "\n";
-    #$error and print STDERR "ERROR = $error\n";
-    $ntests++;
+    #$result and print &Dumper ($result);
 }
 }
 
