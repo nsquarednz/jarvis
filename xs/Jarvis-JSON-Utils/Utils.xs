@@ -213,7 +213,7 @@ SV * json_to_perl_inner (int level, char *json, STRLEN nbytes, STRLEN *offset, A
     }
 
     char ch = json[*offset];
-    DEBUG ("Content[%d]: (%ld bytes remain)\n", ch, nbytes - *offset);
+    DEBUG ("I spy something beginning with '%c' at byte offset %ld.\n", ch, *offset);
 
     // Strings are per RFC7159 section 7. Strings
     //
@@ -618,6 +618,8 @@ SV * json_to_perl_inner (int level, char *json, STRLEN nbytes, STRLEN *offset, A
 
         // NOTE: Do not call free (str).  It is handled by Perl reference counting now.
 
+        DEBUG ("Variable capture finished, now at byte offset %ld.\n", *offset);
+
         // The initial value of the varible is undef.
         return (value_sv);
     }
@@ -790,9 +792,11 @@ SV * json_to_perl_inner (int level, char *json, STRLEN nbytes, STRLEN *offset, A
                 croak ("Array element starting at byte offset %ld has no matching ']'.", start);
             }
 
+            ch = json[*offset];
+            DEBUG ("After object member, looking at '%c' at byte offset %ld.", ch, *offset);
+
             // Now there must be either a ']' or ','.
             // Bracket simply ends the array.
-            ch = json[*offset];
             if (ch == ']') {
                 *offset = *offset + 1;
                 break;
@@ -836,7 +840,7 @@ SV * json_to_perl_inner (int level, char *json, STRLEN nbytes, STRLEN *offset, A
 
         // End of input, object is still open.
         if (*offset >= nbytes) {
-            croak ("Object element starting at byte offset %ld has no matching '}'.", start);
+            croak ("Object starting at byte offset %ld has no matching '}'.", start);
         }
 
         // Get all the attribute elements.
@@ -858,12 +862,17 @@ SV * json_to_perl_inner (int level, char *json, STRLEN nbytes, STRLEN *offset, A
             // This is mortal, it is used only as the hash key then is gone.
             SV *name_sv = sv_2mortal (json_to_perl_inner (level + 1, json, nbytes, offset, NULL, flags | FLAG_STRING_ONLY));
 
+            // This means we couldn't find a double-quote name.
+            if (! name_sv) {
+                croak ("Object name not found at byte offset %ld.", *offset);
+            }
+
             // Consume trailing whitespace.
             eat_space (json, nbytes, offset);
 
-            // End of input, array is still open.
+            // End of input, object is still open.
             if (*offset >= nbytes) {
-                croak ("Object member starting at byte offset %ld has no value.", start);
+                croak ("Object starting at byte offset %ld has no matching '}'.", start);
             }
 
             // Consume the ':' which must be present.
@@ -909,6 +918,8 @@ SV * json_to_perl_inner (int level, char *json, STRLEN nbytes, STRLEN *offset, A
             if (*offset >= nbytes) {
                 croak ("Object starting at byte offset %ld has no matching '}'.", start);
             }
+
+            num_members++;
         }                
 
         // Increment the reference count because we'll lose one reference as it's mortal.

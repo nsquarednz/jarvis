@@ -4,27 +4,7 @@
     </hook>
     <transform fetch="notnull" store="trim,null" />
     <find>
-        <filter>{ "line": $other|line$ }</filter>
-        <options>{ "limit": 1 }</options>
+        <filter>{ "line": $line$ }</filter>
+        <options>{ "limit": $limit|__LIMIT$, "projection": { "name": 1 } }</options>
     </find>
-    <update>
-UPDATE boat
-SET name = {{name}},
-    registration_num = {{registration_num}},
-    class = {{class}},
-    owner = {{owner}},
-    description = {{description}},
-    change_user = {{__username}},
-    change_date = datetime ('now')
-WHERE id = {{id}};
-    </update>
-    <insert returning="yes">
-INSERT INTO boat (name, registration_num, class, owner, description, change_user, change_date)
-VALUES ({{name}}, {{registration_num}}, {{class}}, {{owner}}, {{description}},
-        {{__username}}, datetime ('now'));
-    </insert>
-    <delete>
-DELETE FROM boat
-WHERE id = {{id}};
-    </delete>
 </dataset>

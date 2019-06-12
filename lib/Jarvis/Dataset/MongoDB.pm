@@ -179,26 +179,30 @@ sub fetch_inner {
 
     # Do we have a filter?  It can be undef, it's purely optional.
     my $filter = undef;
+    my $options = undef;
+    my $projection = undef;
 
-    # The parse and substitute methods are separated because in a multi-row 
-    # update we want to parse the JSON once and expand it multiple times.
-    #
+    # Parse the filter from JSON and perform variable substitution.
     if ($dsxml->{dataset}{find}{filter}) {
-
-        # Parse the JSON into a filter.
-        my $vars = [];
+        my $filter_vars = [];
         my $object_json = $dsxml->{dataset}{find}{filter}->content;
-        $filter = &parse_object ($jconfig, $object_json, $vars);
+        $filter = &parse_object ($jconfig, $object_json, $filter_vars);
+        &expand_vars ($jconfig, $filter_vars, $safe_params_href);
+    }
 
-        # Fill in any variable parts in the filter.
-        &expand_vars ($jconfig, $vars, $safe_params_href);
+    # Parse the options from JSON and perform variable substitution.
+    if ($dsxml->{dataset}{find}{options}) {
+        my $options_vars = [];
+        my $object_json = $dsxml->{dataset}{find}{options}->content;
+        $options = &parse_object ($jconfig, $object_json, $options_vars);
+        &expand_vars ($jconfig, $options_vars, $safe_params_href);
     }
 
     # This is the collection handle.
     my $collection = $dbh->ns ($collection_name);
     
     # Find one row.
-    my $cursor = $collection->find ($filter);    
+    my $cursor = $collection->find ($filter, $options);    
     my $rows_aref = [];
 
     while (my $document = $cursor->next ) {

@@ -62,6 +62,7 @@
         <!-- Global default parameters -->
         <default_parameters>
             <parameter name="max_rows" value="500"/>
+            <parameter name="__LIMIT" value="2"/>
         </default_parameters>
 
         <!-- This gives a sample configuration where the Login validation is performed by

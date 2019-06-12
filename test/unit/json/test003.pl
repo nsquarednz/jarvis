@@ -46,7 +46,7 @@ XSLoader::load ('Jarvis::JSON::Utils');
 my @tests = (
     { name => 'empty', json => " {} ", expected => {} },
     { name => 'empty_junk', json => " {\n \n} JUNK\n\n", error => "Trailing non-whitespace begins at byte offset 7." },
-    { name => 'endless', json => " {\n ", error => "Object element starting at byte offset 1 has no matching '}'." },
+    { name => 'endless', json => " {\n ", error => "Object starting at byte offset 1 has no matching '}'." },
     { name => 'basic', json => ' { "ABC": 34 } ', expected => { ABC => 34 } },
     { name => 'utf8', json => '{ "ç": "é" }', expected => { "ç" => "é" }, },
     { name => 'multikey', json => ' { "ABC": 34, "ç": "é", "asdf-\x67": "asdf-\x97", "yes": true, "NO!": false, "maybe?": null } ', 

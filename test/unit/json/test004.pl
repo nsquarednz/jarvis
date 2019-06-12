@@ -62,6 +62,7 @@ my @tests = (
     { name => 'unterm_var1', json => " [ \n\$asdf", error => "Unterminated variable specifier beginning at byte offset 4." },
     { name => 'unterm_var2', json => ' [ $asdf', error => "Unterminated variable specifier beginning at byte offset 3." },
     { name => 'unterm_array', json => ' [ $asdf$', error => "Array element starting at byte offset 1 has no matching ']'." },
+    { name => 'unquoted', json => '{ "limit": $limit|__LIMIT$, projection: { "name": 1 } }', error => "Object name not found at byte offset 28." },
     { name => 'aref', json => ' [ $ABC$ ] ', expected => [ undef ], evars => [ { name => "ABC", vref => \undef } ], after => [ 34 ] },
     { name => 'nested', json => ' [ { "FROG": $çimple!true!NI$, "ANT": $(ABC.FALSE)$, } ] ', 
         expected => [ { "FROG" => undef, "ANT" => undef } ], 
