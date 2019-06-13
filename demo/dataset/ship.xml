@@ -4,7 +4,9 @@
     </hook>
     <transform fetch="notnull" store="trim,null" />
     <find>
-        <filter>{ "line": $line$ }</filter>
-        <options>{ "limit": $limit|__LIMIT$, "projection": { "name": 1 } }</options>
+        <!-- Any clauses missing values will be remove from the filter by Jarvis. -->
+        <filter>{ "$and": [ { "line": { "$eq": $line$ } }, { "name": { "$eq": $name$ } } ] }</filter>
+        WHERE line = {$line} OR {$line} IS NULL
+        <options>{ "projection": { "name": 1 } }</options>
     </find>
 </dataset>

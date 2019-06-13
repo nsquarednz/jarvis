@@ -32,6 +32,8 @@ package Jarvis::Dataset::MongoDB;
 
 use boolean;
 
+#use MongoDB::Types;
+
 use Jarvis::Text;
 use Jarvis::Error;
 use Jarvis::DB;
@@ -52,7 +54,6 @@ XSLoader::load ('Jarvis::JSON::Utils');
 # Returns:
 #       $object parsed from JSON.  Variables not yet substituted.
 ################################################################################
-#
 sub parse_object {
     my ($jconfig, $object_json, $vars) = @_;
 
@@ -94,32 +95,168 @@ sub parse_object {
 }
 
 ################################################################################
-# Expand the previously parsed variables in the object.
+# Make a deep copy of the object and remove any \undef and empty attributes.
+#
+#   Remove any ARRAY elements that == \undef
+#   Remove any HASH entries with value == \undef
+#   Remove any empty ARRAY elements
+#   Remove any empty HASH objects
+#
+# TODO: Rewrite this as an XS module for improved speed.
+#
+# TODO: Check that this really does create new copies of variables in the 
+#       template (when called more than once per template).
+#
+# Note that a completely empty TOP-LEVEL object will return as undef not \undef.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
+#       $var - The object which we will copy.
+#
+# Returns:
+#       $copy
+################################################################################
+sub copy_and_elide {
+    my ($jconfig, $var) = @_;
+
+    # Depth-first copy all the elements.
+    # Remove all the \undef elements from the array.
+    # Then return an array iff there's anything left after elision.
+    if (ref ($var) eq 'ARRAY') {
+        my $ret = [];
+        my $i = 0;
+        foreach my $element (@$var) {
+            my $new = &copy_and_elide ($jconfig, $element);
+            if ((ref ($new) ne 'SCALAR') || (defined $$new)) {
+                &Jarvis::Error::debug ($jconfig, "Keeping array element '%d' (type '%s').", $i, ref ($new));
+                push (@$ret, $new);
+
+            } else {
+                &Jarvis::Error::debug ($jconfig, "Discarding array element '%d'.", $i);
+            }
+            $i++;
+        }
+        if (scalar (@$ret)) {
+            &Jarvis::Error::debug ($jconfig, "Returning array with %d elements.", scalar (@$ret));
+            return $ret;
+
+        } else {
+            &Jarvis::Error::debug ($jconfig, "Discarding empty array.");
+            return \undef;
+        }
+
+    # Depth-first copy all the elements.
+    # Remove all the \undef elements from the array.
+    # Then return an array iff there's anything left after elision.
+    } elsif (ref ($var) eq 'HASH') {
+        my $ret = {};
+        foreach my $key (keys %$var) {
+            my $element = $var->{$key};
+            my $new = &copy_and_elide ($jconfig, $element);
+            if ((ref ($new) ne 'SCALAR') || (defined $$new)) {
+                &Jarvis::Error::debug ($jconfig, "Keeping key '%s' (type '%s').", $key, ref ($new));
+                $ret->{$key} = $new;
+
+            } else {
+                &Jarvis::Error::debug ($jconfig, "Discarding key '%s'.", $key);
+            }
+        }
+        if (scalar (keys (%$ret))) {
+            &Jarvis::Error::debug ($jconfig, "Returning hash with %d keys.", scalar (keys (%$ret)));
+            return $ret;
+
+        } else {
+            &Jarvis::Error::debug ($jconfig, "Discarding empty hash.");
+            return \undef;
+        }
+
+    # Scalars we just pass up so our parents can elide us if they so desire.
+    #} elsif (ref ($var) eq '') {
+    #    return scalar ($var);
+
+    # Anything else we just pass up.
+    } else {
+        return scalar $var;
+    }
+}
+
+################################################################################
+# Make a deep copy of the object and convert all MongoDB classes to Perl.
+#
+# Params:
+#       $jconfig - Jarvis::Config object
+#       $var - The object which we will copy and convert.
+#
+# Returns:
+#       $copy
+################################################################################
+sub mongo_to_perl {
+    my ($jconfig, $var) = @_;
+
+    if (ref ($var) eq 'ARRAY') {
+        my $ret = [];
+        foreach my $element (@$var) {
+            push (@$ret, &mongo_to_perl ($jconfig, $element));
+        }
+        return $ret;
+
+    } elsif (ref ($var) eq 'HASH') {
+        my $ret = {};
+        foreach my $key (keys %$var) {
+            $ret->{$key} = &mongo_to_perl ($jconfig, $var->{$key});
+        }
+        return $ret;
+
+    } elsif (ref ($var) eq 'boolean::true') {
+        return (defined $var) ? ($var ? boolean::true : boolean::false) : $var;
+
+    } elsif (ref ($var) eq 'MongoDB::OID') {
+        return $var->value;
+    }
+
+    # Scalars we just pass up so our parents can elide us if they so desire.
+    #} elsif (ref ($var) eq '') {
+    #    return scalar ($var);
+
+    # Anything else we just pass up.
+    return $var;
+}
+
+################################################################################
+# Expand the previously parsed variables in the object to actual values.
+#
+#   a) Look up the variable name(s) in our $values HASH
+#   b) Perform any !flag type coversion or other mapping.
+#
+# Note that any variable that isn't found in our names hash will be converted 
+# \undef in the expansion process (and then removed in the COPY) process.
+#
+# We invoke copy_and_elide on the result, see the processing above. 
+#
+# Params:
+#       $jconfig - Jarvis::Config object
+#       $object - The object which we will substitute.
 #       $vars - ARRAY reference of vars to pull out.
 #       $values - HASH reference of values to expand.
 #
 # Returns:
 #       undef
 ################################################################################
-#
 sub expand_vars {
-    my ($jconfig, $vars, $values) = @_;
+    my ($jconfig, $object, $vars, $values) = @_;
 
     foreach my $var (@$vars) {
         &Jarvis::Error::debug ($jconfig, "Variable: %s [%s].", join ('|', @{ $var->{names} }), join (",", sort (keys (%{ $var->{flags} }))));
 
         # Clear the variable to remove any values left over from last time.
         my $vref = $var->{vref};
-        $$vref = undef;
-
+        my $matched = 0;
         foreach my $name (@{ $var->{names} }) {
             my $value = $values->{$name};
             if (defined $value) {
                 &Jarvis::Error::debug ($jconfig, "Matched Name '%s' -> %s.", $name, (ref $value) || $value);
                 $$vref = $value;
+                $matched = 1;
                 last;
 
             } else {
@@ -127,16 +264,35 @@ sub expand_vars {
             }
         }
 
+        # Mark it with a "REMOVE ME" flag.
+        # This will force a COPY even if not required.
+        if (! $matched) {
+            &Jarvis::Error::debug ($jconfig, "No name matched.  Set = \\undef for later removal.");
+            $$vref = \undef;
+        }
+
         # Flag processing now.
         # Note that flags are not processed in the order in which they are present in the variable specifier.
         my $flags = $var->{flags};
-        if ($flags->{boolean}) {
+
+        # BOOLEAN is only used to replace 0/1.  An "undef" is not translated.
+        if ($flags->{boolean} && $matched && defined ($$vref)) {
             &Jarvis::Error::debug ($jconfig, "Applying BOOLEAN replacement.");
             $$vref = $$vref ? boolean::true : boolean::false;
         }
     }
 
-    return undef;
+    &Jarvis::Error::debug_var ($jconfig, $object);
+    my $copy = &copy_and_elide ($jconfig, $object);
+    &Jarvis::Error::debug_var ($jconfig, $copy);
+
+    # Never return \undef, that's not nice to do.
+    if ((ref ($copy) eq 'SCALAR') && (! defined $$copy)) {
+        return undef;
+
+    } else {
+        return $copy;
+    }
 }
 
 ################################################################################
@@ -164,7 +320,6 @@ sub expand_vars {
 #       $rows_aref - Array of tuple data returned.
 #       $column_names_aref - Array of tuple column names, if available.
 ################################################################################
-#
 sub fetch_inner {
     my ($jconfig, $subset_name, $dsxml, $dbh, $safe_params_href) = @_;
 
@@ -186,16 +341,16 @@ sub fetch_inner {
     if ($dsxml->{dataset}{find}{filter}) {
         my $filter_vars = [];
         my $object_json = $dsxml->{dataset}{find}{filter}->content;
-        $filter = &parse_object ($jconfig, $object_json, $filter_vars);
-        &expand_vars ($jconfig, $filter_vars, $safe_params_href);
+        my $filter_template = &parse_object ($jconfig, $object_json, $filter_vars);
+        $filter = &expand_vars ($jconfig, $filter_template, $filter_vars, $safe_params_href);
     }
 
     # Parse the options from JSON and perform variable substitution.
     if ($dsxml->{dataset}{find}{options}) {
         my $options_vars = [];
         my $object_json = $dsxml->{dataset}{find}{options}->content;
-        $options = &parse_object ($jconfig, $object_json, $options_vars);
-        &expand_vars ($jconfig, $options_vars, $safe_params_href);
+        my $options_template = &parse_object ($jconfig, $object_json, $options_vars);
+        $options = &expand_vars ($jconfig, $options_template, $options_vars, $safe_params_href);
     }
 
     # This is the collection handle.
@@ -205,8 +360,11 @@ sub fetch_inner {
     my $cursor = $collection->find ($filter, $options);    
     my $rows_aref = [];
 
+
+
     while (my $document = $cursor->next ) {
-        push (@$rows_aref, $document);
+        &Jarvis::Error::debug_var ($jconfig, $document);
+        push (@$rows_aref, &mongo_to_perl ($jconfig, $document));
     }
 
     return ($rows_aref); 
