@@ -7,8 +7,9 @@
 #
 #               We currently support two different types of datasets:
 #
-#                   - DBI (via Perl DBI modules)
+#                   - DBI (via Perl DBI modules and DBD drivers)
 #                   - SDP (SSAS DataPump via SOAP and custom codec)
+#                   - MongoDB (via Perl MongoDB modules)
 #
 # Licence:
 #       This file is part of the Jarvis WebApp/Database gateway utility.

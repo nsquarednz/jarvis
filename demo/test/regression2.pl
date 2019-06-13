@@ -42,15 +42,14 @@ if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json
 }
 my @all_ships = @{ $json->{data} };
 
-
-if (scalar @all_ships) {    
-    my @delete = map { { _id => $_->{_id} }; } @all_ships;
-    #die &Dumper (\@delete);
-    $json = TestUtils::store ([ 'ship' ], { _method => 'delete' }, \@delete);
-    if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1), "JSON Delete all Ships")) {
-        BAIL_OUT("Failed to delete: " . &Dumper ($json));    
-    }
-}
-
+# TBD: Deleting!
+#
+# if (scalar @all_ships) {    
+#     my @delete = map { { _id => $_->{_id} }; } @all_ships;
+#     $json = TestUtils::store ([ 'ship' ], { _method => 'delete' }, \@delete);
+#     if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1), "JSON Delete all Ships")) {
+#         BAIL_OUT("Failed to delete: " . &Dumper ($json));    
+#     }
+# }
 
 done_testing ();
