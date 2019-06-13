@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# Nested Dataset unit tests against demo app database.
+# Regression test suite Part 1 -- exec and DBI.
 #
 use strict;
 use warnings;

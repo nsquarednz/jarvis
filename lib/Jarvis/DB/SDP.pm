@@ -60,6 +60,7 @@ sub init {
     $soap->default_ns('urn:schemas-microsoft-com:xml-analysis');
     $soap->transport->http_request->header ('Authorization' => 'Basic ' . MIME::Base64::encode("$username:$password"));
     $self->{'soap'} = $soap;    
+    return undef;
 }
 
 ##############################################################################

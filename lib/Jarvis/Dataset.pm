@@ -7,8 +7,9 @@
 #
 #               We currently support two different types of datasets:
 #
-#                   - DBI (via Perl DBI modules)
+#                   - DBI (via Perl DBI modules and DBD drivers)
 #                   - SDP (SSAS DataPump via SOAP and custom codec)
+#                   - MongoDB (via Perl MongoDB modules)
 #
 # Licence:
 #       This file is part of the Jarvis WebApp/Database gateway utility.
@@ -45,6 +46,7 @@ use Jarvis::DB;
 use Jarvis::Hook;
 use Jarvis::Dataset::DBI;
 use Jarvis::Dataset::SDP;
+use Jarvis::Dataset::MongoDB;
 use Jarvis::Login;
 
 ###############################################################################
@@ -105,7 +107,7 @@ sub load_dsxml {
 
     # Find the best-matching "dataset_dir" prefix and use that directory.
     my $dsxml_filename = undef;
-    my $dbtype = undef;
+    my $default_dbtype = undef;
     my $best_prefix_len = -1;
     my $default_dbname = undef;
 
@@ -142,7 +144,7 @@ sub load_dsxml {
             &Jarvis::Error::dump ($jconfig, "Prefix '$prefix' matched, length = " . $prefix_len);
             if ($prefix_len > $best_prefix_len) {
                 $best_prefix_len = $prefix_len;
-                $dbtype = $type;
+                $default_dbtype = $type;
 
                 # Now turn "." into "/" on the dataset name (with prefix stripped).
                 $remainder =~ s/\./\//g;
@@ -155,7 +157,7 @@ sub load_dsxml {
     $dsxml_filename || die "No dataset_dir defined with prefix matching dataset '$dataset_name'.\n";
 
     # Load the dataset-specific XML file and double-check it has top-level <dataset> tag.
-    &Jarvis::Error::debug ($jconfig, "Opening DSXML file '$dsxml_filename', type '$dbtype'.");
+    &Jarvis::Error::debug ($jconfig, "Opening DSXML file '$dsxml_filename', default type '$default_dbtype'.");
 
     # Check it exists.
     if (! -f $dsxml_filename) {
@@ -168,6 +170,7 @@ sub load_dsxml {
 
     # What kind of database are we dealing with?
     my $dbname = $dsxml->{dataset}{dbname}->content || $default_dbname;
+    my $dbtype = $dsxml->{dataset}{dbtype}->content || $default_dbtype;
 
     # What dataset level are we at in our stack?  Level 0 is the top-level, master dataset.  Others are childs.
     (defined $jconfig->{datasets}) || ($jconfig->{datasets} = []);
@@ -741,6 +744,11 @@ sub fetch_rows {
     } elsif ($dbtype eq 'sdp') {
         ($rows_aref, $column_names_aref)
             = &Jarvis::Dataset::SDP::fetch_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%safe_params);
+
+    } elsif ($dbtype eq 'mongo') {
+        ($rows_aref, $column_names_aref)
+            = &Jarvis::Dataset::MongoDB::fetch_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%safe_params);
+
     } else {
         die "Unsupported dataset type '$dbtype'.\n";
     }

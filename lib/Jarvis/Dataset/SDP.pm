@@ -150,7 +150,6 @@ sub mdx_with_substitutions {
 # Params:
 #       $jconfig - Jarvis::Config object
 #       $dsxml - Dataset XML object
-#       $dbh - Database handle
 #       $args_href - Hash of args to substitute.
 #
 # Returns:
