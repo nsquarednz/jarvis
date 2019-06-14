@@ -245,6 +245,8 @@ sub unload_dsxml {
 #       - If no "id", try REST parameter #1.  E.g /<app>/<dataset>/<id>
 #       - If no rest parameter, use NULL
 #
+# NOTE: We match the first name WHICH IS PRESENT, even if it is UNDEFINED.
+#
 # Params:
 #       $variable_names_aref - Array of variable names.
 #       $safe_params_href - Hash of name -> values.
@@ -260,9 +262,22 @@ sub names_to_values {
     my @arg_values = ();
     foreach my $name (@$variable_names_aref) {
         my $value = undef;
+
+        # NOTE: Subtle clarification here.  
+        # We match the first name WHICH IS PRESENT, even if it is UNDEFINED.
+        #
+        # This is a very subtle change made in order for DBI to be 100% consistent
+        # with the MongoDB processing.  Previously we used the first variable that
+        # was DEFINED (not just present).
+        #
+        # In practice, I think these are identical in all real-world cases.
+        # So much so that I'm confident enough to make this change.
+        #
         foreach my $option (split ('\|', $name)) {
-            $value = $$safe_params_href {$option};
-            last if (defined $value);
+            if (exists $safe_params_href->{$option}) {
+                $value = $safe_params_href->{$option};
+                last;
+            }
         }
         push (@arg_values, $value);
     }
@@ -653,12 +668,14 @@ sub fetch {
 }
 
 
-################################################################################
+###############################################################################
+# DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED
+# -- These features are officially documented, remember to
+# -- update the documentation if you change/extend then.
+###############################################################################
+###############################################################################
 # Performs the inner fetching of a dataset into an ARRAY reference, with no
 # formatting.
-#
-# NOTE: THIS IS AN OFFICIAL, PUBLICALLY AVAILABLE METHOD DOCUMENTED IN THE
-#       JARVIS GUIDE AND USED BY MANY PLUGINS.  DO NOT MODIFY ITS INTERFACE!
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -676,7 +693,7 @@ sub fetch {
 #
 #       If called in a scalar context, returns only the reference to the hash
 #       of returned data.
-################################################################################
+###############################################################################
 #
 sub fetch_rows {
     my ($jconfig, $dataset_name, $user_args, $extra_href) = @_;
@@ -818,11 +835,16 @@ sub fetch_rows {
     }
 
     
+    ###########################################################################
+    # DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED
+    # -- These features are officially documented, remember to
+    # -- update the documentation if you change/extend then.
+    ###########################################################################
     # 
     # If the retain null flag has been set then we do not want to remove undef values from the return array.
     # This will allow us to have null values in our JSON object.
     # 
-    if (!$jconfig->{'retain_null'}) {
+    if (! $jconfig->{'retain_null'}) {
         # Delete null (undef) values, otherwise JSON/XML will represent them as ''.
         #
         # Note that this must happen AFTER the transform step, for two reasons:
@@ -1099,11 +1121,13 @@ sub store {
 }
 
 ################################################################################
+# DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED
+# -- These features are officially documented, remember to
+# -- update the documentation if you change/extend then.
+################################################################################
+################################################################################
 # Performs an update to the specified table underlying the named dataset.
 # This is currently only supported for DBI datasets.
-#
-# NOTE: THIS IS AN OFFICIAL, PUBLICALLY AVAILABLE METHOD DOCUMENTED IN THE
-#       JARVIS GUIDE AND USED BY MANY PLUGINS.  DO NOT MODIFY ITS INTERFACE!
 #
 # Params:
 #       $jconfig - Jarvis::Config object

@@ -170,6 +170,12 @@ sub sql_with_substitutions {
             my $name = $bits[$idx];
             my %flags = ();
 
+            ###################################################################
+            # DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED
+            # -- These features are officially documented, remember to
+            # -- update the documentation if you change/extend then.
+            ###################################################################
+            #
             # Flags may be specified after the variable name with a colon separating the variable
             # name and the flag.  Multiple flags are permitted in theory, with a colon before
             # each flag.  Supported flags at this stage are:
@@ -430,6 +436,12 @@ sub statement_execute {
         # Statement handle.
         my $sth = $stm->{sth};
 
+        #######################################################################
+        # DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED
+        # -- These features are officially documented, remember to
+        # -- update the documentation if you change/extend then.
+        #######################################################################
+        #
         # Do we have any "!out" flagged variables?
         my $out_flag = 0;
         foreach my $flag (@{ $stm->{vflags_aref} }) {

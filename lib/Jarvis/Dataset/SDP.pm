@@ -108,6 +108,12 @@ sub mdx_with_substitutions {
             }
             (defined $value) || ($value = '');
 
+            ###################################################################
+            # DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED
+            # -- These features are officially documented, remember to
+            # -- update the documentation if you change/extend then.
+            ###################################################################
+
             # With the !string flag, or if the preceding character was a string, 
             # then escape for use in StrToMbr(" ")
             if ($flags{'string'}) {

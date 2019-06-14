@@ -63,7 +63,7 @@ my $text = TestUtils::fetch ([ 'echo' ], { paramA => 'a', paramB => 'b' }, 'text
 if (! ok (defined $text, "Echo")) {
     BAIL_OUT("Failed to echo: " . &Dumper ($text));    
 }
-if (! eq_or_diff ($text, "p0=echo __dataset=echo __group:admin=1 __group:default=1 __group_list=admin,default __username=admin max_rows=500 paramA=a paramB=b\n", 'Echo matches.')) {
+if (! eq_or_diff ($text, "p0=echo __LIMIT=2 __dataset=echo __group:admin=1 __group:default=1 __group_list=admin,default __username=admin max_rows=500 paramA=a paramB=b\n", 'Echo matches.')) {
     BAIL_OUT("Unexpected __status quota: " . &Dumper ($text));    
 }
 
@@ -71,7 +71,7 @@ $text = TestUtils::fetch ([ 'echo2' ], { paramA => 'A', paramB => 'B' }, 'text/p
 if (! ok (defined $text, "Echo2")) {
     BAIL_OUT("Failed to echo2: " . &Dumper ($text));    
 }
-if (! eq_or_diff ($text, "p0=echo2 __dataset=echo2 __group:admin=1 __group:default=1 __group_list=admin,default __username=admin max_rows=500 paramA=A paramB=B\n", 'Echo matches.')) {
+if (! eq_or_diff ($text, "p0=echo2 __LIMIT=2 __dataset=echo2 __group:admin=1 __group:default=1 __group_list=admin,default __username=admin max_rows=500 paramA=A paramB=B\n", 'Echo matches.')) {
     BAIL_OUT("Unexpected __status quota: " . &Dumper ($text));    
 }
 

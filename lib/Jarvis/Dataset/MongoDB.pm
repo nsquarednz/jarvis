@@ -271,8 +271,16 @@ sub expand_vars {
             $$vref = \undef;
         }
 
+        #######################################################################
+        # DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED
+        # -- These features are officially documented, remember to
+        # -- update the documentation if you change/extend then.
+        #######################################################################
         # Flag processing now.
-        # Note that flags are not processed in the order in which they are present in the variable specifier.
+        #
+        # Note that flags are not processed in the order in which they are 
+        # present in the variable specifier.
+        #
         my $flags = $var->{flags};
 
         # BOOLEAN is only used to replace 0/1.  An "undef" is not translated.
