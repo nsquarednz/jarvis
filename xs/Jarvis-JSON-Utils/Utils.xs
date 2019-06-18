@@ -133,6 +133,9 @@ void eat_space (char *json, STRLEN nbytes, STRLEN *offset) {
                 // Otherwise keep on moving.
                 *offset = *offset + len;
             }
+
+            // Go back and look for more whitespace on the next line.
+            continue;
         }
 
         // /* ... Comment Block ... */
@@ -168,6 +171,9 @@ void eat_space (char *json, STRLEN nbytes, STRLEN *offset) {
             if (in_comment) {
                 croak ("Multi-line comment starting at byte offset %ld was not terminated.", start);
             }
+
+            // Go back and look for more whitespace on the next line.
+            continue;            
         }
         
         // Not whitespace.
