@@ -57,17 +57,17 @@ my $values = {
 };
 
 my @tests = (
-    { name => 'topvar', json => " \$ABC ", error => "Variable not permitted at top level, starting at byte offset 1." },
-    { name => 'empty', json => " [ \$\$ ] ", error => "Empty variable specifier detected at byte offset 3." },
-    { name => 'unterm_var1', json => " [ \n\$asdf", error => "Unterminated variable specifier beginning at byte offset 4." },
-    { name => 'unterm_var2', json => ' [ $asdf', error => "Unterminated variable specifier beginning at byte offset 3." },
-    { name => 'unterm_array', json => ' [ $asdf$', error => "Array element starting at byte offset 1 has no matching ']'." },
-    { name => 'unquoted', json => '{ "limit": $limit|__LIMIT$, projection: { "name": 1 } }', error => "Object name not found at byte offset 28." },
-    { name => 'aref', json => ' [ $ABC$ ] ', expected => [ undef ], evars => [ { name => "ABC", vref => \undef } ], after => [ 34 ] },
+    { name => 'topvar', json => " \~ABC ", error => "Variable not permitted at top level, starting at byte offset 1." },
+    { name => 'empty', json => " [ \~\~ ] ", error => "Empty variable specifier detected at byte offset 3." },
+    { name => 'unterm_var1', json => " [ \n\~asdf", error => "Unterminated variable specifier beginning at byte offset 4." },
+    { name => 'unterm_var2', json => ' [ ~asdf', error => "Unterminated variable specifier beginning at byte offset 3." },
+    { name => 'unterm_array', json => ' [ ~asdf~', error => "Array element starting at byte offset 1 has no matching ']'." },
+    { name => 'unquoted', json => '{ "limit": ~limit|__LIMIT~, projection: { "name": 1 } }', error => "Object member name not found at byte offset 28. Expected '\"'." },
+    { name => 'aref', json => ' [ ~ABC~ ] ', expected => [ undef ], evars => [ { name => "ABC", vref => \undef } ], after => [ 34 ] },
     { name => 'space_after_comment', json => 
 '{ "A": "B" // Comment
  , "C": "D" }', expected => { A => "B", C => "D" }, after => { A => "B", C => "D" } },
-    { name => 'nested', json => ' [ { "FROG": $çimple!true!NI$, "ANT": $(ABC.FALSE)$, } ] ', 
+    { name => 'nested', json => ' [ { "FROG": ~çimple!true!NI~, "ANT": ~(ABC.FALSE)~, } ] ', 
         expected => [ { "FROG" => undef, "ANT" => undef } ], 
         evars => [ { name => "çimple!true!NI", vref => \undef }, { name => "(ABC.FALSE)", vref => \undef } ], 
     after => [ { "FROG" => boolean::true, "ANT" => boolean::false } ] },

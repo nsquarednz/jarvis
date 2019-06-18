@@ -32,7 +32,6 @@ package Jarvis::Dataset::MongoDB;
 
 use boolean;
 
-use Jarvis::JSON::Utils;
 use Jarvis::Text;
 use Jarvis::Error;
 use Jarvis::DB;
@@ -40,8 +39,10 @@ use Jarvis::Hook;
 
 use sort 'stable';      # Don't mix up records when server-side sorting
 
+XSLoader::load ('Jarvis::JSON::Utils');
+
 ################################################################################
-# Reads a JSON object and finds/checks the $varname!flag$ variable components.
+# Reads a JSON object and finds/checks the ~varname!flag~ variable components.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -204,12 +205,25 @@ sub mongo_to_perl {
         }
         return $ret;
 
-    } elsif (ref ($var) eq 'boolean::true') {
-        return (defined $var) ? ($var ? boolean::true : boolean::false) : $var;
+    } elsif (ref ($var) eq 'boolean') {
+        return $var ? \1 : \0;
 
     } elsif (ref ($var) eq 'MongoDB::OID') {
+
         return $var->value;
+    } elsif (ref ($var) eq 'BSON::Decimal128') {
+        return $var->value;
+
+    } elsif (ref ($var) eq 'DateTime' ) {
+        return $var->epoch ();
+
+    } else {
+        # For any non sclar types that have a blessed type stop and warn the user to implement them.
+        if (ref ($var)) {
+            die ("Unsupported Blessed Type: " . ref ($var));
+        }
     }
+
 
     # Scalars we just pass up so our parents can elide us if they so desire.
     #} elsif (ref ($var) eq '') {
@@ -285,6 +299,18 @@ sub expand_vars {
             &Jarvis::Error::debug ($jconfig, "Applying BOOLEAN replacement.");
             $$vref = $$vref ? boolean::true : boolean::false;
         }
+
+        # MongoDB::OID is used to replace string GUIID Object IDs. An "undef" is not translated.
+        if ($flags->{oid} && $matched && defined ($$vref)) {
+            &Jarvis::Error::debug ($jconfig, "Applying OID replacement.");
+            $$vref = MongoDB::OID->new (value => $$vref);
+        }
+
+        # Perl DateTime is used to replace epoch date values. An "undef" is not translated.
+        if ($flags->{date} && $matched && defined ($$vref)) {
+            &Jarvis::Error::debug ($jconfig, "Applying Date replacement.");
+            $$vref = DateTime->from_epoch (epoch => $$vref);
+        }
     }
 
     &Jarvis::Error::debug_var ($jconfig, $object);
@@ -333,40 +359,78 @@ sub fetch_inner {
     $dsxml->{dataset}{collection} or die "Dataset '$subset_name' (type 'mongo') has no 'collection' defined.\n";
     my $collection_name = $dsxml->{dataset}{collection}->content;
 
-    # We must also have a <find> block present in the dataset.  
-    # It MUST be present for find to be supported, EVEN IF IT IS EMPTY.
-    $dsxml->{dataset}{find} or die "Dataset '$subset_name' (type 'mongo') has no 'find' present.\n";
-
-    # Do we have a filter?  It can be undef, it's purely optional.
-    my $filter = undef;
-    my $options = undef;
-    my $projection = undef;
-
-    # Parse the filter from JSON and perform variable substitution.
-    if ($dsxml->{dataset}{find}{filter}) {
-        my $filter_vars = [];
-        my $object_json = $dsxml->{dataset}{find}{filter}->content;
-        my $filter_template = &parse_object ($jconfig, $object_json, $filter_vars);
-        $filter = &expand_vars ($jconfig, $filter_template, $filter_vars, $safe_params_href);
-    }
-
-    # Parse the options from JSON and perform variable substitution.
-    if ($dsxml->{dataset}{find}{options}) {
-        my $options_vars = [];
-        my $object_json = $dsxml->{dataset}{find}{options}->content;
-        my $options_template = &parse_object ($jconfig, $object_json, $options_vars);
-        $options = &expand_vars ($jconfig, $options_template, $options_vars, $safe_params_href);
+    # Check that both find and aggregate are not defined at the same time.
+    if ($dsxml->{dataset}{find} && $dsxml->{dataset}{aggregate}) {
+        die "Dataset '$subset_name' (type 'mongo') has both 'find' and 'aggregate' present.\n";
     }
 
     # This is the collection handle.
     my $collection = $dbh->ns ($collection_name);
+    my $cursor     = undef;
+
+    # We must also have either a <find> or <aggregate> block present in the dataset.  
+    # Extract the filter and options from each type as required.
+    if ($dsxml->{dataset}{find}) {
+
+        # Do we have a filter?  It can be undef, it's purely optional.
+        my $filter  = undef;
+        my $options = undef;
+
+        # Parse the filter from JSON and perform variable substitution.
+        if ($dsxml->{dataset}{find}{filter}) {
+            my $filter_vars     = [];
+            my $object_json     = $dsxml->{dataset}{find}{filter}->content;
+            my $filter_template = &parse_object ($jconfig, $object_json, $filter_vars);
+            $filter             = &expand_vars ($jconfig, $filter_template, $filter_vars, $safe_params_href);
+        }
+
+        # Parse the options from JSON and perform variable substitution.
+        if ($dsxml->{dataset}{find}{options}) {
+            my $options_vars     = [];
+            my $object_json      = $dsxml->{dataset}{find}{options}->content;
+            my $options_template = &parse_object ($jconfig, $object_json, $options_vars);
+            $options             = &expand_vars ($jconfig, $options_template, $options_vars, $safe_params_href);
+        }
+
+        # Execute our Mongo find.
+        $cursor = $collection->find ($filter, $options)
+
+
+    } elsif ($dsxml->{dataset}{aggregate}) {
+
+        # Do we have a pipeline? It must be defined.
+        my @pipeline = undef;
+        my $options  = undef;
+
+        # Parse the pipeline from JSON and perform variable substitution.
+        if ($dsxml->{dataset}{aggregate}{pipeline}) {
+            my $pipeline_vars     = [];
+            my $object_json       = $dsxml->{dataset}{aggregate}{pipeline}->content;
+            my $pipeline_template = &parse_object ($jconfig, $object_json, $pipeline_vars);
+            @pipeline = &expand_vars ($jconfig, $pipeline_template, $pipeline_vars, $safe_params_href);
+        }
+        
+        # Parse the options from JSON and perform variable substitution.
+        if ($dsxml->{dataset}{aggregate}{options}) {
+            my $options_vars     = [];
+            my $object_json      = $dsxml->{dataset}{aggregate}{options}->content;
+            my $options_template = &parse_object ($jconfig, $object_json, $options_vars);
+            $options             = &expand_vars ($jconfig, $options_template, $options_vars, $safe_params_href);
+        }
+
+        @pipeline or die "Dataset '$subset_name' (type 'mongo' - 'aggregate') does not have a pipeline present.\n";
+
+        # Execute our Mongo aggregate.
+        $cursor = $collection->aggregate (@pipeline, $options);
+
+    } else {
+        # Either 'find' or 'aggregatea' MUST be present, EVEN IF THEY ARE EMPTY.
+        die "Dataset '$subset_name' (type 'mongo') has no 'find' or 'aggregate' present.\n";
+    }
+
     
-    # Find one row.
-    my $cursor = $collection->find ($filter, $options);    
+    # Process the rows returned from each our method cursors.
     my $rows_aref = [];
-
-
-
     while (my $document = $cursor->next ) {
         &Jarvis::Error::debug_var ($jconfig, $document);
         push (@$rows_aref, &mongo_to_perl ($jconfig, $document));

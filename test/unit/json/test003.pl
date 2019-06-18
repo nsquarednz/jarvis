@@ -53,7 +53,7 @@ my @tests = (
         expected => { "ABC" => 34, "ç" => "é", "asdf-\x67" => "asdf-\x97", "yes" => boolean::true, "NO!" => boolean::false, "maybe?" => undef } },
     { name => 'nested', json => '{ "ABC": { "DOWN": "UNDER", "go": "west", }, "__test": [], "ANOTHER": { "B": "\x01\x02", "D": "\u0001\u0002" } }', 
         expected => { "ABC" => { "DOWN" => "UNDER", "go" => "west", }, "__test" => [], "ANOTHER" => { "B" => "\x01\x02", "D" => "\x01\x02" } }, },
-    { name => 'empty', json => " \$ ", error => "Variable not permitted here starting at byte offset 1." },
+    { name => 'empty', json => " \~ ", error => "Variable not permitted here starting at byte offset 1." },
 );
 
 my $ntests = 0;

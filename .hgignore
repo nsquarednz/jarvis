@@ -1,0 +1,12 @@
+# Files created by the "xs" build process.
+syntax: regexp
+^xs/.*/\.exists$
+^xs/.*/.*\.bs$
+^xs/.*/.*\.o$
+^xs/.*/.*\.c$
+^xs/.*/.*\.so$
+^xs/.*/.*\.yml$
+^xs/.*/pm_to_blib$
+^xs/.*/Makefile$
+^xs/.*/Makefile.old$
+^xs/.*/MYMETA.json

@@ -484,8 +484,8 @@ SV * json_to_perl_inner (int level, char *json, STRLEN nbytes, STRLEN *offset, A
         return NULL;
     }
 
-    // May it be a variable starting with "$" and followed by a non-whitespace string?
-    if (ch == '$') {
+    // May it be a variable starting with "~" and followed by a non-whitespace string?
+    if (ch == '~') {
 
         // Be nice, if variable capture is not enabled give them a clue.
         if (! vars_av) {
@@ -504,7 +504,7 @@ SV * json_to_perl_inner (int level, char *json, STRLEN nbytes, STRLEN *offset, A
         DEBUG ("Variable capture beginning at byte offset %ld.\n", *offset);
         STRLEN start = *offset;
 
-        // Consume the starting '$'. 
+        // Consume the starting '~'. 
         *offset = *offset + 1;
 
         // Assign this as the default string size.  We will re-malloc if and when we outgrow this.
@@ -522,9 +522,9 @@ SV * json_to_perl_inner (int level, char *json, STRLEN nbytes, STRLEN *offset, A
                 croak ("Unterminated variable specifier beginning at byte offset %ld.", start);
             }
 
-            // Terminating '$', we're done!
+            // Terminating '~', we're done!
             ch = json[*offset];
-            if (ch == '$') {
+            if (ch == '~') {
                 *offset = *offset + 1;
                 break;
             }
@@ -544,8 +544,8 @@ SV * json_to_perl_inner (int level, char *json, STRLEN nbytes, STRLEN *offset, A
                     *offset = *offset + (len = 1);
 
                 // Escaped double quote?
-                } else if ((*offset < nbytes) && (json[*offset] == '$')) {
-                    seq[0] = '$';
+                } else if ((*offset < nbytes) && (json[*offset] == '~')) {
+                    seq[0] = '~';
                     *offset = *offset + (len = 1);
 
                 // Else no good.
@@ -870,7 +870,7 @@ SV * json_to_perl_inner (int level, char *json, STRLEN nbytes, STRLEN *offset, A
 
             // This means we couldn't find a double-quote name.
             if (! name_sv) {
-                croak ("Object name not found at byte offset %ld.", *offset);
+                croak ("Object member name not found at byte offset %ld. Expected '\"'.", *offset);
             }
 
             // Consume trailing whitespace.
