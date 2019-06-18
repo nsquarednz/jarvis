@@ -32,16 +32,13 @@ package Jarvis::Dataset::MongoDB;
 
 use boolean;
 
-#use MongoDB::Types;
-
+use Jarvis::JSON::Utils;
 use Jarvis::Text;
 use Jarvis::Error;
 use Jarvis::DB;
 use Jarvis::Hook;
 
 use sort 'stable';      # Don't mix up records when server-side sorting
-
-XSLoader::load ('Jarvis::JSON::Utils');
 
 ################################################################################
 # Reads a JSON object and finds/checks the $varname!flag$ variable components.

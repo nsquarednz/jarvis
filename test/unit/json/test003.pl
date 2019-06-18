@@ -37,7 +37,7 @@ use Data::Compare;
 use Data::Hexdumper;
 use Getopt::Long;
 
-XSLoader::load ('Jarvis::JSON::Utils');
+use Jarvis::JSON::Utils;
 
 ################################################################################
 # TEST CASES
