@@ -757,13 +757,13 @@ sub fetch_rows {
             = &Jarvis::Dataset::DBI::fetch_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%safe_params);
 
     } elsif ($dbtype eq 'sdp') {
-        use Jarvis::Dataset::SDP;
+        require Jarvis::Dataset::SDP;
 
         ($rows_aref, $column_names_aref)
             = &Jarvis::Dataset::SDP::fetch_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%safe_params);
 
     } elsif ($dbtype eq 'mongo') {
-        use Jarvis::Dataset::MongoDB;
+        require Jarvis::Dataset::MongoDB;
 
         ($rows_aref, $column_names_aref)
             = &Jarvis::Dataset::MongoDB::fetch_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%safe_params);
