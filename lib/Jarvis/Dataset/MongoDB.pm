@@ -311,6 +311,12 @@ sub expand_vars {
             &Jarvis::Error::debug ($jconfig, "Applying Date replacement.");
             $$vref = DateTime->from_epoch (epoch => $$vref);
         }
+
+        # BSON::Decimal128 is used to replace decimal values. An "undef" is not translated.
+        if ($flags->{decimal} && $matched && defined ($$vref)) {
+            &Jarvis::Error::debug ($jconfig, "Applying Decimal 128 replacement.");
+            $$vref = BSON::Decimal128->new (value => $$vref);
+        }
     }
 
     &Jarvis::Error::debug_var ($jconfig, $object);
