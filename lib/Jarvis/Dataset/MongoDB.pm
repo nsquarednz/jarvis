@@ -31,6 +31,7 @@ use XML::Smart;
 package Jarvis::Dataset::MongoDB;
 
 use boolean;
+use BSON::Types ':all'; 
 
 use Jarvis::Text;
 use Jarvis::Error;
@@ -67,17 +68,17 @@ sub parse_object {
 
         # Strip all the !flag from the tail.
         my %flags = ();
-        while ($name =~ m/^(.*)(\![a-z]+)$/) {
+        while ($name =~ m/^(.*)(\![a-zA-Z\_]+)$/) {
             $name = $1;
             my $flag = lc ($2);
-            $flag =~ s/[^a-z]//g;
+            $flag =~ s/[^a-zA-Z\_]//g;
             $flags {$flag} = 1;
         }
 
         # This is the trimmed name.
         my @names = split ('\|', $name);
         foreach my $orname (@names) {
-            if ($orname !~ m/^[\.a-zA-Z0-9_\-:]+$/) {
+            if ($orname !~ m/^[\.a-zA-Z0-9\_\-\:]+$/) {
                 die "Unsupported characters in JSON substitution variable '$name'."
             }
         }
@@ -316,6 +317,16 @@ sub expand_vars {
         if ($flags->{decimal} && $matched && defined ($$vref)) {
             &Jarvis::Error::debug ($jconfig, "Applying Decimal 128 replacement.");
             $$vref = BSON::Decimal128->new (value => $$vref);
+        }
+
+        # BSON::Regex is used to replace case insensitive regex match values. An "undef" is not translated.
+        if ($flags->{insensitive_regex} && $matched && defined ($$vref)) {
+            &Jarvis::Error::debug ($jconfig, "Applying Case Insensitive Regex replacement.");
+            
+            # Construct and compile the regex with the `i` insensitive matching flag.
+            my $regex = bson_regex ($$vref, 'i');
+            my $compiled_regex = $regex->try_compile or die ("Failed to compiled regular expression for BSON::Regex type conversion.");
+            $$vref = $compiled_regex;
         }
     }
 
