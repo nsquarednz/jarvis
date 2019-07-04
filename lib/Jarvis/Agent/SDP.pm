@@ -28,7 +28,9 @@ use warnings;
 
 use XML::Smart;
 
-package Jarvis::Dataset::SDP;
+package Jarvis::Agent::SDP;
+
+use parent qw(Jarvis::Agent);
 
 use Jarvis::Text;
 use Jarvis::Error;
@@ -181,6 +183,10 @@ sub parse_mdx {
 }
 
 ################################################################################
+# AGENT METHOD OVERRIDE
+################################################################################
+
+################################################################################
 # Loads the data for the current dataset(s), and puts it into our return data
 # array so that it can be presented to the client in JSON or XML or whatever.
 #
@@ -189,6 +195,7 @@ sub parse_mdx {
 # object.
 #
 # Params:
+#       $class - Agent classname.
 #       $jconfig - Jarvis::Config object
 #           READ
 #               cgi                 Contains data values for {{param}} in MDX
@@ -196,7 +203,7 @@ sub parse_mdx {
 #               group_list          Used for {{group_list}} in MDX
 #               format              Either "json" or "xml" or "csv".
 #
-#       $subset_name - Name of single dataset we are fetching from.
+#       $dataset_name - Name of single dataset we are fetching from.
 #       $dsxml - Dataset's XML configuration object.
 #       $dbh - Database handle of the correct type to match the dataset.
 #       $safe_params_href - All our safe parameters.
@@ -207,11 +214,11 @@ sub parse_mdx {
 ################################################################################
 #
 sub fetch_inner {
-    my ($jconfig, $subset_name, $dsxml, $dbh, $safe_params_href) = @_;
+    my ($class, $jconfig, $dataset_name, $dsxml, $dbh, $safe_params_href) = @_;
     
     # Get our STM.  This has everything attached.
     my $mdx = &parse_mdx ($jconfig, $dsxml, $safe_params_href) ||
-        die "Dataset '$subset_name' (type 'sdp') has no MDX query.\n";
+        die "Dataset '$dataset_name' (type 'sdp') has no MDX query.\n";
 
     # What key will we use to store the row labels?
     my $row_label = $dsxml->{dataset}{mdx}{row_label}->content || 'row_label';

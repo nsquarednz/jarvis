@@ -1,3 +1,6 @@
+# Test cookies file.
+demo/test/cookies.txt
+
 # Files created by the "xs" build process.
 syntax: regexp
 ^xs/.*/\.exists$

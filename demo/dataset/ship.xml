@@ -6,6 +6,8 @@
     <find>
         <!-- Any clauses missing values will be remove from the filter by Jarvis. -->
         <filter>{ "$and": [ { "line": { "$eq": $line$ } }, { "name": { "$eq": $name$ } } ] }</filter>
-        <options>{ "projection": { "name": 1 } }</options>
+        <options>{ "sort": { "name": 1 } }</options>
     </find>
+    <delete>{ "_id": $_id!oid$ }</delete>
+    <insert>{ "name": $name$, "line": $line$, "num_funnels": $num_funnels$ }</insert>
 </dataset>

@@ -35,6 +35,7 @@ use warnings;
 
 package Jarvis::Dataset;
 
+use Module::Load;
 use Data::Dumper;
 use JSON;
 use XML::Smart;
@@ -44,8 +45,13 @@ use Jarvis::Text;
 use Jarvis::Error;
 use Jarvis::DB;
 use Jarvis::Hook;
-use Jarvis::Dataset::DBI;
 use Jarvis::Login;
+
+my $AGENT_CLASSES = {
+    'dbi' => 'Jarvis::Agent::DBI',
+    'sdp' => 'Jarvis::Agent::SDP',
+    'mongo' => 'Jarvis::Agent::MongoDB',
+};
 
 ###############################################################################
 # Internal Functions
@@ -687,7 +693,7 @@ sub fetch {
 #           1. Reference to Hash of returned data.
 #              You may convert to JSON or XML. die on error
 #              (including permissions error)
-#           2. A list of column names, as provided by the DBI driver.
+#           2. A list of column names, if provided by the underlying driver.
 #
 #       If called in a scalar context, returns only the reference to the hash
 #       of returned data.
@@ -749,27 +755,18 @@ sub fetch_rows {
         $jconfig->{txn_dbh} = $dbh;
     }
 
-    # Call to the DBI interface to fetch the tuples.
+    # Load the agent class (at the top level only).
+    if ($dataset->{level} == 0) {
+        $jconfig->{agent_class} = $AGENT_CLASSES->{$dbtype} // die "Unsupported DB Type '$dbtype'.";
+        load $jconfig->{agent_class};
+    }
+    my $agent_class = $jconfig->{agent_class};
+
+    # Now fetch the tuples.
     my ($rows_aref, $column_names_aref);
-
-    if ($dbtype eq 'dbi') {
-        ($rows_aref, $column_names_aref)
-            = &Jarvis::Dataset::DBI::fetch_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%safe_params);
-
-    } elsif ($dbtype eq 'sdp') {
-        require Jarvis::Dataset::SDP;
-
-        ($rows_aref, $column_names_aref)
-            = &Jarvis::Dataset::SDP::fetch_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%safe_params);
-
-    } elsif ($dbtype eq 'mongo') {
-        require Jarvis::Dataset::MongoDB;
-
-        ($rows_aref, $column_names_aref)
-            = &Jarvis::Dataset::MongoDB::fetch_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%safe_params);
-
-    } else {
-        die "Unsupported dataset type '$dbtype'.\n";
+    {
+        no strict 'refs';
+        ($rows_aref, $column_names_aref) = $agent_class->fetch_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%safe_params);
     }
 
     # Now we have an array of hash objects.  Apply post-processing.
@@ -946,7 +943,7 @@ sub fetch_rows {
 }
 
 ################################################################################
-# Performs top-level update.  DBI datasets only.
+# Performs top-level update.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -1129,7 +1126,6 @@ sub store {
 ################################################################################
 ################################################################################
 # Performs an update to the specified table underlying the named dataset.
-# This is currently only supported for DBI datasets.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -1158,9 +1154,6 @@ sub store_rows {
     my $dsxml = $dataset->{dsxml};
     my $dbtype = $dataset->{dbtype};
     my $dbname = $dataset->{dbname};
-
-    # Check that we are DBI only.
-    ($dbtype eq 'dbi') || die "Datasets of type '$dbtype' do not support store operations.\n";
 
     # Load/Start dataset specific hooks.
     &Jarvis::Hook::load_dataset ($jconfig, $dsxml);
@@ -1192,15 +1185,24 @@ sub store_rows {
     # Call the pre-store hook.
     &Jarvis::Hook::dataset_pre_store ($jconfig, $dsxml, \%safe_all_rows_params, $rows_aref);
 
+    # Load the agent class (at the top level only).
+    if ($dataset->{level} == 0) {
+        $jconfig->{agent_class} = $AGENT_CLASSES->{$dbtype} // die "Unsupported DB Type '$dbtype'.";
+        load $jconfig->{agent_class};
+    }
+    my $agent_class = $jconfig->{agent_class};
+
     # Get a database handle.
     my $dbh = undef;
     if ($dataset->{level} == 0) {
+        no strict 'refs';
+
         &Jarvis::Error::debug ($jconfig, "Top-Level Store Dataset.  Opening database handle.");
         $dbh = &Jarvis::DB::handle ($jconfig, $dbname, $dbtype);
         $jconfig->{txn_dbh} = $dbh;
 
-        # Start a transaction.
-        $dbh->begin_work() || die;
+        # Start a transaction (if our agent supports it).
+        $agent_class->transaction_begin ($jconfig, $dbh);
 
     } else {
         &Jarvis::Error::debug ($jconfig, "Nested Store Dataset.  Using already-open parent database handle.");
@@ -1217,24 +1219,18 @@ sub store_rows {
     my $results_aref = [];
     my $message = '';
 
-    # Execute our "before" statement.  This statement is NOT permitted to fail.  If it does,
-    # then we immediately barf
-    {
-        my $bstm = &Jarvis::Dataset::DBI::parse_statement ($jconfig, $dataset_name, $dsxml, $dbh, 'before', \%before_params);
-        if ($bstm) {
-            my @barg_values = &Jarvis::Dataset::names_to_values ($jconfig, $bstm->{vnames_aref}, \%before_params);
-
-            &Jarvis::Dataset::DBI::statement_execute($jconfig, $bstm, \@barg_values);
-            if ($bstm->{error}) {
-                $success = 0;
-                $message || ($message = $bstm->{error});
-                $message =~ s/^Server message number=[0-9]+ severity=[0-9]+ state=[0-9]+ line=[0-9]+ server=[A-Z0-9\\]+text=//i;
-            }
+    # Execute our "before" statement (assuming the agent supports it).
+    if ($dsxml->{dataset}{before}) {
+        no strict 'refs';
+        my $result = $agent_class->execute_before ($jconfig, $dataset_name, $dsxml, $dbh, \%before_params);
+        if (defined $result) {
+            $success = 0;
+            $message = $result;
         }
     }
 
     # Our cached statement handle(s).
-    my %stms = ();
+    my $stms = {};
 
     # Handle each insert/update/delete request row.
     foreach my $fields_href (@$rows_aref) {
@@ -1256,8 +1252,13 @@ sub store_rows {
         my $row_ttype = $safe_params{_ttype} || $ttype;
         ($row_ttype eq 'mixed') && die "Transaction Type 'mixed', but no '_ttype' field present in row.\n";
 
-        # Hand off to DBI code for the actual store.  This will also perform our "returning" logic.
-        my $row_result = &Jarvis::Dataset::DBI::store_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%stms, $row_ttype, \%safe_params, $fields_href);
+        # Hand off to agent for the actual store (assuming it supports it).  
+        # This also perform our "returning" logic (if applicable).
+        my $row_result = undef;
+        {
+            no strict 'refs';
+            $row_result = $agent_class->store_inner ($jconfig, $dataset_name, $dsxml, $dbh, $stms, $row_ttype, \%safe_params, $fields_href);
+        }
 
         # Increment our top-level counts.
         $modified = $modified + $row_result->{modified};
@@ -1366,9 +1367,9 @@ sub store_rows {
     }
 
     # Free any remaining open statement types.
-    foreach my $stm_type (keys %stms) {
-        &Jarvis::Error::debug ($jconfig, "Finished with statement for ttype '$stm_type'.");
-        $stms{$stm_type}{sth}->finish;
+    {
+        no strict 'refs';
+        $agent_class->free_statements ($jconfig, $dbh, $stms);
     }
 
     # Execute our "after" statement.
@@ -1378,16 +1379,13 @@ sub store_rows {
         # Reset our parameters, our per-row parameters are no longer valid.
         my %after_params = %safe_all_rows_params;
 
-        # Invoke the after statement if we have one.
-        my $astm = &Jarvis::Dataset::DBI::parse_statement ($jconfig, $dataset_name, $dsxml, $dbh, 'after', \%after_params);
-        if ($astm) {
-            my @aarg_values = &Jarvis::Dataset::names_to_values ($jconfig, $astm->{vnames_aref}, \%after_params);
-
-            &Jarvis::Dataset::DBI::statement_execute($jconfig, $astm, \@aarg_values);
-            if ($astm->{error}) {
+        # Execute our "after" statement (assuming the agent supports it).
+        if ($dsxml->{dataset}{after}) {
+            no strict 'refs';
+            my $result = $agent_class->execute_after ($jconfig, $dataset_name, $dsxml, $dbh, \%after_params);
+            if (defined $result) {
                 $success = 0;
-                $message || ($message = $astm->{error});
-                $message =~ s/^Server message number=[0-9]+ severity=[0-9]+ state=[0-9]+ line=[0-9]+ server=[A-Z0-9\\]+text=//i;
+                $message = $result;
             }
         }
 
@@ -1401,20 +1399,19 @@ sub store_rows {
     # Determine if we're going to rollback.
     # This now occurs subsequent to the "after" statement and hook.
     if ($dataset->{level} == 0) {
-        if (! $success) {
-            &Jarvis::Error::debug ($jconfig, "Store Error detected.  Rolling back.");
+        no strict 'refs';
 
-            # Use "eval" as some drivers (e.g. SQL Server) will have already rolled-back on the
-            # original failure, and hence a second rollback will fail.
-            eval { local $SIG{__DIE__}; $dbh->rollback (); }
+        if (! $success) {
+            &Jarvis::Error::debug ($jconfig, "Store Error detected.  Rolling back (if supported).");
+            $agent_class->transaction_rollback ($jconfig, $dbh);
 
         } else {
-            &Jarvis::Error::debug ($jconfig, "Store all successful.  Committing all changes.");
-            $dbh->commit ();
+            &Jarvis::Error::debug ($jconfig, "Store all successful.  Committing all changes (if supported).");
+            $agent_class->transaction_commit ($jconfig, $dbh);
         }
     }
 
-    # This final hook allows you to modify the data returned by SQL for one dataset.
+    # This final hook allows you to modify the data returned for one dataset.
     # This hook may completely modify the returned content (by modifying $rows_aref).
     &Jarvis::Hook::dataset_stored ($jconfig, $dsxml, \%safe_all_rows_params, $results_aref, $extra_href);
 

@@ -28,9 +28,12 @@ use warnings;
 
 use XML::Smart;
 
-package Jarvis::Dataset::MongoDB;
+package Jarvis::Agent::MongoDB;
+
+use parent qw(Jarvis::Agent);
 
 use boolean;
+use Data::Dumper;
 use BSON::Types ':all'; 
 
 use Jarvis::Text;
@@ -40,7 +43,7 @@ use Jarvis::Hook;
 
 use sort 'stable';      # Don't mix up records when server-side sorting
 
-XSLoader::load ('Jarvis::JSON::Utils');
+use Jarvis::JSON::Utils;
 
 ################################################################################
 # Reads a JSON object and finds/checks the ~varname!flag~ variable components.
@@ -85,9 +88,6 @@ sub parse_object {
 
         $var->{flags} = \%flags;
         $var->{names} = \@names;
-
-        # This is printed later when we expand vars.  Let's not duplicate the debug.
-        #&Jarvis::Error::debug ($jconfig, "Variable: %s [%s].", join ('|', @names), join (",", sort (keys (%flags))));
     }
 
     return $object;
@@ -353,6 +353,10 @@ sub expand_vars {
 }
 
 ################################################################################
+# AGENT METHOD OVERRIDE
+################################################################################
+
+################################################################################
 # Loads the data for the current dataset(s), and puts it into our return data
 # array so that it can be presented to the client in JSON or XML or whatever.
 #
@@ -361,6 +365,7 @@ sub expand_vars {
 # object.
 #
 # Params:
+#       $class - Agent classname.
 #       $jconfig - Jarvis::Config object
 #           READ
 #               cgi                 Contains data values for {{param}} in MDX
@@ -368,7 +373,7 @@ sub expand_vars {
 #               group_list          Used for {{group_list}} in MDX
 #               format              Either "json" or "xml" or "csv".
 #
-#       $subset_name - Name of single dataset we are fetching from.
+#       $dataset_name - Name of single dataset we are fetching from.
 #       $dsxml - Dataset's XML configuration object.
 #       $dbh - Database handle of the correct type to match the dataset.
 #       $safe_params_href - All our safe parameters.
@@ -378,16 +383,16 @@ sub expand_vars {
 #       $column_names_aref - Array of tuple column names, if available.
 ################################################################################
 sub fetch_inner {
-    my ($jconfig, $subset_name, $dsxml, $dbh, $safe_params_href) = @_;
+    my ($class, $jconfig, $dataset_name, $dsxml, $dbh, $safe_params_href) = @_;
 
     # Start with the collection.  This is at the top level of the datasets.
     # TODO: Maybe allow different operations to override the collection name?
-    $dsxml->{dataset}{collection} or die "Dataset '$subset_name' (type 'mongo') has no 'collection' defined.\n";
+    $dsxml->{dataset}{collection} or die "Dataset '$dataset_name' (type 'mongo') has no 'collection' defined.\n";
     my $collection_name = $dsxml->{dataset}{collection}->content;
 
     # Check that both find and aggregate are not defined at the same time.
     if ($dsxml->{dataset}{find} && $dsxml->{dataset}{aggregate}) {
-        die "Dataset '$subset_name' (type 'mongo') has both 'find' and 'aggregate' present.\n";
+        die "Dataset '$dataset_name' (type 'mongo') has both 'find' and 'aggregate' present.\n";
     }
 
     # This is the collection handle.
@@ -406,6 +411,9 @@ sub fetch_inner {
         if ($dsxml->{dataset}{find}{filter}) {
             my $filter_vars     = [];
             my $object_json     = $dsxml->{dataset}{find}{filter}->content;
+
+            &Jarvis::Error::dump ($jconfig, "Parsing filter...");
+            &Jarvis::Error::dump ($jconfig, $object_json);
             my $filter_template = &parse_object ($jconfig, $object_json, $filter_vars);
             $filter             = &expand_vars ($jconfig, $filter_template, $filter_vars, $safe_params_href);
         }
@@ -414,6 +422,9 @@ sub fetch_inner {
         if ($dsxml->{dataset}{find}{options}) {
             my $options_vars     = [];
             my $object_json      = $dsxml->{dataset}{find}{options}->content;
+
+            &Jarvis::Error::dump ($jconfig, "Parsing options...");
+            &Jarvis::Error::dump ($jconfig, $object_json);
             my $options_template = &parse_object ($jconfig, $object_json, $options_vars);
             $options             = &expand_vars ($jconfig, $options_template, $options_vars, $safe_params_href);
         }
@@ -432,6 +443,9 @@ sub fetch_inner {
         if ($dsxml->{dataset}{aggregate}{pipeline}) {
             my $pipeline_vars     = [];
             my $object_json       = $dsxml->{dataset}{aggregate}{pipeline}->content;
+
+            &Jarvis::Error::dump ($jconfig, "Parsing pipeline...");
+            &Jarvis::Error::dump ($jconfig, $object_json);
             my $pipeline_template = &parse_object ($jconfig, $object_json, $pipeline_vars);
             @pipeline = &expand_vars ($jconfig, $pipeline_template, $pipeline_vars, $safe_params_href);
         }
@@ -440,18 +454,21 @@ sub fetch_inner {
         if ($dsxml->{dataset}{aggregate}{options}) {
             my $options_vars     = [];
             my $object_json      = $dsxml->{dataset}{aggregate}{options}->content;
+
+            &Jarvis::Error::dump ($jconfig, "Parsing options...");
+            &Jarvis::Error::dump ($jconfig, $object_json);
             my $options_template = &parse_object ($jconfig, $object_json, $options_vars);
             $options             = &expand_vars ($jconfig, $options_template, $options_vars, $safe_params_href);
         }
 
-        @pipeline or die "Dataset '$subset_name' (type 'mongo' - 'aggregate') does not have a pipeline present.\n";
+        @pipeline or die "Dataset '$dataset_name' (type 'mongo' - 'aggregate') does not have a pipeline present.\n";
 
         # Execute our Mongo aggregate.
         $cursor = $collection->aggregate (@pipeline, $options);
 
     } else {
         # Either 'find' or 'aggregatea' MUST be present, EVEN IF THEY ARE EMPTY.
-        die "Dataset '$subset_name' (type 'mongo') has no 'find' or 'aggregate' present.\n";
+        die "Dataset '$dataset_name' (type 'mongo') has no 'find' or 'aggregate' present.\n";
     }
 
     
@@ -463,6 +480,267 @@ sub fetch_inner {
     }
 
     return ($rows_aref); 
+}
+
+################################################################################
+# Performs an update to the specified table underlying the named dataset.
+#
+# Params:
+#       $class - Agent classname.
+#       $jconfig - Jarvis::Config object
+#           READ
+#               cgi                 Submitted content and content-type.
+#               username            Used for {{username}} in SQL
+#               group_list          Used for {{group_list}} in SQL
+#               format              Either "json" or "xml" (not "csv").
+#
+#       $dataset_name - Name of single dataset we are storing to.
+#       $dsxml - Dataset XML object.
+#       $dbh - Database handle of the correct type to match the dataset.
+#       $stms - Hash of pre-prepared statements by row type.
+#       $row_ttype - Transaction type for this row.
+#       $safe_params - All our safe parameters.
+#       $fields_href - The raw fields.  We echo those for some DB types.
+#
+# Returns:
+#       $row_result - HASH REF containing {
+#           success => 0/1
+#           modified => num-modified,
+#           message => Error message if not success,
+#           returning => ARRAY of returned rows
+#       }
+#       die on hard error.
+################################################################################
+#
+sub store_inner {
+    my ($class, $jconfig, $dataset_name, $dsxml, $dbh, $stms, $row_ttype, $safe_params, $fields_href) = @_;
+
+    # Start with the collection.  This is at the top level of the datasets.
+    # TODO: Maybe allow different operations to override the collection name?
+    $dsxml->{dataset}{collection} or die "Dataset '$dataset_name' (type 'mongo') has no 'collection' defined.\n";
+    my $collection_name = $dsxml->{dataset}{collection}->content;
+
+    # Check that both find and aggregate are not defined at the same time.
+    if ($dsxml->{dataset}{find} && $dsxml->{dataset}{aggregate}) {
+        die "Dataset '$dataset_name' (type 'mongo') has both 'find' and 'aggregate' present.\n";
+    }
+
+    # Get the statement type for this ttype if we don't have it.  This raises debug.
+    if (! $stms->{$row_ttype} && $dsxml->{dataset}{$row_ttype}) {
+        my $vars = [];
+        my $object_json = $dsxml->{dataset}{$row_ttype}->content;
+
+        &Jarvis::Error::dump ($jconfig, "Parsing $row_ttype...");
+        &Jarvis::Error::dump ($jconfig, $object_json);
+        my $template = &parse_object ($jconfig, $object_json, $vars);
+
+        $stms->{$row_ttype} = { vars => $vars, template => $template };
+    }
+
+    # Check we have an stm for this row.
+    my $stm = $stms->{$row_ttype} ||
+        die "Dataset '$dataset_name' (type 'mongo') has no '$row_ttype' defined.\n";
+
+    # Determine our argument values.
+    my $template = $stm->{template};
+    my $vars = $stm->{vars};    
+    my $object = &expand_vars ($jconfig, $template, $vars, $safe_params);
+
+    &Jarvis::Error::debug ($jconfig, "Result after expansion.");
+    &Jarvis::Error::debug_var ($jconfig, $object);
+
+    # Execute
+    my $row_result = {};
+    my $num_rows = 0;
+
+    # We do not support any MongoDB options for delete.
+    if ($row_ttype eq 'delete') {
+        eval {
+            my $collection_handle = $dbh->ns ($collection_name);
+            my $retval = $collection_handle->delete_one ($object);
+
+            # FIXME: Add checking for "write_errors".
+
+            $row_result->{success} = 1;
+            $row_result->{modified} = $retval->{deleted_count} // 0;
+        };
+        if ($@) {
+            my $message = $@;
+            $message =~ s| at [\.\w\d\\\/]+ line \d+\..*||s;
+
+            $row_result->{success} = 0;
+            $row_result->{modified} = 0;
+            $row_result->{message} = $message;
+        }
+
+    # We do not support any MongoDB options for insert.
+    } elsif ($row_ttype eq 'insert') {
+        eval {
+            my $collection_handle = $dbh->ns ($collection_name);
+            my $retval = $collection_handle->insert_one ($object);
+
+            # FIXME: Add checking for "write_errors".
+
+            $row_result->{success} = 1;
+            $row_result->{modified} = 1;
+            $row_result->{returning} = [ { _id => $retval->{inserted_id}->value } ];
+        };
+        if ($@) {
+            my $message = $@;
+            $message =~ s| at [\.\w\d\\\/]+ line \d+\..*||s;
+
+            $row_result->{success} = 0;
+            $row_result->{modified} = 0;
+            $row_result->{message} = $message;
+        }
+
+    } else {
+        die "Unsupported 'store' row type '$row_ttype'.";
+    }
+
+    # TODO: Add $row_result->{returning}!
+    return $row_result;
+
+    # On failure, we will still return valid JSON/XML to the caller, but we will indicate
+    # which request failed and will send back an overall "non-success" flag.
+    #
+    if ($stm->{error}) {
+        $row_result->{success} = 0;
+        $row_result->{modified} = 0;
+        $row_result->{message} = $stm->{error};
+
+    # Suceeded.  Set per-row status, and fetch the returned results, if this
+    # operation indicates that it returns values.
+    #
+    } else {
+        # DUMMY value just to avoid undef vars.
+        # All of the code below is purely an example from the DBI.
+        # Needs a complete re-write for MongoDB.
+        my @arg_values = (); 
+
+        $row_result->{success} = 1;
+
+        # Try and determine the returned values (normally the auto-increment ID)
+        if ($stm->{returning}) {
+
+            # If you flagged any variables as "!out" then we will have used
+            # bind_param_inout () and copied the output vars into $stm->{returned}.
+            # In this case, all the work is already done, and we just need to copy
+            # everything through.
+            if ($stm->{returned}) {
+
+                my $row = {};
+                foreach my $name (keys %{ $stm->{returned} }) {
+                    my $value_ref = $stm->{returned}{$name};
+                    $row->{$name} = $$value_ref;
+                }
+
+                $row_result->{returning} = [ $row ];
+                &Jarvis::Error::debug ($jconfig, "Copied single row from bind_param_inout results.");
+
+            # SQLite uses the last_insert_rowid() function for returning IDs.  
+            # This is very special case handling.  We echo the input fields too!
+            #
+            } elsif ($dbh->{Driver}{Name} eq 'SQLite') {
+
+                my $rowid = $dbh->func('last_insert_rowid');
+                if ($rowid) {
+                    my $returning_row = {};
+                    foreach my $field (keys %$fields_href) {
+                        (ref $fields_href->{$field} eq '') && ($returning_row->{$field} = $fields_href->{$field});
+                    }
+                    $returning_row->{id} = $rowid;
+                    $row_result->{returning} = [ $returning_row ];
+                    &Jarvis::Error::debug ($jconfig, "Used SQLite last_insert_rowid to get returned 'id' => '$rowid'.");
+
+                } else {
+                    &Jarvis::Error::log ($jconfig, "Used SQLite last_insert_rowid but it returned no id.");
+                }
+
+            # Otherwise: See if the query had a built-in fetch.  Under PostGreSQL (and very
+            # likely also under other drivers) this will fail if there is no current
+            # query.  I.e. if you have no "RETURNING" clause on your insert.
+            #
+            } else {
+                my $returning_aref = $stm->{sth}->fetchall_arrayref({}) || undef;
+
+                if ($returning_aref && (scalar @$returning_aref)) {
+                    if ($DBI::errstr) {
+                        my $error_message = $DBI::errstr;
+                        $error_message =~ s/\s+$//;
+
+                        if (&nolog ($stm, $error_message)) {
+                            &Jarvis::Error::debug ($jconfig, "Failure fetching first return result set. Log disabled.");
+                        } else {
+                            &Jarvis::Error::log ($jconfig, "Failure fetching first return result set for '" . $stm->{ttype} . "'.  Details follow.");
+                            &Jarvis::Error::log ($jconfig, $stm->{sql_with_substitutions}) if $stm->{sql_with_substitutions};
+                            &Jarvis::Error::log ($jconfig, $error_message);
+                            &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) || 'NONE'));
+                        }
+
+                        $stm->{sth}->finish;
+                        $stm->{error} = $error_message;
+                        $row_result->{success} = 0;
+                        $row_result->{message} = $error_message;
+                    }
+
+                    $row_result->{returning} = $returning_aref;
+                    &Jarvis::Error::debug ($jconfig, "Fetched " . (scalar @$returning_aref) . " rows for returning.");
+                }
+
+                # When using output parameters from a SQL Server stored procedure, there is a
+                # difference of behavior between Linux/FreeTDS and Windows/ODBC.  Under Linux you
+                # always get a result set containing the output parameters, with autogenerated
+                # column names prefixed by underscore.
+                #
+                # Under Windows you need to explicitly do a SELECT to get this and you must
+                # specify the column names.
+                #
+                # This leads to the case where to write a dataset that works under both Linux
+                # and Windows, you need to explicitly SELECT (so that you get the data under
+                # Windows, and make sure that the column name you select AS is identical to the
+                # auto-generated name created by FreeTDS).
+                #
+                # However, under Linux that means you get two result sets.  If you pass more than
+                # one <row> in your request, then the second row will fail with
+                # "Attempt to initiate a new Adaptive Server operation with results pending"
+                #
+                # To avoid that error, here we will look to see if there are any extra result
+                # sets now pending to be read.  We will silently read and discard them.
+                #
+                while ($row_result->{success} && $stm->{sth}{syb_more_results}) {
+                    &Jarvis::Error::debug ($jconfig, "Found additional result sets.  Fetch and discard.");
+                    $stm->{sth}->fetchall_arrayref ({});
+
+                    if ($DBI::errstr) {
+                        my $error_message = $DBI::errstr;
+                        $error_message =~ s/\s+$//;
+
+                        if (&nolog ($stm, $error_message)) {
+                            &Jarvis::Error::debug ($jconfig, "Failure fetching additional result sets. Log disabled.");
+                        } else {
+                            &Jarvis::Error::log ($jconfig, "Failure fetching additional result sets for '" . $stm->{ttype} . "'.  Details follow.");
+                            &Jarvis::Error::log ($jconfig, $stm->{sql_with_substitutions}) if $stm->{sql_with_substitutions};
+                            &Jarvis::Error::log ($jconfig, $error_message);
+                            &Jarvis::Error::log ($jconfig, "Args = " . (join (",", map { (defined $_) ? "'$_'" : 'NULL' } @arg_values) || 'NONE'));
+                        }
+
+                        $stm->{sth}->finish;
+                        $stm->{error} = $error_message;
+                        $row_result->{success} = 0;
+                        $row_result->{message} = $error_message;
+                    }
+                }
+            }
+
+            # This is disappointing, but perhaps a "die" is too strong here.
+            if (! $row_result->{returning}) {
+                &Jarvis::Error::debug ($jconfig, "Cannot determine how to get values for 'returning' statement.");
+            }
+        }
+    }
+
+    return $row_result;
 }
 
 1;

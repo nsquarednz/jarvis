@@ -28,7 +28,9 @@
 use strict;
 use warnings;
 
-package Jarvis::Dataset::DBI;
+package Jarvis::Agent::DBI;
+
+use parent qw(Jarvis::Agent);
 
 use DBI qw(:sql_types);;
 use JSON; 
@@ -340,8 +342,8 @@ sub parse_statement {
 #   b) Globally in the <database><nolog>...</nolog></database> field.
 # 
 # Params:
-#       stm - statement object as returned by parse_statement
-#       message - error message to match against nolog flag
+#       $stm - statement object as returned by parse_statement
+#       $message - error message to match against nolog flag
 #
 # Returns:
 #       1 if message matches nolog flag
@@ -382,8 +384,8 @@ sub noerr {
 # check if error message should be supressed due to ignore flag
 # 
 # Params:
-#       stm - statement object as returned by parse_statement
-#       message - error message to match against ignore flag
+#       $stm - statement object as returned by parse_statement
+#       $message - error message to match against ignore flag
 #
 # Returns:
 #       1 if message matches ignore flag
@@ -529,6 +531,46 @@ sub statement_execute {
 }
 
 ################################################################################
+# AGENT METHOD OVERRIDE
+################################################################################
+
+################################################################################
+# Begin, Rollback, Commit handlers.  If your DBH supports transactions then
+# please call them now.
+#
+# Params:
+#       $class - Agent classname.
+#       $jconfig - Jarvis::Config object
+#       $dbh - Database handle of the correct type to match the dataset.
+#
+# Returns:
+#       undef
+################################################################################
+sub transaction_begin {
+    my ($class, $jconfig, $dbh) = @_;
+
+    $dbh->begin_work ();
+
+    return undef;
+}
+sub transaction_rollback {
+    my ($class, $jconfig, $dbh) = @_;
+
+    # Use "eval" as some drivers (e.g. SQL Server) will have already rolled-back on the
+    # original failure, and hence a second rollback will fail.
+    eval { local $SIG{__DIE__}; $dbh->rollback (); };
+
+    return undef;
+}
+sub transaction_commit {
+    my ($class, $jconfig, $dbh) = @_;
+
+    $dbh->commit ();
+
+    return undef;
+}
+
+################################################################################
 # Loads the data for the current dataset(s), and puts it into our return data
 # array so that it can be presented to the client in JSON or XML or whatever.
 #
@@ -537,6 +579,7 @@ sub statement_execute {
 # object.
 #
 # Params:
+#       $class - Agent classname.
 #       $jconfig - Jarvis::Config object
 #           READ
 #               username            Used for {{username}} in SQL
@@ -553,7 +596,7 @@ sub statement_execute {
 ################################################################################
 #
 sub fetch_inner {
-    my ($jconfig, $dataset_name, $dsxml, $dbh, $safe_params) = @_;
+    my ($class, $jconfig, $dataset_name, $dsxml, $dbh, $safe_params) = @_;
     
     # Get our STM.  This has everything attached.
     my $stm = &parse_statement ($jconfig, $dataset_name, $dsxml, $dbh, 'select', $safe_params) ||
@@ -586,9 +629,49 @@ sub fetch_inner {
 }
 
 ################################################################################
+# Execute the "before" statement for a dataset.  This a once-only statement
+# that occurs prior to any row updates.
+#
+# Params:
+#       $class - Agent classname.
+#       $jconfig - Jarvis::Config object
+#           READ
+#               cgi                 Contains data values for {{param}} in MDX
+#               username            Used for {{username}} in MDX
+#               group_list          Used for {{group_list}} in MDX
+#               format              Either "json" or "xml" or "csv".
+#
+#       $dataset_name - Name of single dataset we are fetching from.
+#       $dsxml - Dataset's XML configuration object.
+#       $dbh - Database handle of the correct type to match the dataset.
+#       $before_params_href - All our before parameters parameters.
+#
+# Returns:
+#       undef on success, "Error Text" on failure.
+################################################################################
+sub execute_before {
+    my ($class, $jconfig, $dataset_name, $dsxml, $dbh, $before_params_href) = @_;
+
+    my $bstm = &Jarvis::Dataset::DBI::parse_statement ($jconfig, $dataset_name, $dsxml, $dbh, 'before', $before_params_href);
+    if ($bstm) {
+        my @barg_values = &Jarvis::Dataset::names_to_values ($jconfig, $bstm->{vnames_aref}, $before_params_href);
+
+        &Jarvis::Dataset::DBI::statement_execute($jconfig, $bstm, \@barg_values);
+        if ($bstm->{error}) {
+            my $message = $bstm->{error};
+            $message =~ s/^Server message number=[0-9]+ severity=[0-9]+ state=[0-9]+ line=[0-9]+ server=[A-Z0-9\\]+text=//i;
+            return $message;
+        }
+    }
+
+    return undef;
+}
+
+################################################################################
 # Performs an update to the specified table underlying the named dataset.
 #
 # Params:
+#       $class - Agent classname.
 #       $jconfig - Jarvis::Config object
 #           READ
 #               cgi                 Submitted content and content-type.
@@ -615,7 +698,7 @@ sub fetch_inner {
 ################################################################################
 #
 sub store_inner {
-    my ($jconfig, $dataset_name, $dsxml, $dbh, $stms, $row_ttype, $safe_params, $fields_href) = @_;
+    my ($class, $jconfig, $dataset_name, $dsxml, $dbh, $stms, $row_ttype, $safe_params, $fields_href) = @_;
 
     # Get the statement type for this ttype if we don't have it.  This raises debug.
     if (! $stms->{$row_ttype}) {
@@ -631,8 +714,6 @@ sub store_inner {
 
     # Execute
     my $row_result = {};
-    my $stop = 0;
-    my $num_rows = 0;
 
     &statement_execute ($jconfig, $stm, \@arg_values);
     $row_result->{modified} = $stm->{retval} || 0;
@@ -774,6 +855,68 @@ sub store_inner {
     }
 
     return $row_result;
+}
+
+################################################################################
+# Free any statements or other resources that we might have allocated.
+#
+# Params:
+#       $class - Agent classname.
+#       $jconfig - Jarvis::Config object
+#       $dbh - Database handle of the correct type to match the dataset.
+#       $stms - Hash of pre-prepared statements by row type.
+#
+# Returns:
+#       undef
+################################################################################
+sub free_statements {
+    my ($class, $jconfig, $dbh, $stms) = @_;
+
+    foreach my $stm_type (keys (%$stms)) {
+        &Jarvis::Error::debug ($jconfig, "Finished with statement for ttype '$stm_type'.");
+        $stms->{$stm_type}{sth}->finish;
+    }    
+
+    return undef;
+}
+
+################################################################################
+# Execute the "after" statement for a dataset.  This a once-only statement
+# that occurs prior to any row updates.
+#
+# Params:
+#       $class - Agent classname.
+#       $jconfig - Jarvis::Config object
+#           READ
+#               cgi                 Contains data values for {{param}} in MDX
+#               username            Used for {{username}} in MDX
+#               group_list          Used for {{group_list}} in MDX
+#               format              Either "json" or "xml" or "csv".
+#
+#       $dataset_name - Name of single dataset we are fetching from.
+#       $dsxml - Dataset's XML configuration object.
+#       $dbh - Database handle of the correct type to match the dataset.
+#       $after_params_href - All our after parameters parameters.
+#
+# Returns:
+#       undef on success, "Error Text" on failure.
+################################################################################
+sub execute_after {
+    my ($class, $jconfig, $dataset_name, $dsxml, $dbh, $after_params_href) = @_;
+
+    my $astm = &Jarvis::Dataset::DBI::parse_statement ($jconfig, $dataset_name, $dsxml, $dbh, 'after', $after_params_href);
+    if ($astm) {
+        my @aarg_values = &Jarvis::Dataset::names_to_values ($jconfig, $astm->{vnames_aref}, $after_params_href);
+
+        &Jarvis::Dataset::DBI::statement_execute($jconfig, $astm, \@aarg_values);
+        if ($astm->{error}) {
+            my $message = $astm->{error};
+            $message =~ s/^Server message number=[0-9]+ severity=[0-9]+ state=[0-9]+ line=[0-9]+ server=[A-Z0-9\\]+text=//i;
+            return $message;
+        }
+    }
+
+    return undef;
 }
 
 1;
