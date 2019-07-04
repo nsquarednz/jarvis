@@ -65,43 +65,99 @@ if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{succ
     BAIL_OUT("Failed to insert: " . &Dumper ($json));    
 }
 
+###############################################################################
+# Select all three ships (name only) - projection test.
+###############################################################################
+
+my $olympic_id = $json->{row}[0]{returning}[0]{_id};
+my $queen_mary_id = $json->{row}[1]{returning}[0]{_id};
+my $titanic_id = $json->{row}[2]{returning}[0]{_id};
+
 my $expected = [
     {
         'name' => 'Olympic',
-        '_id' => $json->{row}[0]{returning}[0]{_id},
+        '_id' => $olympic_id,
+        num_funnels => undef,
     },
     {
         'name' => 'Queen Mary',
-        '_id' => $json->{row}[1]{returning}[0]{_id},
+        '_id' => $queen_mary_id,
     },
     {
         'name' => 'Titanic',
-        '_id' => $json->{row}[2]{returning}[0]{_id}
+        '_id' => $titanic_id,
+        'num_funnels' => 4,
     }
 ];
 
 $json = TestUtils::fetch_json ([ 'ship_project' ]);
-if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data}, "JSON Get all Ships")) {
+if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data}, "JSON Get all Ships (ship_project)")) {
     BAIL_OUT("Failed to fetch: " . &Dumper ($json));    
 }
 
-if (! eq_or_diff ($json->{data}, $expected, 'New Rows after Insert matches.')) {
+if (! eq_or_diff ($json->{data}, $expected, 'New Rows after Insert (ship_project) matches.')) {
     BAIL_OUT("Unexpected Duplicated Fetch result: " . &Dumper ($json));    
 }
 
-# $expected = [
-#     {
-#         'success' => 1,
-#         'modified' => '1',
-#         'returning' => [
-#             {
-#                 'name' => 'Fatal Dodger',
-#                 'class' => 'Makkleson',
-#                 'id' => $fd_boat_id
-#             }
-#         ]
-#     }
-# ];
+###############################################################################
+# Select all three ships, all fields.
+###############################################################################
 
+$$expected[0]{line} = 'White Star';
+$$expected[1]{line} = 'Cunard';
+$$expected[2]{line} = 'White Star';
+
+$json = TestUtils::fetch_json ([ 'ship' ]);
+if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data}, "JSON Get all Ships (ship)")) {
+    BAIL_OUT("Failed to fetch: " . &Dumper ($json));    
+}
+
+if (! eq_or_diff ($json->{data}, $expected, 'New Rows after Insert (ship) matches.')) {
+    BAIL_OUT("Unexpected Duplicated Fetch result: " . &Dumper ($json));    
+}
+
+###############################################################################
+# Update the number of funnels on the Queen Mary.
+###############################################################################
+
+# Give the Queen Mary 7 funnels.
+my $update_ships = [
+    {
+        '_id' => $queen_mary_id,
+        num_funnels => 7,
+    },
+];
+
+$json = TestUtils::store ([ 'ship' ], { _method => 'update' }, $update_ships);
+if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1), "JSON Update Queen Mary")) {
+    BAIL_OUT("Failed to update: " . &Dumper ($json));    
+}
+
+$$expected[1]{num_funnels} = 7;
+
+$json = TestUtils::fetch_json ([ 'ship' ]);
+if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data}, "JSON Get all Ships (ship)")) {
+    BAIL_OUT("Failed to fetch: " . &Dumper ($json));    
+}
+
+if (! eq_or_diff ($json->{data}, $expected, 'Updated Rows after Update Queen Mary matches.')) {
+    BAIL_OUT("Unexpected Duplicated Fetch result: " . &Dumper ($json));    
+}
+
+###############################################################################
+# Select all three ships, all fields.  With Paging.
+###############################################################################
+
+shift (@$expected);
+shift (@$expected);
+
+$json = TestUtils::fetch_json ([ 'ship' ], { limit => 2, start => 2 });
+if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data}, "JSON Get all Ships (ship)")) {
+    BAIL_OUT("Failed to fetch: " . &Dumper ($json));    
+}
+
+if (! eq_or_diff ($json->{data}, $expected, 'New Rows after Insert (ship) matches.')) {
+    BAIL_OUT("Unexpected Duplicated Fetch result: " . &Dumper ($json));    
+}
 
 done_testing ();

@@ -134,8 +134,13 @@ sub new {
     # This is used by several things, so let's store it in our config.
     $self->{'format'} = lc ($self->{'cgi'}->param ('format') || $axml->{'format'}->content || "json");
 
-    # This is used to toggle on and off the ability to return nulls, default is off.
-    $self->{'retain_null'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'retain_null'}->content || "no")});
+    # This controls whether we discard null fields on return.
+    #
+    #   default is "on" for JSON.
+    #   default is "off" for everything else.
+    #
+    my $default_retain_null = ($self->{'format'} eq "json") ? "yes" : "no";
+    $self->{'retain_null'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'retain_null'}->content || $default_retain_null)});
 
     # This is used for backwards compatibility with old Jarvis versions.
     $self->{'return_json_as_text'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'return_json_as_text'}->content || "no")});

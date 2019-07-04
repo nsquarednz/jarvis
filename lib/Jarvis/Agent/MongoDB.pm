@@ -127,20 +127,20 @@ sub copy_and_elide {
         foreach my $element (@$var) {
             my $new = &copy_and_elide ($jconfig, $element);
             if ((ref ($new) ne 'SCALAR') || (defined $$new)) {
-                &Jarvis::Error::debug ($jconfig, "Keeping array element '%d' (type '%s').", $i, ref ($new));
+                # &Jarvis::Error::dump ($jconfig, "Keeping array element '%d' (type '%s').", $i, ref ($new));
                 push (@$ret, $new);
 
             } else {
-                &Jarvis::Error::debug ($jconfig, "Discarding array element '%d'.", $i);
+                # &Jarvis::Error::dump ($jconfig, "Discarding array element '%d'.", $i);
             }
             $i++;
         }
         if (scalar (@$ret)) {
-            &Jarvis::Error::debug ($jconfig, "Returning array with %d elements.", scalar (@$ret));
+            # &Jarvis::Error::dump ($jconfig, "Returning array with %d elements.", scalar (@$ret));
             return $ret;
 
         } else {
-            &Jarvis::Error::debug ($jconfig, "Discarding empty array.");
+            # &Jarvis::Error::dump ($jconfig, "Discarding empty array.");
             return \undef;
         }
 
@@ -153,19 +153,19 @@ sub copy_and_elide {
             my $element = $var->{$key};
             my $new = &copy_and_elide ($jconfig, $element);
             if ((ref ($new) ne 'SCALAR') || (defined $$new)) {
-                &Jarvis::Error::debug ($jconfig, "Keeping key '%s' (type '%s').", $key, ref ($new));
+                # &Jarvis::Error::dump ($jconfig, "Keeping key '%s' (type '%s').", $key, ref ($new));
                 $ret->{$key} = $new;
 
             } else {
-                &Jarvis::Error::debug ($jconfig, "Discarding key '%s'.", $key);
+                # &Jarvis::Error::dump ($jconfig, "Discarding key '%s'.", $key);
             }
         }
         if (scalar (keys (%$ret))) {
-            &Jarvis::Error::debug ($jconfig, "Returning hash with %d keys.", scalar (keys (%$ret)));
+            # &Jarvis::Error::dump ($jconfig, "Returning hash with %d keys.", scalar (keys (%$ret)));
             return $ret;
 
         } else {
-            &Jarvis::Error::debug ($jconfig, "Discarding empty hash.");
+            # &Jarvis::Error::dump ($jconfig, "Discarding empty hash.");
             return \undef;
         }
 
@@ -259,13 +259,14 @@ sub expand_vars {
 
     foreach my $var (@$vars) {
         &Jarvis::Error::debug ($jconfig, "Variable: %s [%s].", join ('|', @{ $var->{names} }), join (",", sort (keys (%{ $var->{flags} }))));
+        &Jarvis::Error::debug_var ($jconfig, $values);
 
         # Clear the variable to remove any values left over from last time.
         my $vref = $var->{vref};
         my $matched = 0;
         foreach my $name (@{ $var->{names} }) {
-            my $value = $values->{$name};
-            if (defined $value) {
+            if (exists $values->{$name}) {
+                my $value = $values->{$name};
                 &Jarvis::Error::debug ($jconfig, "Matched Name '%s' -> %s.", $name, (ref $value) || $value);
                 $$vref = $value;
                 $matched = 1;
@@ -337,10 +338,20 @@ sub expand_vars {
             my $compiled_regex = $regex->try_compile or die ("Failed to compiled regular expression for BSON::Regex type conversion.");
             $$vref = $compiled_regex;
         }
+
+        # "null" means use undef even if not matched.
+        if ($flags->{null} && ! $matched) {
+            $matched = 1;
+            $$vref = undef;
+        }
     }
 
+    &Jarvis::Error::debug ($jconfig, "Before copy/elide:");
     &Jarvis::Error::debug_var ($jconfig, $object);
+
     my $copy = &copy_and_elide ($jconfig, $object);
+
+    &Jarvis::Error::debug ($jconfig, "After copy/elide:");
     &Jarvis::Error::debug_var ($jconfig, $copy);
 
     # Never return \undef, that's not nice to do.
@@ -475,7 +486,6 @@ sub fetch_inner {
     # Process the rows returned from each our method cursors.
     my $rows_aref = [];
     while (my $document = $cursor->next ) {
-        &Jarvis::Error::debug_var ($jconfig, $document);
         push (@$rows_aref, &mongo_to_perl ($jconfig, $document));
     }
 
@@ -520,44 +530,91 @@ sub store_inner {
     $dsxml->{dataset}{collection} or die "Dataset '$dataset_name' (type 'mongo') has no 'collection' defined.\n";
     my $collection_name = $dsxml->{dataset}{collection}->content;
 
-    # Check that both find and aggregate are not defined at the same time.
-    if ($dsxml->{dataset}{find} && $dsxml->{dataset}{aggregate}) {
-        die "Dataset '$dataset_name' (type 'mongo') has both 'find' and 'aggregate' present.\n";
-    }
-
     # Get the statement type for this ttype if we don't have it.  This raises debug.
-    if (! $stms->{$row_ttype} && $dsxml->{dataset}{$row_ttype}) {
-        my $vars = [];
-        my $object_json = $dsxml->{dataset}{$row_ttype}->content;
+    if (! $stms->{$row_ttype}) {
+        ($dsxml->{dataset}{$row_ttype}) or die "Dataset '$dataset_name' (type 'mongo') has no '$row_ttype' defined.\n";        
 
-        &Jarvis::Error::dump ($jconfig, "Parsing $row_ttype...");
-        &Jarvis::Error::dump ($jconfig, $object_json);
-        my $template = &parse_object ($jconfig, $object_json, $vars);
+        # Delete has only a document.
+        # TODO: Add <options> support?
+        if ($row_ttype eq 'delete') {
+            ($dsxml->{dataset}{$row_ttype}{filter}) or die "Dataset '$dataset_name' (type 'mongo') has no '$row_ttype.filter' defined.\n";        
+            my $object_json = $dsxml->{dataset}{$row_ttype}{filter}->content;
+            my $filter_vars = [];
 
-        $stms->{$row_ttype} = { vars => $vars, template => $template };
+            &Jarvis::Error::dump ($jconfig, "Parsing $row_ttype.filter...");
+            &Jarvis::Error::dump ($jconfig, $object_json);
+            my $filter_template = &parse_object ($jconfig, $object_json, $filter_vars);
+
+            $stms->{$row_ttype}{filter} = { vars => $filter_vars, template => $filter_template };
+
+        # Insert has only a document.
+        # TODO: Add <options> support?
+        } elsif ($row_ttype eq 'insert') {
+            ($dsxml->{dataset}{$row_ttype}{document}) or die "Dataset '$dataset_name' (type 'mongo') has no '$row_ttype.document' defined.\n";        
+            my $object_json = $dsxml->{dataset}{$row_ttype}{document}->content;
+            my $document_vars = [];
+
+            &Jarvis::Error::dump ($jconfig, "Parsing $row_ttype.document...");
+            &Jarvis::Error::dump ($jconfig, $object_json);
+            my $document_template = &parse_object ($jconfig, $object_json, $document_vars);
+
+            $stms->{$row_ttype}{document} = { vars => $document_vars, template => $document_template };
+
+        # Update requires a filter and a document.
+        # TODO: Add <options> support?
+        } elsif ($row_ttype eq 'update') {
+
+            # Filter
+            ($dsxml->{dataset}{$row_ttype}{filter}) or die "Dataset '$dataset_name' (type 'mongo') has no '$row_ttype.filter' defined.\n";        
+            my $object_json = $dsxml->{dataset}{$row_ttype}{filter}->content;
+            my $filter_vars = [];
+
+            &Jarvis::Error::dump ($jconfig, "Parsing $row_ttype.filter...");
+            &Jarvis::Error::dump ($jconfig, $object_json);
+            my $filter_template = &parse_object ($jconfig, $object_json, $filter_vars);
+
+            $stms->{$row_ttype}{filter} = { vars => $filter_vars, template => $filter_template };
+
+            # Document
+            ($dsxml->{dataset}{$row_ttype}{document}) or die "Dataset '$dataset_name' (type 'mongo') has no '$row_ttype.document' defined.\n";        
+            $object_json = $dsxml->{dataset}{$row_ttype}{document}->content;
+            my $document_vars = [];
+
+            &Jarvis::Error::dump ($jconfig, "Parsing $row_ttype.document...");
+            &Jarvis::Error::dump ($jconfig, $object_json);
+            my $document_template = &parse_object ($jconfig, $object_json, $document_vars);
+
+            $stms->{$row_ttype}{document} = { vars => $document_vars, template => $document_template };
+
+        } else {
+            die "Unsupported 'store' row type '$row_ttype'.";
+        }
     }
-
-    # Check we have an stm for this row.
-    my $stm = $stms->{$row_ttype} ||
-        die "Dataset '$dataset_name' (type 'mongo') has no '$row_ttype' defined.\n";
 
     # Determine our argument values.
-    my $template = $stm->{template};
-    my $vars = $stm->{vars};    
-    my $object = &expand_vars ($jconfig, $template, $vars, $safe_params);
+    my $stm = $stms->{$row_ttype};
 
-    &Jarvis::Error::debug ($jconfig, "Result after expansion.");
-    &Jarvis::Error::debug_var ($jconfig, $object);
+    my $objects = {};
+    foreach my $key (sort (keys (%$stm))) {
+        my $template = $stm->{$key}{template};
+        my $vars = $stm->{$key}{vars};    
+        $objects->{$key} = &expand_vars ($jconfig, $template, $vars, $safe_params);
+
+        &Jarvis::Error::debug ($jconfig, "Resulting %s after expansion.", $key);
+        &Jarvis::Error::debug_var ($jconfig, $objects->{$key});
+    }
 
     # Execute
     my $row_result = {};
     my $num_rows = 0;
 
+    # This is worth having.
+    my $collection_handle = $dbh->ns ($collection_name);
+
     # We do not support any MongoDB options for delete.
     if ($row_ttype eq 'delete') {
         eval {
-            my $collection_handle = $dbh->ns ($collection_name);
-            my $retval = $collection_handle->delete_one ($object);
+            my $retval = $collection_handle->delete_one ($objects->{filter});
 
             # FIXME: Add checking for "write_errors".
 
@@ -565,7 +622,7 @@ sub store_inner {
             $row_result->{modified} = $retval->{deleted_count} // 0;
         };
         if ($@) {
-            my $message = $@;
+            my $message = ($@->isa ('MongoDB::Error')) ? $@->{message} : $@;
             $message =~ s| at [\.\w\d\\\/]+ line \d+\..*||s;
 
             $row_result->{success} = 0;
@@ -576,8 +633,7 @@ sub store_inner {
     # We do not support any MongoDB options for insert.
     } elsif ($row_ttype eq 'insert') {
         eval {
-            my $collection_handle = $dbh->ns ($collection_name);
-            my $retval = $collection_handle->insert_one ($object);
+            my $retval = $collection_handle->insert_one ($objects->{document});
 
             # FIXME: Add checking for "write_errors".
 
@@ -586,7 +642,29 @@ sub store_inner {
             $row_result->{returning} = [ { _id => $retval->{inserted_id}->value } ];
         };
         if ($@) {
-            my $message = $@;
+            my $message = ($@->isa ('MongoDB::Error')) ? $@->{message} : $@;
+            $message =~ s| at [\.\w\d\\\/]+ line \d+\..*||s;
+
+            $row_result->{success} = 0;
+            $row_result->{modified} = 0;
+            $row_result->{message} = $message;
+        }
+
+    # We do not support any MongoDB options for update.
+    } elsif ($row_ttype eq 'update') {
+        eval {
+            my $retval = $collection_handle->update_one ($objects->{filter}, $objects->{document});
+
+            # FIXME: Add checking for "write_errors".
+
+            $row_result->{success} = 1;
+            $row_result->{modified} = $retval->{modified_count} // 0;
+            if ($retval->{upserted_id}) {
+                $row_result->{returning} = [ { _id => $retval->{upserted_id}->value } ];
+            }
+        };
+        if ($@) {
+            my $message = ($@->isa ('MongoDB::Error')) ? $@->{message} : $@;
             $message =~ s| at [\.\w\d\\\/]+ line \d+\..*||s;
 
             $row_result->{success} = 0;

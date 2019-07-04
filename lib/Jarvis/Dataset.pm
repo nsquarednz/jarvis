@@ -771,8 +771,11 @@ sub fetch_rows {
 
     # Now we have an array of hash objects.  Apply post-processing.
     my $num_fetched = scalar @$rows_aref;
-    &Jarvis::Error::debug ($jconfig, "Number of rows fetched = $num_fetched.");
     $extra_href->{fetched} = $num_fetched;
+
+    &Jarvis::Error::debug ($jconfig, "Fetch Result:");
+    &Jarvis::Error::debug_var ($jconfig, $rows_aref);
+    &Jarvis::Error::debug ($jconfig, "Number of rows fetched = $num_fetched.");
 
     # Do we want to do server side sorting?  This happens BEFORE paging.  Note that this
     # will only work when $sth->{NAME} is available.  Some (all?) stored procedures
@@ -833,6 +836,8 @@ sub fetch_rows {
         }
     }
 
+    &Jarvis::Error::debug ($jconfig, "Fetch Result (after transformations):");
+    &Jarvis::Error::debug_var ($jconfig, $rows_aref);
     
     ###########################################################################
     # DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED
