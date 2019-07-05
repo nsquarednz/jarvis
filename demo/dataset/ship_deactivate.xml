@@ -1,0 +1,6 @@
+<dataset dbname="shipdb" dbtype="mongo" read="*" write="*" collection="demo.ship">
+    <delete>
+        <filter>{ "_id": ~_id!oid~ }</filter>
+        <document>{ "$set": { "deleted": true } }</document>
+    </delete>
+</dataset>

@@ -83,7 +83,7 @@ my $jconfig = undef;
 my @etc = ('/etc/jarvis', '/opt/jarvis/etc');
 
 # Version 6.0.0.
-$Jarvis::Main::JARVIS_VERSION = 601;
+$Jarvis::Main::JARVIS_VERSION = 700;
 
 ###############################################################################
 # Debugging for our old friend XML::Smart and its beloved clean errors.
