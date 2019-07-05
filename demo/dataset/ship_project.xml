@@ -1,0 +1,7 @@
+<dataset dbname="shipdb" dbtype="mongo" read="*" write="*" collection="demo.ship">
+    <!-- Test of the projection option. -->
+    <find>
+        <filter>{ "$and": [ { "line": { "$eq": $line$ } }, { "name": { "$eq": $name$ } } ] }</filter>
+        <options>{ "sort": { "name": 1 }, "projection": { "name": 1, "num_funnels": 1 } }</options>
+    </find>
+</dataset>
