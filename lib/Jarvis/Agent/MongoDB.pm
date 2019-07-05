@@ -547,6 +547,19 @@ sub store_inner {
 
             $stms->{$row_ttype}{filter} = { vars => $filter_vars, template => $filter_template };
 
+            # Document
+            if ($dsxml->{dataset}{$row_ttype}{document}) {
+
+                $object_json = $dsxml->{dataset}{$row_ttype}{document}->content;
+                my $document_vars = [];
+
+                &Jarvis::Error::dump ($jconfig, "Parsing $row_ttype.document...");
+                &Jarvis::Error::dump ($jconfig, $object_json);
+                my $document_template = &parse_object ($jconfig, $object_json, $document_vars);
+
+                $stms->{$row_ttype}{document} = { vars => $document_vars, template => $document_template };
+            }
+
         # Insert has only a document.
         # TODO: Add <options> support?
         } elsif ($row_ttype eq 'insert') {
@@ -611,8 +624,33 @@ sub store_inner {
     # This is worth having.
     my $collection_handle = $dbh->ns ($collection_name);
 
+    # Check for update or deletes that contain an update document. This is neccesary for
+    # cases where deletes simply set a `deleted` flag from `false` to `true`
+    #
+    # We do not support any MongoDB options for update.
+    if (($row_ttype eq 'update') || ($row_ttype eq 'delete' && defined $objects->{document})) {
+        eval {
+            my $retval = $collection_handle->update_one ($objects->{filter}, $objects->{document});
+
+            # FIXME: Add checking for "write_errors".
+
+            $row_result->{success} = 1;
+            $row_result->{modified} = $retval->{modified_count} // 0;
+            if ($retval->{upserted_id}) {
+                $row_result->{returning} = [ { _id => $retval->{upserted_id}->value } ];
+            }
+        };
+        if ($@) {
+            my $message = ($@->isa ('MongoDB::Error')) ? $@->{message} : $@;
+            $message =~ s| at [\.\w\d\\\/]+ line \d+\..*||s;
+
+            $row_result->{success} = 0;
+            $row_result->{modified} = 0;
+            $row_result->{message} = $message;
+        }
+
     # We do not support any MongoDB options for delete.
-    if ($row_ttype eq 'delete') {
+    } elsif ($row_ttype eq 'delete') {
         eval {
             my $retval = $collection_handle->delete_one ($objects->{filter});
 
@@ -649,29 +687,6 @@ sub store_inner {
             $row_result->{modified} = 0;
             $row_result->{message} = $message;
         }
-
-    # We do not support any MongoDB options for update.
-    } elsif ($row_ttype eq 'update') {
-        eval {
-            my $retval = $collection_handle->update_one ($objects->{filter}, $objects->{document});
-
-            # FIXME: Add checking for "write_errors".
-
-            $row_result->{success} = 1;
-            $row_result->{modified} = $retval->{modified_count} // 0;
-            if ($retval->{upserted_id}) {
-                $row_result->{returning} = [ { _id => $retval->{upserted_id}->value } ];
-            }
-        };
-        if ($@) {
-            my $message = ($@->isa ('MongoDB::Error')) ? $@->{message} : $@;
-            $message =~ s| at [\.\w\d\\\/]+ line \d+\..*||s;
-
-            $row_result->{success} = 0;
-            $row_result->{modified} = 0;
-            $row_result->{message} = $message;
-        }
-
     } else {
         die "Unsupported 'store' row type '$row_ttype'.";
     }
