@@ -257,6 +257,28 @@ sub mongo_to_perl {
 sub expand_vars {
     my ($jconfig, $object, $vars, $values) = @_;
 
+    #
+    #   This is a temporary solution for now in order to continue Jarvis mongo integration.
+    #   This allows all nested hash parameters to be available at the top level of the values object.
+    #   See: https://youtrack.nsquared.nz/issue/JVS-14584
+    #   This is currently undocumented until a proper solution can be decided on.
+    #
+    sub compact {
+        my ($val) = @_;
+        if (ref ($val) eq 'HASH') {
+            for my $key (keys %$val) {
+                if (ref ($val->{$key}) eq 'HASH') {
+                    for my $subkey (keys %{$val->{$key}}) {
+                        $val->{$subkey} = compact($val->{$key}->{$subkey})
+                    }
+                }
+            }
+        }
+        return $val;
+    }
+    my $compacted_values = compact ($values);
+    $values = $compacted_values;
+
     foreach my $var (@$vars) {
         &Jarvis::Error::debug ($jconfig, "Variable: %s [%s].", join ('|', @{ $var->{names} }), join (",", sort (keys (%{ $var->{flags} }))));
         &Jarvis::Error::debug_var ($jconfig, $values);
@@ -264,6 +286,7 @@ sub expand_vars {
         # Clear the variable to remove any values left over from last time.
         my $vref = $var->{vref};
         my $matched = 0;
+
         foreach my $name (@{ $var->{names} }) {
             if (exists $values->{$name}) {
                 my $value = $values->{$name};
@@ -271,11 +294,11 @@ sub expand_vars {
                 $$vref = $value;
                 $matched = 1;
                 last;
-
             } else {
                 &Jarvis::Error::debug ($jconfig, "No Value for '%s'.", $name);
             }
         }
+
 
         # Now is a special variable less type that will insert the current system time into the query.
         # Must like how NOW () exists within SQL.
@@ -315,6 +338,16 @@ sub expand_vars {
         if ($flags->{oid} && $matched && defined ($$vref)) {
             &Jarvis::Error::debug ($jconfig, "Applying OID replacement.");
             $$vref = MongoDB::OID->new (value => $$vref);
+        }
+
+        # MongoDB::OID is used to replace string GUIID Object IDs. An "undef" is not translated.
+        if ($flags->{oidarray} && $matched && defined ($$vref)) {
+            &Jarvis::Error::debug ($jconfig, "Applying OID Array replacement.");
+
+            # Iterate over each provided ID and convert it into a MongoDB::OID object.
+            for (my $i = 0; $i < scalar @$$vref; $i++) {
+                @{$$vref}[$i] = MongoDB::OID->new (value => @{$$vref}[$i]);
+            }
         }
 
         # Perl DateTime is used to replace epoch date values. An "undef" is not translated.
@@ -670,6 +703,7 @@ sub store_inner {
 
     # We do not support any MongoDB options for insert.
     } elsif ($row_ttype eq 'insert') {
+
         eval {
             my $retval = $collection_handle->insert_one ($objects->{document});
 
