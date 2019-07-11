@@ -429,7 +429,8 @@ SV * json_to_perl_inner (int level, char *json, STRLEN nbytes, STRLEN *offset, A
                     is_utf8 = 1;
                 }
 
-                for (STRLEN i = 0; i < len; i++) {
+                STRLEN i;
+                for (i = 0; i < len; i++) {
                     seq[i] = json[*offset + i];
                 }
 
@@ -449,7 +450,8 @@ SV * json_to_perl_inner (int level, char *json, STRLEN nbytes, STRLEN *offset, A
 
             // Copy the byte(s) for this character.
             // Assume this is faster than memcpy for 1-2 byte strings.
-            for (STRLEN i = 0; i < len; i++) {
+            STRLEN i;
+            for (i = 0; i < len; i++) {
                 str[str_len + i] = seq[i];
             }
             str_len = str_len + len;
@@ -569,7 +571,8 @@ SV * json_to_perl_inner (int level, char *json, STRLEN nbytes, STRLEN *offset, A
                     is_utf8 = 1;
                 }
 
-                for (STRLEN i = 0; i < len; i++) {
+                STRLEN i;
+                for (i = 0; i < len; i++) {
                     seq[i] = json[*offset + i];
                 }
 
@@ -589,7 +592,8 @@ SV * json_to_perl_inner (int level, char *json, STRLEN nbytes, STRLEN *offset, A
 
             // Copy the byte(s) for this character.
             // Assume this is faster than memcpy for 1-2 byte strings.
-            for (STRLEN i = 0; i < len; i++) {
+            STRLEN i;
+            for (i = 0; i < len; i++) {
                 str[str_len + i] = seq[i];
             }
             str_len = str_len + len;
