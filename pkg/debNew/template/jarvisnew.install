@@ -6,3 +6,4 @@ etc/apache etc/jarvisNew
 etc/jarvis/cgi_params.pm etc/jarvisNew
 htdocs usr/share/jarvisNew
 lib usr/share/jarvisNew
+usr /

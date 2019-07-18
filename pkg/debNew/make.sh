@@ -27,9 +27,21 @@ BASEPATH=`dirname $DIR`
 BASEPATH=`dirname $BASEPATH`
 BASEDIR=`basename $BASEPATH`
 
-echo $BASEPATH
+# Compile C modules.
 
-echo $BASEDIR
+# Jarvis JSON Utils
+echo "# Compiling: Jarvis JSON Utils"
+cd "$BASEPATH/xs/Jarvis-JSON-Utils"
+perl Makefile.PL
+make
+make DESTDIR=$BASEPATH/ install
+
+# Remove the generated perllocal.pod file to avoid overwriting the destination file.
+echo "# Removing generated perllocal.pod"
+find $BASEPATH/usr -name perllocal.pod -type f -delete 
+
+# Return to execution directory.
+cd "$DIR"
 
 # Clean up.
 rm -rf jarvisnew-*
@@ -41,14 +53,16 @@ rm -f jarvisnew_*.build
 rm -f jarvisnew_*.changes
 
 # BUILD THE SOURCE TARBALL.
-tar zcf $TAR_ORIG "../../../$BASEDIR" \
+tar zcf $TAR_ORIG \
     --exclude="$BASEDIR/pkg" \
     --exclude="$BASEDIR/BUILDROOT" \
+    --exclude="$BASEDIR/xs" \
     --exclude=CVS \
     --exclude=.hg \
     --exclude=rpms \
     --exclude=jarvis.tar \
-    --transform "s/^$BASEDIR/jarvisnew-$VERSION/"
+    --transform "s/^$BASEDIR/jarvisnew-$VERSION/" \
+    "../../../$BASEDIR"
 
 # COPY THE DEBIAN PACKAGE TEMPLATE.
 #
@@ -76,3 +90,8 @@ perl -pi -e "s/DATE/$DATE/" jarvisnew-$VERSION/debian/copyright
 #
 cd jarvisnew-$VERSION
 debuild -uc -us
+
+# Finally version the output packages to indicate the source system it was compiled on.
+UBUNTUVERSION=`lsb_release -r -s`
+
+mv "$DIR/jarvisnew_${VERSION}-${RELEASE}_all.deb" "$DIR/jarvisnew_${VERSION}-${RELEASE}_UBUNTU${UBUNTUVERSION}.deb"
