@@ -72,6 +72,7 @@ mv $DEPLOY_DIR/$JARVIS_PACKAGE/etc/apache $DEPLOY_DIR/$JARVIS_PACKAGE/etc/httpd/
 
 # Build the RPM package.
 VERSION=$VERSION \
+RELEASE=$RELEASE \
 PACKAGE=$JARVIS_PACKAGE \
     rpmbuild -v \
     --define "_builddir $DIR/$DEPLOY_DIR/$JARVIS_PACKAGE" \

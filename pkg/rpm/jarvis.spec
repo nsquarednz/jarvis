@@ -1,6 +1,6 @@
 Name: %(echo $PACKAGE)
 Version: %(echo $VERSION)
-Release: 1
+Release: %(echo $RELEASE)
 Summary: A web application framework written in Perl
 Group: Application/Enterprise
 License: LGPL v3
