@@ -40,6 +40,7 @@ use Jarvis::Text;
 use Jarvis::Error;
 use Jarvis::DB;
 use Jarvis::Hook;
+use Hash::Fold qw(fold);
 
 use sort 'stable';      # Don't mix up records when server-side sorting
 
@@ -263,20 +264,7 @@ sub expand_vars {
     #   See: https://youtrack.nsquared.nz/issue/JVS-14584
     #   This is currently undocumented until a proper solution can be decided on.
     #
-    sub compact {
-        my ($val) = @_;
-        if (ref ($val) eq 'HASH') {
-            for my $key (keys %$val) {
-                if (ref ($val->{$key}) eq 'HASH') {
-                    for my $subkey (keys %{$val->{$key}}) {
-                        $val->{$subkey} = compact($val->{$key}->{$subkey})
-                    }
-                }
-            }
-        }
-        return $val;
-    }
-    my $compacted_values = compact ($values);
+    my $compacted_values = fold ($values, delimiter => '.');
     $values = $compacted_values;
 
     foreach my $var (@$vars) {
