@@ -265,7 +265,8 @@ sub expand_vars {
     #   This is currently undocumented until a proper solution can be decided on.
     #
     my $compacted_values = fold ($values, delimiter => '.');
-    $values = $compacted_values;
+    # Merge the resulting hash with the original hash to maintain the object structure for variables that require it.
+    $values = { %$values, %$compacted_values };
 
     foreach my $var (@$vars) {
         &Jarvis::Error::debug ($jconfig, "Variable: %s [%s].", join ('|', @{ $var->{names} }), join (",", sort (keys (%{ $var->{flags} }))));
