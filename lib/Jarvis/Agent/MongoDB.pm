@@ -423,9 +423,9 @@ sub fetch_inner {
     $dsxml->{dataset}{collection} or die "Dataset '$dataset_name' (type 'mongo') has no 'collection' defined.\n";
     my $collection_name = $dsxml->{dataset}{collection}->content;
 
-    # Check that both find and aggregate are not defined at the same time.
-    if ($dsxml->{dataset}{find} && $dsxml->{dataset}{aggregate}) {
-        die "Dataset '$dataset_name' (type 'mongo') has both 'find' and 'aggregate' present.\n";
+    # Check that only one of our fetch types are defined on the dataset at one time.
+    if (1 != grep {$_} ($dsxml->{dataset}{find}, $dsxml->{dataset}{aggregate}, $dsxml->{dataset}{distinct})) {
+        die "Dataset '$dataset_name' (type 'mongo') may only have a single 'find', 'aggregate' or 'distinct' operation present.\n";
     }
 
     # This is the collection handle.
@@ -499,9 +499,48 @@ sub fetch_inner {
         # Execute our Mongo aggregate.
         $cursor = $collection->aggregate (@pipeline, $options);
 
+    } elsif ($dsxml->{dataset}{distinct}) {
+
+        # Do we have a field name? It must be defined.
+        my $fieldname = undef;
+        my $filter    = undef;
+        my $options   = undef;
+ 
+        # Parse the fieldname from JSON and perform variable substitution.
+        if ($dsxml->{dataset}{distinct}{fieldname}) {
+            $fieldname = $dsxml->{dataset}{distinct}{fieldname}->content;
+        }
+
+        # Parse the filter from JSON and perform variable substitution.
+        if ($dsxml->{dataset}{distinct}{filter}) {
+            my $filter_vars     = [];
+            my $object_json     = $dsxml->{dataset}{distinct}{filter}->content;
+
+            &Jarvis::Error::dump ($jconfig, "Parsing filter...");
+            &Jarvis::Error::dump ($jconfig, $object_json);
+            my $filter_template = &parse_object ($jconfig, $object_json, $filter_vars);
+            $filter             = &expand_vars ($jconfig, $filter_template, $filter_vars, $safe_params_href);
+        }
+
+        # Parse the options from JSON and perform variable substitution.
+        if ($dsxml->{dataset}{distinct}{options}) {
+            my $options_vars     = [];
+            my $object_json     = $dsxml->{dataset}{distinct}{options}->content;
+
+            &Jarvis::Error::dump ($jconfig, "Parsing options...");
+            &Jarvis::Error::dump ($jconfig, $object_json);
+            my $options_template = &parse_object ($jconfig, $object_json, $options_vars);
+            $options             = &expand_vars ($jconfig, $options_template, $options_vars, $safe_params_href);
+        }
+
+        $fieldname or die "Dataset '$dataset_name' (type 'mongo' - 'distinct') does not have a field name present.\n";
+
+        # Execute our Mongo distinct.
+        $cursor = $collection->distinct ($fieldname, $filter, $options);
+
     } else {
-        # Either 'find' or 'aggregatea' MUST be present, EVEN IF THEY ARE EMPTY.
-        die "Dataset '$dataset_name' (type 'mongo') has no 'find' or 'aggregate' present.\n";
+        # 'find', 'aggregate' or 'distinct' MUST be present, EVEN IF THEY ARE EMPTY.
+        die "Dataset '$dataset_name' (type 'mongo') has no 'find', 'aggregate' or 'distinct' present.\n";
     }
 
     
