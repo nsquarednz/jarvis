@@ -1,0 +1,34 @@
+<dataset dbname="shipdb" dbtype="mongo" read="*" write="*" collection="demo.ship">
+    <hook module="Boat">
+        <parameter name="index" value="Checked"/>
+    </hook>
+    <transform store="trim" />
+    <insert>
+        <document>
+            {
+                "name": ~name~
+                , "line": ~line~
+                , "ship_type": {
+                    "has_propeller": ~ship_type.has_propeller!boolean~
+                    , "type_name": ~ship_type.type_name~
+                }
+            }
+         </document>
+    </insert>
+    <update>
+        <document>
+            {
+                "$set": {
+                    "name": ~name~
+                    , "line": ~line~
+                    , "ship_type": ~ship_type~
+                } 
+            }
+        </document>
+        <filter>
+            {
+                "_id": ~_id!oid~
+            }
+        </filter>
+    </update>
+</dataset>

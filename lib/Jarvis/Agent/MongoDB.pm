@@ -258,11 +258,29 @@ sub mongo_to_perl {
 sub expand_vars {
     my ($jconfig, $object, $vars, $values) = @_;
 
+    #######################################################################
+    # DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED
+    # -- This functionality is documented, remember to
+    # -- update the documentation if you change/extend it.
+    #######################################################################
     #
-    #   This is a temporary solution for now in order to continue Jarvis mongo integration.
-    #   This allows all nested hash parameters to be available at the top level of the values object.
-    #   See: https://youtrack.nsquared.nz/issue/JVS-14584
-    #   This is currently undocumented until a proper solution can be decided on.
+    # Fold the input parameters so that the data sets can directly access 
+    # nested object values and perform type casting if required.
+    #
+    # Input Example = {
+    #    subObject = {
+    #        inputBoolean = true
+    #    }
+    # }
+    #
+    # In most cases a simple subObject = ~subObject~ is sufficient.
+    #
+    # However if the sub object has differning types and types that must be 
+    # type cast direct access is required. Folding achieves this.
+    #
+    # subObject = {
+    #    inputBoolean = ~subObject.inputBoolean!boolean~
+    # }
     #
     my $compacted_values = fold ($values, delimiter => '.');
     # Merge the resulting hash with the original hash to maintain the object structure for variables that require it.

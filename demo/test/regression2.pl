@@ -141,6 +141,23 @@ if (! eq_or_diff ($json->{data}, $expected, 'Updated Rows after Update Queen Mar
 }
 
 ###############################################################################
+# Get all the distinct number of funnels across all 3 ships.
+###############################################################################
+
+my $expected_distinct_funnels = [7, 4];
+
+$json = TestUtils::fetch_json ([ 'ship_funnels' ]);
+
+if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data}, "JSON Get distinct funnels (ship)")) {
+    BAIL_OUT("Failed to fetch: " . &Dumper ($json));
+}
+
+if (! eq_or_diff ($json->{data}, $expected_distinct_funnels, 'Distinct Funnel Numbers (ship) matches.')) {
+    BAIL_OUT("Unexpected Distinct Number of Funnels result: " . &Dumper ($json));    
+}
+
+
+###############################################################################
 # Delete (but not really) the Olympic.
 ###############################################################################
 
@@ -177,6 +194,85 @@ if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json
 
 if (! eq_or_diff ($json->{data}, $expected, 'New Rows after Insert (ship) matches.')) {
     BAIL_OUT("Unexpected Duplicated Fetch result: " . &Dumper ($json));    
+}
+
+###############################################################################
+# Test hash folding approach for accessing folded parameters.
+###############################################################################
+
+my $new_folded_ship = [
+    { name => 'Schrodinger', line => 'Universal', ship_type => { has_propeller => \1, type_name => "Cruise Ship" } }
+];
+
+$json = TestUtils::store ([ 'ship_folded' ], { _method => 'insert' }, $new_folded_ship);
+if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1), "JSON Insert new Folded Ship")) {
+    BAIL_OUT("Failed to insert folded ship: " . &Dumper ($json));    
+}
+
+###############################################################################
+# Test retrieving folded ship and check correct folded parameter types.
+###############################################################################
+
+my $schrodinger_id = $json->{row}[0]{returning}[0]{_id};
+$expected = [
+    {
+        'line' => 'Universal'
+        , 'name' => 'Schrodinger'
+        , '_id' => $schrodinger_id
+        , 'ship_type' => {
+            'type_name' => 'Cruise Ship'
+            , 'has_propeller' => JSON::PP::true
+        }
+    }
+];
+
+$json = TestUtils::fetch_json ([ 'ship' ], { name => "Schrodinger" });
+
+if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data}, "JSON Get folded ship (ship)")) {
+    BAIL_OUT("Failed to fetch folded ship: " . &Dumper ($json));    
+}
+
+if (! eq_or_diff ($json->{data}, $expected, 'New Rows after Insert folded (ship) matches.')) {
+    BAIL_OUT("Unexpected Duplicated folded Fetch result: " . &Dumper ($json));    
+}
+
+###############################################################################
+# Test hash folding approach for assigning complete objects.
+###############################################################################
+
+my $update_folded_ship = [
+    { _id => $schrodinger_id,  name => 'Schrodinger', line => 'Universal', ship_type => { type_name => "Dingy", has_propeller => "Yes" } }
+];
+
+$json = TestUtils::store ([ 'ship_folded' ], { _method => 'update' }, $update_folded_ship);
+if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1), "JSON Insert new Folded Ship")) {
+    BAIL_OUT("Failed to insert folded ship: " . &Dumper ($json));    
+}
+
+###############################################################################
+# Test retrieving folded ship and check correct object assignment parameters.
+###############################################################################
+
+$expected = [
+    {
+        'line' => 'Universal'
+        , 'name' => 'Schrodinger'
+        , '_id' => $schrodinger_id
+        , 'ship_type' => {
+            'type_name' => 'Dingy'
+            , 'has_propeller' => 'Yes'
+        }
+    }
+];
+
+$json = TestUtils::fetch_json ([ 'ship' ], { name => "Schrodinger" });
+
+if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data}, "JSON Get folded object assigned ship (ship)")) {
+    BAIL_OUT("Failed to fetch folded object assigned ship: " . &Dumper ($json));    
+}
+
+if (! eq_or_diff ($json->{data}, $expected, 'New Rows after Insert object assigned (ship) matches.')) {
+    BAIL_OUT("Unexpected Duplicated object assigned Fetch result: " . &Dumper ($json));    
 }
 
 done_testing ();
