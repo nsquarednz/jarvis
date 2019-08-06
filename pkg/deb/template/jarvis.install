@@ -5,3 +5,4 @@ etc/apache etc/jarvis
 etc/jarvis/cgi_params.pm etc/jarvis
 htdocs usr/share/jarvis
 lib usr/share/jarvis
+usr /

@@ -22,24 +22,12 @@
 #
 use ExtUtils::MakeMaker;
 
-#
-# Here, if we're targeting centos/Redhat enterprise, we need to use Lua from 
-# a non-standard package, installed into /DBA/. We need to set up some path
-# details
-#
-my $is_centos = 0;
-$is_centos = 1 if -e "/etc/redhat-release";
-my $INC = $is_centos ? '-I/DBA/lua/5.2.1/include' : '-I/usr/include/lua5.2';
-my $LIBS = $is_centos ? [ '-L/DBA/lua/5.2.1/lib -llua' ] : [ '-llua5.2' ];
-
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
 WriteMakefile(
    AUTHOR => '(c) 2019 by Jonathan Couper-Smartt.', 
    NAME => 'Jarvis::JSON::Utils',
    VERSION => '1.0', # Version for compatibility.
-   LIBS => $LIBS,
    DEFINE => '', # e.g., '-DHAVE_SOMETHING'
    CCFLAGS => "$Config{ccflags} -Wall -Wno-strict-aliasing",
-   INC => $INC
 );

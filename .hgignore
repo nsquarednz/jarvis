@@ -13,3 +13,14 @@ syntax: regexp
 ^xs/.*/Makefile$
 ^xs/.*/Makefile.old$
 ^xs/.*/MYMETA.json
+^pkg/.*/.*\.diff\.gz
+^pkg/.*/.*\.deb
+^pkg/.*/.*\.dsc
+^pkg/.*/.*\.buildinfo
+^pkg/.*/.*\.changes
+^pkg/.*/.*\.build
+^pkg/.*/.*\.orig\.tar\.gz
+^pkg/.*/.*\.rpm
+syntax: glob
+deploy/
+usr/

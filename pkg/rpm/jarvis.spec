@@ -1,16 +1,14 @@
-Name: jarvis
+Name: %(echo $PACKAGE)
 Version: %(echo $VERSION)
-Release: 1
+Release: %(echo $RELEASE)
 Summary: A web application framework written in Perl
 Group: Application/Enterprise
 License: LGPL v3
 URL: http://gitorious.org/jarvis/jarvis
-Source0: jarvis.tar
 BuildArch: noarch
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
-%global Root /usr/share/jarvis
-
+%global jarvisRoot /usr/share/%{name}
 %global _binaries_in_noarch_packages_terminate_build 0
 %{?perl_default_filter}
 
@@ -35,33 +33,62 @@ to perform basic operations on a back end databsae.
 This requires some server script to handle data requests over http and
 perform the corresponding back-end database transactions in a manner 
 which is secure, extensible, standards-based and reasonably efficient.
+
 %prep
+
+#
+# All build steps are done by make.sh.
+#
 
 %build
 
+#
+# All build steps are done by make.sh.
+#
+
 %install
 rm -rf %{buildroot}
-mkdir -p %{buildroot}
-make -f pkg/rpm/Makefile install DESTDIR=%{buildroot}
+mkdir -p %{buildroot}/usr/share/%{name}
+cp -r %{_builddir}/* %{buildroot}/usr/share/%{name}
+cp -r %{_builddir}/usr %{buildroot} 
 
 %clean
 rm -rf %{buildroot}
 
 %files
 %defattr(-,root,root,-)
-%{Root}
+%{jarvisRoot}
 %docdir /usr/share/jarvis/docs/
-%config(noreplace) /etc/httpd/conf.d/jarvis.conf
-%config(noreplace) /etc/jarvis/
+/usr/local/lib64/perl5/auto/Jarvis/
 
 %changelog
 
 %post
+
+# Install the HTTPD configuration file if it doesn't exist.
+if [ ! -f /etc/httpd/conf.d/%{name}.conf ]; then
+    cp /usr/share/%{name}/etc/httpd/conf.d/%{name}.conf /etc/httpd/conf.d/%{name}.conf
+    echo "Created /etc/httpd/conf.d/%{name}.conf"
+fi
+
+# Install the base Jarvis configuration.
+if [ ! -d /etc/%{name} ]; then
+    cp -r /usr/share/%{name}/etc/jarvis /etc/%{name}
+    echo "Created /etc/%{name}"
+fi
+
 echo "Jarvis installed and configuration created in /etc/httpd/conf.d"
 echo "Reload the Apache configuration now."
 echo "   systemctl restart httpd"
 
 %postun
-echo "Jarvis uninstalled and configuration removd from /etc/httpd/conf.d"
+
+# Remove the HTTPD configuration file if it exists.
+if [ -f /etc/httpd/conf.d/%{name}.conf ]; then
+    rm /etc/httpd/conf.d/%{name}.conf
+    echo "Removed /etc/httpd/conf.d/%{name}.conf"
+fi
+
+echo "Jarvis uninstalled and configuration removed from /etc/httpd/conf.d"
 echo "Reload the Apache configuration now."
 echo "   systemctl restart httpd"

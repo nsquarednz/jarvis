@@ -1,0 +1,13 @@
+<dataset dbname="shipdb" dbtype="mongo" read="*" write="*" collection="demo.ship">
+    <distinct>
+        <fieldname>num_funnels</fieldname>
+        <filter>
+            <!-- Get all funnels that are defined. -->
+            {
+                "num_funnels": {
+                    "$ne": null
+                }
+            }
+        </filter>
+    </distinct>
+</dataset>
