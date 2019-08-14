@@ -171,13 +171,15 @@ sub fetch_xml {
 #		$url_parts - Array of URL parts, dataset plus any restful args.  We will encode.
 #		$query_args - Hash of CGI args.
 #		$rows - Array of rows to modify.
+#		$fail - Do we expect this to fail?
 #
 # Returns:
-#       Returned $json (die on error)
+#       IF $fail   - return ($code, $message) (die on success)
+#		IF ! $fail - return $json (die on error)
 ################################################################################
 #
 sub store {
-	my ($url_parts, $query_args, $rows) = @_;
+	my ($url_parts, $query_args, $rows, $fail) = @_;
 
 	# Query args are sent to a restful url.
 	my $restful_url = join ('/', map { uri_escape ($_) } @$url_parts);
@@ -191,14 +193,21 @@ sub store {
 
   	# Check request succeeded, and result is interpretable as JSON.
 	my $res = $ua->request ($req);
- 	($res->is_success) || die "Failed: $restful_url: " . $res->status_line . "\n" . $res->content;
- 	($res->header ('Content-Type') =~ m|^text/plain|) || die "Wrong Content-Type: " . $res->header ('Content-Type');
- 	my $json = decode_json ($res->content ());
 
- 	# Check this looks like a valid response.
- 	(defined $json->{success}) || die "Missing 'success' in response: " . &Dumper ($json);
+	if ($fail) {
+	 	($res->is_success) && die "Expected failure - got success.";
+	 	return ($res->code, $res->content);
 
- 	return $json;
+	} else {
+	 	($res->is_success) || die "Failed: $restful_url: " . $res->status_line . "\n" . $res->content;
+	 	($res->header ('Content-Type') =~ m|^text/plain|) || die "Wrong Content-Type: " . $res->header ('Content-Type');
+	 	my $json = decode_json ($res->content ());
+
+	 	# Check this looks like a valid response.
+	 	(defined $json->{success}) || die "Missing 'success' in response: " . &Dumper ($json);
+
+	 	return $json;
+	}
 }
 
 1;

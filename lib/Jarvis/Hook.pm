@@ -403,11 +403,11 @@ sub dataset_fetched {
     return 1;
 }
 sub dataset_stored {
-    my ($jconfig, $dsxml, $safe_params_href, $results_aref, $extra_href) = @_;
+    my ($jconfig, $dsxml, $safe_params_href, $results_aref, $extra_href, $success_ref, $message_ref) = @_;
 
     foreach my $hook (@{ $jconfig->{hooks} }) {
         next if (($hook->{level} > 0) && ($hook->{level} != $jconfig->{hook_level}));
-        &invoke ($jconfig, $hook, "dataset_stored", $dsxml, $safe_params_href, $results_aref, $extra_href);
+        &invoke ($jconfig, $hook, "dataset_stored", $dsxml, $safe_params_href, $results_aref, $extra_href, $success_ref, $message_ref);
     }
     return 1;
 }

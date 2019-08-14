@@ -118,6 +118,15 @@ if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{succ
 }
 
 ###############################################################################
+# Duplicate INSERT!
+###############################################################################
+
+my ($code, $message) = TestUtils::store ([ 'boat' ], { _method => 'insert' }, $insert, 1);
+if (! ok (($code == 409) && ($message eq "UNIQUE constraint failed: boat.name\n"), "JSON Insert Boat '$en_boat_name' Duplicate")) {
+    BAIL_OUT("Failed to insert: " . &Dumper ($code, $message));    
+}
+
+###############################################################################
 # Fetch Boat "Empty Nest" by ID as a Singleton
 #	- Test <router> named parameter "id" for dataset
 #	- Test <router> singleton

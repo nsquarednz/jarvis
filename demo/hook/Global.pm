@@ -7,6 +7,8 @@ use warnings;
 
 package Global;
 
+use Data::Dumper;
+
 use Jarvis::Config;
 use Jarvis::Error;
 use Jarvis::Text;
@@ -57,6 +59,20 @@ sub Global::dataset_pre_fetch {
     if (defined $safe_params_href->{boat_class}) {
         if ($safe_params_href->{boat_class} eq 'Makleson') {
             $safe_params_href->{boat_class} = 'Makkleson';
+        }
+    }
+
+    return 1;
+}
+
+# Treat duplicate row as a 409.
+sub Global::dataset_stored {
+    my ($jconfig, $hook_params_href, $dsxml, $safe_params_href, $results_aref, $extra_href, $success_ref, $message_ref) = @_;
+
+    if (defined $$message_ref) {
+        if ($$message_ref =~ m/UNIQUE constraint failed/) {
+            $jconfig->{status} = 409;
+            die $$message_ref . "\n";
         }
     }
 
