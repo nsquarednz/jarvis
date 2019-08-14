@@ -267,7 +267,7 @@ sub names_to_values {
     foreach my $name (@$variable_names_aref) {
         my $value = undef;
 
-        # NOTE: Subtle clarification here.  
+        # NOTE: Subtle clarification here.
         # We match the first name WHICH IS PRESENT, even if it is UNDEFINED.
         #
         # This is a very subtle change made in order for DBI to be 100% consistent
@@ -510,9 +510,9 @@ sub fetch {
 
         # Dynamically load this module.
         #
-        # NOTE: This is part of the standard Ubuntu distro, but isn't part of 
+        # NOTE: This is part of the standard Ubuntu distro, but isn't part of
         #       the standard RedHat/CentOS package list.
-        #           
+        #
         require Text::CSV;
         require IO::String;
 
@@ -545,8 +545,8 @@ sub fetch {
         &Jarvis::Error::debug ($jconfig, "Encoding into XLSX format ($format).");
 
         # Dynamically load this module.
-        # 
-        # NOTE: This is CPAN only, not part of standard Debian or RedHat distros. 
+        #
+        # NOTE: This is CPAN only, not part of standard Debian or RedHat distros.
         #
         require Excel::Writer::XLSX;
         require IO::String;
@@ -838,16 +838,16 @@ sub fetch_rows {
 
     &Jarvis::Error::debug ($jconfig, "Fetch Result (after transformations):");
     &Jarvis::Error::debug_var ($jconfig, $rows_aref);
-    
+
     ###########################################################################
     # DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED
     # -- These features are officially documented, remember to
     # -- update the documentation if you change/extend then.
     ###########################################################################
-    # 
+    #
     # If the retain null flag has been set then we do not want to remove undef values from the return array.
     # This will allow us to have null values in our JSON object.
-    # 
+    #
     if (! $jconfig->{'retain_null'}) {
         # Delete null (undef) values, otherwise JSON/XML will represent them as ''.
         #
@@ -1257,7 +1257,7 @@ sub store_rows {
         my $row_ttype = $safe_params{_ttype} || $ttype;
         ($row_ttype eq 'mixed') && die "Transaction Type 'mixed', but no '_ttype' field present in row.\n";
 
-        # Hand off to agent for the actual store (assuming it supports it).  
+        # Hand off to agent for the actual store (assuming it supports it).
         # This also perform our "returning" logic (if applicable).
         my $row_result = undef;
         {
@@ -1270,8 +1270,13 @@ sub store_rows {
         if (! $row_result->{success}) {
             $success = 0;
             $message = $row_result->{message};
+
+            # This is DBD::Sybase string cleanup.
             $message =~ s/^Server message number=[0-9]+ severity=[0-9]+ state=[0-9]+ line=[0-9]+ server=[A-Z0-9\\]+text=//i;
         }
+
+        # Store the results, even if they are not successful.
+        push (@$results_aref, $row_result);
 
         # Stop as soon as anything goes wrong.
         if (! $success) {
@@ -1363,12 +1368,14 @@ sub store_rows {
             }
         }
 
-        # Invoke after_one hook.
-        if ($success) {
-            &Jarvis::Hook::after_one ($jconfig, $dsxml, \%safe_params, $row_result);
+        # Stop on child dataset problem.
+        if (! $success) {
+            &Jarvis::Error::debug ($jconfig, "Error detected in child dataset.  Stopping.");
+            last;
         }
 
-        push (@$results_aref, $row_result);
+        # Call the after_one hook ONLY on success, and after child datasets are processed.
+        &Jarvis::Hook::after_one ($jconfig, $dsxml, \%safe_params, $row_result);
     }
 
     # Free any remaining open statement types.
@@ -1418,7 +1425,9 @@ sub store_rows {
 
     # This final hook allows you to modify the data returned for one dataset.
     # This hook may completely modify the returned content (by modifying $rows_aref).
-    &Jarvis::Hook::dataset_stored ($jconfig, $dsxml, \%safe_all_rows_params, $results_aref, $extra_href);
+    #
+    # NOTE: This is called even on non-success.
+    &Jarvis::Hook::dataset_stored ($jconfig, $dsxml, \%safe_all_rows_params, $results_aref, $extra_href, \$success, \$message);
 
     # In any case, Unload/Finish dataset specific hooks.
     &Jarvis::Hook::unload_dataset ($jconfig);
