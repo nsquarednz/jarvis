@@ -85,9 +85,11 @@
 
         <!-- And a secondary mongoDB database. -->
         <database type="mongo" name="shipdb" connect="mongodb://localhost" username="" password="">
-            <parameter name ="db_name" value="demo"/>
-            <parameter name ="subparam.path" value="/fred/here"/>
-            <parameter name ="subparam.gone_key" value="GONE!"/>
+            <dbh_attributes>
+                <attribute name ="db_name" value="demo"/>
+                <attribute name ="subparam.path" value="/fred/here"/>
+                <attribute name ="subparam.gone_key" value="GONE!"/>
+            </dbh_attributes>
         </database>
 
         <!-- This plugin is used to allow admin users to reset any user's password. -->

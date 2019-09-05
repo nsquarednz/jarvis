@@ -344,11 +344,11 @@ sub before_logout {
     return 1;
 }
 sub pre_connect {
-    my ($jconfig, $dbname, $dbtype, $dbconnect_ref, $dbusername_ref, $dbpassword_ref, $parameters_href) = @_;
+    my ($jconfig, $dbname, $dbtype, $dbconnect_ref, $dbusername_ref, $dbpassword_ref, $dbh_attributes_href) = @_;
 
     foreach my $hook (@{ $jconfig->{hooks} }) {
         last if ($hook->{level} > 0);
-        &invoke ($jconfig, $hook, "pre_connect", $dbname, $dbtype, $dbconnect_ref, $dbusername_ref, $dbpassword_ref, $parameters_href);
+        &invoke ($jconfig, $hook, "pre_connect", $dbname, $dbtype, $dbconnect_ref, $dbusername_ref, $dbpassword_ref, $dbh_attributes_href);
     }
     return 1;
 }

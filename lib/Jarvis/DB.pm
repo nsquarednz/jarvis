@@ -117,41 +117,42 @@ sub handle {
     my $dbpassword = $dbxml->{password}->content || '';
 
     # Optional parameters, handled per-database type.
-    my $parameters = {};
-    if ($dbxml->{parameter}) {
-        foreach my $parameter ($dbxml->{parameter}('@')) {
-            $parameter->{name} or die "DB Parameter entry is missing 'name'.";
-            $parameter->{value} or die "DB Parameter entry is missing 'value'.";
+    my $dbh_attributes = {};
+    if ($dbxml->{dbh_attributes} && $dbxml->{dbh_attributes}{attribute}) {
+        foreach my $attr ($dbxml->{dbh_attributes}{attribute}('@')) {
+            $attr->{name} or die "DB Parameter entry is missing 'name'.";
+            $attr->{value} or die "DB Parameter entry is missing 'value'.";
 
-            my $name = $parameter->{name}->content;
-            my $value = $parameter->{value}->content;
+            my $name = $attr->{name}->content;
+            my $value = $attr->{value}->content;
 
-            &Jarvis::Error::debug ($jconfig, "DB Parameter: '%s' -> '%s'.", $name, $value);
+            &Jarvis::Error::debug ($jconfig, "DBH Attribute: '%s' -> '%s'.", $name, $value);
 
             # A name can contain "." in which case it is a subhash entry.
-            my $p = $parameters;
+            my $a = $dbh_attributes;
             my @subnames = split ('\.', $name);
             foreach my $i (0 .. $#subnames) {
                 my $subname = $subnames[$i];
                 if ($i < $#subnames) {
-                    $p->{$subname} //= {};
-                    $p = $p->{$subname};
+                    $a->{$subname} //= {};
+                    $a = $a->{$subname};
 
                 } else {
-                    $p->{$subname} = $value;
+                    $a->{$subname} = $value;
                 }
             }
         }
     }
+
+    # Optional post-connection command string.
     my $post_connect = $dbxml->{post_connect};
     if ($post_connect) {
-        # trim post_connect string
         $post_connect =~ s/^\s*//;
         $post_connect =~ s/\s*$//;
     }
 
     # Allow the hook to potentially modify some of these attributes.
-    &Jarvis::Hook::pre_connect ($jconfig, $dbname, $dbtype, \$dbconnect, \$dbusername, \$dbpassword, $parameters);
+    &Jarvis::Hook::pre_connect ($jconfig, $dbname, $dbtype, \$dbconnect, \$dbusername, \$dbpassword, $dbh_attributes);
 
     &Jarvis::Error::debug ($jconfig, "DB Connect = '$dbconnect'");
     &Jarvis::Error::debug ($jconfig, "DB Username = '$dbusername'");
@@ -164,25 +165,14 @@ sub handle {
             $dbconnect = "dbi:Pg:dbname=" . $jconfig->{app_name};
             &Jarvis::Error::debug ($jconfig, "DB Connect = '$dbconnect' (default)");
         }
-        my $dbh_attributes = {
-            RaiseError => 1,
-            PrintError => 1,
-            AutoCommit => 1
-        };
-        # Optional DBI connect attributes, handled per-database type.
-        if ($dbxml->{dbh_attributes}) {
-            foreach my $attr ($dbxml->{dbh_attributes}{attribute}('@')) {
-                $attr->{name} or die "DBH Attribute entry is missing 'name'.";
-                $attr->{value} or die "DBH Attribute entry is missing 'value'.";
 
-                my $name = $attr->{name}->content;
-                my $value = $attr->{value}->content;
+        # These are always added for DBI if not already specified.
+        $dbh_attributes->{RaiseError} //= 1;
+        $dbh_attributes->{PrintError} //= 1,;
+        $dbh_attributes->{AutoCommit} //= 1;
 
-                &Jarvis::Error::debug ($jconfig, "DBH Attribute: '%s' -> '%s'.", $name, $value);
-                $dbh_attributes->{$name} = $value;
-            }
-        }
-
+        &Jarvis::Error::debug ($jconfig, "DBI Attributes");
+        &Jarvis::Error::debug_var ($jconfig, $dbh_attributes);
         my $dbh = $dbhs{$dbtype}{$dbname} = DBI->connect ($dbconnect, $dbusername, $dbpassword, $dbh_attributes) ||
             die "Cannot connect to DBI database '$dbname': " . DBI::errstr . "\n";
 
@@ -201,7 +191,9 @@ sub handle {
         require Jarvis::DB::SDP;
 
         $dbconnect || die "Missing 'connect' parameter on SSAS DataPump database '$dbname'.\n";
-        $dbhs{$dbtype}{$dbname} = Jarvis::DB::SDP->new ($jconfig, $dbconnect, $dbusername, $dbpassword, $parameters);
+        &Jarvis::Error::debug ($jconfig, "SDP Attributes");
+        &Jarvis::Error::debug_var ($jconfig, $dbh_attributes);
+        $dbhs{$dbtype}{$dbname} = Jarvis::DB::SDP->new ($jconfig, $dbconnect, $dbusername, $dbpassword, $dbh_attributes);
 
     # MongoDB is a non-relational database with its own driver API.
     # 
@@ -214,8 +206,8 @@ sub handle {
 
         $dbconnect || die "Missing 'connect' parameter on MongoDB DataPump database '$dbname'.\n";
         &Jarvis::Error::debug ($jconfig, "MongoDB Options");
-        &Jarvis::Error::debug_var ($jconfig, $parameters);
-        $dbhs{$dbtype}{$dbname} = MongoDB->connect ($dbconnect, $parameters);
+        &Jarvis::Error::debug_var ($jconfig, $dbh_attributes);
+        $dbhs{$dbtype}{$dbname} = MongoDB->connect ($dbconnect, $dbh_attributes);
 
     } else {
         die "Unsupported Database Type '$dbtype'.\n";
