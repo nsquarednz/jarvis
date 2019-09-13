@@ -298,6 +298,32 @@ sub check {
         $group_list || ($group_list = '');
         $logged_in = (($error_string eq "") && ($username ne "")) ? 1 : 0;
 
+        # Check for a group mappings object within the login configuration block. This will map parsed groups to
+        # static groups that are configured within the login block.
+        if ($axml->{'login'}{'group_mappings'}) {
+            if ($axml->{'login'}{'group_mappings'}{'group_mapping'}) {
+
+                # Split the group list back into a neat array.
+                my @parsed_groups = split (',', $group_list);
+
+                # Attempt to process each available group mapping.
+                foreach my $group_mapping ($axml->{'login'}{'group_mappings'}{'group_mapping'}('@')) {
+
+                    # Parse parameters and check both are provided.
+                    my $from_group = $group_mapping->{'from'}->content || die ("Group mapping must have from mapping.");
+                    my $to_group   = $group_mapping->{'to'}->content   || die ("Group mapping must have to mapping.");
+
+                    # If the from group is present in the group list returned by the login module add the mapped to group to it.
+                    if (grep { $_ eq $from_group } @parsed_groups) {
+                        push @parsed_groups, $to_group;
+                    }
+                }
+
+                # After processing remerge the parsed groups.
+                $group_list = join (',', @parsed_groups);
+            }
+        }
+
         &Jarvis::Error::debug ($jconfig, "Login check complete.  Logged in = $logged_in.  User = $username.");
         if (! $logged_in) {
             &Jarvis::Error::debug ($jconfig, "Not logged in.  Error string = '$error_string'.");
