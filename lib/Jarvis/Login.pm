@@ -303,24 +303,36 @@ sub check {
         if ($axml->{'login'}{'group_mappings'}) {
             if ($axml->{'login'}{'group_mappings'}{'group_mapping'}) {
 
-                # Split the group list back into a neat array.
-                my @parsed_groups = split (',', $group_list);
+                # Split groups into hash. Preserving the original hash.
+                my %initial_groups;
+                foreach my $group (split (',', $group_list)) {
+                    $initial_groups{$group} = 1;
+                }
+
+                # Create variable to store our mapped groups separately.
+                my %mapped_groups;
 
                 # Attempt to process each available group mapping.
                 foreach my $group_mapping ($axml->{'login'}{'group_mappings'}{'group_mapping'}('@')) {
 
-                    # Parse parameters and check both are provided.
-                    my $from_group = $group_mapping->{'from'}->content || die ("Group mapping must have from mapping.");
-                    my $to_group   = $group_mapping->{'to'}->content   || die ("Group mapping must have to mapping.");
+                    # Parse parameters and check both are provided and are defined.
+                    $group_mapping->{'from'} || die ("Group mapping must have from mapping.");
+                    my $from_group = $group_mapping->{'from'}->content;
+                    length ($from_group) || die ("Group mapping must have from mapping.");
+                    
+                    $group_mapping->{'to'}->content   || die ("Group mapping must have to mapping.");
+                    my $to_group = $group_mapping->{'to'}->content;
+                    length ($to_group) || die ("Group mapping must have to mapping.");
 
                     # If the from group is present in the group list returned by the login module add the mapped to group to it.
-                    if (grep { $_ eq $from_group } @parsed_groups) {
-                        push @parsed_groups, $to_group;
+                    if ($initial_groups{$from_group}) {
+                        $mapped_groups{$to_group} = 1;
                     }
                 }
 
-                # After processing remerge the parsed groups.
-                $group_list = join (',', @parsed_groups);
+                # After processing re-merge the parsed groups.
+                my %merged_groups = (%initial_groups, %mapped_groups);
+                $group_list = join (',', sort (keys (%merged_groups)));
             }
         }
 
