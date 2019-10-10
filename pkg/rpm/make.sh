@@ -33,8 +33,7 @@ DEPLOY_DIR=../../deploy
 # Cleanup.
 rm -rf $DEPLOY_DIR
 mkdir $DEPLOY_DIR
-rm -rf rpms
-mkdir rpms
+mkdir -p rpms
 
 # Firstly the base package.
 echo "# Building base package directory to $DEPLOY_DIR/$JARVIS_PACKAGE"
