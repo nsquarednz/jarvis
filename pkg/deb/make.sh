@@ -46,7 +46,6 @@ cd "$DIR"
 # Clean up.
 rm -rf jarvis-*
 rm -f jarvis_*.orig.tar.gz
-rm -f jarvis_*.deb
 rm -f jarvis_*.diff.gz
 rm -f jarvis_*.dsc
 rm -f jarvis_*.build

@@ -83,12 +83,4 @@ echo "   systemctl restart httpd"
 
 %postun
 
-# Remove the HTTPD configuration file if it exists.
-if [ -f /etc/httpd/conf.d/%{name}.conf ]; then
-    rm /etc/httpd/conf.d/%{name}.conf
-    echo "Removed /etc/httpd/conf.d/%{name}.conf"
-fi
-
-echo "Jarvis uninstalled and configuration removed from /etc/httpd/conf.d"
-echo "Reload the Apache configuration now."
-echo "   systemctl restart httpd"
+echo "Jarvis uninstalled and configuration remains in /etc/httpd/conf.d"
