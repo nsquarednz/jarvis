@@ -442,8 +442,8 @@ sub fetch_inner {
     my $collection_name = $dsxml->{dataset}{collection}->content;
 
     # Check that only one of our fetch types are defined on the dataset at one time.
-    if (1 != grep {$_} ($dsxml->{dataset}{find}, $dsxml->{dataset}{aggregate}, $dsxml->{dataset}{distinct})) {
-        die "Dataset '$dataset_name' (type 'mongo') may only have a single 'find', 'aggregate' or 'distinct' operation present.\n";
+    if (1 != grep {$_} ($dsxml->{dataset}{find}, $dsxml->{dataset}{aggregate}, $dsxml->{dataset}{distinct}, $dsxml->{dataset}{count})) {
+        die "Dataset '$dataset_name' (type 'mongo') may only have a single 'find', 'aggregate', 'distinct' or 'count' operation present.\n";
     }
 
     # This is the collection handle.
@@ -556,9 +556,44 @@ sub fetch_inner {
         # Execute our Mongo distinct.
         $cursor = $collection->distinct ($fieldname, $filter, $options);
 
+    } elsif ($dsxml->{dataset}{count}) {
+
+        my $filter    = undef;
+        my $options   = undef;
+
+        # Parse the filter from JSON and perform variable substitution.
+        if ($dsxml->{dataset}{count}{filter}) {
+            my $filter_vars     = [];
+            my $object_json     = $dsxml->{dataset}{count}{filter}->content;
+
+            &Jarvis::Error::dump ($jconfig, "Parsing filter...");
+            &Jarvis::Error::dump ($jconfig, $object_json);
+            my $filter_template = &parse_object ($jconfig, $object_json, $filter_vars);
+            $filter             = &expand_vars ($jconfig, $filter_template, $filter_vars, $safe_params_href);
+        }
+
+        # Parse the options from JSON and perform variable substitution.
+        if ($dsxml->{dataset}{count}{options}) {
+            my $options_vars     = [];
+            my $object_json     = $dsxml->{dataset}{count}{options}->content;
+
+            &Jarvis::Error::dump ($jconfig, "Parsing options...");
+            &Jarvis::Error::dump ($jconfig, $object_json);
+            my $options_template = &parse_object ($jconfig, $object_json, $options_vars);
+            $options             = &expand_vars ($jconfig, $options_template, $options_vars, $safe_params_href);
+        }
+
+        # Execute our Mongo document count.
+        # Since we don't return a cursor and just a result of our count echo it back here.
+        my $count = $collection->count ($filter, $options);
+
+        return [{
+            count => $count
+        }];
+
     } else {
-        # 'find', 'aggregate' or 'distinct' MUST be present, EVEN IF THEY ARE EMPTY.
-        die "Dataset '$dataset_name' (type 'mongo') has no 'find', 'aggregate' or 'distinct' present.\n";
+        # 'find', 'aggregate', 'distinct' or 'count' MUST be present, EVEN IF THEY ARE EMPTY.
+        die "Dataset '$dataset_name' (type 'mongo') has no 'find', 'aggregate', 'distinct' or 'count' present.\n";
     }
 
     
