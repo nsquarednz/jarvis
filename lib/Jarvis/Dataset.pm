@@ -906,9 +906,28 @@ sub fetch_rows {
                 my $old_dataset_name = $jconfig->{dataset_name};
                 $jconfig->{dataset_name} .= ">" . $child_dataset;
 
-                # Execute the sub query and store it in the child field.
+                # Execute the sub query and store it in our ARRAY ref of per-row fields HASH.
                 # This will add default and safe args.
-                $row->{$child_field} = &fetch_rows ($jconfig, $child_dataset, \%child_args, $extra_href);
+                my $child_rows_aref = &fetch_rows ($jconfig, $child_dataset, \%child_args, $extra_href);
+
+                # Check if we have any specialised presentation rules for our child dataset.
+                if ($child->{presentation} && $child->{presentation} eq "singleton") {
+                    if (scalar (@$child_rows_aref) == 0) {
+                        $jconfig->{status} = "404 Not Found";
+                        die "Zero results returned from child dataset 'singleton' request.\n";
+             
+                    } elsif (scalar (@$child_rows_aref) > 1) {
+                        $jconfig->{status} = "406 Not Acceptable";
+                        die "Multiple results returned from child dataset 'singleton' request.\n";
+                        
+                    } else {
+                        # Store the singleton result in the child field.
+                        $row->{$child_field} = $$child_rows_aref[0];
+                    }
+                } else {
+                    # Store all results in the child field.
+                    $row->{$child_field} = $child_rows_aref;
+                }
 
                 # Restore the old name for debugging.
                 $jconfig->{dataset_name} = $old_dataset_name;
