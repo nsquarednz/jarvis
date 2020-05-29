@@ -198,7 +198,7 @@ sub handle {
     # MongoDB is a non-relational database with its own driver API.
     # 
     # NOTE: We load the DB::MongoDB module at runtime with a "require".  Why?  Because very few
-    #       sites actually use SDP, and hence they don't actually need SOAP::Lite as a 
+    #       sites actually use MongoDB, and hence they don't actually need MongoDB as a 
     #       dependency.
     #
     } elsif ($dbtype eq "mongo") {

@@ -34,7 +34,9 @@ use parent qw(Jarvis::Agent);
 
 use boolean;
 use Data::Dumper;
-use BSON::Types ':all'; 
+
+# Load our BSON Types at run time so we don't bleed through to other implementations that may not use MongoDB.
+require BSON::Types;
 
 use Jarvis::Text;
 use Jarvis::Error;
