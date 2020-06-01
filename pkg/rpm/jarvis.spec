@@ -7,13 +7,13 @@ License: LGPL v3
 URL: http://gitorious.org/jarvis/jarvis
 BuildArch: noarch
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+# Lets do our own perl requires, because 50% of the packages we want are not available via yum. 
+# They are automatically inferred by an internal process so lets disable it now.
+AutoReqProv : no
 
 %global jarvisRoot /usr/share/%{name}
 %global _binaries_in_noarch_packages_terminate_build 0
 %{?perl_default_filter}
-
-# Lets do our own perl requires, because 50% of the packages we want are not available via yum.
-%global __requires_exclude perl\\(
 
 #BuildRequires:
 Requires: httpd perl(CGI) perl(CGI::Session) perl(CGI::Cookie) perl(HTTP::Cookies) perl(MIME::Types) perl(DBI) perl(JSON) perl(XML::Smart) perl(Digest::MD5) perl(Time::HiRes)
