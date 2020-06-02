@@ -15,8 +15,11 @@ AutoReqProv : no
 %global _binaries_in_noarch_packages_terminate_build 0
 %{?perl_default_filter}
 
+#BuildProvides:
+Provides: perl(Jarvis::Config) perl(Jarvis::DB) perl(Jarvis::Error) perl(Jarvis::Main) perl(Jarvis::Dataset) perl(Jarvis::Exec) perl(Jarvis::Habitat) perl(Jarvis::Hook) perl(Jarvis::JSON::Utils) perl(Jarvis::Login) perl(Jarvis::Login::Adempiere) perl(Jarvis::Plugin) perl(Jarvis::Route) perl(Jarvis::Status) perl(Jarvis::Text)
+
 #BuildRequires:
-Requires: httpd perl(CGI) perl(CGI::Session) perl(CGI::Cookie) perl(HTTP::Cookies) perl(MIME::Types) perl(DBI) perl(JSON) perl(XML::Smart) perl(Digest::MD5) perl(Time::HiRes) perl(Jarvis::Config) perl(Jarvis::DB) perl(Jarvis::Error) perl(Jarvis::Main) perl(Jarvis::Dataset) perl(Jarvis::Exec) perl(Jarvis::Habitat) perl(Jarvis::Hook) perl(Jarvis::JSON::Utils) perl(Jarvis::Login) perl(Jarvis::Login::Adempiere) perl(Jarvis::Plugin) perl(Jarvis::Route) perl(Jarvis::Status) perl(Jarvis::Text)
+Requires: httpd perl(CGI) perl(CGI::Session) perl(CGI::Cookie) perl(HTTP::Cookies) perl(MIME::Types) perl(DBI) perl(JSON) perl(XML::Smart) perl(Digest::MD5) perl(Time::HiRes) 
 
 %description
 Jarvis is "helper glue". It is designed to bridge the gap between your
