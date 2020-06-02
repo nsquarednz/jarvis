@@ -7,16 +7,16 @@ License: LGPL v3
 URL: http://gitorious.org/jarvis/jarvis
 BuildArch: noarch
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+# RHEL 6 cannot correctly export our dependencies while correctly excluding automatically parsed PERL requirements.
+# To this end we will disable this and manually export all of our provided PERL source modules.
+AutoReqProv : no
 
 %global jarvisRoot /usr/share/%{name}
 %global _binaries_in_noarch_packages_terminate_build 0
 %{?perl_default_filter}
 
-# Lets do our own perl requires, because 50% of the packages we want are not available via yum.
-%global __requires_exclude perl\\(
-
 #BuildRequires:
-Requires: httpd perl(CGI) perl(CGI::Session) perl(CGI::Cookie) perl(HTTP::Cookies) perl(MIME::Types) perl(DBI) perl(JSON) perl(XML::Smart) perl(Digest::MD5) perl(Time::HiRes)
+Requires: httpd perl(CGI) perl(CGI::Session) perl(CGI::Cookie) perl(HTTP::Cookies) perl(MIME::Types) perl(DBI) perl(JSON) perl(XML::Smart) perl(Digest::MD5) perl(Time::HiRes) perl(Jarvis::Config) perl(Jarvis::DB) perl(Jarvis::Error) perl(Jarvis::Main) perl(Jarvis::Dataset) perl(Jarvis::Exec) perl(Jarvis::Habitat) perl(Jarvis::Hook) perl(Jarvis::JSON::Utils) perl(Jarvis::Login) perl(Jarvis::Login::Adempiere) perl(Jarvis::Plugin) perl(Jarvis::Route) perl(Jarvis::Status) perl(Jarvis::Text)
 
 %description
 Jarvis is "helper glue". It is designed to bridge the gap between your
@@ -70,8 +70,8 @@ if [ ! -f /etc/httpd/conf.d/%{name}.conf ]; then
     cp /usr/share/%{name}/etc/httpd/conf.d/%{name}.conf /etc/httpd/conf.d/%{name}.conf
     echo "Created /etc/httpd/conf.d/%{name}.conf"
 fi
-
-# Install the base Jarvis configuration.
+#
+ Install the base Jarvis configuration.
 if [ ! -d /etc/%{name} ]; then
     cp -r /usr/share/%{name}/etc/jarvis /etc/%{name}
     echo "Created /etc/%{name}"

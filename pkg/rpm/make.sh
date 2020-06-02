@@ -69,6 +69,20 @@ cp $SRC_DIR/docs/jarvis_guide.pdf $DEPLOY_DIR/$JARVIS_PACKAGE/docs
 mkdir $DEPLOY_DIR/$JARVIS_PACKAGE/etc/httpd
 mv $DEPLOY_DIR/$JARVIS_PACKAGE/etc/apache $DEPLOY_DIR/$JARVIS_PACKAGE/etc/httpd/conf.d
 
+# Determine the version of the source system the output packages where compiled on.
+# This is used in our output filename as well as determining which spec file to use.
+RHELVERSION=`rpm -E %{rhel}`
+
+# We implement a specific version for RHEL6 everything else just uses the default spec file.
+SPECFILE=""
+if [[ $RHELVERSION == '6' ]]; then
+    SPECFILE="jarvis_rhel_6.spec"
+else 
+    SPECFILE="jarvis.spec"
+fi
+
+echo "# Building RPM Package with spec file: $SPECFILE"
+
 # Build the RPM package.
 VERSION=$VERSION \
 RELEASE=$RELEASE \
@@ -78,10 +92,7 @@ PACKAGE=$JARVIS_PACKAGE \
     --define "_rpmdir %(pwd)/rpms" \
     --define "_srcrpmdir %(pwd)/rpms" \
     --define "_sourcedir %(pwd)/../" \
-    -ba jarvis.spec
-
-# Finally version the output packages to indicate the source system it was compiled on.
-RHELVERSION=`rpm -E %{rhel}`
+    -ba $SPECFILE
 
 mv "$DIR/rpms/noarch/jarvis-$VERSION-$RELEASE.noarch.rpm" "$DIR/rpms/noarch/jarvis-$VERSION-$RELEASE-RHEL-$RHELVERSION.noarch.rpm"
 mv "$DIR/rpms/jarvis-$VERSION-$RELEASE.src.rpm" "$DIR/rpms/jarvis-$VERSION-$RELEASE-RHEL-$RHELVERSION.src.rpm"
