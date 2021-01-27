@@ -35,6 +35,7 @@ use XML::Smart;
 
 package Jarvis::Login;
 
+use JSON qw(decode_json);
 use Jarvis::Error;
 use Jarvis::Text;
 use Jarvis::Main qw(generate_uuid);
@@ -187,6 +188,20 @@ sub check {
     my $url_username = $jconfig->{'cgi'}->url_param('username');
     my $url_password = $jconfig->{'cgi'}->url_param('password');
     my $require_post_error = undef;
+
+    # We might also be given our login details via JSON so we should check if we have some POSTDATA to parse.
+    my $cgi_postdata = $jconfig->{'cgi'}->param('POSTDATA');
+
+    # If we get something we should still be careful in case its not JSON encoded. Currently we only support JSON.
+    if (defined $cgi_postdata) {
+        # Attempt to parse our CGI data as JSON. We'll do this in an EVAL to be safe.
+        eval {
+            my $parsed_cgi_postdata = decode_json ($cgi_postdata);
+            # If we have any of our expected login fields apply them against our existing parameters so we can continue our login.
+            $cgi_username = ($parsed_cgi_postdata->{username} ? $parsed_cgi_postdata->{username} : $cgi_username);
+            $cgi_password = ($parsed_cgi_postdata->{password} ? $parsed_cgi_postdata->{password} : $cgi_password);
+        }
+    }
 
     if ($login_requires_post and ($url_username or $url_password)) {
         &Jarvis::Error::log ($jconfig, "Username/password provided as URL parameters when require_post was specified (removed).");
