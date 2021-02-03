@@ -32,8 +32,8 @@ package Jarvis::Agent::DBI;
 
 use parent qw(Jarvis::Agent);
 
-use DBI qw(:sql_types);;
-use JSON; 
+use DBI qw(:sql_types);
+use JSON;
 use XML::Smart;
 use Data::Dumper;
 
@@ -140,6 +140,8 @@ sub sql_with_substitutions {
             #   !out            Request an inout variable binding.
             #   !varchar        Call bind_param(_inout) with SQL_VARCHAR (the default)
             #   !numeric        Call bind_param(_inout) with SQL_NUMERIC
+            #   !json           When referring to a reference, we might want to serialize it 
+            #                   as JSON for storage in some DBs like PostgreSQL.
             #
             while ($name =~ m/^(.*)(\![a-z]+)$/) {
                 $name = $1;
@@ -446,14 +448,42 @@ sub statement_execute {
         #
         # Do we have any "!out" flagged variables?
         my $out_flag = 0;
+        # Do we have any special handling that we need to perform on any of our SQL parameters?
+        my $special_flag = 0;
         foreach my $flag (@{ $stm->{vflags_aref} }) {
-            if (defined $flag && $flag->{out}) {
-                $out_flag = 1;
+            # Look for out or json as valid special flags that will need additional processing.
+            if (defined $flag && ($flag->{out} || $flag->{json})) {
+                if ($flag->{out}) {
+                    $out_flag = 1;
+                }
+                if ($flag->{json}) {
+                    $special_flag = 1;
+                }
                 last;
             }
         }
 
-        # The caes with "!out" variables is suddenly more interesting.
+        # If we have any special processing we need to perform lets handle that now.
+        if ($special_flag) {
+            &Jarvis::Error::debug ($jconfig, "At least one bind variable is flagged with special '!'. Performing argument manipulation.");
+            foreach my $i (0 .. $#$args) {
+                # Get the flags for the current argument.
+                my $flags = $stm->{vflags_aref}[$i];
+
+                # Handle JSON encoded values. We need to take the requested argument which is
+                # expected to be a HASH reference and encode it as JSON we can use.
+                if (defined $flags->{json}) {
+                    eval {
+                        $$args[$i] = JSON::encode_json ($$args[$i]);
+                    };
+                    if ($@) {
+                        die "Failed to encode JSON bind value: $@\n";
+                    }
+                }
+            }
+        }
+
+        # The cases with "!out" variables is suddenly more interesting.
         if ($out_flag) {
             my %out_arg_refs = ();
 
