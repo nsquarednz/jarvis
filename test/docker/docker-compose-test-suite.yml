@@ -1,0 +1,25 @@
+version: '2'
+networks:
+  jarvis-test-suite:
+
+services:
+  jarvis:
+    container_name: jarvis
+    # Using a locally built jarvis image. We won't use our registry for this.
+    image: jarvis:latest
+    networks:
+      - jarvis-test-suite
+    tty: true
+    ports:
+      # HTTP API.
+      - 8000:80
+    environment:
+      ### Permissions
+      #
+      # Declare the UID and GID associated with the user that will run the
+      # process.
+      # In a development environment this should be the same user your
+      # development environment is owned by. This will give you full read/write
+      # access to your files. To find your UID and GID, simply run 'id -a'.
+      - PUID=1000
+      - PGID=1000

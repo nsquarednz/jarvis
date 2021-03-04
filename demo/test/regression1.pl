@@ -10,8 +10,18 @@ use lib "./lib";
 use Test::More;
 use Test::Differences;
 use Data::Dumper;
+use Getopt::Long;
 
 use TestUtils;
+
+################################################################################
+# Flags.
+################################################################################
+my $base_url_override = undef;
+&Getopt::Long::GetOptions ("base_url_override=s" => \$base_url_override) || die "usage: perl $0 [--base_url_override <override_uri>]";
+if ($base_url_override) {
+    $TestUtils::base_url = $base_url_override;
+}
 
 ###############################################################################
 # Initial Set-Up
@@ -122,7 +132,11 @@ if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{succ
 ###############################################################################
 
 my ($code, $message) = TestUtils::store ([ 'boat' ], { _method => 'insert' }, $insert, 1);
-if (! ok (($code == 409) && ($message eq "UNIQUE constraint failed: boat.name\n"), "JSON Insert Boat '$en_boat_name' Duplicate")) {
+
+# Note when running under FastCGI we will get back a message that looks something like:
+# [Thu Mar  4 01:58:19 2021] fast-agent.fcgi: UNIQUE constraint failed: boat.name
+# We should regex match looking for the latter part of the string.
+if (! ok (($code == 409) && ($message =~ /^.*UNIQUE constraint failed: boat\.name\n$/gm), "JSON Insert Boat '$en_boat_name' Duplicate")) {
     BAIL_OUT("Failed to insert: " . &Dumper ($code, $message));    
 }
 

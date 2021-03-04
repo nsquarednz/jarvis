@@ -1,0 +1,143 @@
+#
+# Create an environment that is used to spin up a self contained Jarvis test implementation within a container.
+#
+# The major things that this container installs are:
+#       Ubuntu 18.04
+#       Apache Latest
+#       Jarvis Latest
+#
+# If you want to locally build the docker image you can do so with:
+#   
+#   docker build -t jarvis -f test/docker/DockerfileJarvis .
+#
+# The image can be started up using the test suite docker compose script file.
+# 
+#   docker-compose -f test/docker/docker-compose-test-suite.yml up --detach
+#
+
+# Currently using 18.04, there are issues with libmongodb-perl on 20.04 as it deprecated a number of items.
+# If we have to handle Mongo in the future we'll have to rethink this.
+FROM ubuntu:18.04
+LABEL maintainer="N-Squared Software <support@nsquared.nz>"
+
+# Set an argument that we want our front end to be non-interactive. We need to to deal with any installation prompts we can handle with -y.
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Copy configuration files into the root directory to setup things like Apache and Jarvis.
+COPY test/docker/root/ /
+
+# Setup the base home working directory that Jarvis will live in.
+WORKDIR /jarvis
+
+# Copy the contents of the current directory which will be our Jarvis root into our working context.
+COPY . .
+
+# Perform our installation tasks.
+RUN \
+    echo "**** Fix up sources list to use local servers ****" \
+        && sed -i -e 's/archive.ubuntu.com/nz.archive.ubuntu.com/' /etc/apt/sources.list\
+    && \
+    echo "**** Update sources ****" \
+        && apt-get update \
+    && \
+    echo "**** Install utilities from apt ****" \
+        && apt-get install -y \
+            # Get rid of some warnings/errors during the next step.
+            libterm-readline-perl-perl \
+            # Used to rotate the FOUNDATIONDB log.
+            logrotate \
+            # Used in the cont-init.d script.
+            netcat \
+            # Make for our Jarvis XS code.
+            make gcc \
+            # Apache for serving Jarvis and our application API and its dependencies.
+            apache2 libapache2-mod-fcgid \
+            # A sane text editor.
+            nano \
+            # Tools required for getting and installing GPG keys.
+            gnupg wget \
+    && \
+    echo "**** Setup Additional Sources ****" \
+        # Mongo DB. Again using 4.0 due to Ubuntu 18.04 and this is the only version we have out in the wild.
+        && wget -qO - https://www.mongodb.org/static/pgp/server-4.0.asc | apt-key add - \
+        && echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-4.0.list \
+        # Refresh any apt sources that we might have created for future installs.
+        && apt-get update \
+    && \
+    echo "**** Install Perl Dependencies ****" \
+        && apt-get install -y \
+            libcgi-fast-perl \
+            libcgi-session-perl \
+            libxml-smart-perl \
+            libjson-perl \
+            libmime-types-perl \
+            libcrypt-eksblowfish-perl \
+            libdbi-perl \
+            libdbd-sqlite3-perl \
+            libmongodb-perl \
+            libsub-exporter-perl \
+    && \
+    echo "**** Install Mongo DB ****" \
+        && apt-get update \
+        && apt-get install -y \
+            mongodb-org=4.0.19 mongodb-org-server=4.0.19 mongodb-org-shell=4.0.19 mongodb-org-mongos=4.0.19 mongodb-org-tools=4.0.19 \
+            # mongodb-org \
+            # mongodb-org-server \
+            # mongodb-org-shell \
+            # mongodb-org-mongos \
+            # mongodb-org-tools \
+        # Since for some insane reason this doesn't actually install any of our service stuff we'll have to do it ourselves :|
+        # We copy the config over with out root directory. But we need to fix up permissions. 
+        && chmod 755 /etc/init.d/mongod \
+        # Create data directories.
+        && mkdir -p /data/db \
+        && chmod -R 755 /data \
+    && \
+    echo "**** Create Jarvis Config Directories ****" \
+        && mkdir /etc/jarvis \
+        && mkdir /var/lib/jarvis \
+        && mkdir -p /var/lib/jarvis/demo/sessions \
+        && chown -R www-data:www-data /var/lib/jarvis \
+    &&\
+    echo "**** Cleanup setup files ****" \
+        && rm -rf \
+            /tmp/* \
+            /var/lib/apt/lists/* \
+            /var/tmp/*
+
+# Define the tasks that will be run when our container starts up.
+ENTRYPOINT \
+    # Setup Jarvis.
+    echo "**** Setting up Jarvis ****" \
+        && cd /jarvis/xs/Jarvis-JSON-Utils/ \
+        && perl Makefile.PL \
+        && make install \
+        && ln -sf /jarvis /usr/share/jarvis \
+    && \
+    # Startup Mongo DB.
+    echo "**** Setting up MongoDB ****" \
+        && service mongod start \
+        # Wait a second for Mongo to completly startup before we connect to the instance.
+        && sleep 2 \
+    && \
+    # Setup Jarvis configuration files for configurations we want to deploy.
+    # This will just be a copy so we can redeploy if needed without a rebuild.
+    echo "**** Setup Jarvis Configurations ****" \
+        # Setup jarvis configurations for our demo test suite.
+        && cp /jarvis/demo/etc/demo.xml /etc/jarvis/ \
+        # Setup the demo SQLLite DB.
+        && cp /jarvis/demo/db/demo-empty.db /var/lib/jarvis/demo/demo.db \
+        && chown www-data:www-data /var/lib/jarvis/demo/demo.db \
+        # And the Mongo DB.
+        && mongo < /jarvis/demo/db/demo-mongo.js \
+    && \
+    # Start Apache.
+    echo "**** Starting up Apache ****" \
+        && a2enmod proxy \
+        && a2enmod proxy_http \
+        && a2enmod headers \
+        && service apache2 start \
+    && \
+    # Attach to bash to keep our container alive. This will be our "init".
+    echo "Application Ready" \
+    && /bin/bash

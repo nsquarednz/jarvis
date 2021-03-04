@@ -11,8 +11,18 @@ use Test::More;
 use Test::Differences;
 use Data::Dumper;
 use JSON::PP;
+use Getopt::Long;
 
 use TestUtils;
+
+################################################################################
+# Flags.
+################################################################################
+my $base_url_override = undef;
+&Getopt::Long::GetOptions ("base_url_override=s" => \$base_url_override) || die "usage: perl $0 [--base_url_override <override_uri>]";
+if ($base_url_override) {
+    $TestUtils::base_url = $base_url_override;
+}
 
 ###############################################################################
 # Initial Set-Up
@@ -144,7 +154,7 @@ if (! eq_or_diff ($json->{data}, $expected, 'Updated Rows after Update Queen Mar
 # Get all the distinct number of funnels across all 3 ships.
 ###############################################################################
 
-my $expected_distinct_funnels = [7, 4];
+my $expected_distinct_funnels = [4, 7];
 
 $json = TestUtils::fetch_json ([ 'ship_funnels' ]);
 

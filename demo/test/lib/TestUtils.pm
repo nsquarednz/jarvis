@@ -14,8 +14,10 @@ use JSON qw(encode_json decode_json);
 use URI::Escape;
 use XML::Smart;
 
-# Jarvis base URL.
-my $base_url = "http://localhost/jarvis-agent/demo";
+# Define the base URL to use. Calling scripts may overwrite this if required. 
+# Docker test runners run on different ports so we'll need this for those cases.
+$TestUtils::base_url = "http://localhost/jarvis-agent/demo";
+
 my %passwords = ("admin" => "admin", "guest" => "guest");
 
 my $JSON_SENT_MIME_TYPE = "application/json";
@@ -40,7 +42,7 @@ $ua->cookie_jar (HTTP::Cookies->new (file => "cookies.txt", autosave => 1));
 sub logout_json {
 
 	# Request is a simple GET.
- 	my $req = HTTP::Request->new (GET => "$base_url/__logout");
+ 	my $req = HTTP::Request->new (GET => "$TestUtils::base_url/__logout");
 
  	# Check request succeeded, and result is interpretable as JSON.
  	my $res = $ua->request ($req);
@@ -73,7 +75,7 @@ sub login_json {
 	my $urlencoded_form = join ('&', map { uri_escape ($_) . '=' . uri_escape ($query_args{$_}) } (keys %query_args));
 
 	# Request is a POST with user/pass.
- 	my $req = HTTP::Request->new (POST => "$base_url/__status");
+ 	my $req = HTTP::Request->new (POST => "$TestUtils::base_url/__status");
     $req->content_type ('application/x-www-form-urlencoded');
     $req->content ($urlencoded_form); 	
 
@@ -108,7 +110,7 @@ sub fetch {
 	my $urlencoded_args = join ('&', map { uri_escape ($_) . '=' . uri_escape ($query_args->{$_}) } (keys %$query_args));
 
 	# Request is a GET with query args in the URL.
- 	my $req = HTTP::Request->new (GET => "$base_url/$restful_url?$urlencoded_args");
+ 	my $req = HTTP::Request->new (GET => "$TestUtils::base_url/$restful_url?$urlencoded_args");
 
   	# Check request succeeded, and result is interpretable as JSON.
 	my $res = $ua->request ($req);
@@ -187,7 +189,7 @@ sub store {
 	my $rows_json = encode_json ($rows);
 
 	# Request is a POST with query args in the URL and a content.
- 	my $req = HTTP::Request->new (POST => "$base_url/$restful_url?$urlencoded_args");
+ 	my $req = HTTP::Request->new (POST => "$TestUtils::base_url/$restful_url?$urlencoded_args");
     $req->content_type ($JSON_SENT_MIME_TYPE);
     $req->content ($rows_json);
 
