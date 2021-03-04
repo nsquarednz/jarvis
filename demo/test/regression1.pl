@@ -99,6 +99,15 @@ if (! eq_or_diff ($json->{quota}, "4 Gazillion", 'JSON Fetch quota parameter mat
 }
 my @all_boats = @{ $json->{data} };
 
+# Repeat for XML format.
+$xml = TestUtils::fetch_xml ([ 'boat' ]);
+if (! ok (defined $xml->{response}{returned} && defined $xml->{response}{fetched} && defined $xml->{response}{data}, "XML Get all Boats")) {
+    BAIL_OUT("Failed to fetch: " . &Dumper ($xml));    
+}
+if (! eq_or_diff ($xml->{response}{quota}->content, "4 Gazillion", 'XML Fetch quota parameter matches.')) {
+    BAIL_OUT("Unexpected __status quota: " . &Dumper ($xml));    
+}
+
 ###############################################################################
 # Delete/Create Boat "Empty Nest"
 #	- Test Single Row non-nested delete
@@ -208,6 +217,29 @@ if (! eq_or_diff ($json->{data}, $expected, 'JSON Duplicated Fetch matches.')) {
     BAIL_OUT("Unexpected Duplicated Fetch result: " . &Dumper ($json));    
 }
 
+# Repeat for XML format.
+$xml = TestUtils::fetch_xml ([ 'boat', $en_boat_id ], { duplicate => 1 });
+if (! ok (defined $xml->{response}{returned} && defined $xml->{response}{fetched} && defined $xml->{response}{data}, "XML Get Boat '$en_boat_name' by ID $en_boat_id with Duplicate")) {
+    BAIL_OUT("Failed to fetch: " . &Dumper ($xml));    
+}
+
+# Its a bit fiddly but I just don't know how else to get an array of objects from a response.
+# Process each node.
+my @nodes = $xml->{response}{data}->nodes;
+my $parsed_content;
+foreach my $node (@nodes) {
+    # Get all the arg value objects.
+    my @arg_values = map $_->args_values, $node;
+    my $content;
+    # Map each arg value object key and content to a hash.
+    map $content->{$_->key} = $_->content, @arg_values;
+    push @{$parsed_content}, $content;
+}
+
+if (! eq_or_diff ($parsed_content, $expected, 'XML Duplicated Fetch matches.')) {
+    BAIL_OUT("Unexpected Duplicated Fetch result: " . &Dumper ($xml));    
+}
+
 ###############################################################################
 # Get all boats and test paging.
 ###############################################################################
@@ -220,6 +252,17 @@ if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json
 my $num_rows = scalar (@{ $json->{data} });
 if (! ok ($num_rows > 10, 'JSON All Boats Fetch count.')) {
     BAIL_OUT("Unexpected All Boats Fetch count: " . &Dumper ($json));    
+}
+
+# Repeat for XML format.
+$xml = TestUtils::fetch_xml ([ 'boat' ]);
+if (! ok (defined $xml->{response}{returned} && defined $xml->{response}{fetched} && defined $xml->{response}{data}, "XML Get All Boats")) {
+    BAIL_OUT("Failed to fetch: " . &Dumper ($xml));    
+}
+
+$num_rows = scalar ($xml->{response}{data}->nodes);
+if (! ok ($num_rows > 10, 'XML All Boats Fetch count.')) {
+    BAIL_OUT("Unexpected All Boats Fetch count: " . &Dumper ($xml));    
 }
 
 # NOTE: "start" and "limit" parameter names are specified in demo.xml
@@ -337,9 +380,14 @@ my @part_ids = map { $_->{returning}[0]{id} } @{ $json->{row} };
 # OK, now try a nested fetch!
 ###############################################################################
 $json = TestUtils::fetch_json ([ 'boat_object' ], { id => $en_boat_id });
-
 if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json->{data}, "JSON Select Nested Boat Object for '$en_boat_name'")) {
     BAIL_OUT("Failed to fetch: " . &Dumper ($json));    
+}
+
+# Repeat for XML.
+$xml = TestUtils::fetch_xml ([ 'boat_object' ], { id => $en_boat_id });
+if (! ok (defined $xml->{response}{returned} && defined $xml->{response}{fetched} && defined $xml->{response}{data}, "JSON Select Nested Boat Object for '$en_boat_name'")) {
+    BAIL_OUT("Failed to fetch: " . &Dumper ($xml));
 }
 
 ###############################################################################
@@ -423,6 +471,43 @@ $expected = {
 };
 if (! eq_or_diff ($json->{data}, $expected, 'JSON Object Fetch matches.')) {
     BAIL_OUT("Unexpected Duplicated Fetch result: " . &Dumper ($json));    
+}
+
+$xml = TestUtils::fetch_xml ([ 'boat_object', $mh_boat_id ]);
+if (! ok (defined $xml->{response}{returned} && defined $xml->{response}{fetched} && defined $xml->{response}{data}, "XML Get Boat '$mh_boat_name' by ID $mh_boat_id")) {
+    BAIL_OUT("Failed to fetch: " . &Dumper ($xml));    
+}
+
+# Its a bit fiddly but I just don't know how else to get an array of objects from a response.
+# Process each node.
+@nodes = $xml->{response}{data}->nodes;
+undef $parsed_content;
+foreach my $node (@nodes) {
+    # Get all the arg value objects.
+    my @arg_values = map $_->args_values, $node;
+    my $content;
+    # Map each arg value object key and content to a hash.
+    map $content->{$_->key} = $_->content, @arg_values;
+
+    # Handle nested elements.
+    my @part_nodes = $xml->{response}{data}{row}->nodes;
+
+    # Again don't know how to get these out nicely with XML::Smart.
+    $content->{parts} = [];
+    foreach my $part_node (@part_nodes) {
+        my @part_arg_values = map $_->args_values, $part_node;
+        my $part_content;
+        map $part_content->{$_->key} = $_->content, @part_arg_values;
+        push @{$content->{parts}}, $part_content;
+    }
+
+    push @{$parsed_content}, $content;
+}
+
+# Check that we only got one back!
+eq_or_diff (scalar @{$parsed_content}, 1, 'XML Object Fetch singleton.');
+if (! eq_or_diff (@{$parsed_content}[0], $expected, 'XML Object Fetch matches.')) {
+    BAIL_OUT("Unexpected Duplicated Fetch result: " . &Dumper ($xml));    
 }
 
 ###############################################################################
