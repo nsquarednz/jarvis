@@ -1,0 +1,33 @@
+#
+# This docker file will setup an image ready to execute the demo test suite.
+# To use this docker file first build the docker file from the root directory of the Jarvis repository.
+#   
+#   docker build -t jarvis-demo -f demo/docker/DockerfileDemo  .
+#
+# The image can then be executed and its exit code checked for success with:
+#
+#   docker run --network docker_jarvis-test-suite jarvis-demo
+#
+
+# Use our test runner environment to build and subsequently use this image.
+FROM collector.nsquared.nz/test-environment-jarvis-deb-1804:latest
+LABEL maintainer="N-Squared Software <support@nsquared.nz>"
+
+# Setup the base home working directory that N2ACD will live in.
+WORKDIR /jarvis
+
+# Copy the contents of the current directory which will be our N2ACD root into our working context.
+COPY . .
+
+# Start the container with a number of running headless items that are needed for our tests.
+RUN \
+    echo "**** No Prequisites ****"
+
+# Define the tasks that will be run when our container starts up.
+ENTRYPOINT \
+    # Start our test scripts.
+    echo "*** Executing Regression Tests ***" \
+        && cd /jarvis/demo/test \
+        && perl regression1.pl --base_url_override "http://jarvis:80/jarvis-agent/demo" \
+        && perl regression2.pl --base_url_override "http://jarvis:80/jarvis-agent/demo"
+

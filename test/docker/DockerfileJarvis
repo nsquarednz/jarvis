@@ -136,6 +136,7 @@ ENTRYPOINT \
         && a2enmod proxy \
         && a2enmod proxy_http \
         && a2enmod headers \
+        && a2enmod cgi \
         && service apache2 start \
     && \
     # Attach to bash to keep our container alive. This will be our "init".
