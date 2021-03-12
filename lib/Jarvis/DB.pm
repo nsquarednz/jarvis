@@ -70,10 +70,11 @@ sub db_config {
     $dbname = "default" unless defined $dbname && $dbname . '';
     $dbtype = "dbi" unless defined $dbtype && $dbtype . '';
 
-    my $axml = $jconfig->{xml}{jarvis}{app};
+    my $axml = $jconfig->{xml}->find ('/jarvis/app')->pop ();
 
     # Find the specific database config we need.
-    my @dbs = grep { (($_->{name}->content || 'default') eq $dbname) && (($_->{type}->content || 'dbi') eq $dbtype) } @{ $axml->{database} };
+    my @dbs = grep { (($_->findvalue ('./@name') || 'default') eq $dbname) && (($_->findvalue ('./@type') || 'dbi') eq $dbtype) } $axml->findnodes ('./database');
+
     (scalar @dbs) || die "No database with name '$dbname', type '$dbtype' is currently configured in Jarvis.\n";
     ((scalar @dbs) == 1) || die "Multiple databases with name '$dbname', type '$dbtype' are currently configured in Jarvis.\n";
 
@@ -112,19 +113,19 @@ sub handle {
 
     # Configuration common to all database types.
     my $dbxml = &db_config($jconfig, $dbname, $dbtype);
-    my $dbconnect = $dbxml->{connect}->content || '';
-    my $dbusername = $dbxml->{username}->content || '';
-    my $dbpassword = $dbxml->{password}->content || '';
+    my $dbconnect = $dbxml->{connect} || '';
+    my $dbusername = $dbxml->{username} || '';
+    my $dbpassword = $dbxml->{password} || '';
 
     # Optional parameters, handled per-database type.
     my $dbh_attributes = {};
-    if ($dbxml->{dbh_attributes} && $dbxml->{dbh_attributes}{attribute}) {
-        foreach my $attr ($dbxml->{dbh_attributes}{attribute}('@')) {
+    if ($dbxml->exists ('./dbh_attributes') && $dbxml->exists ('./dbh_attributes/attribute')) {
+        foreach my $attr ($dbxml->findnodes ('./dbh_attributes/attribute')) {
             $attr->{name} or die "DB Parameter entry is missing 'name'.";
             $attr->{value} or die "DB Parameter entry is missing 'value'.";
 
-            my $name = $attr->{name}->content;
-            my $value = $attr->{value}->content;
+            my $name = $attr->{name};
+            my $value = $attr->{value};
 
             &Jarvis::Error::debug ($jconfig, "DBH Attribute: '%s' -> '%s'.", $name, $value);
 
@@ -182,9 +183,9 @@ sub handle {
         }
 
     # SDP is a SSAS DataPump pseudo-database.
-    # 
+    #
     # NOTE: We load the DB::SDP module at runtime with a "require".  Why?  Because very few
-    #       sites actually use SDP, and hence they don't actually need SOAP::Lite as a 
+    #       sites actually use SDP, and hence they don't actually need SOAP::Lite as a
     #       dependency.
     #
     } elsif ($dbtype eq "sdp") {
@@ -196,9 +197,9 @@ sub handle {
         $dbhs{$dbtype}{$dbname} = Jarvis::DB::SDP->new ($jconfig, $dbconnect, $dbusername, $dbpassword, $dbh_attributes);
 
     # MongoDB is a non-relational database with its own driver API.
-    # 
+    #
     # NOTE: We load the DB::MongoDB module at runtime with a "require".  Why?  Because very few
-    #       sites actually use MongoDB, and hence they don't actually need MongoDB as a 
+    #       sites actually use MongoDB, and hence they don't actually need MongoDB as a
     #       dependency.
     #
     } elsif ($dbtype eq "mongo") {
@@ -239,7 +240,7 @@ sub disconnect {
         foreach my $dbn (sort (keys %{ $dbhs{$dbt} })) {
             next if ((defined $dbname) && ($dbname ne $dbn));
 
-            &Jarvis::Error::debug ($jconfig, "Check Disconnect from database type = '%s', name = '%s'.  Rollback = %s.", 
+            &Jarvis::Error::debug ($jconfig, "Check Disconnect from database type = '%s', name = '%s'.  Rollback = %s.",
                 $dbt, $dbn, $rollback ? "YES" : "NO");
 
             eval {
@@ -248,7 +249,7 @@ sub disconnect {
 
                 if ($dbhs{$dbt}{$dbn}) {
                     if ($rollback) {
-                        $dbhs{$dbt}{$dbn}->rollback();    
+                        $dbhs{$dbt}{$dbn}->rollback();
                     }
                     $dbhs{$dbt}{$dbn}->disconnect();
 

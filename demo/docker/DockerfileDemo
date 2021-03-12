@@ -1,7 +1,7 @@
 #
 # This docker file will setup an image ready to execute the demo test suite.
 # To use this docker file first build the docker file from the root directory of the Jarvis repository.
-#   
+#
 #   docker build -t jarvis-demo -f demo/docker/DockerfileDemo  .
 #
 # The image can then be executed and its exit code checked for success with:

@@ -26,8 +26,6 @@
 use strict;
 use warnings;
 
-use XML::Smart;
-
 package Jarvis::Agent::SDP;
 
 use parent qw(Jarvis::Agent);
@@ -44,7 +42,7 @@ use sort 'stable';      # Don't mix up records when server-side sorting
 #       - Replace {$args} with text equivalent.
 #       - Replace [$args] with text equivalent.
 #
-# Note that the SQL/DBI version allows more flexible syntax.  We do not, we 
+# Note that the SQL/DBI version allows more flexible syntax.  We do not, we
 # support only the single specified formats.  In the future we will be forcing
 # DBI datasets to move to the same syntax.
 #
@@ -93,7 +91,7 @@ sub mdx_with_substitutions {
             # open bracket, and we should automatically activate the :bracket
             # flag.  But in the end, I just couldn't see that it was going to be
             # 100% safe or reliable.  So let's leave it in the query designer's
-            # hands, and just default to "safe" mode. 
+            # hands, and just default to "safe" mode.
             #
             while ($name =~ m/^(.*)(\![a-z]+)$/) {
                 $name = $1;
@@ -116,29 +114,29 @@ sub mdx_with_substitutions {
             # -- update the documentation if you change/extend then.
             ###################################################################
 
-            # With the !string flag, or if the preceding character was a string, 
+            # With the !string flag, or if the preceding character was a string,
             # then escape for use in StrToMbr(" ")
             if ($flags{'string'}) {
                 $value =~ s/\\/\\\\/g;
                 $value =~ s/"/\\"/g;
-                
-            # We can allow brackets. 
+
+            # We can allow brackets.
             } elsif ($flags{'bracket'}) {
                 $value =~ s/\]/\]\]/g;
-                
-            # Else we go raw.  Only allowed for SAFE variables (not client-supplied). 
+
+            # Else we go raw.  Only allowed for SAFE variables (not client-supplied).
             } elsif ($flags{'raw'} && ($name =~ m/^__/)) {
                 # No change.
-                
+
             # Or else we will just use plain identifiers.  Characters and spaces
             # can go through unchanged.  Note that if you use space identifiers
             # without square brackets in your surrounding MDX, your query will
             # not execute.
             #
             } else {
-                $value =~ s/[^0-9a-zA-Z _\-,]//ig;                
+                $value =~ s/[^0-9a-zA-Z _\-,]//ig;
             }
-            &Jarvis::Error::debug ($jconfig, "Expanding: '$name' " . (scalar %flags ? ("[" . join (",", keys %flags) . "] ") : "") . "-> '$value'.");            
+            &Jarvis::Error::debug ($jconfig, "Expanding: '$name' " . (scalar %flags ? ("[" . join (",", keys %flags) . "] ") : "") . "-> '$value'.");
             $mdx2 .= $value;
 
         } else {
@@ -168,11 +166,11 @@ sub parse_mdx {
     my ($jconfig, $dsxml, $args_href) = @_;
 
     # Get the raw values.
-    my $raw_mdx = $dsxml->{dataset}{'mdx'}->content || return undef;
+    my $raw_mdx = $dsxml->findvalue ('/dataset/mdx') || return undef;
     $raw_mdx =~ s/^\s*\-\-.*$//gm;   # Remove comments
     $raw_mdx = &trim ($raw_mdx);
 
-    # Perform textual substitution... being vary careful about injection!    
+    # Perform textual substitution... being vary careful about injection!
     &Jarvis::Error::dump ($jconfig, "MDX as read from XML = " . $raw_mdx);
 
     # Get our MDX with placeholders and prepare it.
@@ -191,7 +189,7 @@ sub parse_mdx {
 # array so that it can be presented to the client in JSON or XML or whatever.
 #
 # This function only processes a single dataset.  The parent method may invoke
-# us multiple times for a single request, and combine into a single return 
+# us multiple times for a single request, and combine into a single return
 # object.
 #
 # Params:
@@ -215,18 +213,18 @@ sub parse_mdx {
 #
 sub fetch_inner {
     my ($class, $jconfig, $dataset_name, $dsxml, $dbh, $safe_params_href) = @_;
-    
+
     # Get our STM.  This has everything attached.
     my $mdx = &parse_mdx ($jconfig, $dsxml, $safe_params_href) ||
         die "Dataset '$dataset_name' (type 'sdp') has no MDX query.\n";
 
     # What key will we use to store the row labels?
-    my $row_label = $dsxml->{dataset}{mdx}{row_label}->content || 'row_label';
-        
-    # Execute Fetch in 2D tuple format.
-    my ($rows_aref, $column_names_aref) = $dbh->fetchall_arrayref ($jconfig, $mdx, $row_label);    
+    my $row_label = $dsxml->findvalue ('/dataset/mdx/@row_label') || 'row_label';
 
-    return ($rows_aref, $column_names_aref); 
+    # Execute Fetch in 2D tuple format.
+    my ($rows_aref, $column_names_aref) = $dbh->fetchall_arrayref ($jconfig, $mdx, $row_label);
+
+    return ($rows_aref, $column_names_aref);
 }
 
 1;

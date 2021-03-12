@@ -35,7 +35,7 @@ use Jarvis::Error;
 # Parses a URL, finds the best route, and performs parameter substitution.
 # We pull out any named REST args and merge them with our numbered rest args
 # array to form a complete combined REST args hash.
-# 
+#
 # Fallback to $rest_args[0]
 #
 # Params:
@@ -61,17 +61,21 @@ sub find {
     # Load routes and store in $jconfig, just in case we need them again.
     if (! defined ($jconfig->{routes})) {
         my @routes = ();
-        
+
         # Process the 'route' entries across the main jarvis file AND THEN any <include> files.
-        foreach my $axml ($jconfig->{xml}{jarvis}{app}, @{ $jconfig->{iaxmls} }) {
-            my $rxml = $axml->{router};
-            if ($rxml && $rxml->{route}) {
-                foreach my $route ($rxml->{route}('@')) {
+        foreach my $axml ($jconfig->{xml}->findnodes ('/jarvis/app'), (map { $_->findnodes ('/jarvis/app') } @{$jconfig->{iaxmls}})) {
+
+            # Look for the first router element in each XML configuration, and check that it has at least one route defined.
+            my $rxml = $axml->find ('./router')->pop ();
+            if ($rxml && $rxml->exists ('./route')) {
+                foreach my $route ($rxml->findnodes ("./route")) {
+                    # Sanity checks.
                     (defined $route->{dataset}) or die "Router has route with no dataset.\n";
                     (defined $route->{path}) or die "Router has route with no path.\n";
-                    my $dataset = $route->{dataset}->content;
-                    my $path = $route->{path}->content;
-                    my $presentation = $route->{presentation} ? $route->{presentation}->content : "array";
+                    # Fetch data.
+                    my $dataset = $route->{dataset};
+                    my $path = $route->{path};
+                    my $presentation = $route->{presentation} ? $route->{presentation} : "array";
                     (($presentation eq 'array') || ($presentation eq 'singleton')) or die "Unsupported presentation '$presentation' in route.\n";
 
                     # Remove leading slash to expose the first path part.

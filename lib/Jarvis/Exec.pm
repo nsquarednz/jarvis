@@ -78,33 +78,34 @@ sub do {
     my $cleanup_after = 0;              # Cleanup after how many minutes?  0 = NEVER CLEANUP.
 
     # Process the 'exec' entries across the main jarvis file AND THEN any <include> files.
-    ALL_EXECS: foreach my $axml ($jconfig->{xml}{jarvis}{app}, @{ $jconfig->{iaxmls} }) {
-        if ($axml->{exec}) {
-            foreach my $exec (@{ $axml->{exec} }) {
-                my $exec_ds = $exec->{dataset}->content;
+    ALL_EXECS: foreach my $axml ($jconfig->{xml}->findnodes ('/jarvis/app'), (map { $_->findnodes ('/jarvis/app') } @{$jconfig->{iaxmls}})) {
+        if ($axml->exists ('./exec')) {
+            foreach my $exec ($axml->findnodes ('./exec')) {
+                my $exec_ds = $exec->{dataset};
                 &Jarvis::Error::dump ($jconfig, "Comparing '$dataset' to '$exec_ds'.");
                 next if (($dataset ne $exec_ds) && ($dataset !~ m/^$exec_ds\./));
 
                 &Jarvis::Error::debug ($jconfig, "Found matching custom <exec> dataset '$dataset'.");
 
-                $allowed_groups = $exec->{access}->content || die "No 'access' defined for exec dataset '$dataset'\n";
-                $command = $exec->{command}->content || die "No 'command' defined for exec dataset '$dataset'\n";
-                $add_headers = defined ($Jarvis::Config::yes_value {lc ($exec->{add_headers}->content || "no")});
-                $default_filename = $exec->{default_filename}->content;
-                $filename_parameter = $exec->{filename_parameter}->content || 'filename';
-                $mime_type = $exec->{mime_type}->content;
-                $cleanup_after = $exec->{cleanup_after}->content || 0;
+                $allowed_groups = $exec->{access} || die "No 'access' defined for exec dataset '$dataset'\n";
+                $command = $exec->{command}       || die "No 'command' defined for exec dataset '$dataset'\n";
+
+                $add_headers = defined ($Jarvis::Config::yes_value {lc ($exec->{add_headers} || "no")});
+                $default_filename = $exec->{default_filename};
+                $filename_parameter = $exec->{filename_parameter} || 'filename';
+                $mime_type = $exec->{mime_type};
+                $cleanup_after = $exec->{cleanup_after} || 0;
 
                 # If HTTP redirection URL is specified, then use of tmp files is forced.
-                $tmp_directory = $exec->{tmp_directory}->content;
-                $tmp_http_path = $exec->{tmp_http_path}->content;
+                $tmp_directory = $exec->{tmp_directory};
+                $tmp_http_path = $exec->{tmp_http_path};
 
-                $use_tmpfile = $tmp_http_path || $tmp_directory || defined ($Jarvis::Config::yes_value {lc ($exec->{use_tmpfile}->content || "no")});
+                $use_tmpfile = $tmp_http_path || $tmp_directory || defined ($Jarvis::Config::yes_value {lc ($exec->{use_tmpfile} || "no")});
                 $tmp_redirect = $tmp_http_path;
 
                 # Override debug/dump.  Won't get much, but at least we'll see what is produced.
-                $jconfig->{dump} = $jconfig->{dump} || defined ($Jarvis::Config::yes_value {lc ($exec->{dump}->content || "no")});
-                $jconfig->{debug} = $jconfig->{dump} || $jconfig->{debug} || defined ($Jarvis::Config::yes_value {lc ($exec->{debug}->content || "no")});
+                $jconfig->{dump} = $jconfig->{dump} || defined ($Jarvis::Config::yes_value {lc ($exec->{dump} || "no")});
+                $jconfig->{debug} = $jconfig->{dump} || $jconfig->{debug} || defined ($Jarvis::Config::yes_value {lc ($exec->{debug} || "no")});
 
                 last ALL_EXECS;
             }

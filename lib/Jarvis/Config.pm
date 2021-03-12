@@ -37,10 +37,14 @@ package Jarvis::Config;
 use CGI;
 use CGI::Session;
 use DBI;
-use XML::Smart;
+use XML::LibXML;
 
 use Jarvis::Error;
 use Data::Dumper;
+
+# Allow our XML::LibXML library to generate warnings specific to that library.
+# That will let us better present any error messages.
+$XML::LibXML::Error::WARNINGS = 1;
 
 %Jarvis::Config::yes_value = ('yes' => 1, 'true' => 1, 'on' => 1, '1' => 1);
 
@@ -58,14 +62,14 @@ use Data::Dumper;
 #       Jarvis::Config object
 #           WRITE
 #               app_name           Copy of app name provided to us.
-#               xml                Handle to an XML::Smart object of app config.
+#               xml                Handle to an XML::LibXML object of app config.
 #               cgi                Handle to a CGI object for this request.
 #               format             Format xml or json?
 #               retain_null        Retain nulls when outputting JSON?
 #               debug              Debug enabled for this app?
 #               dump               Dump (Detailed Debug) enabled for this app?
 #               log_format         Format for log and debug output.
-#               error_response_format         
+#               error_response_format
 #                                  The format of error messages sent to the client
 ################################################################################
 #
@@ -100,39 +104,54 @@ sub new {
     #
     # Process the global XML config file.
     my $xml_filename = $self->{'etc_dir'} . "/" . $self->{'app_name'} . ".xml";
-    my $xml = XML::Smart->new ("$xml_filename") || die "Cannot read '$xml_filename': $!.\n";
-    ($xml->{jarvis}) || die "Missing <jarvis> tag in '$xml_filename'!\n";
 
+    # Attempt to read our XML configuration file.
+    my $xml;
+    eval {
+        $xml = XML::LibXML->load_xml (location => $xml_filename);
+    };
+
+    # Check for XML::LibXML error object.
+    if (ref ($@)) {
+        # If we have a specific XML::LibXML::Error object then we can pretty print the error.
+        die "Cannot read '$xml_filename': $@\n";
+
+    # Fall back to default error handling.
+    } elsif ($@) {
+        die "Cannot read '$xml_filename': $@.\n";
+    }
+
+    # Sanity check the XML structure.
+    $xml->exists ("/jarvis") || die "Missing <jarvis> tag in '$xml_filename'!\n";
+
+    # Store the XML refernce, most of our configuration reading happens in classes that call this module.
     $self->{'xml'} = $xml;
 
     ###############################################################################
-    # Get the application config.  Note that we must NOT store this in our args
-    # hashref because XML::Smart->DESTROY gets confused if it attempts to clean up
-    # XML::Smart objects at different points in the tree.
-    #
+    # Get the application config.
     # This function should fetch all the application config at one time.
     ###############################################################################
     #
     # We MUST have an entry for this application in our config.
-    my $axml = $xml->{jarvis}{app};
-    (defined $axml) || die "Cannot find <jarvis><app> in '" . $self->{'app_name'} . ".xml'!\n";
+    $xml->exists ("/jarvis/app") || die "Cannot find <jarvis><app> in '" . $self->{'app_name'} . ".xml'!\n";
+    my $axml = $xml->findnodes ("/jarvis/app")->pop ();
 
     # Defines if we should produce debug and/or dump output.  Dump implies debug.
-    $self->{'dump'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'dump'}->content || "no")});
-    $self->{'debug'} = $self->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($axml->{'debug'}->content || "no")});
+    $self->{'dump'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'dump'} || "no")});
+    $self->{'debug'} = $self->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($axml->{'debug'} || "no")});
 
     # Set binmode on STDERR because folks could want to send us UTF-8 content, and
     # debug (or even log) could raise "Wide character in print" errors.
     binmode STDERR, ":utf8";
 
     # This is used by both debug and log output.
-    $self->{'log_format'} = $axml->{'log_format'}->content || '[%P/%A/%U/%D][%R] %M';
+    $self->{'log_format'} = $axml->{'log_format'} || '[%P/%A/%U/%D][%R] %M';
 
     # This is what format we use when sending death messages back to the client
-    $self->{'error_response_format'} = $axml->{'error_response_format'}->content || '[%T][%R] %M';
+    $self->{'error_response_format'} = $axml->{'error_response_format'} || '[%T][%R] %M';
 
     # This is used by several things, so let's store it in our config.
-    $self->{'format'} = lc ($self->{'cgi'}->param ('format') || $axml->{'format'}->content || "json");
+    $self->{'format'} = lc ($self->{'cgi'}->param ('format') || $axml->{'format'} || "json");
 
     # This controls whether we discard null fields on return.
     #
@@ -140,40 +159,40 @@ sub new {
     #   default is "off" for everything else.
     #
     my $default_retain_null = ($self->{'format'} eq "json") ? "yes" : "no";
-    $self->{'retain_null'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'retain_null'}->content || $default_retain_null)});
+    $self->{'retain_null'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'retain_null'} || $default_retain_null)});
 
     # This is used for backwards compatibility with old Jarvis versions.
-    $self->{'return_json_as_text'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'return_json_as_text'}->content || "no")});
+    $self->{'return_json_as_text'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'return_json_as_text'} || "no")});
 
     # This is an optional METHOD overide parameter, similar to Ruby on Rails.
     # It bypasses a problem where non-proxied Flex can only send GET/POST requests.
     $self->{'method_param'} = $self->{'cgi'}->param ('method_param') || "_method";
 
     # Load settings for CSRF protection. Enabled flag, cookie name and header name.
-    $self->{'csrf_protection'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'csrf_protection'}->content || "no")});
-    $self->{'csrf_cookie'} = uc ($axml->{'csrf_cookie'}->content || "XSRF-TOKEN");
-    $self->{'csrf_header'} = uc ($axml->{'csrf_header'}->content || "X-XSRF-TOKEN");
+    $self->{'csrf_protection'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'csrf_protection'} || "no")});
+    $self->{'csrf_cookie'} = uc ($axml->{'csrf_cookie'} || "XSRF-TOKEN");
+    $self->{'csrf_header'} = uc ($axml->{'csrf_header'} || "X-XSRF-TOKEN");
 
     # Check if cross origin protection is enabled. All incoming requests will have their referer or origin compared to the host configuration.
-    $self->{'cross_origin_protection'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'cross_origin_protection'}->content || "no")});
+    $self->{'cross_origin_protection'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'cross_origin_protection'} || "no")});
 
     # Check if XSRF protection is enabled. All JSON requests will be prefixed with ")]}',\n"
-    $self->{'xsrf_protection'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'xsrf_protection'}->content || "no")});
+    $self->{'xsrf_protection'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'xsrf_protection'} || "no")});
 
     # Pull out the list of default (Perl) library paths to use for perl plugins scripts
     # from the configuration, and store in an array in the config item.
     $self->{'default_libs'} = [];
-    if ($axml->{'default_libs'}{'lib'}) {
-        foreach my $lib ($axml->{'default_libs'}{'lib'}('@')) {
-            &Jarvis::Error::debug ($self, "Default Lib Path: " . ($lib->{'path'}->content || 'UNDEFINED'));
-            if ($lib->{'path'}->content) {
-                push (@{ $self->{'default_libs'} }, $lib->{'path'}->content);
+    if ($axml->exists ('./default_libs/lib')) {
+        foreach my $lib ($axml->findnodes ('default_libs//lib')) {
+            &Jarvis::Error::debug ($self, "Default Lib Path: " . ($lib->{'path'} || 'UNDEFINED'));
+            if ($lib->{'path'}) {
+                push (@{ $self->{'default_libs'} }, $lib->{'path'});
             }
         }
     }
 
     # Basic security check here.
-    $self->{'require_https'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'require_https'}->content || "no")});
+    $self->{'require_https'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'require_https'} || "no")});
     if ($self->{'require_https'} && ! $self->{'cgi'}->https()) {
         die "Client must access over HTTPS for this application.\n";
     }
@@ -208,23 +227,38 @@ sub new {
     #
     ###############################################################################
     #
-    # Load each file referenced in <include> as an XML::Smart object so that other
+    # Load each file referenced in <include> as an XML::LibXML object so that other
     # config loading code (e.g. Plugin, Hook, Exec, Route) can load from include
     # files as well as from the primary file.
-    # 
+    #
     my @iaxmls = ();
-    foreach my $include ($xml->{jarvis}{include}('@') ) {
+    foreach my $include ($xml->findnodes ("/jarvis/include")) {
+
         (defined $include->{file}) or die "Missing attribute 'file' on <include> within '$app_name'.";
-        my $filename = $include->{file}->content;        
+        my $filename = $include->{file};
         (length ($filename) > 0) or die "Filename for <include> '$app_name' is empty.";
 
         &Jarvis::Error::debug ($self, "Include File: '%s'.", $filename);
         (-e $filename) or die "Application '$app_name' include file '$filename' does not exist.";
         (-r $filename) or die "Application '$app_name' include file '$filename' is not readable.";
-        
-        my $ixml = XML::Smart->new ($filename) or die "Cannot read '$filename': $!.";
 
-        # This is a sanity check for any stray content which the user might have 
+        # Attempt to the included configuration files.
+        my $ixml;
+        eval {
+            $ixml = XML::LibXML->load_xml (location => $filename);
+        };
+
+        # Check for XML::LibXML error object.
+        if (ref ($@)) {
+            # If we have a specific XML::LibXML::Error object then we can pretty print/jarvis/include/@* the error.
+            die "Cannot read '$xml_filename': $@\n";
+
+        # Fall back to default error handling.
+        } elsif ($@) {
+            die "Cannot read '$xml_filename': $@.\n";
+        }
+
+        # This is a sanity check for any stray content which the user might have
         # put into the include file thinking that it will be read when it won't.
         #
         # All that we read from <include> files is:
@@ -237,38 +271,58 @@ sub new {
         #       <router>
         #           <route *.../>
         #
-        foreach my $arg ($ixml->args ()) {
-            &Jarvis::Error::log ($self, "Unsupported <xml> arg '%s' in <include> '%s'.", $arg, $filename);
+
+        # Check for unsupported attributes on our top level element. We don't support any.
+        foreach my $arg ($ixml->findnodes ('/*/@*')) {
+            &Jarvis::Error::log ($self, "Unsupported <xml> arg '%s' in <include> '%s'.", $arg->nodeName, $filename);
         }
-        foreach my $node_key ($ixml->nodes_keys ()) {
+
+        # Sanity check that only the Jarvis element is defined at the top level.
+        foreach my $node ($ixml->findnodes('/*')) {
+            my $node_key = $node->nodeName;
             if ($node_key ne 'jarvis') {
                 &Jarvis::Error::log ($self, "Unsupported <xml> node key '%s' in <include> '%s'.", $node_key, $filename);
             }
         }
-        foreach my $node_key ($ixml->{jarvis}->nodes_keys ()) {
+
+        # Again check if only an app element is present within our app element.
+        foreach my $node ($ixml->findnodes ('/jarvis/*')) {
+            my $node_key = $node->nodeName;
             if ($node_key ne 'app') {
                 &Jarvis::Error::log ($self, "Unsupported <xml><jarvis> node key '%s' in <include> '%s'.", $node_key, $filename);
             }
         }
-        if ($ixml->{jarvis}{app}) {
-            foreach my $node_key ($ixml->{jarvis}{app}->nodes_keys ()) {
+
+        # Now validate that within our app element that we only have supported elements present.
+        # For anything that we don't support we'll throw and error message into our log.
+        if ($ixml->exists ('/jarvis/app')) {
+
+            # Again check for node keys that we don't support.
+            foreach my $node ($ixml->findnodes ('/jarvis/app/*')) {
+                my $node_key = $node->nodeName;
                 if (($node_key ne 'plugin') && ($node_key ne 'hook') && ($node_key ne 'exec') && ($node_key ne 'router')) {
                     &Jarvis::Error::log ($self, "Unsupported <xml><jarvis><app> node key '%s' in <include> '%s'.", $node_key, $filename);
                 }
             }
-            if ($ixml->{jarvis}{app}{router}) {
-                foreach my $arg ($ixml->{jarvis}{app}{router}->args ()) {
-                    &Jarvis::Error::log ($self, "Unsupported <xml><jarvis><app><router> arg '%s' in <include> '%s'.", $arg, $filename);
+
+            # If we have a router element defined, go ahead and validate.
+            if ($ixml->exists ('/jarvis/app/router')) {
+                # Check attributes.
+                foreach my $arg ($ixml->findnodes ('/jarvis/app/router/@*')) {
+                    &Jarvis::Error::log ($self, "Unsupported <xml><jarvis><app><router> arg '%s' in <include> '%s'.", $arg->nodeName, $filename);
                 }
-                foreach my $node_key ($ixml->{jarvis}{app}{router}->nodes_keys ()) {
+                # Then check elements.
+                foreach my $node ($ixml->findnodes ('/jarvis/app/router/*')) {
+                    my $node_key = $node->nodeName;
                     if ($node_key ne 'route') {
                         &Jarvis::Error::log ($self, "Unsupported <xml><jarvis><app><router> node key '%s' in <include> '%s'.", $node_key, $filename);
                     }
                 }
             }
-            push (@iaxmls, $ixml->{jarvis}{app});
+            push (@iaxmls, $ixml->findnodes ('/jarvis/app'));
         }
     }
+
     $self->{iaxmls} = \@iaxmls;
 
     return $self;
@@ -280,7 +334,7 @@ sub new {
 #
 # Params:
 #       $jconfig - Jarvis::Config object
-#       $fxml - An XML::Smart flag element on which we can invoke ->content.
+#       $fxml - An XML::LibXML flag element on which we can check.
 #       $default - Default true/false value.  Default = Default NO.
 #
 # Returns:
@@ -291,7 +345,7 @@ sub xml_yes_no {
     my ($jconfig, $fxml, $default) = @_;
 
     if ($fxml) {
-        return (defined $Jarvis::Config::yes_value{ lc ($fxml->content) }) ? 1 : 0;
+        return (defined $Jarvis::Config::yes_value{ lc ($fxml) }) ? 1 : 0;
 
     } else {
         return $default ? 1 : 0;
@@ -314,11 +368,11 @@ sub default_parameters {
     $jconfig || die;
 
     my %default_parameters = ();
-    
-    my $pxml = $jconfig->{'xml'}{'jarvis'}{'app'}{'default_parameters'};
-    if ($pxml && $pxml->{'parameter'}) {
-        foreach my $parameter ($pxml->{'parameter'}('@')) {
-            $default_parameters {$parameter->{'name'}->content} = $parameter->{'value'}->content;
+
+    my $pxml = $jconfig->{'xml'}->find ('./jarvis/app/default_parameters')->pop ();
+    if ($pxml && $pxml->exists ('./parameter')) {
+        foreach my $parameter ($pxml->findnodes ('./parameter')) {
+            $default_parameters {$parameter->{'name'}} = $parameter->{'value'};
         }
     }
     return %default_parameters;
@@ -326,7 +380,7 @@ sub default_parameters {
 
 
 ################################################################################
-# Construct a final list of "safe" parameters from the following sources.  
+# Construct a final list of "safe" parameters from the following sources.
 # The following order applies.  Later values will override earlier ones.
 #
 #   - Globally defined defaults.

@@ -24,7 +24,7 @@
 use strict;
 use warnings;
 
-use XML::Smart;
+use XML::LibXML;
 
 package Jarvis::Habitat;
 
@@ -50,9 +50,23 @@ sub print {
     my ($jconfig) = @_;
 
     my $xml = $jconfig->{'xml'};
-    my $cxml = $xml->{jarvis}{app}{habitat} || new XML::Smart ();
 
-    my $content = $cxml->data (tree => $cxml, noheader => 1, root => 'habitat');
+    # Parse the habitat nodes from the jarvis config or use an empty new object.
+    my $cxml = $xml->find ('/jarvis/app/habitat')->pop ();
+
+    # If there is no xml configuration generate an empty habitat.
+    if (! defined ($cxml)) {
+        # Don't generate the headers for new XML documents.
+        $XML::LibXML::skipXMLDeclaration = 1;
+
+        # Create a new document and add an empty habitat element. For XML we will return this document. JSON will strip it.
+        $cxml = XML::LibXML::Document->new ("1.0", "UTF-8");
+        my $habitat_node = $cxml->createElement ("habitat");
+        $cxml->setDocumentElement ($habitat_node);
+    }
+
+    # Output the CXML as a string, using 1 for pretty print indenting.
+    my $content = $cxml->toString (1);
 
     # Strip the outer <habitat></habitat> for non-XML.  That is the only concession
     # we make to the JSON format.  If you want a JSON habitat, then I recommend

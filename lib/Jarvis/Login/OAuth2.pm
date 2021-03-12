@@ -47,7 +47,7 @@ use JSON::WebToken;
 
 ################################################################################
 # Determines if we are "logged in".  In this case we look at CGI variables
-# for the existing OAuth code.  
+# for the existing OAuth code.
 # We validate this by first calling an OAuth Token endpoint to retrieve a valid
 # access token.
 # Once we have our access token we contact an OAuth Token Introspection endpoint
@@ -108,11 +108,11 @@ sub Jarvis::Login::OAuth2::check {
         my $self_signed_cert = $login_parameters{self_signed_cert};
 
         # At this stage we have everyting we need to send a request on to our token request endpoint. Lets construct this now.
-        
+
         # Define our UserAgent.
         my $ua = LWP::UserAgent->new;
 
-        # If for instance we have a self signed cert the SSL library will reject it unless we trust the cert. 
+        # If for instance we have a self signed cert the SSL library will reject it unless we trust the cert.
         # If a cert path is provided allow it now.
         if ($self_signed_cert) {
 
@@ -173,7 +173,7 @@ sub Jarvis::Login::OAuth2::check {
 
             # Check for success.
             if ($introspection_response->is_success) {
-                
+
                 # Parse the JSON contents of the response.
                 my $introspection_message      = $introspection_response->decoded_content;
                 my $introspection_message_json = JSON::XS::decode_json($introspection_message);
@@ -186,19 +186,19 @@ sub Jarvis::Login::OAuth2::check {
 
                 # Decode the token using our token library.
                 my $decoded_token =JSON::WebToken->decode($token_message_json->{id_token}, undef, 0, 'none');
-                    
+
                 # Grab our user groups.
                 my $user_groups = $decoded_token->{groups} ? $decoded_token->{groups} : [];
 
                 # Finally return our successful login indicator to our calling module providing the username and groups we got back.
-                return ("", $username, $user_groups);               
+                return ("", $username, $user_groups);
 
-            } else {   
+            } else {
                 die ("Failed to contact introspection endpoint: [" . ($introspection_response->code ? $introspection_response->code : 500) . "] " . ($introspection_response->message ? $introspection_response->message : "") . "\n");
             }
         } else {
             die ("Failed to contact token endpoint: [" . ($token_response->code ? $token_response->code : 500) . "] " . ($token_response->message ? $token_response->message : "") . "\n");
         }
-    }   
+    }
 }
 1;

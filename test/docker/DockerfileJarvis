@@ -7,11 +7,11 @@
 #       Jarvis Latest
 #
 # If you want to locally build the docker image you can do so with:
-#   
+#
 #   docker build -t jarvis -f test/docker/DockerfileJarvis .
 #
 # The image can be started up using the test suite docker compose script file.
-# 
+#
 #   docker-compose -f test/docker/docker-compose-test-suite.yml up --detach
 #
 
@@ -87,7 +87,7 @@ RUN \
             # mongodb-org-mongos \
             # mongodb-org-tools \
         # Since for some insane reason this doesn't actually install any of our service stuff we'll have to do it ourselves :|
-        # We copy the config over with out root directory. But we need to fix up permissions. 
+        # We copy the config over with out root directory. But we need to fix up permissions.
         && chmod 755 /etc/init.d/mongod \
         # Create data directories.
         && mkdir -p /data/db \

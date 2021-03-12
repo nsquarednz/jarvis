@@ -38,8 +38,9 @@ package Jarvis::Dataset;
 use Module::Load;
 use Data::Dumper;
 use JSON;
-use XML::Smart;
 use URI::Escape;
+
+use XML::LibXML;
 
 use Jarvis::Text;
 use Jarvis::Error;
@@ -56,6 +57,35 @@ my $AGENT_CLASSES = {
 ###############################################################################
 # Internal Functions
 ###############################################################################
+
+#
+# Recurisve helper method that will append new XML LibXML elements to a begining element.
+#
+sub append_rows {
+    my ($return_object, $parent_node, $node_name, $rows) = @_;
+
+    foreach my $row (@{$rows}) {
+        my $child_node = $return_object->createElement ($node_name);
+
+        # Process each key. If a key is a non scalar value then we just set
+        # it as an attribute otherwise we create a new child element.
+        foreach my $key (keys %{$row}) {
+            my $value = $row->{$key};
+
+            # Check for scalars. Nice and easy, just set the attribute.
+            if (ref ($value) eq '') {
+                $child_node->setAttribute ($key, $value);
+
+            } elsif (ref ($value) eq 'ARRAY') {
+                # Recurisve loop processing these items as nested items.
+                # The name of the items is derived from the key name.
+                append_rows ($return_object, $child_node, $key, $value);
+            }
+        }
+
+        $parent_node->addChild ($child_node);
+    }
+}
 
 ################################################################################
 # Loads the DataSet config from the config dir.  This will push a dataset
@@ -84,7 +114,7 @@ my $AGENT_CLASSES = {
 #       {
 #           level => 0+             # 0 = Master dataset.  1 = child, 2 = grandchild, etc.
 #           name => $dataset_name,
-#           dsxml => $dsxml,        # XML::Smart object holding config info read from file
+#           dsxml => $dsxml,        # XML::LibXML object holding config info read from file
 #           dbtype => 'dbi'/'sdp'
 #           dbname => $dbname,      # Key into Jarvis app <database> list
 #
@@ -121,17 +151,18 @@ sub load_dsxml {
     # dataset.  Note that any remaining "." that aren't stripped off by a prefix
     # match are treated as subdirectories inside the dataset dir.
     #
-    my $axml = $jconfig->{xml}{jarvis}{app};
-    $axml->{dataset_dir} || die "Missing configuration for mandatory element(s) 'dataset_dir'.\n";
+    my $axml = $jconfig->{xml}->find ('./jarvis/app')->pop ();
+    $axml->exists ('./dataset_dir') || die "Missing configuration for mandatory element(s) 'dataset_dir'.\n";
 
     # Check for duplicate prefixes.
     my %prefix_seen = ();
 
-    foreach my $dsdir ($axml->{dataset_dir}('@')) {
-        my $dir = $dsdir->content || die "Missing directory in 'dataset_dir' element.\n";
-        my $type = $dsdir->{type}->content || 'dbi';
-        my $prefix = $dsdir->{prefix}->content || '';
-        my $dbname = $dsdir->{dbname}->content || 'default';
+    foreach my $dsdir ($axml->findnodes ('./dataset_dir')) {
+
+        my $dir = $dsdir->to_literal () || die "Missing directory in 'dataset_dir' element.\n";
+        my $type = $dsdir->{type} || 'dbi';
+        my $prefix = $dsdir->{prefix} || '';
+        my $dbname = $dsdir->{dbname} || 'default';
 
         # Non-empty prefix paths must end in a "." for matching purposes.
         if ($prefix && ($prefix !~ m/\.$/)) {
@@ -169,12 +200,27 @@ sub load_dsxml {
         die "No such DSXML file '$dataset_name.xml' for application '" . $jconfig->{app_name} . "'.\n";
     }
 
-    my $dsxml = XML::Smart->new ("$dsxml_filename") || die "Cannot read '$dsxml_filename': $!\n";
-    ($dsxml->{dataset}) || die "Missing <dataset> tag in '$dsxml_filename'!\n";
+    # Attempt to read our Dataset XML configuration file.
+    my $dsxml;
+    eval {
+        $dsxml = XML::LibXML->load_xml (location => $dsxml_filename);
+    };
+
+    # Check for XML::LibXML error object.
+    if (ref ($@)) {
+        # If we have a specific XML::LibXML::Error object then we can pretty print the error.
+        die "Cannot read '$dsxml_filename': $@\n";
+
+    # Fall back to default error handling.
+    } elsif ($@) {
+        die "Cannot read '$dsxml_filename': $@.\n";
+    }
+
+    ($dsxml->exists ('/dataset')) || die "Missing <dataset> tag in '$dsxml_filename'!\n";
 
     # What kind of database are we dealing with?
-    my $dbname = $dsxml->{dataset}{dbname}->content || $default_dbname;
-    my $dbtype = $dsxml->{dataset}{dbtype}->content || $default_dbtype;
+    my $dbname = $dsxml->findvalue ('/dataset/@dbname') || $default_dbname;
+    my $dbtype = $dsxml->findvalue ('/dataset/@dbtype') || $default_dbtype;
 
     # What dataset level are we at in our stack?  Level 0 is the top-level, master dataset.  Others are childs.
     (defined $jconfig->{datasets}) || ($jconfig->{datasets} = []);
@@ -184,8 +230,8 @@ sub load_dsxml {
     my $debug_previous = $jconfig->{debug};
     my $dump_previous = $jconfig->{dump};
 
-    my $debug = $debug_previous || defined ($Jarvis::Config::yes_value {lc ($dsxml->{dataset}{debug}->content || "no")});
-    my $dump = $debug || $debug_previous || defined ($Jarvis::Config::yes_value {lc ($dsxml->{dataset}{dump}->content || "no")});
+    my $debug = $debug_previous || defined ($Jarvis::Config::yes_value {lc ($dsxml->findvalue ('/dataset/@debug') || "no")});
+    my $dump = $debug || $debug_previous || defined ($Jarvis::Config::yes_value {lc ($dsxml->findvalue ('/dataset/@dump') || "no")});
 
     # Construct our dataset descriptor.
     my $dataset = {
@@ -202,11 +248,12 @@ sub load_dsxml {
 
     # Only the top level set supports paging.
     if ($level == 0) {
-        $dataset->{page_start_param} = $axml->{page_start_param}->content || 'page_start';
-        $dataset->{page_limit_param} = $axml->{page_limit_param}->content || 'page_limit';
-        $dataset->{sort_field_param} = $axml->{sort_field_param}->content || 'sort_field';
-        $dataset->{sort_dir_param} = $axml->{sort_dir_param}->content || 'sort_dir';
+        $dataset->{page_start_param} = $axml->find ('./page_start_param')->to_literal () || 'page_start';
+        $dataset->{page_limit_param} = $axml->find ('./page_limit_param')->to_literal () || 'page_limit';
+        $dataset->{sort_field_param} = $axml->find ('./sort_field_param')->to_literal () || 'sort_field';
+        $dataset->{sort_dir_param}   = $axml->find ('./sort_dir_param')->to_literal ()   || 'sort_dir';
     }
+
     push (@{ $jconfig->{datasets}}, $dataset);
 
     # Change to new debug/dump levels.
@@ -314,7 +361,7 @@ sub transform {
     my ($transforms_href, $vals_href) = @_;
 
     # Convert MS Word characters into their HTML equivalent.  This will stop
-    # XML::Smart from attempting to encode them in base64.
+    # Our XML from attempting to encode them in base64.
     if ($$transforms_href{word2html}) {
         foreach my $key (keys %$vals_href) {
             next if ! defined $$vals_href{$key};
@@ -477,19 +524,31 @@ sub fetch {
     } elsif ($format eq "xml") {
         &Jarvis::Error::debug ($jconfig, "Encoding into XML format ($format).");
 
-        my $return_object = XML::Smart->new ();
-        $return_object->{response}{data}{row} = $rows_aref;
-        $return_object->{response}{logged_in} = $jconfig->{logged_in};
-        $return_object->{response}{username} = $jconfig->{username};
-        $return_object->{response}{error_string} = $jconfig->{error_string};
-        $return_object->{response}{group_list} = $jconfig->{group_list};
+        my $return_object = XML::LibXML::Document->new ("1.0", "UTF-8");
+
+        my $response_node = $return_object->createElement ("response");
+        $return_object->setDocumentElement ($response_node);
+
+        # Set attributes on the root response object.
+        $response_node->setAttribute ("logged_in", $jconfig->{logged_in});
+        $response_node->setAttribute ("username", $jconfig->{username});
+        $response_node->setAttribute ("error_string", $jconfig->{error_string});
+        $response_node->setAttribute ("group_list", $jconfig->{group_list});
+
+        # Create the base element that will contain all of our rows of data.
+        my $data_node = $return_object->createElement ("data");
+        $response_node->addChild ($data_node);
+
+        # Start off using our "parent" data node, placing the first items into row.
+        # Anything else that is nested will use its name for the key.
+        append_rows ($return_object, $data_node, 'row', $rows_aref);
 
         # Copy across any extra root parameters set by the return_fetch hook.
         foreach my $name (sort (keys %$extra_href)) {
-            $return_object->{response}{$name} = $extra_href->{$name};
+            $response_node->setAttribute ($name, $extra_href->{$name});
         }
 
-        $return_value = $return_object->data ();
+        $return_value = $return_object->toString (1);
 
     # CSV format tricky.  Note that it is dependent on the $sth->{NAME} data
     # being available.  This field is absent in the following cases at least:
@@ -718,7 +777,7 @@ sub fetch_rows {
     &Jarvis::Hook::load_dataset ($jconfig, $dsxml);
 
     # Check the allowed groups.
-    my $allowed_groups = $dsxml->{dataset}{"read"};
+    my $allowed_groups = $dsxml->findvalue ('/dataset/@read');
 
     # Perform CSRF checks.
     Jarvis::Main::check_csrf_protection ($jconfig, $allowed_groups);
@@ -826,7 +885,7 @@ sub fetch_rows {
     }
 
     # What transformations should we use when sending out fetch data?
-    my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->{dataset}{transform}{fetch});
+    my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->findvalue ('/dataset/transform/@fetch'));
     &Jarvis::Error::debug ($jconfig, "Fetch transformations = " . join (', ', keys %transforms) . " (applied to returned results)");
 
     # Apply any output transformations to remaining hashes.
@@ -867,26 +926,26 @@ sub fetch_rows {
     }
 
     # Now do we have any child datasets?
-    if ($dsxml->{dataset}{child}) {
+    if ($dsxml->exists ('/dataset/child')) {
         &Jarvis::Error::debug ($jconfig, "We have child datasets to append.");
 
-        foreach my $child (@{ $dsxml->{dataset}{child} }) {
+        foreach my $child ($dsxml->findnodes ('./dataset/child')) {
 
             # What dataset do we use to get child data, and where do we store it?
             $child->{field} || die "Invalid dataset child configuration, <child> with no 'field' attribute.\n";
             $child->{dataset} || die "Invalid dataset child configuration, <child> with no 'dataset' attribute.\n";
-            my $child_field = $child->{field}->content;
-            my $child_dataset = $child->{dataset}->content;
+            my $child_field = $child->{field};
+            my $child_dataset = $child->{dataset};
             &Jarvis::Error::debug ($jconfig, "Processing child dataset '$child_dataset' to store as field '$child_field'.");
 
             # Get all our links.  This ties a parent row value to a child query arg.
             # We can execute with no links, although it doesn't give a very strong parent/child relationship!
             my %links = ();
-            if ($child->{link}) {
-                foreach my $link (@{ $child->{link} }) {
+            if ($child->exists ('./link')) {
+                foreach my $link ($child->findnodes ('./link')) {
                     $link->{parent} || die "Invalid dataset child link configuration, <link> with no 'parent' attribute.\n";
                     $link->{child} || die "Invalid dataset child link configuration, <link> with no 'child' attribute.\n";
-                    $links{$link->{parent}->content} = $link->{child}->content;
+                    $links{$link->{parent}} = $link->{child};
                 }
             }
 
@@ -922,7 +981,7 @@ sub fetch_rows {
     #       See http://support.nsquaredsoftware.com/tickets/view.php?id=6777
     #
     if ($dataset->{level} == 0) {
-        my $filename_parameter = $dsxml->{dataset}{filename_parameter}->content || 'filename';
+        my $filename_parameter = $dsxml->findvalue ('./dataset/@filename_parameter') || 'filename';
         &Jarvis::Error::debug ($jconfig, "Filename parameter = '$filename_parameter'.");
         $jconfig->{return_filename} = $safe_params {$filename_parameter} || '';
         &Jarvis::Error::debug ($jconfig, "Return filename = '" . $jconfig->{return_filename} . "'.");
@@ -1003,24 +1062,44 @@ sub store {
     # XML in here please.
     } elsif ($content_type =~ m|^[a-z]+/xml(;.*)?$|) {
         $format = 'xml';
-        my $cxml = XML::Smart->new ($content);
+
+        # Parse the content input string into an XML::LibXMl document.
+        my $cxml = XML::LibXML->load_xml (
+            string => $content
+        );
 
         # Sanity check on outer object.
-        $cxml->{request} || die "Missing top-level 'request' element in submitted XML content.\n";
+        $cxml->exists ('/request') || die "Missing top-level 'request' element in submitted XML content.\n";
 
         # Fields may either sit at the top level, or you may provide an array of
         # records in a <row> array.
         #
         my @rows = ();
-        if ($cxml->{request}{row}) {
-            foreach my $row (@{ $cxml->{request}{row} }) {
-                my %fields =%{ $row };
+        if ($cxml->exists ('/request/row')) {
+            foreach my $cxml_row ($cxml->findnodes ('/request/row')) {
+                # Data can be store in either an attribute or an element. We need to parse both types.
+                my %fields;
+
+                # Process /* this will get all of our elements.
+                map { $fields{$_->nodeName} = $_->to_literal } $cxml_row->findnodes ('./*');
+
+                # Then perform @* which is all of our attributes.
+                map { $fields{$_->nodeName} = $_->nodeValue } $cxml_row->findnodes ('./@*');
+
                 push (@rows, \%fields);
             }
             $return_array = 1;
 
         } else {
-            my %fields = %{ $cxml->{request} };
+            # Process each of the arguments stored on the request object. Same deal as with the row object. Might be elements or attributes.
+            my %fields;
+
+            # Again process all elements underneath the request element.
+            map { $fields{$_->nodeName} = $_->to_literal } $cxml->findnodes ('/request/*');
+
+            # Afterwards again process each attribute underneath the request element.
+            map { $fields{$_->nodeName} = $_->nodeValue } $cxml->findnodes ('/request/@*');
+
             push (@rows, \%fields);
         }
         $rows_aref = \@rows;
@@ -1091,28 +1170,51 @@ sub store {
     } elsif ($jconfig->{format} eq "xml") {
         &Jarvis::Error::debug ($jconfig, "Returning XML.  Return Array = $return_array.");
 
-        my $xml = XML::Smart->new ();
-        $xml->{response}{success} = $success;
-        $xml->{response}{logged_in} = $jconfig->{logged_in};
-        $xml->{response}{username} = $jconfig->{username};
-        $xml->{response}{error_string} = $jconfig->{error_string};
-        $xml->{response}{group_list} = $jconfig->{group_list};
-        $success && ($xml->{response}{modified} = $modified);
-        $success || ($xml->{response}{message} = &trim($message));
+        # Construct our LibXML core document.
+        my $return_object = XML::LibXML::Document->new ("1.0", "UTF-8");
+
+        # Create and append the response node as required.
+        my $response_node = $return_object->createElement ("response");
+        $return_object->setDocumentElement ($response_node);
+
+        # Set our reponse object attributes as required.
+        $response_node->setAttribute ('success', $success);
+        $response_node->setAttribute ('logged_in', $jconfig->{logged_in});
+        $response_node->setAttribute ('username', $jconfig->{username});
+        $response_node->setAttribute ('error_string', $jconfig->{error_string});
+        $response_node->setAttribute ('group_list', $jconfig->{group_list});
+
+        # Set modified and message attributes depending on our success state.
+        $success && ($response_node->setAttribute ('modified', $modified));
+        $success || ($response_node->setAttribute ('message', &trim($message)));
+
+        # Process extra parameters. These are all stored as attributes as well.
         foreach my $name (sort (keys %$extra_href)) {
-            $xml->{response}{$name} = $extra_href->{$name};
+            $response_node->setAttribute ($name, $extra_href->{$name});
         }
 
-        # Return the array data if we succeeded.
+        # Return the array data if we succeeded. We encode a results object and encode rows for each entry in our results AREF.
         if ($success && $return_array) {
-            $xml->{response}{results}{row} = $results_aref;
+
+            # Create top level results.
+            my $results_node = $return_object->createElement ("results");
+            $response_node->addChild ($results_node);
+
+            # Start off using our "parent" result node, placing the first items into row.
+            # Anything else that is nested will use its name for the key.
+            append_rows ($return_object, $results_node, 'row', $results_aref);
         }
 
         # Return non-array fields in success case only.
         if ($success && ! $return_array) {
-            $$results_aref[0]{returning} && ($xml->{response}{returning} = $$results_aref[0]{returning});
+            if ($$results_aref[0]{returning}) {
+                # Append the single returning object into a returning array underneath our top level response node.
+                append_rows ($return_object, $response_node, 'returning', $$results_aref[0]{returning});
+            }
         }
-        $return_text = $xml->data ();
+
+        # Output the return test using the to string method. Providing 1 to auto indent the text.
+        $return_text = $return_object->toString (1);
 
     } else {
         die "Unsupported format '" . $jconfig->{format} ."' for Dataset::store return data.\n";
@@ -1164,7 +1266,7 @@ sub store_rows {
     &Jarvis::Hook::load_dataset ($jconfig, $dsxml);
 
     # Now perform security check.
-    my $allowed_groups = $dsxml->{dataset}{"write"};
+    my $allowed_groups = $dsxml->findvalue ('/dataset/@write');
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
     if ($failure ne '') {
         $jconfig->{status} = "401 Unauthorized";
@@ -1179,10 +1281,10 @@ sub store_rows {
     my %safe_all_rows_params = &Jarvis::Config::safe_variables ($jconfig, $user_args, undef);
 
     # What transforms should we use when processing store data?
-    my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->{dataset}{transform}{store});
+    my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->findvalue ('/dataset/transform/@store'));
     &Jarvis::Error::debug ($jconfig, "Store transformations = " . join (', ', keys %transforms) . " (applied to incoming row data)");
 
-    # Apply input transformations to the all-rows before_all/after_all parameters too.
+    # Apply input transformations to the all-rows before_all/after_all parameters too.`
     if (scalar (keys %transforms)) {
         &Jarvis::Dataset::transform (\%transforms, \%safe_all_rows_params);
     }
@@ -1225,7 +1327,7 @@ sub store_rows {
     my $message = '';
 
     # Execute our "before" statement (assuming the agent supports it).
-    if ($dsxml->{dataset}{before}) {
+    if ($dsxml->exists ('/dataset/before')) {
         no strict 'refs';
         my $result = $agent_class->execute_before ($jconfig, $dataset_name, $dsxml, $dbh, \%before_params);
         if (defined $result) {
@@ -1285,7 +1387,7 @@ sub store_rows {
         }
 
         # Now do we have any child datasets?
-        if ($dsxml->{dataset}{child}) {
+        if ($dsxml->exists ('/dataset/child')) {
 
             # For insert/update only!  Don't recurse on delete.
             if ($row_ttype eq 'delete') {
@@ -1294,23 +1396,23 @@ sub store_rows {
             } else {
                 &Jarvis::Error::debug ($jconfig, "Processing child datasets for '$row_ttype' store.");
             }
-            foreach my $child (@{ $dsxml->{dataset}{child} }) {
+            foreach my $child ($dsxml->findnodes ('/dataset/child')) {
 
                 # What dataset do we use to get child data, and where do we store it?
                 $child->{field} || die "Invalid dataset child configuration, <child> with no 'field' attribute.\n";
                 $child->{dataset} || die "Invalid dataset child configuration, <child> with no 'dataset' attribute.\n";
-                my $child_field = $child->{field}->content;
-                my $child_dataset = $child->{dataset}->content;
+                my $child_field = $child->{field};
+                my $child_dataset = $child->{dataset};
                 &Jarvis::Error::debug ($jconfig, "Processing child dataset '$child_dataset' to store as field '$child_field'.");
 
                 # Get all our links.  This ties a parent row value to a child query arg.
                 # We can execute with no links, although it doesn't give a very strong parent/child relationship!
                 my %links = ();
-                if ($child->{link}) {
-                    foreach my $link (@{ $child->{link} }) {
+                if ($child->exists ('./link')) {
+                    foreach my $link ($child->findnodes ('./link')) {
                         $link->{parent} || die "Invalid dataset child link configuration, <link> with no 'parent' attribute.\n";
                         $link->{child} || die "Invalid dataset child link configuration, <link> with no 'child' attribute.\n";
-                        $links{$link->{parent}->content} = $link->{child}->content;
+                        $links{$link->{parent}} = $link->{child};
                     }
                 }
 
@@ -1392,7 +1494,7 @@ sub store_rows {
         my %after_params = %safe_all_rows_params;
 
         # Execute our "after" statement (assuming the agent supports it).
-        if ($dsxml->{dataset}{after}) {
+        if ($dsxml->exists ('/dataset/after')) {
             no strict 'refs';
             my $result = $agent_class->execute_after ($jconfig, $dataset_name, $dsxml, $dbh, \%after_params);
             if (defined $result) {

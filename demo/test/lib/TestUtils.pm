@@ -181,35 +181,68 @@ sub fetch_xml {
 ################################################################################
 #
 sub store {
-	my ($url_parts, $query_args, $rows, $fail) = @_;
+	my ($url_parts, $query_args, $content, $fail, $sent_content_type, $returned_content_type) = @_;
 
 	# Query args are sent to a restful url.
 	my $restful_url = join ('/', map { uri_escape ($_) } @$url_parts);
 	my $urlencoded_args = join ('&', map { uri_escape ($_) . '=' . uri_escape ($query_args->{$_}) } (keys %$query_args));
-	my $rows_json = encode_json ($rows);
 
 	# Request is a POST with query args in the URL and a content.
  	my $req = HTTP::Request->new (POST => "$TestUtils::base_url/$restful_url?$urlencoded_args");
-    $req->content_type ($JSON_SENT_MIME_TYPE);
-    $req->content ($rows_json);
-
-  	# Check request succeeded, and result is interpretable as JSON.
+    $req->content_type ($sent_content_type);
+    $req->content ($content);
 	my $res = $ua->request ($req);
+ 
+ 	return $res;
+}
+
+sub store_json {
+	my ($url_parts, $query_args, $rows, $fail) = @_;
+
+	my $encoded_content = encode_json ($rows);
+
+	my $content = &store ($url_parts, $query_args, $encoded_content, $fail, $JSON_SENT_MIME_TYPE, $JSON_RETURNED_MIME_TYPE);
 
 	if ($fail) {
-	 	($res->is_success) && die "Expected failure - got success.";
-	 	return ($res->code, $res->content);
+	 	($content->is_success) && die "Expected failure - got success.";
+	 	return ($content->code, $content->content);
 
 	} else {
-	 	($res->is_success) || die "Failed: $restful_url: " . $res->status_line . "\n" . $res->content;
-	 	($res->header ('Content-Type') =~ m|^text/plain|) || die "Wrong Content-Type: " . $res->header ('Content-Type');
-	 	my $json = decode_json ($res->content ());
+	 	($content->is_success) || die "Failed: " . $content->status_line . "\n" . $content->content;
+	 	($content->header ('Content-Type') =~ m|^text/plain|) || die "Wrong Content-Type: " . $content->header ('Content-Type');
 
-	 	# Check this looks like a valid response.
-	 	(defined $json->{success}) || die "Missing 'success' in response: " . &Dumper ($json);
+	 	my $json = decode_json ($content->content ());
+	 	(defined $json->{logged_in}) || die "Missing 'logged_in' in response: " . &Dumper ($json);
 
 	 	return $json;
-	}
+	} 	
+}
+
+sub store_xml {
+	my ($url_parts, $query_args, $rows, $fail) = @_;
+
+	my $encoded_content = XML::Smart->new ();
+	$encoded_content->{request} = $rows;
+	$encoded_content = $encoded_content->data ();	
+
+	$query_args->{format} = 'xml';
+	my $content = &store ($url_parts, $query_args, $encoded_content, $fail, 'application/xml', 'application/xml');
+
+
+	if ($fail) {
+	 	($content->is_success) && die "Expected failure - got success.";
+	 	return ($content->code, $content->content);
+
+	} else {
+	 	($content->is_success) || die "Failed: " . $content->status_line . "\n" . $content->content;
+	 	($content->header ('Content-Type') =~ m|^text/plain|) || die "Wrong Content-Type: " . $content->header ('Content-Type');
+
+
+	 	my $xml = XML::Smart->new ($content->content ());
+	 	(defined $xml->{response}{logged_in}) || die "Missing 'logged_in' in response: " . &Dumper ($xml);
+
+ 		return $xml;
+	} 	
 }
 
 1;
