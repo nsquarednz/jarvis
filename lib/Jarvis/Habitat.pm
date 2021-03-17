@@ -75,6 +75,10 @@ sub print {
     if ($jconfig->{'format'} ne "xml") {
         $content =~ s/^\s*<habitat[^>]*>\s*//si;
         $content =~ s/\s*<\/habitat>\s*$//i;
+
+        # Since switching to XML::LibXML it doesn't automatically strip the CDATA tags so we need to do that here.
+        $content =~ s/^\s*<!\[CDATA\[\s*//si;
+        $content =~ s/\s*\]\]>\s*$//i;
     }
 
     return $content;
