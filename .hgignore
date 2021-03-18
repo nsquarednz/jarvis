@@ -24,3 +24,4 @@ syntax: regexp
 syntax: glob
 deploy/
 usr/
+cgi-session/

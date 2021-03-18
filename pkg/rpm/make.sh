@@ -20,6 +20,8 @@ fi
 # Other parameters.
 DATE=`date -R`
 JARVIS_PACKAGE='jarvis'
+CGI_SESSION_VERSION='CGI-Session-4.48'
+CGI_SESSION_PATH="https://cpan.metacpan.org/authors/id/M/MA/MARKSTOS/$CGI_SESSION_VERSION.tar.gz"
 
 # Find our base directory, so we can build the package directory correctly
 DIR=`pwd`
@@ -29,6 +31,23 @@ BASEDIR=`basename $BASEPATH`
 # Deployement directories.
 SRC_DIR=../..
 DEPLOY_DIR=../../deploy
+CGI_SESSION_DIR=../../cgi-session
+
+# Determine the version of the source system the output packages where compiled on.
+# This is used in our output filename as well as determining which spec file to use.
+RHELVERSION=`rpm -E %{rhel}`
+
+# We implement a specific version for RHEL6 everything else just uses the default spec file.
+SPECFILE=""
+if [[ $RHELVERSION == '6' ]]; then
+    SPECFILE="jarvis_rhel_6.spec"
+
+elif [[ $RHELVERSION == '8' ]]; then
+    SPECFILE="jarvis_rhel_8.spec"
+
+else
+    SPECFILE="jarvis.spec"
+fi
 
 # Cleanup.
 rm -rf $DEPLOY_DIR
@@ -51,7 +70,7 @@ make DESTDIR=$DIR/$DEPLOY_DIR/$JARVIS_PACKAGE/ install
 
 # Remove the generated perllocal.pod file to avoid overwriting the destination file.
 echo "# Removing generated perllocal.pod"
-find $DIR/$DEPLOY_DIR/$JARVIS_PACKAGE -name perllocal.pod -type f -delete 
+find $DIR/$DEPLOY_DIR/$JARVIS_PACKAGE -name perllocal.pod -type f -delete
 
 echo "# Building package hierarchy to $DEPLOY_DIR/$JARVIS_PACKAGE"
 cd "$DIR"
@@ -69,16 +88,34 @@ cp $SRC_DIR/docs/jarvis_guide.pdf $DEPLOY_DIR/$JARVIS_PACKAGE/docs
 mkdir $DEPLOY_DIR/$JARVIS_PACKAGE/etc/httpd
 mv $DEPLOY_DIR/$JARVIS_PACKAGE/etc/apache $DEPLOY_DIR/$JARVIS_PACKAGE/etc/httpd/conf.d
 
-# Determine the version of the source system the output packages where compiled on.
-# This is used in our output filename as well as determining which spec file to use.
-RHELVERSION=`rpm -E %{rhel}`
+# Check for RHEL 8 specific build tasks.
+if [[ $RHELVERSION == '8' ]]; then
+    # Fetch, build and inline the CGI Session Library.
+    echo "# RHEL 8 Detected. Fetching and building perl-CGI-Session"
 
-# We implement a specific version for RHEL6 everything else just uses the default spec file.
-SPECFILE=""
-if [[ $RHELVERSION == '6' ]]; then
-    SPECFILE="jarvis_rhel_6.spec"
-else 
-    SPECFILE="jarvis.spec"
+    # Cleanup.
+    rm -rf $CGI_SESSION_DIR
+    mkdir $CGI_SESSION_DIR
+
+    # Move into our build directory.
+    cd "$DIR/$CGI_SESSION_DIR"
+
+    # Get the binaries.
+    wget $CGI_SESSION_PATH
+
+    # Unpack.
+    tar -zxvf "$CGI_SESSION_VERSION.tar.gz"
+
+    # Build.
+    cd "$CGI_SESSION_VERSION"
+    perl Makefile.PL
+    make
+
+    # Copy files into the required directories.
+    cp -r lib/* $DEPLOY_DIR/$JARVIS_PACKAGE/lib
+
+    # Move back to the dir the rest of the build expects us to be in.
+    cd "$DIR"
 fi
 
 echo "# Building RPM Package with spec file: $SPECFILE"
