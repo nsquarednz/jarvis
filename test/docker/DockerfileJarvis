@@ -68,7 +68,7 @@ RUN \
         && apt-get install -y \
             libcgi-fast-perl \
             libcgi-session-perl \
-            libxml-smart-perl \
+            libxml-libxml-perl \
             libjson-perl \
             libmime-types-perl \
             libcrypt-eksblowfish-perl \
