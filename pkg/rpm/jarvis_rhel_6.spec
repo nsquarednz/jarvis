@@ -19,22 +19,22 @@ AutoReqProv : no
 Provides: perl(Jarvis::Config) perl(Jarvis::DB) perl(Jarvis::Error) perl(Jarvis::Main) perl(Jarvis::Dataset) perl(Jarvis::Exec) perl(Jarvis::Habitat) perl(Jarvis::Hook) perl(Jarvis::JSON::Utils) perl(Jarvis::Login) perl(Jarvis::Login::Adempiere) perl(Jarvis::Plugin) perl(Jarvis::Route) perl(Jarvis::Status) perl(Jarvis::Text)
 
 #BuildRequires:
-Requires: httpd perl(CGI) perl(CGI::Session) perl(CGI::Cookie) perl(HTTP::Cookies) perl(MIME::Types) perl(DBI) perl(JSON) perl(XML::Smart) perl(Digest::MD5) perl(Time::HiRes) 
+Requires: httpd perl(CGI) perl(CGI::Session) perl(CGI::Cookie) perl(HTTP::Cookies) perl(MIME::Types) perl(DBI) perl(JSON) perl(XML::LibXML) perl(Digest::MD5) perl(Time::HiRes)
 
 %description
 Jarvis is "helper glue". It is designed to bridge the gap between your
-web-apps and your back-end database. The three standard components in a 
+web-apps and your back-end database. The three standard components in a
 solution using Jarvis are:
  1. Rich Internet Applications. Ajax (XML or JSON) request and response.
  2. JARVIS
  3. Database. Accessible via SQL.
 Front-end RIAs are often written using technologies such as Adobe Flex,
-or JavaScript using libraries, including Dojo or ExtJS. These are often 
+or JavaScript using libraries, including Dojo or ExtJS. These are often
 simple CRUD (Create, Read, Update, Delete) applications which simple wish
 to perform basic operations on a back end databsae.
 
 This requires some server script to handle data requests over http and
-perform the corresponding back-end database transactions in a manner 
+perform the corresponding back-end database transactions in a manner
 which is secure, extensible, standards-based and reasonably efficient.
 
 %prep
@@ -53,7 +53,7 @@ which is secure, extensible, standards-based and reasonably efficient.
 rm -rf %{buildroot}
 mkdir -p %{buildroot}/usr/share/%{name}
 cp -r %{_builddir}/* %{buildroot}/usr/share/%{name}
-cp -r %{_builddir}/usr %{buildroot} 
+cp -r %{_builddir}/usr %{buildroot}
 
 %clean
 rm -rf %{buildroot}

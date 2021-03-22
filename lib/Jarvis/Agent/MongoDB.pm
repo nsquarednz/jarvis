@@ -26,15 +26,13 @@
 use strict;
 use warnings;
 
-use XML::Smart;
-
 package Jarvis::Agent::MongoDB;
 
 use parent qw(Jarvis::Agent);
 
 use boolean;
 use Data::Dumper;
-use BSON::Types ':all'; 
+use BSON::Types ':all';
 
 use Jarvis::Text;
 use Jarvis::Error;
@@ -104,7 +102,7 @@ sub parse_object {
 #
 # TODO: Rewrite this as an XS module for improved speed.
 #
-# TODO: Check that this really does create new copies of variables in the 
+# TODO: Check that this really does create new copies of variables in the
 #       template (when called more than once per template).
 #
 # Note that a completely empty TOP-LEVEL object will return as undef not \undef.
@@ -241,10 +239,10 @@ sub mongo_to_perl {
 #   a) Look up the variable name(s) in our $values HASH
 #   b) Perform any !flag type coversion or other mapping.
 #
-# Note that any variable that isn't found in our names hash will be converted 
+# Note that any variable that isn't found in our names hash will be converted
 # \undef in the expansion process (and then removed in the COPY) process.
 #
-# We invoke copy_and_elide on the result, see the processing above. 
+# We invoke copy_and_elide on the result, see the processing above.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -264,7 +262,7 @@ sub expand_vars {
     # -- update the documentation if you change/extend it.
     #######################################################################
     #
-    # Fold the input parameters so that the data sets can directly access 
+    # Fold the input parameters so that the data sets can directly access
     # nested object values and perform type casting if required.
     #
     # Input Example = {
@@ -275,7 +273,7 @@ sub expand_vars {
     #
     # In most cases a simple subObject = ~subObject~ is sufficient.
     #
-    # However if the sub object has differning types and types that must be 
+    # However if the sub object has differning types and types that must be
     # type cast direct access is required. Folding achieves this.
     #
     # subObject = {
@@ -330,7 +328,7 @@ sub expand_vars {
         #######################################################################
         # Flag processing now.
         #
-        # Note that flags are not processed in the order in which they are 
+        # Note that flags are not processed in the order in which they are
         # present in the variable specifier.
         #
         my $flags = $var->{flags};
@@ -372,7 +370,7 @@ sub expand_vars {
         # BSON::Regex is used to replace case insensitive regex match values. An "undef" is not translated.
         if ($flags->{insensitive_regex} && $matched && defined ($$vref)) {
             &Jarvis::Error::debug ($jconfig, "Applying Case Insensitive Regex replacement.");
-            
+
             # Construct and compile the regex with the `i` insensitive matching flag.
             my $regex = bson_regex ($$vref, 'i');
             my $compiled_regex = $regex->try_compile or die ("Failed to compiled regular expression for BSON::Regex type conversion.");
@@ -412,7 +410,7 @@ sub expand_vars {
 # array so that it can be presented to the client in JSON or XML or whatever.
 #
 # This function only processes a single dataset.  The parent method may invoke
-# us multiple times for a single request, and combine into a single return 
+# us multiple times for a single request, and combine into a single return
 # object.
 #
 # Params:
@@ -438,11 +436,11 @@ sub fetch_inner {
 
     # Start with the collection.  This is at the top level of the datasets.
     # TODO: Maybe allow different operations to override the collection name?
-    $dsxml->{dataset}{collection} or die "Dataset '$dataset_name' (type 'mongo') has no 'collection' defined.\n";
-    my $collection_name = $dsxml->{dataset}{collection}->content;
+    $dsxml->exists ('./dataset/@collection') or die "Dataset '$dataset_name' (type 'mongo') has no 'collection' defined.\n";
+    my $collection_name = $dsxml->findvalue ('./dataset/@collection');
 
     # Check that only one of our fetch types are defined on the dataset at one time.
-    if (1 != grep {$_} ($dsxml->{dataset}{find}, $dsxml->{dataset}{aggregate}, $dsxml->{dataset}{distinct}, $dsxml->{dataset}{count})) {
+    if (1 != grep {$_} ($dsxml->exists ('./dataset/find'), $dsxml->exists ('./dataset/aggregate'), $dsxml->exists ('./dataset/distinct'), $dsxml->exists ('./dataset/count'))) {
         die "Dataset '$dataset_name' (type 'mongo') may only have a single 'find', 'aggregate', 'distinct' or 'count' operation present.\n";
     }
 
@@ -450,18 +448,18 @@ sub fetch_inner {
     my $collection = $dbh->ns ($collection_name);
     my $cursor     = undef;
 
-    # We must also have either a <find> or <aggregate> block present in the dataset.  
+    # We must also have either a <find> or <aggregate> block present in the dataset.
     # Extract the filter and options from each type as required.
-    if ($dsxml->{dataset}{find}) {
+    if ($dsxml->exists ('./dataset/find')) {
 
         # Do we have a filter?  It can be undef, it's purely optional.
         my $filter  = undef;
         my $options = undef;
 
         # Parse the filter from JSON and perform variable substitution.
-        if ($dsxml->{dataset}{find}{filter}) {
+        if ($dsxml->exists ('./dataset/find/filter')) {
             my $filter_vars     = [];
-            my $object_json     = $dsxml->{dataset}{find}{filter}->content;
+            my $object_json     = $dsxml->findvalue ('./dataset/find/filter');
 
             &Jarvis::Error::dump ($jconfig, "Parsing filter...");
             &Jarvis::Error::dump ($jconfig, $object_json);
@@ -470,9 +468,9 @@ sub fetch_inner {
         }
 
         # Parse the options from JSON and perform variable substitution.
-        if ($dsxml->{dataset}{find}{options}) {
+        if ($dsxml->exists ('./dataset/find/options')) {
             my $options_vars     = [];
-            my $object_json      = $dsxml->{dataset}{find}{options}->content;
+            my $object_json      = $dsxml->findvalue ('./dataset/find/options');
 
             &Jarvis::Error::dump ($jconfig, "Parsing options...");
             &Jarvis::Error::dump ($jconfig, $object_json);
@@ -484,27 +482,27 @@ sub fetch_inner {
         $cursor = $collection->find ($filter, $options)
 
 
-    } elsif ($dsxml->{dataset}{aggregate}) {
+    } elsif ($dsxml->exists ('./dataset/aggregate')) {
 
         # Do we have a pipeline? It must be defined.
         my @pipeline = undef;
         my $options  = undef;
 
         # Parse the pipeline from JSON and perform variable substitution.
-        if ($dsxml->{dataset}{aggregate}{pipeline}) {
+        if ($dsxml->exists ('./dataset/aggregate/pipeline')) {
             my $pipeline_vars     = [];
-            my $object_json       = $dsxml->{dataset}{aggregate}{pipeline}->content;
+            my $object_json       = $dsxml->findvalue ('./dataset/aggregate/pipeline');
 
             &Jarvis::Error::dump ($jconfig, "Parsing pipeline...");
             &Jarvis::Error::dump ($jconfig, $object_json);
             my $pipeline_template = &parse_object ($jconfig, $object_json, $pipeline_vars);
             @pipeline = &expand_vars ($jconfig, $pipeline_template, $pipeline_vars, $safe_params_href);
         }
-        
+
         # Parse the options from JSON and perform variable substitution.
-        if ($dsxml->{dataset}{aggregate}{options}) {
+        if ($dsxml->exists ('./dataset/aggregate/options')) {
             my $options_vars     = [];
-            my $object_json      = $dsxml->{dataset}{aggregate}{options}->content;
+            my $object_json      = $dsxml->findvalue ('./dataset/aggregate/options');
 
             &Jarvis::Error::dump ($jconfig, "Parsing options...");
             &Jarvis::Error::dump ($jconfig, $object_json);
@@ -517,22 +515,22 @@ sub fetch_inner {
         # Execute our Mongo aggregate.
         $cursor = $collection->aggregate (@pipeline, $options);
 
-    } elsif ($dsxml->{dataset}{distinct}) {
+    } elsif ($dsxml->exists ('./dataset/distinct')) {
 
         # Do we have a field name? It must be defined.
         my $fieldname = undef;
         my $filter    = undef;
         my $options   = undef;
- 
+
         # Parse the fieldname from JSON and perform variable substitution.
-        if ($dsxml->{dataset}{distinct}{fieldname}) {
-            $fieldname = $dsxml->{dataset}{distinct}{fieldname}->content;
+        if ($dsxml->exists ('./dataset/distinct/fieldname')) {
+            $fieldname = $dsxml->findvalue ('./dataset/distinct/fieldname');
         }
 
         # Parse the filter from JSON and perform variable substitution.
-        if ($dsxml->{dataset}{distinct}{filter}) {
+        if ($dsxml->exists ('./dataset/distinct/filter')) {
             my $filter_vars     = [];
-            my $object_json     = $dsxml->{dataset}{distinct}{filter}->content;
+            my $object_json     = $dsxml->findvalue ('./dataset/distinct/filter');
 
             &Jarvis::Error::dump ($jconfig, "Parsing filter...");
             &Jarvis::Error::dump ($jconfig, $object_json);
@@ -541,9 +539,9 @@ sub fetch_inner {
         }
 
         # Parse the options from JSON and perform variable substitution.
-        if ($dsxml->{dataset}{distinct}{options}) {
+        if ($dsxml->exists ('./dataset/distinct/options')) {
             my $options_vars     = [];
-            my $object_json     = $dsxml->{dataset}{distinct}{options}->content;
+            my $object_json     = $dsxml->findvalue ('./dataset/distinct/options');
 
             &Jarvis::Error::dump ($jconfig, "Parsing options...");
             &Jarvis::Error::dump ($jconfig, $object_json);
@@ -556,15 +554,15 @@ sub fetch_inner {
         # Execute our Mongo distinct.
         $cursor = $collection->distinct ($fieldname, $filter, $options);
 
-    } elsif ($dsxml->{dataset}{count}) {
+    } elsif ($dsxml->exists ('./dataset/count')) {
 
         my $filter    = undef;
         my $options   = undef;
 
         # Parse the filter from JSON and perform variable substitution.
-        if ($dsxml->{dataset}{count}{filter}) {
+        if ($dsxml->exists ('./dataset/count/filter')) {
             my $filter_vars     = [];
-            my $object_json     = $dsxml->{dataset}{count}{filter}->content;
+            my $object_json     = $dsxml->findvalue ('./dataset/count/filter');
 
             &Jarvis::Error::dump ($jconfig, "Parsing filter...");
             &Jarvis::Error::dump ($jconfig, $object_json);
@@ -573,9 +571,9 @@ sub fetch_inner {
         }
 
         # Parse the options from JSON and perform variable substitution.
-        if ($dsxml->{dataset}{count}{options}) {
+        if ($dsxml->exists ('./dataset/count/options')) {
             my $options_vars     = [];
-            my $object_json     = $dsxml->{dataset}{count}{options}->content;
+            my $object_json     = $dsxml->findvalue ('./dataset/count/options');
 
             &Jarvis::Error::dump ($jconfig, "Parsing options...");
             &Jarvis::Error::dump ($jconfig, $object_json);
@@ -596,14 +594,14 @@ sub fetch_inner {
         die "Dataset '$dataset_name' (type 'mongo') has no 'find', 'aggregate', 'distinct' or 'count' present.\n";
     }
 
-    
+
     # Process the rows returned from each our method cursors.
     my $rows_aref = [];
     while (my $document = $cursor->next ) {
         push (@$rows_aref, &mongo_to_perl ($jconfig, $document));
     }
 
-    return ($rows_aref); 
+    return ($rows_aref);
 }
 
 ################################################################################
@@ -641,18 +639,20 @@ sub store_inner {
 
     # Start with the collection.  This is at the top level of the datasets.
     # TODO: Maybe allow different operations to override the collection name?
-    $dsxml->{dataset}{collection} or die "Dataset '$dataset_name' (type 'mongo') has no 'collection' defined.\n";
-    my $collection_name = $dsxml->{dataset}{collection}->content;
+    $dsxml->exists ('./dataset/@collection') or die "Dataset '$dataset_name' (type 'mongo') has no 'collection' defined.\n";
+    my $collection_name = $dsxml->findvalue ('./dataset/@collection');
 
     # Get the statement type for this ttype if we don't have it.  This raises debug.
     if (! $stms->{$row_ttype}) {
-        ($dsxml->{dataset}{$row_ttype}) or die "Dataset '$dataset_name' (type 'mongo') has no '$row_ttype' defined.\n";        
+
+        # Check that our dataset xml file contains the dataset type that we're trying to execute.
+        ($dsxml->exists ("./dataset/$row_ttype")) or die "Dataset '$dataset_name' (type 'mongo') has no '$row_ttype' defined.\n";
 
         # Delete has only a document.
         # TODO: Add <options> support?
         if ($row_ttype eq 'delete') {
-            ($dsxml->{dataset}{$row_ttype}{filter}) or die "Dataset '$dataset_name' (type 'mongo') has no '$row_ttype.filter' defined.\n";        
-            my $object_json = $dsxml->{dataset}{$row_ttype}{filter}->content;
+            ($dsxml->exists ("./dataset/$row_ttype/filter")) or die "Dataset '$dataset_name' (type 'mongo') has no '$row_ttype.filter' defined.\n";
+            my $object_json = $dsxml->findvalue ("./dataset/$row_ttype/filter");
             my $filter_vars = [];
 
             &Jarvis::Error::dump ($jconfig, "Parsing $row_ttype.filter...");
@@ -662,9 +662,9 @@ sub store_inner {
             $stms->{$row_ttype}{filter} = { vars => $filter_vars, template => $filter_template };
 
             # Document
-            if ($dsxml->{dataset}{$row_ttype}{document}) {
+            if ($dsxml->exists ("./dataset/$row_ttype/document")) {
 
-                $object_json = $dsxml->{dataset}{$row_ttype}{document}->content;
+                $object_json = $dsxml->findvalue ("./dataset/$row_ttype/document");
                 my $document_vars = [];
 
                 &Jarvis::Error::dump ($jconfig, "Parsing $row_ttype.document...");
@@ -677,8 +677,8 @@ sub store_inner {
         # Insert has only a document.
         # TODO: Add <options> support?
         } elsif ($row_ttype eq 'insert') {
-            ($dsxml->{dataset}{$row_ttype}{document}) or die "Dataset '$dataset_name' (type 'mongo') has no '$row_ttype.document' defined.\n";        
-            my $object_json = $dsxml->{dataset}{$row_ttype}{document}->content;
+            ($dsxml->exists ("./dataset/$row_ttype/document")) or die "Dataset '$dataset_name' (type 'mongo') has no '$row_ttype.document' defined.\n";
+            my $object_json = $dsxml->findvalue ("./dataset/$row_ttype/document");
             my $document_vars = [];
 
             &Jarvis::Error::dump ($jconfig, "Parsing $row_ttype.document...");
@@ -692,8 +692,8 @@ sub store_inner {
         } elsif ($row_ttype eq 'update') {
 
             # Filter
-            ($dsxml->{dataset}{$row_ttype}{filter}) or die "Dataset '$dataset_name' (type 'mongo') has no '$row_ttype.filter' defined.\n";        
-            my $object_json = $dsxml->{dataset}{$row_ttype}{filter}->content;
+            ($dsxml->exists ("./dataset/$row_ttype/filter")) or die "Dataset '$dataset_name' (type 'mongo') has no '$row_ttype.filter' defined.\n";
+            my $object_json = $dsxml->findvalue ("./dataset/$row_ttype/filter");
             my $filter_vars = [];
 
             &Jarvis::Error::dump ($jconfig, "Parsing $row_ttype.filter...");
@@ -703,8 +703,8 @@ sub store_inner {
             $stms->{$row_ttype}{filter} = { vars => $filter_vars, template => $filter_template };
 
             # Document
-            ($dsxml->{dataset}{$row_ttype}{document}) or die "Dataset '$dataset_name' (type 'mongo') has no '$row_ttype.document' defined.\n";        
-            $object_json = $dsxml->{dataset}{$row_ttype}{document}->content;
+            ($dsxml->exists ("./dataset/$row_ttype/document")) or die "Dataset '$dataset_name' (type 'mongo') has no '$row_ttype.document' defined.\n";
+            $object_json = $dsxml->findvalue ("./dataset/$row_ttype/document");
             my $document_vars = [];
 
             &Jarvis::Error::dump ($jconfig, "Parsing $row_ttype.document...");
@@ -724,7 +724,7 @@ sub store_inner {
     my $objects = {};
     foreach my $key (sort (keys (%$stm))) {
         my $template = $stm->{$key}{template};
-        my $vars = $stm->{$key}{vars};    
+        my $vars = $stm->{$key}{vars};
         $objects->{$key} = &expand_vars ($jconfig, $template, $vars, $safe_params);
 
         &Jarvis::Error::debug ($jconfig, "Resulting %s after expansion.", $key);

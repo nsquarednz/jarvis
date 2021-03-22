@@ -31,7 +31,6 @@ use CGI;
 use CGI::Session;
 use CGI::Cookie;
 use DBI;
-use XML::Smart;
 
 package Jarvis::Login;
 
@@ -83,24 +82,27 @@ sub check {
     # Jarvis to manage its own cookies.
     ###############################################################################
     #
-    my $axml = $jconfig->{'xml'}->{jarvis}{app};
+    my $axml = $jconfig->{'xml'}->find ('./jarvis/app')->pop ();
     (defined $axml) || die "Cannot find <jarvis><app> in '" . $jconfig->{'app_name'} . ".xml'!\n";
 
-    if ($axml->{'sessiondb'}) {
+    if ($axml->exists ('./sessiondb')) {
 
         # Where are our sessions stored?
-        my $sid_store = $axml->{'sessiondb'}->{'store'}->content || "driver:file;serializer:default;id:md5";
+        my $sid_store = $axml->findvalue ('./sessiondb/@store') || "driver:file;serializer:default;id:md5";
         &Jarvis::Error::debug ($jconfig, "SID Store '$sid_store'.");
 
+        # die Data::Dumper::Dumper ($sid_store);
+
         my $default_cookie_name = uc ($jconfig->{'app_name'}) . "_CGISESSID";
-        my $sid_cookie_name = $axml->{'sessiondb'}->{'cookie'}->content || $default_cookie_name;
+        my $sid_cookie_name = $axml->findvalue ('./sessiondb/@cookie') || $default_cookie_name;
+
         CGI::Session->name($sid_cookie_name);
         &Jarvis::Error::debug ($jconfig, "SID Cookie Name '$sid_cookie_name'.");
 
         my %sid_params = ();
-        if ($axml->{'sessiondb'}->{'parameter'}) {
-            foreach my $sid_param (@{ $axml->{'sessiondb'}->{'parameter'} }) {
-                $sid_params {$sid_param->{'name'}->content} = $sid_param->{'value'}->content;
+        if ($axml->exists ('./sessiondb/parameter')) {
+            foreach my $sid_param ($axml->findnodes ('./sessiondb/parameter')) {
+                $sid_params {$sid_param->{'name'}} = $sid_param->{'value'};
             }
         }
 
@@ -110,7 +112,7 @@ sub check {
         # To trigger a new login overriding any cookie that may exist
         # (if configured to look up cookies), configure the order as 'url,cookie'
         # and send a URL with the relevant parameter, but empty.
-        my @sid_sources = map { lc (&trim($_)) } split (',', ($axml->{'sessiondb'}->{'sid_source'}->content || "cookie"));
+        my @sid_sources = map { lc (&trim($_)) } split (',', ($axml->findvalue ('./sessiondb/@sid_source') || "cookie"));
         my $sid = undef;
         foreach my $source (@sid_sources) {
             $sid = $jconfig->{'cgi'}->param($sid_cookie_name) if $source eq 'url';
@@ -129,6 +131,7 @@ sub check {
 
         my $err_handler = $SIG{__DIE__};
         $SIG{__DIE__} = sub {};
+
         my $session = new CGI::Session ($sid_store, $sid, \%sid_params);
         # If we have CSRF Protection enabled and we are not logged in update the CSRF Token.
         if ($jconfig->{csrf_protection} && !$session->param ('logged_in')) {
@@ -181,7 +184,7 @@ sub check {
 
     # require_post flag. If true, we prohibit username/password as url parameters
     # this is to prevent them from getting logged (e.g. by apache)
-    my $login_requires_post = defined ($Jarvis::Config::yes_value {lc ($axml->{'login'}{'require_post'} || 'no')});
+    my $login_requires_post = defined ($Jarvis::Config::yes_value {lc ($axml->findvalue ('./login/@require_post') || 'no')});
     # by this stage URL parameters have already been copied into POST parameters
     my $cgi_username = $jconfig->{'cgi'}->param('username');
     my $cgi_password = $jconfig->{'cgi'}->param('password');
@@ -238,7 +241,7 @@ sub check {
     }
 
     # Our login module configuration.
-    my $login_module = $axml->{login}{module};
+    my $login_module = $axml->findvalue ('./login/@module');
 
     # Existing, successful Jarvis session?  Fine, we trust this.
     #
@@ -277,14 +280,14 @@ sub check {
         # but that seemed to cause all sorts of DataDumper and cleanup problems.  This seems to
         # work smoothly.
         my %login_parameters = ();
-        if ($axml->{'login'}{'parameter'}) {
-            foreach my $parameter ($axml->{'login'}{'parameter'}('@')) {
-                &Jarvis::Error::debug ($jconfig, "Login Parameter: " . $parameter->{'name'}->content . " -> " . $parameter->{'value'}->content);
-                $login_parameters {$parameter->{'name'}->content} = $parameter->{'value'}->content;
+        if ($axml->exists ('./login/parameter')) {
+            foreach my $parameter ($axml->findnodes ('./login/parameter')) {
+                &Jarvis::Error::debug ($jconfig, "Login Parameter: " . $parameter->{'name'} . " -> " . $parameter->{'value'});
+                $login_parameters {$parameter->{'name'}} = $parameter->{'value'};
             }
         }
 
-        my $lib = $axml->{login}{lib} || undef;
+        my $lib = $axml->findvalue ('./login/@lib') || undef;
 
         &Jarvis::Error::debug ($jconfig, "Using default libs: '" . (join ',', @{$jconfig->{'default_libs'}}) . "'". ($lib ? ", plugin lib '$lib'." : ", no plugin specific lib."));
         &Jarvis::Error::debug ($jconfig, "Loading login module '" . $login_module . "'.");
@@ -315,8 +318,8 @@ sub check {
 
         # Check for a group mappings object within the login configuration block. This will map parsed groups to
         # static groups that are configured within the login block.
-        if ($axml->{'login'}{'group_mappings'}) {
-            if ($axml->{'login'}{'group_mappings'}{'group_mapping'}) {
+        if ($axml->exists ('./login/group_mappings')) {
+            if ($axml->exists ('./login/group_mappings/group_mapping')) {
 
                 # Split groups into hash. Preserving the original hash.
                 my %initial_groups;
@@ -328,15 +331,15 @@ sub check {
                 my %mapped_groups;
 
                 # Attempt to process each available group mapping.
-                foreach my $group_mapping ($axml->{'login'}{'group_mappings'}{'group_mapping'}('@')) {
+                foreach my $group_mapping ($axml->findnodes ('./login/group_mappings/group_mapping')) {
 
                     # Parse parameters and check both are provided and are defined.
                     $group_mapping->{'from'} || die ("Group mapping must have from mapping.");
-                    my $from_group = $group_mapping->{'from'}->content;
+                    my $from_group = $group_mapping->{'from'};
                     length ($from_group) || die ("Group mapping must have from mapping.");
-                    
-                    $group_mapping->{'to'}->content   || die ("Group mapping must have to mapping.");
-                    my $to_group = $group_mapping->{'to'}->content;
+
+                    $group_mapping->{'to'} || die ("Group mapping must have to mapping.");
+                    my $to_group = $group_mapping->{'to'};
                     length ($to_group) || die ("Group mapping must have to mapping.");
 
                     # If the from group is present in the group list returned by the login module add the mapped to group to it.
@@ -407,7 +410,7 @@ sub check {
 
     # Set/extend session expiry.  Flush new/modified session data.
     if ($session) {
-        my $session_expiry = $jconfig->{'expiry'} || $axml->{'sessiondb'}->{'expiry'}->content || '+1h';
+        my $session_expiry = $jconfig->{'expiry'} || $axml->findvalue ('./sessiondb/@expiry') || '+1h';
         $session->expire ($session_expiry);
         $session->flush ();
 
@@ -466,7 +469,7 @@ sub check {
                 }
             }
         }
-   }
+    }
 
     # Log the results if we actually tried to login.  Write to tracker database too
     # if we are configured to do so.
@@ -504,27 +507,27 @@ sub alter_session {
 
     &Jarvis::Error::debug ($jconfig, "Updating session variables.");
 
-    my $axml = $jconfig->{'xml'}->{jarvis}{app};
+    my $axml = $jconfig->{'xml'}->find ('./jarvis/app')->pop ();
     (defined $axml) || die "Cannot find <jarvis><app> in '" . $jconfig->{'app_name'} . ".xml'!\n";
 
-    if (! $axml->{'sessiondb'}) {
+    if (! $axml->exists ('./sessiondb')) {
         &Jarvis::Error::debug ($jconfig, "No session DB is defined.");
         return 0;
     }
 
     # Where are our sessions stored?
-    my $sid_store = $axml->{'sessiondb'}->{'store'}->content || "driver:file;serializer:default;id:md5";
+    my $sid_store = $axml->findvalue ('./sessiondb/@store') || "driver:file;serializer:default;id:md5";
     &Jarvis::Error::debug ($jconfig, "SID Store '$sid_store'.");
 
     my $default_cookie_name = uc ($jconfig->{'app_name'}) . "_CGISESSID";
-    my $sid_cookie_name = $axml->{'sessiondb'}->{'cookie'}->content || $default_cookie_name;
+    my $sid_cookie_name = $axml->findvalue ('./sessiondb/@cookie') || $default_cookie_name;
     CGI::Session->name($sid_cookie_name);
     &Jarvis::Error::debug ($jconfig, "SID Cookie Name '$sid_cookie_name'.");
 
     my %sid_params = ();
-    if ($axml->{'sessiondb'}->{'parameter'}) {
-        foreach my $sid_param (@{ $axml->{'sessiondb'}->{'parameter'} }) {
-            $sid_params {$sid_param->{'name'}->content} = $sid_param->{'value'}->content;
+    if ($axml->exists ('./sessiondb/parameter')) {
+        foreach my $sid_param ($axml->findnodes ('./sessiondb/parameter')) {
+            $sid_params {$sid_param->{'name'}} = $sid_param->{'value'};
         }
     }
 
@@ -534,11 +537,11 @@ sub alter_session {
     # To trigger a new login overriding any cookie that may exist
     # (if configured to look up cookies), configure the order as 'url,cookie'
     # and send a URL with the relevant parameter, but empty.
-    my @sid_sources = map { lc (&trim($_)) } split (',', ($axml->{'sessiondb'}->{'sid_source'}->content || "cookie"));
+    my @sid_sources = map { lc (&trim($_)) } split (',', ($axml->findvalue ('./sessiondb/@sid_source') || "cookie"));
     my $sid = undef;
     foreach my $source (@sid_sources) {
-        $sid = $jconfig->{'cgi'}->param($sid_cookie_name) if $source eq 'url';
-        $sid = $jconfig->{'cgi'}->cookie($sid_cookie_name) if $source eq 'cookie';
+        $sid = $jconfig->{'cgi'}->param ($sid_cookie_name) if $source eq 'url';
+        $sid = $jconfig->{'cgi'}->cookie ($sid_cookie_name) if $source eq 'cookie';
         if (defined $sid) {
             $jconfig->{'sid_source'} = $source;
             last;
@@ -559,12 +562,12 @@ sub alter_session {
 
     my $err_handler = $SIG{__DIE__};
     $SIG{__DIE__} = sub {};
-    my $session = new CGI::Session ($sid_store, $sid, \%sid_params);    
+    my $session = new CGI::Session ($sid_store, $sid, \%sid_params);
     $SIG{__DIE__} = $err_handler;
     if (! $session) {
         die "Error in creating CGI::Session: " . ($! || "Unknown Reason");
     }
-    
+
     # Now modify the session vars.
     my $dataref = $session->dataref();
     foreach my $name (keys %$new_vars) {
@@ -579,7 +582,7 @@ sub alter_session {
     }
 
     # Write to the session file.
-    my $session_expiry = $jconfig->{'expiry'} || $axml->{'sessiondb'}->{'expiry'}->content || '+1h';
+    my $session_expiry = $jconfig->{'expiry'} || $axml->findvalue ('./sessiondb/@expiry') || '+1h';
     $session->expire ($session_expiry);
     $session->flush ();
 }
@@ -626,7 +629,7 @@ sub logout {
             $jconfig->{'error_string'} = "Logged out at client request.";
             $jconfig->{'username'} = '';
             $jconfig->{'group_list'} = '';
-            
+
         } else {
             $jconfig->{'error_string'} = "Logout not required (no existing session).";
         }

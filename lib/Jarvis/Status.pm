@@ -25,7 +25,7 @@ use strict;
 use warnings;
 
 use JSON;
-use XML::Smart;
+use XML::LibXML;
 
 package Jarvis::Status;
 
@@ -75,10 +75,21 @@ sub report {
         return $json_string;
 
     } elsif ($jconfig->{'format'} =~ m/^xml/) {
-        my $xml = XML::Smart->new ();
-        $xml->{'response'} = \%fields;
 
-        my $xml_string = $xml->data ();
+        # Create a new XML::LibXML document. We will assign each key/value pair of fields as an attribute on the response object.
+        my $xml_object = XML::LibXML::Document->new ("1.0", "UTF-8");
+
+        # Create a response node element and attach it to the root object.
+        my $response_node = $xml_object->createElement ("response");
+        $xml_object->setDocumentElement ($response_node);
+
+        # Set attributes on the root response object.
+        foreach my $key (keys %fields) {
+            $response_node->setAttribute ($key, $fields{$key});
+        }
+
+        # Convert our XML object into a string. Use 1 to format using indentation.
+        my $xml_string = $xml_object->toString (1);
         &Jarvis::Error::debug ($jconfig, "Returned content length = " . length ($xml_string));
         &Jarvis::Error::dump ($jconfig, $xml_string);
         return $xml_string;

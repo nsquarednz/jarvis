@@ -34,7 +34,6 @@ use parent qw(Jarvis::Agent);
 
 use DBI qw(:sql_types);
 use JSON;
-use XML::Smart;
 use Data::Dumper;
 
 use Jarvis::Text;
@@ -50,7 +49,7 @@ use sort 'stable';      # Don't mix up records when server-side sorting
 # Params:
 #       $jconfig - Jarvis::Config object (NOT USED YET)
 #       $which   - SQL Type ("select", "insert", "update", "delete")
-#       $dsxml   - XML::Smart object for dataset configuration
+#       $dsxml   - XML::LibXML object for dataset configuration
 #
 # Returns:
 #       $raw_sql
@@ -60,10 +59,9 @@ use sort 'stable';      # Don't mix up records when server-side sorting
 sub get_sql {
     my ($jconfig, $which, $dsxml) = @_;
 
-    my $raw_sql = $dsxml->{dataset}{$which}->content || return undef;
+    my $raw_sql = $dsxml->findvalue ("/dataset/$which") || return undef;
     $raw_sql =~ s/^\s*\-\-.*$//gm;   # Remove SQL comments
     $raw_sql = &trim ($raw_sql);
-
     return $raw_sql;
 }
 
@@ -117,7 +115,7 @@ sub sql_with_substitutions {
             &Jarvis::Error::dump ($jconfig, "SQL available args: '$k' -> <" . (ref $v) . ">.");
         }
     }
-    
+
     # Parse the update SQL to get a prepared statement, pulling out the list
     # of names of {{variables}} we replaced by ?.
     #
@@ -140,7 +138,7 @@ sub sql_with_substitutions {
             #   !out            Request an inout variable binding.
             #   !varchar        Call bind_param(_inout) with SQL_VARCHAR (the default)
             #   !numeric        Call bind_param(_inout) with SQL_NUMERIC
-            #   !json           When referring to a reference, we might want to serialize it 
+            #   !json           When referring to a reference, we might want to serialize it
             #                   as JSON for storage in some DBs like PostgreSQL.
             #
             while ($name =~ m/^(.*)(\![a-z]+)$/) {
@@ -208,17 +206,17 @@ sub sql_with_substitutions {
             if ($value =~ m/^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$/ && ! $flags{quote}) {
                 # No change.
 
-            # Raw flag performs NO changes ever!  Only allowed for SAFE variables (not client-supplied). 
+            # Raw flag performs NO changes ever!  Only allowed for SAFE variables (not client-supplied).
             } elsif ($flags{raw} && ($name =~ m/^__/)) {
                 # No change.
-                
+
             } elsif ($flags{noquote}) {
                 $value =~ s/[^0-9a-zA-Z _\-,]//g;
 
             } else {
                 $value = $dbh->quote($value);
             }
-            &Jarvis::Error::debug ($jconfig, "Expanding: '$name' " . (scalar %flags ? ("[" . join (",", keys %flags) . "] ") : "") . "-> '$value'.");            
+            &Jarvis::Error::debug ($jconfig, "Expanding: '$name' " . (scalar %flags ? ("[" . join (",", keys %flags) . "] ") : "") . "-> '$value'.");
             $sql3 .= $value;
 
         } else {
@@ -285,7 +283,7 @@ sub parse_statement {
     &Jarvis::Error::dump ($jconfig, "SQL as read from XML = " . $stm->{raw_sql});
 
     # Does this insert return rows?
-    $stm->{returning} = &Jarvis::Config::xml_yes_no ($jconfig, $dsxml->{dataset}{$ttype}{returning});
+    $stm->{returning} = &Jarvis::Config::xml_yes_no ($jconfig, $dsxml->findvalue ("/dataset/$ttype/\@returning"));
     &Jarvis::Error::debug ($jconfig, "Returning? = " . $stm->{returning});
 
     # Get our SQL with placeholders and prepare it.
@@ -297,11 +295,12 @@ sub parse_statement {
     &Jarvis::Error::dump ($jconfig, "SQL after substition = " . $sql_with_substitutions);
 
     # get db-specific parameters
-    my $dbxml = &Jarvis::DB::db_config ($jconfig, $dsxml->{dataset}{dbname}, $dsxml->{dataset}{dbtype});
+    my $dbxml = &Jarvis::DB::db_config ($jconfig, $dsxml->findvalue ('/dataset/@dbname'), $dsxml->findvalue ('/dataset/@dbtype'));
 
     # Use special prepare parameters
-    my $db_prepare_str = $dbxml->{prepare};
-    my $ds_prepare_str = $dsxml->{dataset}{$ttype}{prepare};
+    my $db_prepare_str = $dbxml->findvalue ('./@prepare');
+    my $ds_prepare_str = $dsxml->findvalue ("/dataset/$ttype/\@prepare");
+
     my %prepare_attr = ();
     foreach my $prepare_str (grep { $_ } ($db_prepare_str, $ds_prepare_str)) {
         &Jarvis::Error::debug ($jconfig, "Prepare += '$prepare_str'");
@@ -317,19 +316,19 @@ sub parse_statement {
             die "Couldn't prepare statement for $ttype on '$dataset_name'.\nSQL ERROR = '" . $dbh->errstr . "'.\n";
     }
 
-    # NOTE: "nolog" : Report back to client.  Do not log. 
-    #       "noerr" : Do NOT report back to client.  Do not log. 
-    
+    # NOTE: "nolog" : Report back to client.  Do not log.
+    #       "noerr" : Do NOT report back to client.  Do not log.
+
     # Log and error suppression patterns (dataset)
-    $stm->{nolog_dataset} = ($dsxml->{dataset}{$ttype}{nolog} ? $dsxml->{dataset}{$ttype}{nolog}->content : '');
-    $stm->{noerr_dataset} = ($dsxml->{dataset}{$ttype}{noerr} ? $dsxml->{dataset}{$ttype}{noerr}->content : '');
-    
+    $stm->{nolog_dataset} = ($dsxml->exists ("/dataset/$ttype/\@nolog") ? $dsxml->findvalue ("/dataset/$ttype/\@nolog") : '');
+    $stm->{noerr_dataset} = ($dsxml->exists ("/dataset/$ttype/\@noerr") ? $dsxml->findvalue ("/dataset/$ttype/\@noerr") : '');
+
     # Log and error suppression patterns (database global)
-    $stm->{nolog_dbh} = ($dbxml->{nolog} ? $dbxml->{nolog}->content : '');
-    $stm->{noerr_dbh} = ($dbxml->{noerr} ? $dbxml->{noerr}->content : '');
-    
+    $stm->{nolog_dbh} = ($dbxml->{nolog} ? $dbxml->{nolog} : '');
+    $stm->{noerr_dbh} = ($dbxml->{noerr} ? $dbxml->{noerr} : '');
+
     # Warning/error suppression pattern
-    $stm->{ignore} = ($dsxml->{dataset}{$ttype}{ignore} ? $dsxml->{dataset}{$ttype}{ignore}->content : '');
+    $stm->{ignore} = ($dsxml->exists ("/dataset/$ttype/\@ignore") ? $dsxml->findvalue ("/dataset/$ttype/\@ignore") : '');
 
     return $stm;
 }
@@ -342,7 +341,7 @@ sub parse_statement {
 #         <update nolog="uq_EducatorPoliceChecks_PoliceCheckDate">
 #
 #   b) Globally in the <database><nolog>...</nolog></database> field.
-# 
+#
 # Params:
 #       $stm - statement object as returned by parse_statement
 #       $message - error message to match against nolog flag
@@ -384,7 +383,7 @@ sub noerr {
 
 ################################################################################
 # check if error message should be supressed due to ignore flag
-# 
+#
 # Params:
 #       $stm - statement object as returned by parse_statement
 #       $message - error message to match against ignore flag
@@ -495,7 +494,7 @@ sub statement_execute {
             &Jarvis::Error::debug ($jconfig, "At least one bind variable is flagged '!out'.  Use bind_param () mechanism.");
             foreach my $i (0 .. $#$args) {
                 my $flags = $stm->{vflags_aref}[$i];
-                my $sql_type = SQL_VARCHAR;                
+                my $sql_type = SQL_VARCHAR;
                 if (defined $flags->{numeric}) {
                     $sql_type = SQL_NUMERIC;
                 }
@@ -540,7 +539,7 @@ sub statement_execute {
 
         if (&nolog ($stm, $error_message)) {
             &Jarvis::Error::debug ($jconfig, "Failure executing SQL. Log disabled.");
-            
+
         } else {
             &Jarvis::Error::log ($jconfig, "Failure executing SQL for '" . $stm->{ttype} . "'.  Details follow.");
             &Jarvis::Error::log ($jconfig, $stm->{sql_with_substitutions}) if $stm->{sql_with_substitutions};
@@ -549,8 +548,8 @@ sub statement_execute {
         }
 
         $stm->{sth}->finish;
-        
-        if (! &noerr ($stm, $error_message)) {        
+
+        if (! &noerr ($stm, $error_message)) {
             $stm->{error} = $error_message;
         }
         return 0;
@@ -605,7 +604,7 @@ sub transaction_commit {
 # array so that it can be presented to the client in JSON or XML or whatever.
 #
 # This function only processes a single dataset.  The parent method may invoke
-# us multiple times for a single request, and combine into a single return 
+# us multiple times for a single request, and combine into a single return
 # object.
 #
 # Params:
@@ -627,7 +626,7 @@ sub transaction_commit {
 #
 sub fetch_inner {
     my ($class, $jconfig, $dataset_name, $dsxml, $dbh, $safe_params) = @_;
-    
+
     # Get our STM.  This has everything attached.
     my $stm = &parse_statement ($jconfig, $dataset_name, $dsxml, $dbh, 'select', $safe_params) ||
         die "Dataset '$dataset_name' has no SQL of type 'select'.\n";
@@ -641,21 +640,21 @@ sub fetch_inner {
 
     # Fetch the data.
     my $rows_aref = $stm->{sth}->fetchall_arrayref({});
-    
-    # See if we can get column names.  If we can't get them legitimately 
+
+    # See if we can get column names.  If we can't get them legitimately
     # then try sniffing them from the results, though we will lose any column
     # ordering that might have otherwise existed in the original query.
-    my $column_names_aref = $stm->{sth}{NAME}; 
+    my $column_names_aref = $stm->{sth}{NAME};
     if ((scalar @$rows_aref) && ! $column_names_aref) {
         &Jarvis::Error::debug ($jconfig, 'No column names from query.  Try sniffing results.');
         my @column_names = sort (keys (%{ $$rows_aref[0] }));
         $column_names_aref = \@column_names;
     }
-    
+
     # Finish the statement handle.
     $stm->{sth}->finish;
 
-    return ($rows_aref, $column_names_aref); 
+    return ($rows_aref, $column_names_aref);
 }
 
 ################################################################################
@@ -780,7 +779,7 @@ sub store_inner {
                 $row_result->{returning} = [ $row ];
                 &Jarvis::Error::debug ($jconfig, "Copied single row from bind_param_inout results.");
 
-            # SQLite uses the last_insert_rowid() function for returning IDs.  
+            # SQLite uses the last_insert_rowid() function for returning IDs.
             # This is very special case handling.  We echo the input fields too!
             #
             } elsif ($dbh->{Driver}{Name} eq 'SQLite') {
@@ -905,7 +904,7 @@ sub free_statements {
     foreach my $stm_type (keys (%$stms)) {
         &Jarvis::Error::debug ($jconfig, "Finished with statement for ttype '$stm_type'.");
         $stms->{$stm_type}{sth}->finish;
-    }    
+    }
 
     return undef;
 }

@@ -58,11 +58,11 @@ use Jarvis::Route;
 #
 # Note that global variables under mod_perl require careful consideration!
 #
-# Specifically, you must ensure that all variables which require 
+# Specifically, you must ensure that all variables which require
 # re-initialisation for each invocation will receive it.
 #
 
-# This is our CGI object.  
+# This is our CGI object.
 # We pass it into our Jasper::Config, and also use it in our "die" error handler.
 #
 # It is safe because it is re-initialised in Main::do.
@@ -84,22 +84,6 @@ my @etc = ('/etc/jarvis', '/opt/jarvis/etc');
 
 # Version 6.0.0.
 $Jarvis::Main::JARVIS_VERSION = 700;
-
-###############################################################################
-# Debugging for our old friend XML::Smart and its beloved clean errors.
-###############################################################################
-#
-use XML::Smart; 
-{
-    no warnings 'redefine';
-    sub XML::Smart::DESTROY {
-      my $this = shift ;
-      # print STDERR "In XML::Smart::DESTROY.\n";
-      # print STDERR "  (object) is a " . ref ($this) . "\n";
-      # print STDERR ($$this ? "  and is defined.\n" : "  but is null.\n");
-      $$this && $$this->clean ;    
-    }
-}
 
 ###############################################################################
 # Generate a random UUID. Avoid any reliance on 3rd party UUID generator
@@ -137,7 +121,7 @@ sub error_handler {
     #
     # The problem arises when running under mod_perl.  The mod_perl wrapper
     # runs everything inside its own "eval", which we detect, and confuse
-    # with a Jarvis plugin "eval". 
+    # with a Jarvis plugin "eval".
     #
     if ((! defined $^S) or ($^S == 1)) {
 
@@ -151,7 +135,7 @@ sub error_handler {
     	    my $subroutine = $frame[3];
 
     	    # If we hit "(eval)" before Jarvis::Main::do, then that means this is a user-eval.
-    	    # We don't want to die at all in this case!  Just return and let the user's "eval" 
+    	    # We don't want to die at all in this case!  Just return and let the user's "eval"
     	    # post-processing run and deal with things.
     	    if ($subroutine eq '(eval)') {
                 return;
@@ -172,9 +156,9 @@ sub error_handler {
     $msg =~ s/\x00.*$//;
     $msg =~ s/\s*$/\n/;
 
-    # Return error to client.  Note that we do not print stack trace to user, 
+    # Return error to client.  Note that we do not print stack trace to user,
     # since that is a potential security weakness.
-    $jconfig->{status} = $jconfig->{status} || "500 Internal Server Error"; 
+    $jconfig->{status} = $jconfig->{status} || "500 Internal Server Error";
     my $status = $jconfig->{status};
     &Jarvis::Config::add_http_headers($jconfig,{ -status => $status, -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt" });
     print $cgi->header($jconfig->{http_headers});
@@ -199,7 +183,7 @@ sub error_handler {
     # We MUST ensure that ALL the cached database handles are removed.
     # Otherwise, under mod_perl, the next application would get OUR database handles!
     &Jarvis::DB::disconnect ($jconfig, undef, undef, 1);
-    
+
     # Under mod_perl this will be ModPerl::Util::exit (), which won't really end the process.
     # Under non-mod_perl, this will really exit the process.
     exit ();
@@ -242,19 +226,19 @@ sub check_csrf_protection {
 # Main "do" method.
 #
 # This method is called by either:
-#	Main::Agent (mod_perl case) or 
+#	Main::Agent (mod_perl case) or
 #	agent.pl (non-mod_perl case)
 ###############################################################################
 #
 sub do {
     my $options = shift;
-   
+
     $SIG{__WARN__} = sub { die shift };
     $SIG{__DIE__} = \&Jarvis::Main::error_handler;
 
     # Optional mod-perl stream output variable
     my $mod_perl_io = $options && $options->{mod_perl_io};
-    
+
     # If we have a CGI parameters configuration file require it now to
     # set any defined CGI parameters.
     foreach my $etc (@etc) {
@@ -299,7 +283,7 @@ sub do {
             $jarvis_etc = $etc;
         }
     }
-    $jarvis_etc || die "Cannot determine JARVIS_ETC.";    
+    $jarvis_etc || die "Cannot determine JARVIS_ETC.";
 
     ###############################################################################
     # Check basic HTML parameters.
@@ -351,12 +335,12 @@ sub do {
             }
         }
     }
-    
+
     ###############################################################################
     # Get our app name and read our $jconfig at last!  Debug can start too.
     ###############################################################################
 
-    # Clean up our path to remove & args, # names.  
+    # Clean up our path to remove & args, # names.
     $path =~ s|(?<!\\)&.*$||;
     $path =~ s|(?<!\\)#.*$||;
 
@@ -430,18 +414,18 @@ sub do {
         $user_args->{$name} = $cgi_params->{$name};
     }
 
-    # Dataset name can't be empty.  Also, it can only be normal characters 
+    # Dataset name can't be empty.  Also, it can only be normal characters
     # with "-", and "." for directory separator.
     #
-    # Note that we don't check yet for leading and trailing dot and other file 
-    # security stuff.  We'll do that when we actually go to open the file, 
+    # Note that we don't check yet for leading and trailing dot and other file
+    # security stuff.  We'll do that when we actually go to open the file,
     # because maybe some execs/plugins might allow it, and we don't want
     # to restrict them.
     #
     if ((! defined $dataset_name) || ($dataset_name eq '')) {
         die "All requests require $script_name/$app_name/<dataset-or-special>[/<arg1>...] in URI!\n";
     }
-    ($dataset_name =~ m|^[\w\-\.]+$|) || die "Invalid dataset_name '$dataset_name'!\n";    
+    ($dataset_name =~ m|^[\w\-\.]+$|) || die "Invalid dataset_name '$dataset_name'!\n";
 
     ###############################################################################
     # Action: "status", "habitat", "logout", "fetch", "update",  or custom
@@ -487,7 +471,7 @@ sub do {
     # If we have CSRF Protection enabled check that the origin and target locations match for all requests.
     if ($jconfig->{cross_origin_protection}) {
         # If the Origin header is present verify it matches the target origin.
-        # Use the user specified session domain when comparing the referer or origin addresses. 
+        # Use the user specified session domain when comparing the referer or origin addresses.
         my $host = $jconfig->{scookie_domain};
         if (defined ($ENV{HTTP_ORIGIN})) {
             my $raw_origin = ($ENV{HTTP_ORIGIN} =~ /^(?:.*:\/\/)?(.*?)(?:\/.*)?$/g)[0];
@@ -525,7 +509,7 @@ sub do {
 
     } elsif ($jconfig->{format} =~ /XML/i ) {
         $object_content_type =  'application/xml; charset=UTF-8"';
-    }   
+    }
 
     # All special datasets start with "__".
     #
@@ -561,8 +545,8 @@ sub do {
             die "Unknown special dataset '$dataset_name'!\n";
         }
         &Jarvis::Config::add_http_headers ($jconfig, {
-            -type => $object_content_type, 
-            -cookie => $jconfig->{cookie}, 
+            -type => $object_content_type,
+            -cookie => $jconfig->{cookie},
             'Cache-Control' => 'no-store, no-cache, must-revalidate'
         });
         print $cgi->header ($jconfig->{http_headers});
@@ -661,7 +645,7 @@ sub do {
     # We MUST ensure that ALL the cached database handles are removed.
     # Otherwise, under mod_perl, the next application would get OUR database handles!
     #
-    # Note that deep in the internals of mod_perl, the underlying handle may be 
+    # Note that deep in the internals of mod_perl, the underlying handle may be
     # cached for potential re-use by DBI.  But that will ensure that the password
     # and other information matches before allowing it.
     &Jarvis::DB::disconnect ($jconfig);

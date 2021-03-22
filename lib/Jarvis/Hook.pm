@@ -116,7 +116,7 @@ sub invoke {
         if (exists &$method) {
             &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
             &$method ($jconfig, $hook_parameters_href, @hook_args);
-        }            
+        }
     }
 
     return 1;
@@ -145,19 +145,21 @@ sub load_global {
     $jconfig->{hook_level} = 0;
 
     # Process the 'hook' entries across the main jarvis file AND THEN any <include> files.
-    foreach my $axml ($jconfig->{xml}{jarvis}{app}, @{ $jconfig->{iaxmls} }) {
-        if ($axml->{hook}) {
-            foreach my $hook (@{ $axml->{hook} }) {
-                my $lib = $hook->{lib} ? $hook->{lib}->content : undef;
-                my $module = $hook->{module}->content || die "Invalid global hook configuration, <hook> configured with no 'module' attribute.\n";
+    foreach my $axml ($jconfig->{xml}->findnodes ('./jarvis/app'), @{$jconfig->{iaxmls}}) {
+        if ($axml->exists ('./hook')) {
+            foreach my $hook ($axml->findnodes ('./hook')) {
+
+                # Sanity checks, get data.
+                my $lib = $hook->{lib} ? $hook->{lib} : undef;
+                my $module = $hook->{module} || die "Invalid global hook configuration, <hook> configured with no 'module' attribute.\n";
 
                 &Jarvis::Error::debug ($jconfig, "Loading (level 0) global <hook> with module '$module'.");
 
                 my %hook_parameter = ();
-                if ($hook->{parameter}) {
-                    foreach my $parameter ($hook->{parameter}('@')) {
-                        &Jarvis::Error::debug ($jconfig, "Hook Parameter: " . $parameter->{name}->content . " -> " . $parameter->{value}->content);
-                        $hook_parameter {$parameter->{name}->content} = $parameter->{value}->content;
+                if ($hook->exists ('./parameter')) {
+                    foreach my $parameter ($hook->findnodes ('./parameter')) {
+                        &Jarvis::Error::debug ($jconfig, "Hook Parameter: " . $parameter->{name} . " -> " . $parameter->{value});
+                        $hook_parameter {$parameter->{name}} = $parameter->{value};
                     }
                 }
 
@@ -205,7 +207,7 @@ sub unload_global {
         &invoke ($jconfig, $hook, "finish");
     }
 
-    # Finally remove ALL hooks (global and dataset). 
+    # Finally remove ALL hooks (global and dataset).
     $jconfig->{hooks} = [];
 }
 
@@ -229,23 +231,21 @@ sub load_dataset {
     my $hook_level = ++($jconfig->{hook_level});
     &Jarvis::Error::debug ($jconfig, "Loading dataset-specific hooks at hook level $hook_level.");
 
-    if ($dsxml->{dataset}{hook}) {
-        foreach my $hook (@{ $dsxml->{dataset}{hook} }) {
-            my $lib = $hook->{lib} ? $hook->{lib}->content : undef;
-            my $module = $hook->{module}->content || die "Invalid dataset hook configuration, <hook> configured with no module.\n";
+    if ($dsxml->exists ('/dataset/hook')) {
+        foreach my $hook ($dsxml->findnodes ('/dataset/hook')) {
+            my $lib = $hook->{lib} ? $hook->{lib} : undef;
+            my $module = $hook->{module} || die "Invalid dataset hook configuration, <hook> configured with no module.\n";
 
             &Jarvis::Error::debug ($jconfig, "Loading (level $hook_level) dataset-specific <hook> with module '$module'.");
 
             my %hook_parameter = ();
-            if ($hook->{parameter}) {
-                foreach my $parameter ($hook->{parameter}('@')) {
-                    &Jarvis::Error::debug ($jconfig, "Hook Parameter: " . $parameter->{name}->content . " -> " . $parameter->{value}->content);
-                    $hook_parameter {$parameter->{name}->content} = $parameter->{value}->content;
+            if ($hook->exists ('./parameter')) {
+                foreach my $parameter ($hook->findnodes ('./parameter')) {
+                    &Jarvis::Error::debug ($jconfig, "Hook Parameter: " . $parameter->{name} . " -> " . $parameter->{value});
+                    $hook_parameter {$parameter->{name}} = $parameter->{value};
                 }
             }
 
-            # Note that you can NOT add $dsxml to the hook_def object.  You cannot
-            # ever take a copy of an XML::Smart object, because the cleanup fails. 
             my %hook_def = ('module' => $module, 'lib' => $lib, 'parameters' => \%hook_parameter, level => $hook_level, dsxml => $dsxml);
             push (@{ $jconfig->{hooks} }, \%hook_def);
             &load_module ($jconfig, \%hook_def);
@@ -255,7 +255,7 @@ sub load_dataset {
                 no strict 'refs';
                 exists &$method && &Jarvis::Error::debug ($jconfig, "Invoking hook method '$method'");
                 exists &$method && &$method ($jconfig, \%hook_parameter, $dsxml);
-            }            
+            }
         }
     }
 
@@ -263,7 +263,7 @@ sub load_dataset {
 }
 
 ###############################################################################
-# Unload any dataset hooks added by the most recent call to load_dataset (), 
+# Unload any dataset hooks added by the most recent call to load_dataset (),
 # invoke the "finish" method on each hook as we do so.
 #
 # Params:
