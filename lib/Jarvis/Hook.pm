@@ -145,7 +145,7 @@ sub load_global {
     $jconfig->{hook_level} = 0;
 
     # Process the 'hook' entries across the main jarvis file AND THEN any <include> files.
-    foreach my $axml ($jconfig->{xml}->findnodes ('/jarvis/app'), (map { $_->findnodes ('/jarvis/app') } @{$jconfig->{iaxmls}})) {
+    foreach my $axml ($jconfig->{xml}->findnodes ('./jarvis/app'), @{$jconfig->{iaxmls}}) {
         if ($axml->exists ('./hook')) {
             foreach my $hook ($axml->findnodes ('./hook')) {
 

@@ -91,7 +91,7 @@ sub do {
     my %plugin_parameters = &Jarvis::Config::default_parameters ($jconfig);
 
     # Process the 'plugin' entries across the main jarvis file AND THEN any <include> files.
-    ALL_PLUGINS: foreach my $axml ($jconfig->{xml}->findnodes ('/jarvis/app'), (map { $_->findnodes ('/jarvis/app') } @{$jconfig->{iaxmls}})) {
+    ALL_PLUGINS: foreach my $axml ($jconfig->{xml}->findnodes ('./jarvis/app'), @{$jconfig->{iaxmls}}) {
         if ($axml->exists ('./plugin')) {
             foreach my $plugin ($axml->findnodes ('./plugin')) {
                 my $plugin_ds = $plugin->{dataset};

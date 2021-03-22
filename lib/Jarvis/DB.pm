@@ -70,7 +70,7 @@ sub db_config {
     $dbname = "default" unless defined $dbname && $dbname . '';
     $dbtype = "dbi" unless defined $dbtype && $dbtype . '';
 
-    my $axml = $jconfig->{xml}->find ('/jarvis/app')->pop ();
+    my $axml = $jconfig->{xml}->find ('./jarvis/app')->pop ();
 
     # Find the specific database config we need.
     my @dbs = grep { (($_->findvalue ('./@name') || 'default') eq $dbname) && (($_->findvalue ('./@type') || 'dbi') eq $dbtype) } $axml->findnodes ('./database');

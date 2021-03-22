@@ -78,7 +78,7 @@ sub do {
     my $cleanup_after = 0;              # Cleanup after how many minutes?  0 = NEVER CLEANUP.
 
     # Process the 'exec' entries across the main jarvis file AND THEN any <include> files.
-    ALL_EXECS: foreach my $axml ($jconfig->{xml}->findnodes ('/jarvis/app'), (map { $_->findnodes ('/jarvis/app') } @{$jconfig->{iaxmls}})) {
+    ALL_EXECS: foreach my $axml ($jconfig->{xml}->findnodes ('./jarvis/app'), @{$jconfig->{iaxmls}}) {
         if ($axml->exists ('./exec')) {
             foreach my $exec ($axml->findnodes ('./exec')) {
                 my $exec_ds = $exec->{dataset};

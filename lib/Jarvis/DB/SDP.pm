@@ -26,6 +26,10 @@ BEGIN {
     require Exporter;
 }
 
+# Allow our XML::LibXML library to generate warnings specific to that library.
+# That will let us better present any error messages.
+$XML::LibXML::Error::WARNINGS = 1;
+
 ##############################################################################
 ##############################################################################
 # OBJECT LOADERS AND FINDERS
@@ -123,11 +127,19 @@ sub fetchall {
         );
     };
 
-    # Check for warnings.
-    if ($@) {
-        die "Malformed XML on SDP response.\n";
+    # Check for XML::LibXML error object.
+    if (ref ($@)) {
+        # If we have a specific XML::LibXML::Error object then we can pretty print the error.
+        my $error_domain  = $@->domain ();
+        my $error_message = $@->message ();
+        die "MMalformed XML on SDP response: [$error_domain] $error_message\n";
+
+    # Fall back to default error handling.
+    } elsif ($@) {
+        die "Malformed XML on SDP response: $@.\n";
     }
 
+    # Sanity checks.
     $response->exists ('./soap:Envelope/soap:Body') || die "No soap:Envelope/soap:Body found in SDP response.\n";
 
     if ($response->exists ('./soap:Envelope/soap:Body/soap:Fault')) {
@@ -137,7 +149,8 @@ sub fetchall {
         die "$source returned error $error_code: $description\n";
     }
 
-    return $response->findvalue ('./soap:Envelope/soap:Body/ExecuteResponse/return/root') || die "Missing ExecuteResponse/return/root in SDP response.\n";
+    # Pass back the root element.
+    return $response->find ('./soap:Envelope/soap:Body/ExecuteResponse/return/root')->pop () || die "Missing ExecuteResponse/return/root in SDP response.\n";
 }
 
 ################################################################################
@@ -164,10 +177,10 @@ sub fetchall_arrayref {
     my $root = $self->fetchall ($jconfig, $mdx);
 
     # Check for errors.
-    &Jarvis::Error::dump ($jconfig, $root->data);
-    if ($root->{'Exception'}) {
-        my $code = $root->{'Messages'}->{'Error'}->{'ErrorCode'} || '???';
-        my $description  = $root->{'Messages'}->{'Error'}->{'Description'} || '???';
+    &Jarvis::Error::dump ($jconfig, $root->toString ());
+    if ($root->exists ('./Exception')) {
+        my $code         = $root->findvalue ('./Messages/Error/ErrorCode')   || '???';
+        my $description  = $root->findvalue ('./Messages/Error/Description') || '???';
         die "An MDX error $code occured: $description\n";
     }
 
@@ -175,27 +188,27 @@ sub fetchall_arrayref {
     &Jarvis::Error::debug ($jconfig, "Converting 2D MDX result to Array of tuples.");
 
     # Now the fun bit.  Convert the deep complicated structure into 2D tuple array like DBI would.
-    my @axis_names = grep { $_ ne 'SlicerAxis' } map { $_->{'name'}->content } $root->{'OlapInfo'}->{'AxesInfo'}->{'AxisInfo'}('@');
+    my @axis_names = grep { $_ ne 'SlicerAxis' } map { $_->{'name'} } $root->findnodes ('./OlapInfo/AxesInfo/AxisInfo');
     foreach my $axis_name (@axis_names) {
         &Jarvis::Error::debug ($jconfig, "Axis: $axis_name");
     }
     (scalar @axis_names == 2) || die "Require exactly two (non-Slice) Axes for 2D tuple encoding.  Got " . (scalar @axis_names) . ".\n";
 
     # What are the names for the column/row axes?
-    my $column_axis_label = $root->{'OlapInfo'}->{'AxesInfo'}->{'AxisInfo'}[0]->{'HierarchyInfo'}->{'name'}->content || "Unknown Axis0 Name";
-    my $row_axis_label = $root->{'OlapInfo'}->{'AxesInfo'}->{'AxisInfo'}[1]->{'HierarchyInfo'}->{'name'}->content || "Unknown Axis1 Name";
+    # XML::LibXML is not zero indexed!
+    my $column_axis_label = $root->findvalue ('./OlapInfo/AxesInfo/AxisInfo[1]/HierarchyInfo/@name') || "Unknown Axis0 Name";
+    my $row_axis_label    = $root->findvalue ('./OlapInfo/AxesInfo/AxisInfo[2]/HierarchyInfo/@name') || "Unknown Axis1 Name";
     &Jarvis::Error::debug ($jconfig, "Column Axis Label = $column_axis_label");
     &Jarvis::Error::debug ($jconfig, "Row Axis Label = $row_axis_label");
 
     # What are the tuple names?
-    ($root->{'Axes'}->{'Axis'}[0]->{'name'}->content eq 'Axis0') || die "Inconsistent Axis0 Name\n";
-    ($root->{'Axes'}->{'Axis'}[1]->{'name'}->content eq 'Axis1') || die "Inconsistent Axis1 Name\n";
+    ($root->findvalue ('./Axes/Axis[1]/@name') eq 'Axis0') || die "Inconsistent Axis0 Name\n";
+    ($root->findvalue ('./Axes/Axis[2]/@name') eq 'Axis1') || die "Inconsistent Axis1 Name\n";
 
-    my @column_names = map { my $x = $_->{'Member'}->{'Caption'}->content; $x; } $root->{'Axes'}->{'Axis'}[0]->{'Tuples'}{'Tuple'}('@');
-
+    my @column_names = map { my $x = $_->findvalue ('./Member/Caption'); $x; } $root->findnodes ('./Axes/Axis[1]/Tuples/Tuple');
     my $num_columns = scalar @column_names;
 
-    my @row_names = map { my $x = $_->{'Member'}->{'Caption'}->content; $x; } $root->{'Axes'}->{'Axis'}[1]->{'Tuples'}{'Tuple'}('@');
+    my @row_names = map { my $x = $_->findvalue ('./Member/Caption'); $x; } $root->findnodes ('./Axes/Axis[2]/Tuples/Tuple');
     my $num_rows = scalar @row_names;
 
     # Pre-fill the rows.
@@ -211,9 +224,9 @@ sub fetchall_arrayref {
     }
 
     # Now the cell data
-    foreach my $cell ($root->{'CellData'}->{'Cell'}('@')) {
-        my $ordinal = $cell->{'CellOrdinal'}->content;
-        my $value = $cell->{'Value'}->content;
+    foreach my $cell ($root->findnodes ('./CellData/Cell')) {
+        my $ordinal = $cell->findvalue ('./@CellOrdinal');
+        my $value = $cell->findvalue ('./Value');
         my $column = $ordinal % $num_columns;
         my $row = ($ordinal - $column) / $num_columns;
         my $column_name = $column_names[$column];
@@ -254,38 +267,39 @@ sub fetchall_hashref_3d {
     &Jarvis::Error::debug ($jconfig, "Converting 3D MDX result to Array of nested tuples.");
 
     # Now the fun bit.  Convert the deep complicated structure into 2D tuple array like DBI would.
-    my @axis_names = grep { $_ ne 'SlicerAxis' } map { $_->{'name'}->content } $root->{'OlapInfo'}->{'AxesInfo'}->{'AxisInfo'}('@');
+    my @axis_names = grep { $_ ne 'SlicerAxis' } map { $_->{'name'} } $root->findnodes ('./OlapInfo/AxesInfo/AxisInfo');
     foreach my $axis_name (@axis_names) {
         &Jarvis::Error::debug ($jconfig, "Axis: $axis_name");
     }
     (scalar @axis_names == 3) || die "Require exactly three (non-Slice) Axes for 3D tuple encoding.  Got " . (scalar @axis_names) . ".\n";
 
     # What are the names for the column/row axes?
-    my $column_axis_label = $root->{'OlapInfo'}->{'AxesInfo'}->{'AxisInfo'}[0]->{'HierarchyInfo'}->{'name'}->content || "Unknown Axis0 Name";
-    my $row_axis_label = $root->{'OlapInfo'}->{'AxesInfo'}->{'AxisInfo'}[1]->{'HierarchyInfo'}->{'name'}->content || "Unknown Axis1 Name";
-    my $page_axis_label = $root->{'OlapInfo'}->{'AxesInfo'}->{'AxisInfo'}[2]->{'HierarchyInfo'}->{'name'}->content || "Unknown Axis2 Name";
+    # XML::LibXML is not zero indexed!
+    my $column_axis_label = $root->findvalue ('./OlapInfo/AxesInfo/AxisInfo[1]/HierarchyInfo/@name') || "Unknown Axis0 Name";
+    my $row_axis_label    = $root->findvalue ('./OlapInfo/AxesInfo/AxisInfo[2]/HierarchyInfo/@name') || "Unknown Axis1 Name";
+    my $page_axis_label   = $root->findvalue ('./OlapInfo/AxesInfo/AxisInfo[3]/HierarchyInfo/@name') || "Unknown Axis2 Name";
     &Jarvis::Error::debug ($jconfig, "Column Axis Label = $column_axis_label");
     &Jarvis::Error::debug ($jconfig, "Row Axis Label = $row_axis_label");
     &Jarvis::Error::debug ($jconfig, "Page Axis Label = $page_axis_label");
 
     # What are the tuple names?
-    ($root->{'Axes'}->{'Axis'}[0]->{'name'}->content eq 'Axis0') || die "Inconsistent Axis0 Name\n";
-    ($root->{'Axes'}->{'Axis'}[1]->{'name'}->content eq 'Axis1') || die "Inconsistent Axis1 Name\n";
-    ($root->{'Axes'}->{'Axis'}[2]->{'name'}->content eq 'Axis2') || die "Inconsistent Axis2 Name\n";
+    ($root->findvalue ('./Axes/Axis[1]/@name') eq 'Axis0') || die "Inconsistent Axis0 Name\n";
+    ($root->findvalue ('./Axes/Axis[2]/@name') eq 'Axis1') || die "Inconsistent Axis1 Name\n";
+    ($root->findvalue ('./Axes/Axis[3]/@name') eq 'Axis2') || die "Inconsistent Axis2 Name\n";
 
-    my @column_names = map { $_->{'Member'}->{'Caption'}->content } $root->{'Axes'}->{'Axis'}[0]->{'Tuples'}{'Tuple'}('@');
+    my @column_names = map { $_->findvalue ('./Member/Caption') } $root->findnodes ('./Axes/Axis[1]/Tuples/Tuple');
     my $num_columns = scalar @column_names;
     foreach my $column (@column_names) {
         &Jarvis::Error::dump ($jconfig, "Column: " . $column);
     }
 
-    my @row_names = map { $_->{'Member'}->{'Caption'}->content } $root->{'Axes'}->{'Axis'}[1]->{'Tuples'}{'Tuple'}('@');
+    my @row_names = map { $_->findvalue ('./Member/Caption') } $root->findnodes ('./Axes/Axis[2]/Tuples/Tuple');
     my $num_rows = scalar @row_names;
     foreach my $row (@row_names) {
         &Jarvis::Error::dump ($jconfig, "Row: " . $row);
     }
 
-    my @page_names = map { $_->{'Member'}->{'Caption'}->content } $root->{'Axes'}->{'Axis'}[2]->{'Tuples'}{'Tuple'}('@');
+    my @page_names = map { $_->findvalue ('./Member/Caption') } $root->findnodes ('./Axes/Axis[3]/Tuples/Tuple');
     my $num_pages = scalar @page_names;
     foreach my $page (@page_names) {
         &Jarvis::Error::dump ($jconfig, "Page: " . $page);
@@ -296,9 +310,9 @@ sub fetchall_hashref_3d {
 
     # Now the cell data
     my %data = ();
-    foreach my $cell ($root->{'CellData'}->{'Cell'}('@')) {
-        my $ordinal = $cell->{'CellOrdinal'}->content;
-        my $value = $cell->{'Value'}->content;
+    foreach my $cell ($root->findnodes ('./CellData/Cell')) {
+        my $ordinal = $cell->findvalue ('./@CellOrdinal');
+        my $value = $cell->findvalue ('./Value');
         my $column = $ordinal % $num_columns;
         $ordinal = ($ordinal - $column) / $num_columns;
 

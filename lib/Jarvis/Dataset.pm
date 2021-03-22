@@ -58,10 +58,24 @@ my $AGENT_CLASSES = {
 # Internal Functions
 ###############################################################################
 
-#
+################################################################################
 # Recurisve helper method that will append new XML LibXML elements to a begining element.
 #
-sub append_rows {
+#       $return_object - The main XML::LibXML::Document object that we have to append each created node to.
+#
+#       $parent_node   - The direct parent node that we are attaching the current row against.
+#
+#       $node_name     - The name of the child node that we are creating.
+#
+#       $rows          - The data (potentiall nested) that we are appending to the parent node.
+#
+#       Note: This function may be called recursivly for nested return rows.
+#
+# Returns:
+#       undef
+################################################################################
+#
+sub libxml_append_rows {
     my ($return_object, $parent_node, $node_name, $rows) = @_;
 
     foreach my $row (@{$rows}) {
@@ -79,7 +93,7 @@ sub append_rows {
             } elsif (ref ($value) eq 'ARRAY') {
                 # Recurisve loop processing these items as nested items.
                 # The name of the items is derived from the key name.
-                append_rows ($return_object, $child_node, $key, $value);
+                libxml_append_rows ($return_object, $child_node, $key, $value);
             }
         }
 
@@ -209,18 +223,20 @@ sub load_dsxml {
     # Check for XML::LibXML error object.
     if (ref ($@)) {
         # If we have a specific XML::LibXML::Error object then we can pretty print the error.
-        die "Cannot read '$dsxml_filename': $@\n";
+        my $error_domain  = $@->domain ();
+        my $error_message = $@->message ();
+        die "Cannot read '$dsxml_filename': [$error_domain] $error_message\n";
 
     # Fall back to default error handling.
     } elsif ($@) {
         die "Cannot read '$dsxml_filename': $@.\n";
     }
 
-    ($dsxml->exists ('/dataset')) || die "Missing <dataset> tag in '$dsxml_filename'!\n";
+    ($dsxml->exists ('./dataset')) || die "Missing <dataset> tag in '$dsxml_filename'!\n";
 
     # What kind of database are we dealing with?
-    my $dbname = $dsxml->findvalue ('/dataset/@dbname') || $default_dbname;
-    my $dbtype = $dsxml->findvalue ('/dataset/@dbtype') || $default_dbtype;
+    my $dbname = $dsxml->findvalue ('./dataset/@dbname') || $default_dbname;
+    my $dbtype = $dsxml->findvalue ('./dataset/@dbtype') || $default_dbtype;
 
     # What dataset level are we at in our stack?  Level 0 is the top-level, master dataset.  Others are childs.
     (defined $jconfig->{datasets}) || ($jconfig->{datasets} = []);
@@ -230,8 +246,8 @@ sub load_dsxml {
     my $debug_previous = $jconfig->{debug};
     my $dump_previous = $jconfig->{dump};
 
-    my $debug = $debug_previous || defined ($Jarvis::Config::yes_value {lc ($dsxml->findvalue ('/dataset/@debug') || "no")});
-    my $dump = $debug || $debug_previous || defined ($Jarvis::Config::yes_value {lc ($dsxml->findvalue ('/dataset/@dump') || "no")});
+    my $debug = $debug_previous || defined ($Jarvis::Config::yes_value {lc ($dsxml->findvalue ('./dataset/@debug') || "no")});
+    my $dump = $debug || $debug_previous || defined ($Jarvis::Config::yes_value {lc ($dsxml->findvalue ('./dataset/@dump') || "no")});
 
     # Construct our dataset descriptor.
     my $dataset = {
@@ -541,7 +557,7 @@ sub fetch {
 
         # Start off using our "parent" data node, placing the first items into row.
         # Anything else that is nested will use its name for the key.
-        append_rows ($return_object, $data_node, 'row', $rows_aref);
+        libxml_append_rows ($return_object, $data_node, 'row', $rows_aref);
 
         # Copy across any extra root parameters set by the return_fetch hook.
         foreach my $name (sort (keys %$extra_href)) {
@@ -777,7 +793,7 @@ sub fetch_rows {
     &Jarvis::Hook::load_dataset ($jconfig, $dsxml);
 
     # Check the allowed groups.
-    my $allowed_groups = $dsxml->findvalue ('/dataset/@read');
+    my $allowed_groups = $dsxml->findvalue ('./dataset/@read');
 
     # Perform CSRF checks.
     Jarvis::Main::check_csrf_protection ($jconfig, $allowed_groups);
@@ -885,7 +901,7 @@ sub fetch_rows {
     }
 
     # What transformations should we use when sending out fetch data?
-    my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->findvalue ('/dataset/transform/@fetch'));
+    my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->findvalue ('./dataset/transform/@fetch'));
     &Jarvis::Error::debug ($jconfig, "Fetch transformations = " . join (', ', keys %transforms) . " (applied to returned results)");
 
     # Apply any output transformations to remaining hashes.
@@ -926,7 +942,7 @@ sub fetch_rows {
     }
 
     # Now do we have any child datasets?
-    if ($dsxml->exists ('/dataset/child')) {
+    if ($dsxml->exists ('./dataset/child')) {
         &Jarvis::Error::debug ($jconfig, "We have child datasets to append.");
 
         foreach my $child ($dsxml->findnodes ('./dataset/child')) {
@@ -1069,14 +1085,14 @@ sub store {
         );
 
         # Sanity check on outer object.
-        $cxml->exists ('/request') || die "Missing top-level 'request' element in submitted XML content.\n";
+        $cxml->exists ('./request') || die "Missing top-level 'request' element in submitted XML content.\n";
 
         # Fields may either sit at the top level, or you may provide an array of
         # records in a <row> array.
         #
         my @rows = ();
-        if ($cxml->exists ('/request/row')) {
-            foreach my $cxml_row ($cxml->findnodes ('/request/row')) {
+        if ($cxml->exists ('./request/row')) {
+            foreach my $cxml_row ($cxml->findnodes ('./request/row')) {
                 # Data can be store in either an attribute or an element. We need to parse both types.
                 my %fields;
 
@@ -1095,10 +1111,10 @@ sub store {
             my %fields;
 
             # Again process all elements underneath the request element.
-            map { $fields{$_->nodeName} = $_->to_literal } $cxml->findnodes ('/request/*');
+            map { $fields{$_->nodeName} = $_->to_literal } $cxml->findnodes ('./request/*');
 
             # Afterwards again process each attribute underneath the request element.
-            map { $fields{$_->nodeName} = $_->nodeValue } $cxml->findnodes ('/request/@*');
+            map { $fields{$_->nodeName} = $_->nodeValue } $cxml->findnodes ('./request/@*');
 
             push (@rows, \%fields);
         }
@@ -1202,14 +1218,14 @@ sub store {
 
             # Start off using our "parent" result node, placing the first items into row.
             # Anything else that is nested will use its name for the key.
-            append_rows ($return_object, $results_node, 'row', $results_aref);
+            libxml_append_rows ($return_object, $results_node, 'row', $results_aref);
         }
 
         # Return non-array fields in success case only.
         if ($success && ! $return_array) {
             if ($$results_aref[0]{returning}) {
                 # Append the single returning object into a returning array underneath our top level response node.
-                append_rows ($return_object, $response_node, 'returning', $$results_aref[0]{returning});
+                libxml_append_rows ($return_object, $response_node, 'returning', $$results_aref[0]{returning});
             }
         }
 
@@ -1266,7 +1282,7 @@ sub store_rows {
     &Jarvis::Hook::load_dataset ($jconfig, $dsxml);
 
     # Now perform security check.
-    my $allowed_groups = $dsxml->findvalue ('/dataset/@write');
+    my $allowed_groups = $dsxml->findvalue ('./dataset/@write');
     my $failure = &Jarvis::Login::check_access ($jconfig, $allowed_groups);
     if ($failure ne '') {
         $jconfig->{status} = "401 Unauthorized";
@@ -1281,7 +1297,7 @@ sub store_rows {
     my %safe_all_rows_params = &Jarvis::Config::safe_variables ($jconfig, $user_args, undef);
 
     # What transforms should we use when processing store data?
-    my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->findvalue ('/dataset/transform/@store'));
+    my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->findvalue ('./dataset/transform/@store'));
     &Jarvis::Error::debug ($jconfig, "Store transformations = " . join (', ', keys %transforms) . " (applied to incoming row data)");
 
     # Apply input transformations to the all-rows before_all/after_all parameters too.`
@@ -1327,7 +1343,7 @@ sub store_rows {
     my $message = '';
 
     # Execute our "before" statement (assuming the agent supports it).
-    if ($dsxml->exists ('/dataset/before')) {
+    if ($dsxml->exists ('./dataset/before')) {
         no strict 'refs';
         my $result = $agent_class->execute_before ($jconfig, $dataset_name, $dsxml, $dbh, \%before_params);
         if (defined $result) {
@@ -1387,7 +1403,7 @@ sub store_rows {
         }
 
         # Now do we have any child datasets?
-        if ($dsxml->exists ('/dataset/child')) {
+        if ($dsxml->exists ('./dataset/child')) {
 
             # For insert/update only!  Don't recurse on delete.
             if ($row_ttype eq 'delete') {
@@ -1396,7 +1412,7 @@ sub store_rows {
             } else {
                 &Jarvis::Error::debug ($jconfig, "Processing child datasets for '$row_ttype' store.");
             }
-            foreach my $child ($dsxml->findnodes ('/dataset/child')) {
+            foreach my $child ($dsxml->findnodes ('./dataset/child')) {
 
                 # What dataset do we use to get child data, and where do we store it?
                 $child->{field} || die "Invalid dataset child configuration, <child> with no 'field' attribute.\n";
@@ -1494,7 +1510,7 @@ sub store_rows {
         my %after_params = %safe_all_rows_params;
 
         # Execute our "after" statement (assuming the agent supports it).
-        if ($dsxml->exists ('/dataset/after')) {
+        if ($dsxml->exists ('./dataset/after')) {
             no strict 'refs';
             my $result = $agent_class->execute_after ($jconfig, $dataset_name, $dsxml, $dbh, \%after_params);
             if (defined $result) {

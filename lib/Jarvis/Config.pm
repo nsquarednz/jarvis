@@ -114,7 +114,9 @@ sub new {
     # Check for XML::LibXML error object.
     if (ref ($@)) {
         # If we have a specific XML::LibXML::Error object then we can pretty print the error.
-        die "Cannot read '$xml_filename': $@\n";
+        my $error_domain  = $@->domain ();
+        my $error_message = $@->message ();
+        die "Cannot read '$xml_filename': [$error_domain] $error_message\n";
 
     # Fall back to default error handling.
     } elsif ($@) {
@@ -122,7 +124,7 @@ sub new {
     }
 
     # Sanity check the XML structure.
-    $xml->exists ("/jarvis") || die "Missing <jarvis> tag in '$xml_filename'!\n";
+    $xml->exists ('./jarvis') || die "Missing <jarvis> tag in '$xml_filename'!\n";
 
     # Store the XML refernce, most of our configuration reading happens in classes that call this module.
     $self->{'xml'} = $xml;
@@ -133,8 +135,8 @@ sub new {
     ###############################################################################
     #
     # We MUST have an entry for this application in our config.
-    $xml->exists ("/jarvis/app") || die "Cannot find <jarvis><app> in '" . $self->{'app_name'} . ".xml'!\n";
-    my $axml = $xml->findnodes ("/jarvis/app")->pop ();
+    $xml->exists ('./jarvis/app') || die "Cannot find <jarvis><app> in '" . $self->{'app_name'} . ".xml'!\n";
+    my $axml = $xml->findnodes ('./jarvis/app')->pop ();
 
     # Defines if we should produce debug and/or dump output.  Dump implies debug.
     $self->{'dump'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'dump'} || "no")});
@@ -183,7 +185,7 @@ sub new {
     # from the configuration, and store in an array in the config item.
     $self->{'default_libs'} = [];
     if ($axml->exists ('./default_libs/lib')) {
-        foreach my $lib ($axml->findnodes ('default_libs//lib')) {
+        foreach my $lib ($axml->findnodes ('./default_libs/lib')) {
             &Jarvis::Error::debug ($self, "Default Lib Path: " . ($lib->{'path'} || 'UNDEFINED'));
             if ($lib->{'path'}) {
                 push (@{ $self->{'default_libs'} }, $lib->{'path'});
@@ -232,7 +234,7 @@ sub new {
     # files as well as from the primary file.
     #
     my @iaxmls = ();
-    foreach my $include ($xml->findnodes ("/jarvis/include")) {
+    foreach my $include ($xml->findnodes ('./jarvis/include')) {
 
         (defined $include->{file}) or die "Missing attribute 'file' on <include> within '$app_name'.";
         my $filename = $include->{file};
@@ -250,8 +252,10 @@ sub new {
 
         # Check for XML::LibXML error object.
         if (ref ($@)) {
-            # If we have a specific XML::LibXML::Error object then we can pretty print/jarvis/include/@* the error.
-            die "Cannot read '$xml_filename': $@\n";
+            # If we have a specific XML::LibXML::Error object then we can pretty print the error.
+            my $error_domain  = $@->domain ();
+            my $error_message = $@->message ();
+            die "Cannot read '$xml_filename': [$error_domain] $error_message\n";
 
         # Fall back to default error handling.
         } elsif ($@) {
@@ -286,7 +290,7 @@ sub new {
         }
 
         # Again check if only an app element is present within our app element.
-        foreach my $node ($ixml->findnodes ('/jarvis/*')) {
+        foreach my $node ($ixml->findnodes ('./jarvis/*')) {
             my $node_key = $node->nodeName;
             if ($node_key ne 'app') {
                 &Jarvis::Error::log ($self, "Unsupported <xml><jarvis> node key '%s' in <include> '%s'.", $node_key, $filename);
@@ -295,10 +299,9 @@ sub new {
 
         # Now validate that within our app element that we only have supported elements present.
         # For anything that we don't support we'll throw and error message into our log.
-        if ($ixml->exists ('/jarvis/app')) {
-
+        if ($ixml->exists ('./jarvis/app')) {
             # Again check for node keys that we don't support.
-            foreach my $node ($ixml->findnodes ('/jarvis/app/*')) {
+            foreach my $node ($ixml->findnodes ('./jarvis/app/*')) {
                 my $node_key = $node->nodeName;
                 if (($node_key ne 'plugin') && ($node_key ne 'hook') && ($node_key ne 'exec') && ($node_key ne 'router')) {
                     &Jarvis::Error::log ($self, "Unsupported <xml><jarvis><app> node key '%s' in <include> '%s'.", $node_key, $filename);
@@ -306,20 +309,20 @@ sub new {
             }
 
             # If we have a router element defined, go ahead and validate.
-            if ($ixml->exists ('/jarvis/app/router')) {
+            if ($ixml->exists ('./jarvis/app/router')) {
                 # Check attributes.
-                foreach my $arg ($ixml->findnodes ('/jarvis/app/router/@*')) {
+                foreach my $arg ($ixml->findnodes ('./jarvis/app/router/@*')) {
                     &Jarvis::Error::log ($self, "Unsupported <xml><jarvis><app><router> arg '%s' in <include> '%s'.", $arg->nodeName, $filename);
                 }
                 # Then check elements.
-                foreach my $node ($ixml->findnodes ('/jarvis/app/router/*')) {
+                foreach my $node ($ixml->findnodes ('./jarvis/app/router/*')) {
                     my $node_key = $node->nodeName;
                     if ($node_key ne 'route') {
                         &Jarvis::Error::log ($self, "Unsupported <xml><jarvis><app><router> node key '%s' in <include> '%s'.", $node_key, $filename);
                     }
                 }
             }
-            push (@iaxmls, $ixml->findnodes ('/jarvis/app'));
+            push (@iaxmls, $ixml->findnodes ('./jarvis/app'));
         }
     }
 

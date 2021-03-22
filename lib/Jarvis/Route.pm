@@ -63,8 +63,7 @@ sub find {
         my @routes = ();
 
         # Process the 'route' entries across the main jarvis file AND THEN any <include> files.
-        foreach my $axml ($jconfig->{xml}->findnodes ('/jarvis/app'), (map { $_->findnodes ('/jarvis/app') } @{$jconfig->{iaxmls}})) {
-
+        foreach my $axml ($jconfig->{xml}->findnodes ('./jarvis/app'), @{$jconfig->{iaxmls}}) {
             # Look for the first router element in each XML configuration, and check that it has at least one route defined.
             my $rxml = $axml->find ('./router')->pop ();
             if ($rxml && $rxml->exists ('./route')) {
