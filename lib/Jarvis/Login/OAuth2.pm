@@ -284,7 +284,12 @@ sub Jarvis::Login::OAuth2::refresh {
     my $client_id     = $login_parameters{client_id}                 || die ("client_id must be defined.\n");
     my $client_secret = $login_parameters{client_secret}             || die ("client_secret must be defined.\n");
     my $site          = $login_parameters{site}                      || die ("site must be defined.\n");
-    my $refresh_token = $jconfig->{session}->param ('refresh_token') || die ("No valid refresh token stored in session.\n");
+    my $refresh_token = $jconfig->{session}->param ('refresh_token');
+
+    # No refresh token? This can happen, no point in trying.
+    if (! defined ($refresh_token)) {
+        return undef;
+    }
 
     # Optional fields.
     my $self_signed_cert = $login_parameters{self_signed_cert};
@@ -368,8 +373,13 @@ sub Jarvis::Login::OAuth2::logout {
     my $client_id     = $login_parameters{client_id}                 || die ("client_id must be defined.\n");
     my $client_secret = $login_parameters{client_secret}             || die ("client_secret must be defined.\n");
     my $site          = $login_parameters{site}                      || die ("site must be defined.\n");
-    my $refresh_token = $jconfig->{session}->param ('refresh_token') || die ("No valid refresh token stored in session.\n");
-    my $access_token  = $jconfig->{session}->param ('access_token')  || die ("No valid access token stored in session.\n");
+    my $refresh_token = $jconfig->{session}->param ('refresh_token');
+    my $access_token  = $jconfig->{session}->param ('access_token');
+
+    # No tokens, lets skip as this can happen.
+    if (! defined ($refresh_token) || ! defined ($access_token)) {
+        return undef;
+    }
 
     # Optional fields.
     my $self_signed_cert = $login_parameters{self_signed_cert};
