@@ -243,43 +243,10 @@ sub check {
     # Our login module configuration.
     my $login_module = $axml->findvalue ('./login/@module');
 
-    # Existing, successful Jarvis session?  Fine, we trust this.
-    #
-    my $session = $jconfig->{'session'};
-    if ($session && $session->param('logged_in') && $session->param('username') && ! $force_relogin) {
-        &Jarvis::Error::debug ($jconfig, "Already logged in for session '" . $jconfig->{'sid'} . "'.");
-        $logged_in = $session->param('logged_in') ? 1 : 0;
-        $username = $session->param('username') || '';
-        $group_list = $session->param('group_list') || '';
-        $already_logged_in = 1;
+    # Get our login parameter values.
+    my %login_parameters = ();
+    if ($login_module) {
 
-        # Copy any additional safe params from session context into $jconfig's area.
-        my $dataref = $session->dataref();
-        foreach my $name (keys %$dataref) {
-            next if ($name !~ m/^__/);
-            my $value = $dataref->{$name};
-            &Jarvis::Error::debug ($jconfig, "Session set additional safe parameter '$name' = " . ($value ? "'$value'" : "undefined"));
-            $jconfig->{'additional_safe'}{$name} = $value;
-        }
-
-        # Add to our $args_href since e.g. fetch queries might use them.
-        $jconfig->{'logged_in'} = $logged_in;
-        $jconfig->{'username'} = $username;
-        $jconfig->{'error_string'} = $error_string;
-        $jconfig->{'group_list'} = $group_list;
-
-    # No successful session?  Login.  Note that we store failed sessions too.
-    #
-    # Note that not all actions allow you to provide a username and password for
-    # login purposes.  "status" does, and so does "fetch".  But the others don't.
-    # For exec scripts that's good, since it means that a report parameter named
-    # "username" won't get misinterpreted as an attempt to login.
-    #
-    } elsif ($login_module) {
-        # Get our login parameter values.  We were using $axml->{login}{parameter}('[@]', 'name');
-        # but that seemed to cause all sorts of DataDumper and cleanup problems.  This seems to
-        # work smoothly.
-        my %login_parameters = ();
         if ($axml->exists ('./login/parameter')) {
             foreach my $parameter ($axml->findnodes ('./login/parameter')) {
                 &Jarvis::Error::debug ($jconfig, "Login Parameter: " . $parameter->{'name'} . " -> " . $parameter->{'value'});
@@ -299,6 +266,63 @@ sub check {
                 die "Cannot load login module '$login_module': " . $@;
             }
         }
+    }
+
+
+    # Existing, successful Jarvis session?  Fine, we trust this.
+    #
+    my $session = $jconfig->{'session'};
+    if ($session && $session->param('logged_in') && $session->param('username') && ! $force_relogin) {
+        &Jarvis::Error::debug ($jconfig, "Already logged in for session '" . $jconfig->{'sid'} . "'.");
+
+        $logged_in         = $session->param('logged_in') ? 1 : 0;
+        $username          = $session->param('username') || '';
+        $group_list        = $session->param('group_list') || '';
+        $already_logged_in = 1;
+
+        # Copy any additional safe params from session context into $jconfig's area.
+        my $dataref = $session->dataref();
+        foreach my $name (keys %$dataref) {
+            next if ($name !~ m/^__/);
+            my $value = $dataref->{$name};
+            &Jarvis::Error::debug ($jconfig, "Session set additional safe parameter '$name' = " . ($value ? "'$value'" : "undefined"));
+            $jconfig->{'additional_safe'}{$name} = $value;
+        }
+
+        # Add to our $args_href since e.g. fetch queries might use them.
+        $jconfig->{'logged_in'}    = $logged_in;
+        $jconfig->{'username'}     = $username;
+        $jconfig->{'error_string'} = $error_string;
+        $jconfig->{'group_list'}   = $group_list;
+
+        # If we are logged in check if our login module implements a refresh mechanism. Some external providers utilizing SSO and OAuth expose a refresh endpoint that will
+        # Let us refresh the refresh_token we are storing on the session and continue our ongoing session.
+        # Not all login modules may implement a refresh method. Lets sanity check using the UNIVERSAL::can method.
+        if ($logged_in && $login_module && $login_module->can ('refresh')) {
+
+            my $error_string;
+            my $refresh_method = $login_module . "::refresh";
+            {
+                no strict 'refs';
+                ($error_string) = &$refresh_method ($jconfig, %login_parameters);
+            }
+
+            # If our refresh method generated any sort of error message we should alert.
+            if ($error_string) {
+                $jconfig->{'error_string'} = $error_string;
+                return 0;
+            }
+        }
+
+    # No successful session?  Login.  Note that we store failed sessions too.
+    #
+    # Note that not all actions allow you to provide a username and password for
+    # login purposes.  "status" does, and so does "fetch".  But the others don't.
+    # For exec scripts that's good, since it means that a report parameter named
+    # "username" won't get misinterpreted as an attempt to login.
+    #
+    } elsif ($login_module) {
+
         my $login_method = $login_module . "::check";
         {
             no strict 'refs';
@@ -315,44 +339,6 @@ sub check {
         $username || ($username = '');
         $group_list || ($group_list = '');
         $logged_in = (($error_string eq "") && ($username ne "")) ? 1 : 0;
-
-        # Check for a group mappings object within the login configuration block. This will map parsed groups to
-        # static groups that are configured within the login block.
-        if ($axml->exists ('./login/group_mappings')) {
-            if ($axml->exists ('./login/group_mappings/group_mapping')) {
-
-                # Split groups into hash. Preserving the original hash.
-                my %initial_groups;
-                foreach my $group (split (',', $group_list)) {
-                    $initial_groups{$group} = 1;
-                }
-
-                # Create variable to store our mapped groups separately.
-                my %mapped_groups;
-
-                # Attempt to process each available group mapping.
-                foreach my $group_mapping ($axml->findnodes ('./login/group_mappings/group_mapping')) {
-
-                    # Parse parameters and check both are provided and are defined.
-                    $group_mapping->{'from'} || die ("Group mapping must have from mapping.");
-                    my $from_group = $group_mapping->{'from'};
-                    length ($from_group) || die ("Group mapping must have from mapping.");
-
-                    $group_mapping->{'to'} || die ("Group mapping must have to mapping.");
-                    my $to_group = $group_mapping->{'to'};
-                    length ($to_group) || die ("Group mapping must have to mapping.");
-
-                    # If the from group is present in the group list returned by the login module add the mapped to group to it.
-                    if ($initial_groups{$from_group}) {
-                        $mapped_groups{$to_group} = 1;
-                    }
-                }
-
-                # After processing re-merge the parsed groups.
-                my %merged_groups = (%initial_groups, %mapped_groups);
-                $group_list = join (',', sort (keys (%merged_groups)));
-            }
-        }
 
         &Jarvis::Error::debug ($jconfig, "Login check complete.  Logged in = $logged_in.  User = $username.");
         if (! $logged_in) {
@@ -371,6 +357,43 @@ sub check {
         #
         if ($logged_in) {
             &Jarvis::Hook::after_login ($jconfig, $additional_safe);
+        }
+
+        # Check for a group mappings object within the login configuration block. This will map parsed groups to
+        # static groups that are configured within the login block.
+        # We do this after our after_login hook as those hooks may also modify the group mappings.
+        if ($axml->exists ('./login/group_mappings')) {
+            if ($axml->exists ('./login/group_mappings/group_mapping')) {
+
+                # Split groups into hash. Preserving the original hash.
+                my %initial_groups;
+                foreach my $group (split (',', $jconfig->{'group_list'})) {
+                    $initial_groups{$group} = 1;
+                }
+
+                # Create variable to store our mapped groups separately.
+                my %mapped_groups;
+
+                # Attempt to process each available group mapping.
+                foreach my $group_mapping ($axml->findnodes ('./login/group_mappings/group_mapping')) {
+                    # Parse parameters and check both are provided and are defined.
+                    $group_mapping->exists ('./@from') || die ("Group mapping must have from mapping.");
+                    my $from_group = $group_mapping->findvalue ('./@from');
+                    length ($from_group) || die ("Group mapping must have from mapping.");
+
+                    $group_mapping->exists ('./@to') || die ("Group mapping must have to mapping.");
+                    my $to_group = $group_mapping->findvalue ('./@to');
+                    length ($to_group) || die ("Group mapping must have to mapping.");
+
+                    # If the from group is present in the group list returned by the login module add the mapped to group to it.
+                    if ($initial_groups{$from_group}) {
+                        $mapped_groups{$to_group} = 1;
+                    }
+                }
+                # After processing re-merge the parsed groups.
+                my %merged_groups = (%initial_groups, %mapped_groups);
+                $jconfig->{'group_list'} = join (',', sort (keys (%merged_groups)));
+            }
         }
 
         # If Jarvis is maintaining its own session (and it usually is) then track
@@ -618,6 +641,55 @@ sub logout {
     &Jarvis::Error::debug ($jconfig, "Logout for '$username' on '$sid'.");
     my $session = $jconfig->{'session'};
     if ($session) {
+
+        # If we have a login module it may implement additional processing that we might want to perform before we clear our session.
+        # An example of this might be an OAuth or SSO based module that needs to invalidate an external token.
+        # Get our jarvis config and check for a defined custom login module.
+        my $axml = $jconfig->{'xml'}->find ('./jarvis/app')->pop ();
+        (defined $axml) || die "Cannot find <jarvis><app> in '" . $jconfig->{'app_name'} . ".xml'!\n";
+        my $login_module = $axml->findvalue ('./login/@module');
+
+        if ($login_module && $jconfig->{logged_in}) {
+
+            # Get our login parameter values.
+            my %login_parameters = ();
+            if ($axml->exists ('./login/parameter')) {
+                foreach my $parameter ($axml->findnodes ('./login/parameter')) {
+                    &Jarvis::Error::debug ($jconfig, "Login Parameter: " . $parameter->{'name'} . " -> " . $parameter->{'value'});
+                    $login_parameters {$parameter->{'name'}} = $parameter->{'value'};
+                }
+            }
+
+            my $lib = $axml->findvalue ('./login/@lib') || undef;
+
+            &Jarvis::Error::debug ($jconfig, "Using default libs: '" . (join ',', @{$jconfig->{'default_libs'}}) . "'". ($lib ? ", plugin lib '$lib'." : ", no plugin specific lib."));
+            &Jarvis::Error::debug ($jconfig, "Loading login module '" . $login_module . "'.");
+            {
+                map { eval "use lib \"$_\""; } @{$jconfig->{'default_libs'}};
+                eval "use lib \"$lib\"" if $lib;
+                eval "require $login_module";
+                if ($@) {
+                    die "Cannot load login module '$login_module': " . $@;
+                }
+            }
+
+            # Not all login modules may implement a logout method. Lets sanity check using the UNIVERSAL::can method.
+            if ($login_module->can ('logout')) {
+
+                my $error_string;
+                my $logout_method = $login_module . "::logout";
+                {
+                    no strict 'refs';
+                    ($error_string) = &$logout_method ($jconfig, %login_parameters);
+                }
+
+                # If our logout module generated any sort of error message we should alert the fact and halt the logout.
+                if ($error_string) {
+                    $jconfig->{'error_string'} = $error_string;
+                    return 0;
+                }
+            }
+        }
 
         &Jarvis::Hook::before_logout ($jconfig);
 
