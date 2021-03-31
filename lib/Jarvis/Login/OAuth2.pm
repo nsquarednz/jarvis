@@ -231,19 +231,22 @@ sub Jarvis::Login::OAuth2::check {
             my $extended_token_message_json = JSON::XS::decode_json($extended_token_message);
 
             # Check if the response contains the access token we expect.
-            my $extended_access_token = $extended_token_message_json->{access_token} || die ("Another Token introspection response did not contain an OpenID token.\n");
+            my $extended_access_token = $extended_token_message_json->{access_token};
 
-            # Decode the token using our token library.
-            my $decoded_extended_access_token =JSON::WebToken->decode ($extended_access_token, undef, 0, 'none');
+            # If we have no extended access token we won't bail out. There are situations where they might have a valid login but no permissions.
+            if (defined $extended_access_token) {
+                  # Decode the token using our token library.
+                my $decoded_extended_access_token =JSON::WebToken->decode ($extended_access_token, undef, 0, 'none');
 
-            # Sanity check.
-            $decoded_extended_access_token->{authorization}{permissions} || die ("RPT Token missing authorization permissions.");
+                # Sanity check.
+                $decoded_extended_access_token->{authorization}{permissions} || die ("RPT Token missing authorization permissions.");
 
-            # Convert our permissions objects array to a list of associated permissions.
-            my @permission_names = map { $_->{rsname} } @{$decoded_extended_access_token->{authorization}{permissions}};
+                # Convert our permissions objects array to a list of associated permissions.
+                my @permission_names = map { $_->{rsname} } @{$decoded_extended_access_token->{authorization}{permissions}};
 
-            # Associate the list of permissions against our Jarvis session. Implementing applications can access this as required.
-            $jconfig->{session}->param ("oauth_permissions", \@permission_names);
+                # Associate the list of permissions against our Jarvis session. Implementing applications can access this as required.
+                $jconfig->{session}->param ("oauth_permissions", \@permission_names);
+            }
 
             # Finally return our successful login indicator to our calling module providing the user name and groups we got back.
             return ("", $username, $user_groups);
