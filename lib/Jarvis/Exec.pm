@@ -142,7 +142,7 @@ sub do {
     $use_tmpfile = 1 if $^O eq "MSWin32";
 
     # Now construct our safe variables from our CGI, rest and per-row (none) arguments.
-    my %safe_params = &Jarvis::Config::safe_variables ($jconfig, $user_args, undef);
+    my %safe_params = &Jarvis::Config::safe_variables ($jconfig, undef, $user_args, undef);
 
     my $tmp_file = undef;
     if ($use_tmpfile) {

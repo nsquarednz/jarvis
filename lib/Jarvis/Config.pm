@@ -402,21 +402,21 @@ sub default_parameters {
 #           READ
 #               username
 #               group_list
-#
-#       $user_args - Hash of CGI + numbered/named REST args (top level datasest).
-#                    OR linked child args (for nested datasets).
-#       $row_params - User-supplied (unsafe) hash of per-row parameters.
+#       $existing_safe_params - Hash of existing safe parameters that may have been modified by a
+#                               hook module with "safe" changes that we want to persist.
+#       $user_args            - Hash of CGI + numbered/named REST args (top level datasest).
+#                               OR linked child args (for nested datasets).
+#       $row_params           - User-supplied (unsafe) hash of per-row parameters.
 #
 # Returns:
 #       1
 ################################################################################
 #
 sub safe_variables {
-
-    my ($jconfig, $user_args, $row_params) = @_;
+    my ($jconfig, $existing_safe_params, $user_args, $row_params) = @_;
 
     # Start with our default parameters.
-    my %safe_params = &default_parameters ($jconfig);
+    my %safe_params = ((defined $existing_safe_params) ? %{$existing_safe_params} : &default_parameters ($jconfig));
 
     # Copy through the user-provided parameters.  Do not copy any user-provided
     # variable which begins with "__" (two underscores).  That prefix is strictly

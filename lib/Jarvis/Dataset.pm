@@ -39,6 +39,7 @@ use Module::Load;
 use Data::Dumper;
 use JSON;
 use URI::Escape;
+use Storable qw(dclone);
 
 use XML::LibXML;
 
@@ -808,7 +809,7 @@ sub fetch_rows {
     # Turn our CGI params and REST args into a safe list of parameters.
     # This will also add our special parameters - __username, __group_list, etc.
     # It will also merge in application default parameters and session safe variables.
-    my %params_copy = &Jarvis::Config::safe_variables ($jconfig, $user_args, undef);
+    my %params_copy = &Jarvis::Config::safe_variables ($jconfig, undef, $user_args, undef);
 
     # Call the pre-fetch hook.
     my %safe_params = %params_copy;
@@ -1294,7 +1295,7 @@ sub store_rows {
     #
     # Merge CGI params + REST args, plus default, safe and session vars.
     #
-    my %safe_all_rows_params = &Jarvis::Config::safe_variables ($jconfig, $user_args, undef);
+    my %safe_all_rows_params = &Jarvis::Config::safe_variables ($jconfig, undef, $user_args, undef);
 
     # What transforms should we use when processing store data?
     my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->findvalue ('./dataset/transform/@store'));
@@ -1332,9 +1333,9 @@ sub store_rows {
         $dbh = $jconfig->{txn_dbh};
     }
 
-    # Invoke before_all hook.
-    my %before_params = %safe_all_rows_params;
-    &Jarvis::Hook::before_all ($jconfig, $dsxml, \%before_params, $rows_aref);
+    # Invoke before_all hook. Deep clone our safe parameters here as any changes should only affect our before SQL.
+    my $before_params = dclone (\%safe_all_rows_params);
+    &Jarvis::Hook::before_all ($jconfig, $dsxml, $before_params, $rows_aref);
 
     # Loop for each set of updates.
     my $success = 1;
@@ -1345,7 +1346,7 @@ sub store_rows {
     # Execute our "before" statement (assuming the agent supports it).
     if ($dsxml->exists ('./dataset/before')) {
         no strict 'refs';
-        my $result = $agent_class->execute_before ($jconfig, $dataset_name, $dsxml, $dbh, \%before_params);
+        my $result = $agent_class->execute_before ($jconfig, $dataset_name, $dsxml, $dbh, $before_params);
         if (defined $result) {
             $success = 0;
             $message = $result;
@@ -1361,7 +1362,7 @@ sub store_rows {
         ((ref $fields_href) eq 'HASH') || die "User-supplied object to store is not HASH.";
 
         # Re-do our parameter merge, this time including our per-row parameters.
-        my %safe_params = &Jarvis::Config::safe_variables ($jconfig, $user_args, $fields_href);
+        my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%safe_all_rows_params, $user_args, $fields_href);
 
         # Any input transformations?
         if (scalar (keys %transforms)) {
