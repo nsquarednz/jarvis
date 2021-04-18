@@ -1011,7 +1011,7 @@ sub fetch_rows {
     # Now we have an array of hash objects.  Apply post-processing.
     my $num_returned = scalar @$rows_aref;
     &Jarvis::Error::debug ($jconfig, "Number of rows returned = $num_returned (after 'dataset_fetched' hook).");
-    $extra_href->{returned} = $num_returned;
+    $extra_href->{returned} = 1 * $num_returned;
 
     # In any case, Unload/Finish dataset specific hooks.
     &Jarvis::Hook::unload_dataset ($jconfig);
