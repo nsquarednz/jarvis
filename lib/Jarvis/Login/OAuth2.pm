@@ -27,6 +27,7 @@
 #   In order to use this module the following dependencies must be installed:
 #       libjson-webtoken-perl
 #       libio-socket-ssl-perl
+#       libcrypt-ssleay-perl
 #
 use strict;
 use warnings;
