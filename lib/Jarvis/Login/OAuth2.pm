@@ -24,11 +24,6 @@
 #       This software is Copyright 2021 by Jonathan Couper-Smartt.
 ###############################################################################
 #
-#   In order to use this module the following dependencies must be installed:
-#       libjson-webtoken-perl
-#       libio-socket-ssl-perl
-#       libcrypt-ssleay-perl
-#
 use strict;
 use warnings;
 
@@ -40,7 +35,6 @@ package Jarvis::Login::OAuth2;
 use LWP::UserAgent;
 use URI::Escape;
 use JSON::XS;
-use Net::SSL;
 use Data::Dumper;
 use JSON::WebToken;
 use IO::Socket::SSL;
