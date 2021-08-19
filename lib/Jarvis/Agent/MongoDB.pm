@@ -41,6 +41,7 @@ use Jarvis::Hook;
 use Hash::Fold qw(fold);
 
 use sort 'stable';      # Don't mix up records when server-side sorting
+use DateTime;
 
 use Jarvis::JSON::Utils;
 
