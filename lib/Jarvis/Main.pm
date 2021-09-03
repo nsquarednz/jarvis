@@ -445,11 +445,12 @@ sub do {
     ($action =~ m/^\w+$/) || die "Invalid characters in parameter 'action'\n";
 
     # Now canonicalise our action.
-    if ($action eq 'get') { $action = 'select' };
-    if ($action eq 'fetch') { $action = 'select' };
-    if ($action eq 'post') { $action = 'insert' };
+    if ($action eq 'get')    { $action = 'select' };
+    if ($action eq 'fetch')  { $action = 'select' };
+    if ($action eq 'post')   { $action = 'insert' };
     if ($action eq 'create') { $action = 'insert' };
-    if ($action eq 'put') { $action = 'update' };
+    if ($action eq 'put')    { $action = 'update' };
+    if ($action eq 'patch')  { $action = 'merge'  };
 
     $jconfig->{action} = $action;
 
@@ -620,7 +621,7 @@ sub do {
         }
 
     # Modify a regular dataset.
-    } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete") || ($action eq "mixed")) {
+    } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete") || ($action eq "mixed") || ($action eq "merge")) {
 
         $jconfig->{dataset_type} = 's';
         my $return_text = &Jarvis::Dataset::store ($jconfig, $dataset_name, $user_args);

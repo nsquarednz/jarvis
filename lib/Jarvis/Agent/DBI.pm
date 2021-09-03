@@ -122,7 +122,7 @@ sub sql_with_substitutions {
     # Parameters NAMES may contain only a-z, A-Z, 0-9, underscore(_), colon(:), dot(.) and hyphen(-)
     # Note pipe(|) is also allowed at this point as it separates (try-else variable names)
     my $sql2 = "";
-    my @bits = split (/\{\{?\$?([\.a-zA-Z0-9_\-:\|]+(?:\![a-z]+)*)\}\}?/i, $sql);
+    my @bits = split (/\{\{?\$?([\.a-zA-Z0-9_\-:\|]+(?:\?|\![a-z]+)*)\}\}?/i, $sql);
     my @variable_names = ();
     my @variable_flags = ();
 
@@ -148,9 +148,30 @@ sub sql_with_substitutions {
                 $flags {$flag} = 1;
             }
 
-            push (@variable_names, $name);
-            push (@variable_flags, \%flags);
-            $sql2 .= "?";
+            #
+            # We support optional parameters for purposes of doing merge, patch operations.
+            # This can be specified with:
+            #
+            #   variable?
+            #
+            # This will check if variable is present in the args_href, if so will replace the bind with 1
+            # otherwise 0
+            #
+            my $optional = 0;
+            while ($name =~ m/^(.*)(\?)$/) {
+                $name = $1;
+                $sql2 .= (defined ($args_href->{$name}) ? 1 : 0);
+                $optional = 1;
+            }
+
+            #
+            # If we don't have an optional parameter then we are just using standard varriable substituation.
+            #
+            if (! $optional) {
+                push (@variable_names, $name);
+                push (@variable_flags, \%flags);
+                $sql2 .= "?";
+            }
 
         } else {
             $sql2 .= $bits[$idx];

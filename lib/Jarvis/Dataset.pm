@@ -1130,7 +1130,7 @@ sub store {
     # What is the default transaction type from here down?
     my $ttype = $jconfig->{action};
     &Jarvis::Error::debug ($jconfig, "Transaction Type = '$ttype'");
-    ($ttype eq "delete") || ($ttype eq "update") || ($ttype eq "insert") || ($ttype eq "mixed") ||
+    ($ttype eq "delete") || ($ttype eq "update") || ($ttype eq "insert") || ($ttype eq "mixed") || ($ttype eq "merge") ||
         die "Unsupported transaction type '$ttype'.\n";
 
     # Store the row content for the top-level dataset.  This may push out to child sets.
