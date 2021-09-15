@@ -40,6 +40,7 @@ use Data::Dumper;
 use JSON;
 use URI::Escape;
 use Storable qw(dclone);
+use Time::HiRes qw (gettimeofday tv_interval);
 
 use XML::LibXML;
 
@@ -511,7 +512,10 @@ sub fetch {
 
     # Get the ROWS inner content for the dataset.
     my $extra_href = {};
+    my $fetch_rows_start = [gettimeofday];
     my ($rows_aref, $column_names_aref) = &fetch_rows ($jconfig, $dataset_name, $user_args, $extra_href);
+
+    &Jarvis::Error::debug ($jconfig, '[Timing] Completed Fetch Rows in: %fs', tv_interval ($fetch_rows_start));
 
     # This is for when a router requests a "singleton" presentation explicitly.
     if ($jconfig->{presentation} eq "singleton") {
@@ -531,7 +535,10 @@ sub fetch {
     #           Completely override the return content formatting.
     #
     my $return_value = undef;
+    my $return_fetch_start = [gettimeofday];
     &Jarvis::Hook::return_fetch ($jconfig, $user_args, $rows_aref, $extra_href, \$return_value);
+
+    &Jarvis::Error::debug ($jconfig, '[Timing] Completed Return Fetch Hook in: %fs', tv_interval ($return_fetch_start));
 
     # If the hook performed its own encoding, we have no further work to do.
     if (defined $return_value) {
@@ -784,14 +791,22 @@ sub fetch_rows {
     (defined $user_args) || ($user_args = {});
     (defined $extra_href) || ($extra_href = {});
 
+    # Timing.
+    my $load_dsxml_start = [gettimeofday];
+
     # Read the dataset config file.  This changes debug level as a side-effect.
     my $dataset = &load_dsxml ($jconfig, $dataset_name) || die "Cannot load configuration for dataset '$dataset_name'.\n";
     my $dsxml = $dataset->{dsxml};
     my $dbtype = $dataset->{dbtype};
     my $dbname = $dataset->{dbname};
 
+    &Jarvis::Error::debug ($jconfig, '[Timing] Loaded DSXML in: %fs', tv_interval ($load_dsxml_start));
+    my $load_dataset_start = [gettimeofday];
+
     # Load/Start dataset specific hooks.
     &Jarvis::Hook::load_dataset ($jconfig, $dsxml);
+
+    &Jarvis::Error::debug ($jconfig, '[Timing] Completed Load Dataset Hook in: %fs', tv_interval ($load_dataset_start));
 
     # Check the allowed groups.
     my $allowed_groups = $dsxml->findvalue ('./dataset/@read');
@@ -813,10 +828,14 @@ sub fetch_rows {
 
     # Call the pre-fetch hook.
     my %safe_params = %params_copy;
+    my $dataset_pre_fetch_start = [gettimeofday];
     &Jarvis::Hook::dataset_pre_fetch ($jconfig, $dsxml, \%safe_params);
+
+    &Jarvis::Error::debug ($jconfig, '[Timing] Completed Dataset Pre Fetch Hook in: %fs', tv_interval ($dataset_pre_fetch_start));
 
     # Get a database handle.
     my $dbh = undef;
+    my $get_handle_start = [gettimeofday];
     if ($dataset->{level} == 0) {
         &Jarvis::Error::debug ($jconfig, "Top-Level Fetch Dataset.  Opening database handle.");
         $dbh = &Jarvis::DB::handle ($jconfig, $dbname, $dbtype);
@@ -831,6 +850,8 @@ sub fetch_rows {
         $jconfig->{txn_dbh} = $dbh;
     }
 
+    &Jarvis::Error::debug ($jconfig, '[Timing] Got Database Handle in: %fs', tv_interval ($get_handle_start));
+
     # Load the agent class (at the top level only).
     if ($dataset->{level} == 0) {
         $jconfig->{agent_class} = $AGENT_CLASSES->{$dbtype} // die "Unsupported DB Type '$dbtype'.";
@@ -839,11 +860,14 @@ sub fetch_rows {
     my $agent_class = $jconfig->{agent_class};
 
     # Now fetch the tuples.
+    my $fetch_innert_start = [gettimeofday];
     my ($rows_aref, $column_names_aref);
     {
         no strict 'refs';
         ($rows_aref, $column_names_aref) = $agent_class->fetch_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%safe_params);
     }
+
+    &Jarvis::Error::debug ($jconfig, '[Timing] Completed Fetch Inner in: %fs', tv_interval ($fetch_innert_start));
 
     # Now we have an array of hash objects.  Apply post-processing.
     my $num_fetched = scalar @$rows_aref;
@@ -984,7 +1008,9 @@ sub fetch_rows {
 
                 # Execute the sub query and store it in the child field.
                 # This will add default and safe args.
+                my $fetch_child_rows_start = [gettimeofday];
                 $row->{$child_field} = &fetch_rows ($jconfig, $child_dataset, \%child_args, $extra_href);
+                &Jarvis::Error::debug ($jconfig, '[Timing] Completed Fetch Child Rows in: %fs', tv_interval ($fetch_child_rows_start));
 
                 # Restore the old name for debugging.
                 $jconfig->{dataset_name} = $old_dataset_name;
@@ -1006,7 +1032,9 @@ sub fetch_rows {
 
     # This final hook allows you to modify the data returned by SQL for one dataset.
     # This hook may completely modify the returned content (by modifying $rows_aref).
+    my $dataset_fetched_start = [gettimeofday];
     &Jarvis::Hook::dataset_fetched ($jconfig, $dsxml, \%safe_params, $rows_aref, $extra_href, $column_names_aref);
+    &Jarvis::Error::debug ($jconfig, '[Timing] Completed Dataset Fetched Hook in: %fs', tv_interval ($dataset_fetched_start));
 
     # Now we have an array of hash objects.  Apply post-processing.
     my $num_returned = scalar @$rows_aref;
@@ -1014,7 +1042,9 @@ sub fetch_rows {
     $extra_href->{returned} = 1 * $num_returned;
 
     # In any case, Unload/Finish dataset specific hooks.
+    my $unload_dataset_start = [gettimeofday];
     &Jarvis::Hook::unload_dataset ($jconfig);
+    &Jarvis::Error::debug ($jconfig, '[Timing] Completed Unload Dataset Hook in: %fs', tv_interval ($unload_dataset_start));
 
     # And unwind our own dataset stack.
     &unload_dsxml ($jconfig);
@@ -1135,7 +1165,10 @@ sub store {
 
     # Store the row content for the top-level dataset.  This may push out to child sets.
     my $extra_href = {};
+    my $store_rows_start = [gettimeofday];
     my ($success, $message, $modified, $results_aref) = &store_rows ($jconfig, $dataset_name, $ttype, $user_args, $rows_aref, $extra_href);
+
+    &Jarvis::Error::debug ($jconfig, '[Timing] Completed Store Rows in: %fs', tv_interval ($store_rows_start));
 
     # This final GLOBAL hook allows you to do whatever you want to modify the returned
     # data.  This hook may do one or both of:
@@ -1144,7 +1177,10 @@ sub store {
     #   - Peform a custom encoding into text (by setting $return_text)
     #
     my $return_text = undef;
+    my $return_store_start = [gettimeofday];
     &Jarvis::Hook::return_store ($jconfig, $user_args, $results_aref, $extra_href, \$return_text);
+
+    &Jarvis::Error::debug ($jconfig, '[Timing] Completed Return Store Hook in: %fs', tv_interval ($return_store_start));
 
     # If the hook set $return_text then we use that.
     if ($return_text) {
@@ -1273,14 +1309,22 @@ sub store {
 sub store_rows {
     my ($jconfig, $dataset_name, $ttype, $user_args, $rows_aref, $extra_href) = @_;
 
+    # Timing.
+    my $load_dsxml_start = [gettimeofday];
+
     # Read the dataset config file.  This changes debug level as a side-effect.
     my $dataset = &load_dsxml ($jconfig, $dataset_name) || die "Cannot load configuration for dataset '$dataset_name'.\n";
     my $dsxml = $dataset->{dsxml};
     my $dbtype = $dataset->{dbtype};
     my $dbname = $dataset->{dbname};
 
+    &Jarvis::Error::debug ($jconfig, '[Timing] Loaded DSXML in: %fs', tv_interval ($load_dsxml_start));
+    my $load_dataset_start = [gettimeofday];
+
     # Load/Start dataset specific hooks.
     &Jarvis::Hook::load_dataset ($jconfig, $dsxml);
+
+    &Jarvis::Error::debug ($jconfig, '[Timing] Completed Load Dataset Hook in: %fs', tv_interval ($load_dataset_start));
 
     # Now perform security check.
     my $allowed_groups = $dsxml->findvalue ('./dataset/@write');
@@ -1307,7 +1351,10 @@ sub store_rows {
     }
 
     # Call the pre-store hook.
+    my $dataset_pre_store_start = [gettimeofday];
     &Jarvis::Hook::dataset_pre_store ($jconfig, $dsxml, \%safe_all_rows_params, $rows_aref);
+
+    &Jarvis::Error::debug ($jconfig, '[Timing] Completed Dataset Pre Store Hook in: %fs', tv_interval ($dataset_pre_store_start));
 
     # Load the agent class (at the top level only).
     if ($dataset->{level} == 0) {
@@ -1335,7 +1382,10 @@ sub store_rows {
 
     # Invoke before_all hook. Deep clone our safe parameters here as any changes should only affect our before SQL.
     my $before_params = dclone (\%safe_all_rows_params);
+    my $before_all_start = [gettimeofday];
     &Jarvis::Hook::before_all ($jconfig, $dsxml, $before_params, $rows_aref);
+
+    &Jarvis::Error::debug ($jconfig, '[Timing] Completed Before All Hook in: %fs', tv_interval ($before_all_start));
 
     # Loop for each set of updates.
     my $success = 1;
@@ -1346,11 +1396,14 @@ sub store_rows {
     # Execute our "before" statement (assuming the agent supports it).
     if ($dsxml->exists ('./dataset/before')) {
         no strict 'refs';
+        my $execute_before_start = [gettimeofday];
         my $result = $agent_class->execute_before ($jconfig, $dataset_name, $dsxml, $dbh, $before_params);
         if (defined $result) {
             $success = 0;
             $message = $result;
         }
+
+        &Jarvis::Error::debug ($jconfig, '[Timing] Completed Execute Before Statement in: %fs', tv_interval ($execute_before_start));
     }
 
     # Our cached statement handle(s).
@@ -1370,7 +1423,10 @@ sub store_rows {
         }
 
         # Invoke before_one hook.
+        my $before_one_start = [gettimeofday];
         &Jarvis::Hook::before_one ($jconfig, $dsxml, \%safe_params);
+
+        &Jarvis::Error::debug ($jconfig, '[Timing] Completed Before One Hook in: %fs', tv_interval ($before_one_start));
 
         # Figure out which statement type we will use for this row.
         my $row_ttype = $safe_params{_ttype} || $ttype;
@@ -1379,10 +1435,12 @@ sub store_rows {
         # Hand off to agent for the actual store (assuming it supports it).
         # This also perform our "returning" logic (if applicable).
         my $row_result = undef;
+        my $store_inner_start = [gettimeofday];
         {
             no strict 'refs';
             $row_result = $agent_class->store_inner ($jconfig, $dataset_name, $dsxml, $dbh, $stms, $row_ttype, \%safe_params, $fields_href);
         }
+        &Jarvis::Error::debug ($jconfig, '[Timing] Completed Store Inner in: %fs', tv_interval ($store_inner_start));
 
         # Increment our top-level counts.
         $modified = $modified + $row_result->{modified};
@@ -1464,8 +1522,11 @@ sub store_rows {
 
                 # Execute the sub query and store it in the child field.
                 # This will add default and safe args.
+                my $store_child_rows_start = [gettimeofday];
                 my ($child_success, $child_message, $child_modified, $child_results_aref) =
                     &store_rows ($jconfig, $child_dataset, $row_ttype, \%child_args, $child_rows_aref, $extra_href);
+
+                &Jarvis::Error::debug ($jconfig, '[Timing] Completed Store Child Rows in: %fs', tv_interval ($store_child_rows_start));
 
                 # Restore the old name for debugging.
                 $jconfig->{dataset_name} = $old_dataset_name;
@@ -1494,7 +1555,10 @@ sub store_rows {
         }
 
         # Call the after_one hook ONLY on success, and after child datasets are processed.
+        my $after_one_start = [gettimeofday];
         &Jarvis::Hook::after_one ($jconfig, $dsxml, \%safe_params, $row_result);
+
+        &Jarvis::Error::debug ($jconfig, '[Timing] Completed After One Hook in: %fs', tv_interval ($after_one_start));
     }
 
     # Free any remaining open statement types.
@@ -1513,17 +1577,23 @@ sub store_rows {
         # Execute our "after" statement (assuming the agent supports it).
         if ($dsxml->exists ('./dataset/after')) {
             no strict 'refs';
+            my $execute_after_start = [gettimeofday];;
             my $result = $agent_class->execute_after ($jconfig, $dataset_name, $dsxml, $dbh, \%after_params);
             if (defined $result) {
                 $success = 0;
                 $message = $result;
             }
+
+            &Jarvis::Error::debug ($jconfig, '[Timing] Completed Execute After Hook in: %fs', tv_interval ($execute_after_start));
         }
 
         # Invoke the "after_all" hook, if the "after" statement succeeded.
         # Or even if we have no "after" statement.
         if ($success) {
+            my $after_all_start = [gettimeofday];
             &Jarvis::Hook::after_all ($jconfig, $dsxml, \%after_params, $rows_aref, $results_aref);
+
+            &Jarvis::Error::debug ($jconfig, '[Timing] Completed After All Hook in: %fs', tv_interval ($after_all_start));
         }
     }
 
@@ -1546,10 +1616,16 @@ sub store_rows {
     # This hook may completely modify the returned content (by modifying $rows_aref).
     #
     # NOTE: This is called even on non-success.
+    my $dataset_stored_start = [gettimeofday];
     &Jarvis::Hook::dataset_stored ($jconfig, $dsxml, \%safe_all_rows_params, $results_aref, $extra_href, \$success, \$message);
 
+    &Jarvis::Error::debug ($jconfig, '[Timing] Completed Dataset Stored Hook in: %fs', tv_interval ($dataset_stored_start));
+
     # In any case, Unload/Finish dataset specific hooks.
+    my $unload_dataset_start = [gettimeofday];
     &Jarvis::Hook::unload_dataset ($jconfig);
+
+    &Jarvis::Error::debug ($jconfig, '[Timing] Completed Unload Dataset Hook in: %fs', tv_interval ($unload_dataset_start));
 
     # And unwind our own dataset stack.
     &unload_dsxml ($jconfig);

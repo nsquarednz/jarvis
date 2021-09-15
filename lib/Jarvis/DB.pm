@@ -29,6 +29,7 @@ package Jarvis::DB;
 
 use DBI;
 use Data::Dumper;
+use Time::HiRes qw (gettimeofday tv_interval);
 
 use Jarvis::Error;
 use Jarvis::Hook;
@@ -153,7 +154,10 @@ sub handle {
     }
 
     # Allow the hook to potentially modify some of these attributes.
+    my $pre_connect_start = [gettimeofday];
     &Jarvis::Hook::pre_connect ($jconfig, $dbname, $dbtype, \$dbconnect, \$dbusername, \$dbpassword, $dbh_attributes);
+
+    &Jarvis::Error::debug ($jconfig, '[Timing] Completed Pre Connect Hook in: %fs', tv_interval ($pre_connect_start));
 
     &Jarvis::Error::debug ($jconfig, "DB Connect = '$dbconnect'");
     &Jarvis::Error::debug ($jconfig, "DB Username = '$dbusername'");
