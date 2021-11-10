@@ -130,6 +130,3 @@ PACKAGE=$JARVIS_PACKAGE \
     --define "_srcrpmdir %(pwd)/rpms" \
     --define "_sourcedir %(pwd)/../" \
     -ba $SPECFILE
-
-mv "$DIR/rpms/noarch/jarvis-$VERSION-$RELEASE.noarch.rpm" "$DIR/rpms/noarch/jarvis-$VERSION-$RELEASE-RHEL-$RHELVERSION.noarch.rpm"
-mv "$DIR/rpms/jarvis-$VERSION-$RELEASE.src.rpm" "$DIR/rpms/jarvis-$VERSION-$RELEASE-RHEL-$RHELVERSION.src.rpm"

@@ -1,11 +1,12 @@
 Name: %(echo $PACKAGE)
 Version: %(echo $VERSION)
-Release: %(echo $RELEASE)
+# Release is passed through to our script. We concatenate on the dist flag.
+# Dist is a magic variable that will populate our version. I.E. EL8.
+Release: %(echo $RELEASE)%{?dist}
 Summary: A web application framework written in Perl
 Group: Application/Enterprise
 License: LGPL v3
 URL: http://gitorious.org/jarvis/jarvis
-BuildArch: noarch
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 # RHEL 6 cannot correctly export our dependencies while correctly excluding automatically parsed PERL requirements.
 # To this end we will disable this and manually export all of our provided PERL source modules.
