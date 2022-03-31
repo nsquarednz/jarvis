@@ -50,6 +50,7 @@ package Jarvis::Login::Single;
 #            <parameter name="username" value="bob"/>
 #            <parameter name="password" value="test"/>
 #            <parameter name="group_list" value="default"/>
+#            <parameter name="oauth_permissions" value="*"/>
 #        </login>
 #        ...
 #   </app>
@@ -73,12 +74,12 @@ package Jarvis::Login::Single;
 sub Jarvis::Login::Single::check {
     my ($jconfig, $username, $password, %login_parameters) = @_;
 
-    my $require_https = defined ($Jarvis::Config::yes_value {lc ($login_parameters{'require_https'} || "no")});
-    my $remote_ip_list = $login_parameters{'remote_ip'} || '';
+    my $require_https     = defined ($Jarvis::Config::yes_value {lc ($login_parameters{'require_https'} || "no")});
+    my $remote_ip_list    = $login_parameters{'remote_ip'} || '';
     my $expected_username = $login_parameters{'username'};
     my $expected_password = $login_parameters{'password'};
-    my $group_list = $login_parameters{'group_list'} || $expected_username;
-
+    my $group_list        = $login_parameters{'group_list'} || $expected_username;
+    my $oauth_permissions = $login_parameters{'oauth_permissions'} || '';
 
     # Check basic configuration.  We must have EITHER remote_ip OR a password
     # You can have both, that would be evern better.
@@ -119,6 +120,14 @@ sub Jarvis::Login::Single::check {
         $username || return ("Username must be supplied.");
         ($username eq $expected_username) || return ("Specified username is not known to this system.");
         ($password eq $expected_password) || return ("Password is incorrect.");
+    }
+
+    # Do we have an override of OAuth permissions to set.
+    if ($oauth_permissions) {
+        # Split by ',' we expect an array of strings downstream.
+        my @oauth_permission_list = split (',', $oauth_permissions);
+        # OAuth permissions are stored on the session.
+        $jconfig->{session}->param ("oauth_permissions", \@oauth_permission_list);
     }
 
     return ("", $expected_username, $group_list);
