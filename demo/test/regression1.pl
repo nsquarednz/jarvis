@@ -363,6 +363,70 @@ if (! eq_or_diff ($json->{row}, $expected, "Insert Boat '$fd_boat_name' Returned
 }
 
 ###############################################################################
+# Merge, changing name and registration only.
+###############################################################################
+my $update = [
+    {
+        id => $fd_boat_id,
+        class => 'X Class',
+        registration_num => 47
+    }
+];
+$json = TestUtils::store_json ([ 'boat' ], { _method => 'merge' }, $update);
+if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1), "JSON Merge (class/registration_num) for '$fd_boat_name'")) {
+    BAIL_OUT("Failed to merge: " . &Dumper ($json));
+}
+
+# Validate:
+$json = TestUtils::fetch_json ([ 'boat' ], { id => $fd_boat_id });
+if (! ok (defined $json->{returned} && defined $json->{fetched} && ($json->{fetched} == 1), "JSON Get Fatal Dodger $fd_boat_id")) {
+    BAIL_OUT("Failed to fetch: " . &Dumper ($json));
+}
+$expected = {
+    'id' => $fd_boat_id,
+    'name' => $fd_boat_name,
+    'class' => 'X Class',
+    'owner' => '',
+    'registration_num' => 47,
+    'description' => '',
+};
+if (! eq_or_diff ($json->{data}[0], $expected, 'JSON Object Fetch matches.')) {
+    BAIL_OUT("Unexpected Merge (class/registration_num) Fetch result: " . &Dumper ($json));
+}
+
+###############################################################################
+# This time merge the description and remove the registration_num.
+###############################################################################
+$update = [
+    {
+        id => $fd_boat_id,
+        description => 'Slightly Scruffy',
+        registration_num => undef
+    }
+];
+$json = TestUtils::store_json ([ 'boat' ], { _method => 'merge' }, $update);
+if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1), "JSON Merge (description/registration_num) for '$fd_boat_name'")) {
+    BAIL_OUT("Failed to merge: " . &Dumper ($json));
+}
+
+# Validate:
+$json = TestUtils::fetch_json ([ 'boat' ], { id => $fd_boat_id });
+if (! ok (defined $json->{returned} && defined $json->{fetched} && ($json->{fetched} == 1), "JSON Get Fatal Dodger $fd_boat_id")) {
+    BAIL_OUT("Failed to fetch: " . &Dumper ($json));
+}
+$expected = {
+    'id' => $fd_boat_id,
+    'name' => $fd_boat_name,
+    'class' => 'X Class',
+    'owner' => '',
+    'registration_num' => '',
+    'description' => 'Slightly Scruffy',
+};
+if (! eq_or_diff ($json->{data}[0], $expected, 'JSON Object Fetch matches.')) {
+    BAIL_OUT("Unexpected Merge (description/registration_num) Fetch result: " . &Dumper ($json));
+}
+
+###############################################################################
 # Add parts to "Empty Nest"
 ###############################################################################
 $insert = [
@@ -427,7 +491,7 @@ my $mh_hoosit_id = $json->{row}[0]{child}{parts}{row}[2]{returning}[0]{id};
 ###############################################################################
 # Nested Update: Change Class, delete Doodad, and Thingey.
 ###############################################################################
-my $update = [
+$update = [
 	{
 		_ttype => 'update',
 		id => $mh_boat_id,
@@ -547,7 +611,7 @@ Interview|Cross-Sectional
 Rest 0|file_download
 Rest 1|X Class
 Boat Class|X Class
-All Boats|4";
+All Boats|5";
 
 if (! eq_or_diff ($content, $expected, 'JSON FileDownload Plugin Content Check')) {
     BAIL_OUT("Unexpected FilePlugin result: " . &Dumper ($content));
@@ -565,7 +629,7 @@ Interview|Secondary Alternative
 Rest 0|file_download2
 Rest 1|X Class
 Boat Class|X Class
-All Boats|4";
+All Boats|5";
 
 if (! eq_or_diff ($content, $expected, 'JSON FileDownload2 Plugin Content Check')) {
     BAIL_OUT("Unexpected FilePlugin result: " . &Dumper ($content));
@@ -583,7 +647,7 @@ Interview|Cross-Sectional
 Rest 0|file_download3
 Rest 1|X Class
 Boat Class|X Class
-All Boats|4";
+All Boats|5";
 
 if (! eq_or_diff ($content, $expected, 'JSON FileDownload3 Plugin Content Check')) {
     BAIL_OUT("Unexpected FilePlugin result: " . &Dumper ($content));

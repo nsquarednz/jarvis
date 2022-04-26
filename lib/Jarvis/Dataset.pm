@@ -333,6 +333,7 @@ sub names_to_values {
         my $value = undef;
 
         # NOTE: Subtle clarification here.
+        #
         # We match the first name WHICH IS PRESENT, even if it is UNDEFINED.
         #
         # This is a very subtle change made in order for DBI to be 100% consistent
@@ -343,9 +344,24 @@ sub names_to_values {
         # So much so that I'm confident enough to make this change.
         #
         foreach my $option (split ('\|', $name)) {
-            if (exists $safe_params_href->{$option}) {
-                $value = $safe_params_href->{$option};
+
+            # The "varname?" syntax is the "exists" mechanism.
+            if (($option =~ s/^\?//) || ($option =~ s/\?$//)) {
+
+                # This is simple.  If the row has contains the option then it evaluates to 1, otherwise it evaluates to undef.
+                # 
+                # NOTE: Using an "exists" test as the non-last element in a pipe-list e.g. "{var1?|var2}" is 
+                # pointless since the exists test for "var1?" always terminates the searching process and
+                # "var2" is never checked.
+                #
+                $value = exists ($safe_params_href->{$option}) ? 1 : undef;
                 last;
+
+            } else {
+                if (exists $safe_params_href->{$option}) {
+                    $value = $safe_params_href->{$option};
+                    last;
+                }
             }
         }
         push (@arg_values, $value);

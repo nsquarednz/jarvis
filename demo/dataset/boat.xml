@@ -21,6 +21,17 @@ SET name = {{name}},
     change_date = datetime ('now')
 WHERE id = {{id}};
     </update>
+    <merge>
+UPDATE boat
+SET name = CASE WHEN {name?} THEN {name} ELSE name END,
+    registration_num = CASE WHEN {registration_num?} THEN {registration_num} ELSE registration_num END,
+    class = CASE WHEN {class?} THEN {class} ELSE class END,
+    owner = CASE WHEN {owner?} THEN {owner} ELSE owner END,
+    description = CASE WHEN {description?} THEN {description} ELSE description END,
+    change_user = {{__username}},
+    change_date = datetime ('now')
+WHERE id = {{id}};
+    </merge>
     <insert returning="yes">
 INSERT INTO boat (name, registration_num, class, owner, description, change_user, change_date)
 VALUES ({{name}}, {{registration_num}}, {{class}}, {{owner}}, {{description}},

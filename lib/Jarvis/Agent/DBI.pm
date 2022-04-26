@@ -122,7 +122,7 @@ sub sql_with_substitutions {
     # Parameters NAMES may contain only a-z, A-Z, 0-9, underscore(_), colon(:), dot(.) and hyphen(-)
     # Note pipe(|) is also allowed at this point as it separates (try-else variable names)
     my $sql2 = "";
-    my @bits = split (/\{\{?\$?([\.a-zA-Z0-9_\-:\|]+(?:\?|\![a-z]+)*)\}\}?/i, $sql);
+    my @bits = split (/\{\{?\$?([\.a-zA-Z0-9_\-:\|\?]+(?:\![a-z]+)*)\}\}?/i, $sql);
     my @variable_names = ();
     my @variable_flags = ();
 
@@ -141,37 +141,22 @@ sub sql_with_substitutions {
             #   !json           When referring to a reference, we might want to serialize it
             #                   as JSON for storage in some DBs like PostgreSQL.
             #
+            # NOTE: The "?" test is not a flag in this context.  It is an indicator which 
+            # belongs to the variable name and is handled in the names_to_values () method.
+            # That is because it needs to inspect the values row to check for the existence 
+            # of a row hash value (which we cannot do here, here we can only check for defined).
+            #
             while ($name =~ m/^(.*)(\![a-z]+)$/) {
                 $name = $1;
                 my $flag = lc ($2);
-                $flag =~ s/[^a-z]//g;
-                $flags {$flag} = 1;
+                $flag =~ s/[^a-z\?]//g;
+                $flags{$flag} = 1;
             }
 
-            #
-            # We support optional parameters for purposes of doing merge, patch operations.
-            # This can be specified with:
-            #
-            #   variable?
-            #
-            # This will check if variable is present in the args_href, if so will replace the bind with 1
-            # otherwise 0
-            #
-            my $optional = 0;
-            while ($name =~ m/^(.*)(\?)$/) {
-                $name = $1;
-                $sql2 .= (defined ($args_href->{$name}) ? 1 : 0);
-                $optional = 1;
-            }
-
-            #
-            # If we don't have an optional parameter then we are just using standard varriable substituation.
-            #
-            if (! $optional) {
-                push (@variable_names, $name);
-                push (@variable_flags, \%flags);
-                $sql2 .= "?";
-            }
+            # The variable names may contain the "?" test indicator.
+            push (@variable_names, $name);
+            push (@variable_flags, \%flags);
+            $sql2 .= "?";
 
         } else {
             $sql2 .= $bits[$idx];
@@ -182,8 +167,10 @@ sub sql_with_substitutions {
     # this really only makes sense with FETCH statements, and with rest
     # args in store statements.
     #
-    # Parameters NAMES may contain only a-z, A-Z, 0-9, underscore(_), colon(:) and hyphen(-)
-    # Note pipe(|) is also allowed at this point as it separates (try-else variable names)
+    # Parameters NAMES may contain only a-z, A-Z, 0-9, underscore(_), colon(:) and hyphen(-) plus:
+    #
+    #   pipe(|) is also allowed at this point as it separates (try-else variable names)
+    #   question(?) is also allowed at this point, it is the "exists" test flag
     #
     @bits = split (/\[[\[\$]([a-zA-Z0-9_\-:\|]+(?:\![a-z]+)*)\]\]?/i, $sql2);
 
@@ -217,8 +204,22 @@ sub sql_with_substitutions {
             # The name may be a pipe-separated sequence of "names to try".
             my $value = undef;
             foreach my $option (split ('\|', $name)) {
+
+                # NOTE: The "varname?" or "exists" test is not support here.
+                if (($option =~ m/^\?/) || ($option =~ m/\?$/)) {
+                    die "The existance test variable syntax is not supported in textual substitution.";
+                }
+
                 $value = $args_href->{$option};
+
+                # NOTE: Non-SCALAR variables are silently ignored here!  Beware subtle bugs!
                 next if (ref $value ne '');
+
+                # NOTE: In textual substitution we take the first DEFINED value in the list.
+                #
+                # Compare this with the normal variable expansion mechanism where we take the
+                # first row HASH variable which EXISTS (even if it is not defined).
+                #
                 last if (defined $value);
             }
             (defined $value) || ($value = '');
@@ -468,25 +469,24 @@ sub statement_execute {
         #
         # Do we have any "!out" flagged variables?
         my $out_flag = 0;
+
         # Do we have any special handling that we need to perform on any of our SQL parameters?
-        my $special_flag = 0;
+        my $preproc_flag = 0;
+
         foreach my $flag (@{ $stm->{vflags_aref} }) {
-            # Look for out or json as valid special flags that will need additional processing.
-            if (defined $flag && ($flag->{out} || $flag->{json})) {
-                if ($flag->{out}) {
-                    $out_flag = 1;
-                }
-                if ($flag->{json}) {
-                    $special_flag = 1;
-                }
-                last;
-            }
+
+            # Not all variables have flags.
+            next if (! defined $flag);
+
+            # Examine which flags we have.
+            $out_flag     = 1 if $flag->{out};
+            $preproc_flag = 1 if $flag->{json};
         }
 
-        # If we have any special processing we need to perform lets handle that now.
-        if ($special_flag) {
-            &Jarvis::Error::debug ($jconfig, "At least one bind variable is flagged with special '!'. Performing argument manipulation.");
-            foreach my $i (0 .. $#$args) {
+        # Do any of our flags involve pre-processing/transforming input variables?
+        if ($preproc_flag) {
+            &Jarvis::Error::debug ($jconfig, "At least one bind variable requires pre-processing.");
+            foreach my $i (0 .. $#$args) { 
                 # Get the flags for the current argument.
                 my $flags = $stm->{vflags_aref}[$i];
 
