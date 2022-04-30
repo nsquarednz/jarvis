@@ -472,6 +472,10 @@ sub get_post_data {
         $jconfig->{post_data} = $jconfig->{cgi}->param('PUTDATA');
     }
 
+    if (! $jconfig->{post_data}) {
+        $jconfig->{post_data} = $jconfig->{cgi}->param('PATCHDATA');
+    }
+
     # Last ditch effort - read STDIN.
     if (! $jconfig->{post_data}) {
         $jconfig->{post_data} = "";
