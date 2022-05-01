@@ -4,6 +4,15 @@
 
 The Jarvis Web Framework. More information can be found at https://www.nsquared.co.nz/tech/jarvis.html
 
+## [7.3.0] - 2022-04-27
+### Added
+
+### Changed
+- 14574: Rework the "varname?" modifier.
+
+### Fixed
+
+
 ## [7.2.1] - 2022-03-31
 ### Added
 
