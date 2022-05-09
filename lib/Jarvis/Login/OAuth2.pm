@@ -2,8 +2,17 @@
 # Description:
 #       Functions for dealing with OAuth login and user authentication.
 #
-#       This login method will accept a one time access code for purposes
-#       of retrieving a users access token from an OAuth provider.
+#       This OAuth login module currently supports to Authorization Code Flows.
+#
+#       Confidential:
+#           This login method will accept a one time access code for purposes
+#           of retrieving a users access token from an OAuth provider.
+#
+#       Public:
+#           This login method will accept a bearer token on each request
+#           the first time this is seen it is validated and confirmed using the
+#           OAuth providers public key and then stored in the session.
+#           Subsequent attempts will check the key hash has not changed.
 #
 # License:
 #       This file is part of the Jarvis WebApp/Database gateway utility.
@@ -38,6 +47,9 @@ use JSON::XS;
 use Data::Dumper;
 use JSON::WebToken;
 use IO::Socket::SSL;
+use Time::HiRes qw (gettimeofday tv_interval);
+use Digest::MD5 qw(md5_hex);
+use Crypt::OpenSSL::RSA;
 
 ###############################################################################
 # Helper Functions
@@ -77,33 +89,166 @@ sub get_user_agent {
 }
 
 ###############################################################################
+# Helper function that will handle getting our auth public key.
+# This method will check to see if we have a cached key on disk in a tmp file.
+#
+# If no file is present or the file is too old we will fetch from the configured
+# endpoint.
+#
+# Otherwise we will fetch it off disk and just pass it back.
+#
+# Params:
+#       %login_parameters - Hash reference of login parameters passed through.
+#
+# Returns:
+#       Public key string.
+#
+###############################################################################
+sub get_auth_public_key {
+    my (%login_parameters) = @_;
+
+    # Get all of the base parameters we'll need.
+    my $site                        = $login_parameters{site}                        || die ("OAuth2 module 'site' must be defined.\n");
+    my $public_key_path             = $login_parameters{public_key_path}             || die ("OAuth2 module 'public_key_path' must be defined.\n");
+    my $public_key_key              = $login_parameters{public_key_key}              || die ("OAuth2 module 'public_key_key' must be defined.\n");
+    my $public_key_store            = $login_parameters{public_key_store}            // '/tmp/auth_public_key';
+    my $public_key_lifetime_seconds = $login_parameters{public_key_lifetime_seconds} // 600;
+
+    # Optional fields.
+    my $self_signed_cert = $login_parameters{self_signed_cert};
+
+    # We store the public key in a storage file. We need to check that it exists and that its lifetime doesn't
+    # exceed our configured amount. If either of those aren't valid then we fetch a new key and store it.
+    my $public_key_valid = 0;
+    # First check existence.
+    if (-f $public_key_store ) {
+        # Next get mod information to determine the file age in seconds.
+        my $public_key_mod_time = [(stat($public_key_store))[9], 0];
+        my $public_key_age = tv_interval ($public_key_mod_time, [gettimeofday]);
+        if ($public_key_age < $public_key_lifetime_seconds) {
+            $public_key_valid = 1;
+        }
+    }
+
+    # If the key store has valid timing lets go ahead and load it.
+    if ($public_key_valid) {
+        # Load the contents of the key file and return it. Nice and easy.
+        open (FH, '<', $public_key_store) || die ("Failed to open public key store.\n");
+        read FH, my $formatted_public_key, -s FH;
+        close (FH);
+
+        # Run the key through the OpenSSL Crypt library to valid the key is actually valid.
+        eval {
+            Crypt::OpenSSL::RSA->new_public_key ($formatted_public_key);
+        };
+        if ($@) {
+            # Invalid key.
+            $public_key_valid = 0;
+        }
+
+        # Still valid?
+        if ($public_key_valid) {
+            # Simply return.
+            return $formatted_public_key;
+        }
+    }
+
+    # If we make it here then either we had no key store, the key store was out of date, or the key we loaded was not valid.
+    # Go ahead and fetch a new one.
+    # Fetch a user agent.
+    my $ua = get_user_agent ($self_signed_cert);
+
+    # Construct the public key endpoint.
+    my $public_key_endpoint = $site . $public_key_path;
+
+    # Trigger the request.
+    my $public_key_response = $ua->get ($public_key_endpoint);
+
+    # Check for success.
+    if ($public_key_response->is_success) {
+        # Parse the JSON contents of the response.
+        my $public_key_message      = $public_key_response->decoded_content;
+        my $public_key_message_json = JSON::XS::decode_json($public_key_message);
+
+        # Attempt to fetch the key we requested.
+        my $public_key = $public_key_message_json->{$public_key_key} || die ("Public Key endpoint JSON did not contain '$public_key_key'\n");
+
+        # Format the public key. We're expected to include the standard OpenSSL notation.
+        my $formatted_public_key = "-----BEGIN PUBLIC KEY-----\n$public_key\n-----END PUBLIC KEY-----\n";
+
+        # Write to our temp file.
+        open (FH, '>', $public_key_store) || die ("Failed to open public key store.\n");
+        print FH $formatted_public_key;
+        close (FH);
+
+        # Hand back the newly updated key to the callee.
+        return $formatted_public_key;
+
+    } else {
+        die ("Failed to contact public key endpoint: [" . ($public_key_response->code ? $public_key_response->code : 500) . "] " . ($public_key_response->message ? $public_key_response->message : "") . "\n");
+    }
+}
+
+###############################################################################
 # Public Functions
 ###############################################################################
 
 ################################################################################
-# Determines if we are "logged in".  In this case we look at CGI variables
-# for the existing OAuth code.
-# We validate this by first calling an OAuth Token endpoint to retrieve a valid
-# access, refresh and ID token.
-# Once we have valid tokens we contact the extended OAuth token
-# endpoint to query additional permissions.
+# Determines if we are "logged in".
 #
-# To use this method, specify the following login parameters.
+# The operations we perform depends on our operating configuration.
 #
-#    <app format="json" debug="no">
-#        ...
-#           <login module="Jarvis::Login::OAuth2">
-#               <parameter name="client_secret"      value="<client_secret>"/>
-#               <parameter name="client_id"          value="<client_id>"/>
-#               <parameter name="site"               value="<oauth_provider_base_site>"/>
-#               <parameter name="token_path"         value="/auth/realms/<realm>/protocol/openid-connect/token"/>
-#               <parameter name="logout_path"        value="/auth/realms/<realm>/protocol/openid-connect/logout"/>
-#               <parameter name="redirect_uri"       value="<application_redirect_uri>"/>
-#               <!-- Optional self signed cert path if the oauth provider is using a self signed cert. -->
-#               <parameter name="self_signed_cert"   value="<path_to_self_signed_cert>"/>
-#           </login>
-#        ...
-#    </app>
+# CONFIDENTIAL FLOW
+#
+#   In this case we look at CGI variables
+#   for the existing OAuth code.
+#   We validate this by first calling an OAuth Token endpoint to retrieve a valid
+#   access, refresh and ID token.
+#   Once we have valid tokens we contact the extended OAuth token
+#   endpoint to query additional permissions.
+#
+#   To use this method, specify the following login parameters.
+#
+#      <app format="json" debug="no">
+#          ...
+#             <login module="Jarvis::Login::OAuth2">
+#                   <parameter name="grant_type"         value="auth_code"/>
+#                   <parameter name="access_type"        value="confidential"/>
+#                   <parameter name="client_secret"      value="<client_secret>"/>
+#                   <parameter name="client_id"          value="<client_id>"/>
+#                   <parameter name="site"               value="<oauth_provider_base_site>"/>
+#                   <parameter name="token_path"         value="/auth/realms/<realm>/protocol/openid-connect/token"/>
+#                   <parameter name="logout_path"        value="/auth/realms/<realm>/protocol/openid-connect/logout"/>
+#                   <parameter name="redirect_uri"       value="<application_redirect_uri>"/>
+#                   <!-- Optional self signed cert path if the oauth provider is using a self signed cert. -->
+#                   <parameter name="self_signed_cert"   value="<path_to_self_signed_cert>"/>
+#             </login>
+#          ...
+#      </app>
+#
+# PUBLIC FLOW
+#
+#   In this case we expect to receieve an access token in an Authorization bearer token.
+#   We validate this token using a public retreived from the service provider and then pull it apart
+#   storing the information in our session. We expect a token provided with each subsequent request which
+#   we will match against a stored hash to determine if it has been updated and needs to be re-parsed.
+#
+#   To use this method, specify the following login parameters.
+#
+#      <app format="json" debug="no">
+#          ...
+#             <login module="Jarvis::Login::OAuth2">
+#                   <parameter name="grant_type"                  value="auth_code"/>
+#                   <parameter name="access_type"                 value="public"/>
+#                   <parameter name="site"                        value="<oauth_provider_base_site>"/>
+#                   <parameter name="public_key_path"             value="/auth/realms/<realm>"/>
+#                   <parameter name="public_key_key"              value="public_key"/>
+#                   <parameter name="public_key_store"            value="/tmp/auth_public_key"/>
+#                   <parameter name="public_key_lifetime_seconds" value="600"/>
+#                   <parameter name="self_signed_cert"            value="<path_to_self_signed_cert>"/>
+#             </login>
+#          ...
+#      </app>
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -120,136 +265,223 @@ sub get_user_agent {
 sub Jarvis::Login::OAuth2::check {
     my ($jconfig, %login_parameters) = @_;
 
-    # Check if we were provided an OAuth code.
-    my $auth_code = $jconfig->{'cgi'}->param('code');
+    # Load base parameters. Fall back to confidential auth code setups to support existing deployments.
+    my $grant_type  = $login_parameters{grant_type}  // 'auth_code';
+    my $access_type = $login_parameters{access_type} // 'confidential';
 
-    # We might have also been given an encoded POSTDATA object.
-    if (my $post_data = $jconfig->{'cgi'}->param('POSTDATA')) {
-        # If we have POSTDATA lets try and decode it as JSON.
-        eval {
-            my $post_json = decode_json ($post_data);
-            $auth_code = $post_json->{'code'};
-        };
-        if ($@) {
-            die "Failed to parse non application/json POSTDATA";
-        }
+    # Check for a supported grant type.
+    if ($grant_type eq 'auth_code') {
 
-    }
+        # Check for supported access types.
 
-    # If we have a defined OAuth code lets proceed with trying to do our token grant and introspection.
-    if (defined $auth_code) {
+        #
+        # The public OAuth flow is where the token key exchange is handled by the client.
+        # We are only passed the resulting access token which we will validate using the server providers public key.
+        # We parse this key and store it within our session information and periodically update the information if the access token changes.
+        # We expect the access token passed to us with every request via an authorization bearer header.
+        #
+        if ($access_type eq 'public') {
 
-        # At this stage lets sanity check that all the required items we need are defined.
-        my $client_secret= $login_parameters{client_secret} || die ("client_secret must be defined.\n");
-        my $client_id    = $login_parameters{client_id}     || die ("client_id must be defined.\n");
-        my $site         = $login_parameters{site}          || die ("site must be defined.\n");
-        my $token_path   = $login_parameters{token_path}    || die ("token_path must be defined.\n");
-        my $redirect_uri = $login_parameters{redirect_uri}  || die ("redirect_uri must be defined.\n");
+            # Check if we were provided an Authorization header.
+            my $authorization_header = $jconfig->{cgi}->http('Authorization');
 
-        # Optional fields.
-        my $self_signed_cert = $login_parameters{self_signed_cert};
+            # No auth header. Then likely just a blank request to __status.
+            if ($authorization_header) {
 
-        # At this stage we have everything we need to send a request on to our token request endpoint. Lets construct this now.
-        my $ua = get_user_agent ($self_signed_cert);
+                # First things first lets hash the auth header so we can check if its the same as one that might already be stored.
+                my $authorization_header_hash = md5_hex ($authorization_header);
 
-        # Construct the token endpoint.
-        my $token_endpoint = $site . $token_path;
+                # Get the auth providers public key. We use this to validat the JWT token.
+                my $public_key = get_auth_public_key (%login_parameters);
 
-        # Create our outbound request and construct our data.
-        my $token_request_data = {
-            client_id       => $client_id
-            , client_secret => $client_secret
-            , code          => $auth_code
-            , redirect_uri  => $redirect_uri
-            , grant_type    => 'authorization_code'
-            , scope         => 'openid'
-        };
+                # If we receieve a Bearer in front of our token. Remove it otherwise the parsing will fail.
+                $authorization_header =~ s/Bearer\s?//;
 
-        # Trigger our token request.
-        my $token_response = $ua->post ($token_endpoint, $token_request_data);
+                # Attempt to decode the auth header. This is were we validate it against the public key. If this step fails for any reason
+                # we will not continue the authorization and fail hard.
+                my $decoded_authorization_token;
+                eval {
+                    $decoded_authorization_token = JSON::WebToken->decode ($authorization_header, $public_key, 1, 'RS256');
+                };
+                if ($@) {
+                    die "Failed to decode Authorization Token: $@\n";
+                }
 
-        # Check for success.
-        if ($token_response->is_success) {
+                # Start fetching information that we will store in our session. We will parse various parts and store it.
+                # First lets hash the auth token and store that. This will let us skip all the parsing steps if the token is still valid and hasn't changed.
+                my $username = $decoded_authorization_token->{preferred_username};
 
-            # Parse the JSON contents of the response.
-            my $token_message      = $token_response->decoded_content;
-            my $token_message_json = JSON::XS::decode_json($token_message);
+                # Grab our user groups. This might be a string or an array or even undefined so lets be careful.
+                my $user_groups = '';
+                if (defined $decoded_authorization_token->{groups}) {
+                    if (ref $decoded_authorization_token->{groups} eq 'ARRAY') {
+                        $user_groups = join (',', @{$decoded_authorization_token->{groups}});
 
-            # Pull the access token out of the request, we can use that to get information on the token associated with the user to get their
-            # groups and other information that we need.
-            my $access_token  = $token_message_json->{access_token}  || die ("Authorization token repose did not contain an access token.\n");
-            my $refresh_token = $token_message_json->{refresh_token} || die ("Authorization token repose did not contain a refresh token.\n");
-            my $id_token      = $token_message_json->{id_token}      || die ("Authorization token repose did not contain an id token.\n");
+                    } else {
+                        $user_groups = $decoded_authorization_token->{groups};
+                    }
+                }
 
-            # Store each of the tokens we receive on the session. We will need these in future requests.
-            $jconfig->{session}->param ("access_token" , $access_token);
-            $jconfig->{session}->param ("refresh_token", $refresh_token);
-            $jconfig->{session}->param ("id_token"     , $id_token);
+                # Grab the expiry time of the token.
+                my $token_expiry = $decoded_authorization_token->{exp} || die ("Authorization Token does not contain an expiry time.\n");
+                # Grab the external ID of the user that we performed auth for.
+                my $external_user_id = $decoded_authorization_token->{sub} || die ("Authorization Token does not contain sub information.\n");
 
-            # Decode the ID token using our token library. This contains user identifying information that we can access and use.
-            my $decoded_id_token =JSON::WebToken->decode ($id_token, undef, 0, 'none');
+                # Store session properties.
+                $jconfig->{session}->param ("token_expiry", $token_expiry);
+                $jconfig->{session}->param ("current_auth_token_hash", $authorization_header_hash);
+                $jconfig->{session}->param ('external_user_id', $external_user_id);
 
-            # Also decode the refresh token, it will hold our session expiry time.
-            my $decoded_refresh_token =JSON::WebToken->decode ($refresh_token, undef, 0, 'none');
+                # Finally return our successful login indicator to our calling module providing the user name and groups we got back.
+                return ("", $username, $user_groups);
+            }
 
-            # Extract values as needed.
-            my $username = $decoded_id_token->{preferred_username};
+        #
+        # The confidential OAuth flow is were we are passed an authorization code by the client and we handle the key exchange ourselves
+        # with the service provider. We exchange the token along with a secret key to get a token that we can then pull apart
+        # to load our service. We update this only periodically and store all the information in our CGI session.
+        #
+        } elsif ($access_type eq 'confidential') {
 
-            # Update the expiry stored against our session.
-            $decoded_refresh_token->{'exp'} || die ("Refresh token does not contain an expiry time.\n");
-            $jconfig->{session}->expire ($decoded_refresh_token->{'exp'});
+            # Check if we were provided an OAuth code.
+            my $auth_code = $jconfig->{'cgi'}->param('code');
 
-            # Grab our user groups. This might be a string or an array or even undefined so lets be careful.
-            my $user_groups = '';
-            if (defined $decoded_id_token->{groups}) {
-                if (ref $decoded_id_token->{groups} eq 'ARRAY') {
-                    $user_groups = join (',', @{$decoded_id_token->{groups}});
+            # We might have also been given an encoded POSTDATA object.
+            if (my $post_data = $jconfig->{'cgi'}->param('POSTDATA')) {
+                # If we have POSTDATA lets try and decode it as JSON.
+                eval {
+                    my $post_json = decode_json ($post_data);
+                    $auth_code = $post_json->{'code'};
+                };
+                if ($@) {
+                    die "Failed to parse non application/json POSTDATA";
+                }
+
+            }
+
+            # If we have a defined OAuth code lets proceed with trying to do our token grant and introspection.
+            if (defined $auth_code) {
+
+                # At this stage lets sanity check that all the required items we need are defined.
+                my $client_secret= $login_parameters{client_secret} || die ("client_secret must be defined.\n");
+                my $client_id    = $login_parameters{client_id}     || die ("client_id must be defined.\n");
+                my $site         = $login_parameters{site}          || die ("site must be defined.\n");
+                my $token_path   = $login_parameters{token_path}    || die ("token_path must be defined.\n");
+                my $redirect_uri = $login_parameters{redirect_uri}  || die ("redirect_uri must be defined.\n");
+
+                # Optional fields.
+                my $self_signed_cert = $login_parameters{self_signed_cert};
+
+                # At this stage we have everything we need to send a request on to our token request endpoint. Lets construct this now.
+                my $ua = get_user_agent ($self_signed_cert);
+
+                # Construct the token endpoint.
+                my $token_endpoint = $site . $token_path;
+
+                # Create our outbound request and construct our data.
+                my $token_request_data = {
+                    client_id       => $client_id
+                    , client_secret => $client_secret
+                    , code          => $auth_code
+                    , redirect_uri  => $redirect_uri
+                    , grant_type    => 'authorization_code'
+                    , scope         => 'openid'
+                };
+
+                # Trigger our token request.
+                my $token_response = $ua->post ($token_endpoint, $token_request_data);
+
+                # Check for success.
+                if ($token_response->is_success) {
+
+                    # Parse the JSON contents of the response.
+                    my $token_message      = $token_response->decoded_content;
+                    my $token_message_json = JSON::XS::decode_json($token_message);
+
+                    # Pull the access token out of the request, we can use that to get information on the token associated with the user to get their
+                    # groups and other information that we need.
+                    my $access_token  = $token_message_json->{access_token}  || die ("Authorization token repose did not contain an access token.\n");
+                    my $refresh_token = $token_message_json->{refresh_token} || die ("Authorization token repose did not contain a refresh token.\n");
+                    my $id_token      = $token_message_json->{id_token}      || die ("Authorization token repose did not contain an id token.\n");
+
+                    # Store each of the tokens we receive on the session. We will need these in future requests.
+                    $jconfig->{session}->param ("access_token" , $access_token);
+                    $jconfig->{session}->param ("refresh_token", $refresh_token);
+                    $jconfig->{session}->param ("id_token"     , $id_token);
+
+                    # Decode the ID token using our token library. This contains user identifying information that we can access and use.
+                    my $decoded_id_token = JSON::WebToken->decode ($id_token, undef, 0, 'none');
+
+                    # Also decode the refresh token, it will hold our session expiry time.
+                    my $decoded_refresh_token =JSON::WebToken->decode ($refresh_token, undef, 0, 'none');
+
+                    # Extract values as needed.
+                    my $username = $decoded_id_token->{preferred_username};
+
+                    # Update the expiry stored against our session.
+                    $decoded_refresh_token->{'exp'} || die ("Refresh token does not contain an expiry time.\n");
+                    $jconfig->{session}->expire ($decoded_refresh_token->{'exp'});
+
+                    # Grab our user groups. This might be a string or an array or even undefined so lets be careful.
+                    my $user_groups = '';
+                    if (defined $decoded_id_token->{groups}) {
+                        if (ref $decoded_id_token->{groups} eq 'ARRAY') {
+                            $user_groups = join (',', @{$decoded_id_token->{groups}});
+
+                        } else {
+                            $user_groups = $decoded_id_token->{groups};
+                        }
+                    }
+
+                    # Once we've done everything that we can with the tokens that we currently have
+                    # we need to send a request to the token endpoint so we can request our extended permissions.
+                    my $extended_token_request_data = {
+                        grant_type    => 'urn:ietf:params:oauth:grant-type:uma-ticket'
+                        , audience => $client_id
+                    };
+
+                    # This type of endpoint is special. We have to include our access token as authorization to query this information.
+                    # The LWP user agent is a bit weird with how this works for setting headers. Anything after the first parameter can be a header definition.
+                    # This continues until the 'Content' property is detected at which point it is encoded as the post data.
+                    my $extended_token_response = $ua->post ($token_endpoint, 'Authorization' => "Bearer $access_token", Content => $extended_token_request_data);
+
+                    my $extended_token_message      = $extended_token_response->decoded_content;
+                    my $extended_token_message_json = JSON::XS::decode_json($extended_token_message);
+
+                    # Check if the response contains the access token we expect.
+                    my $extended_access_token = $extended_token_message_json->{access_token};
+
+                    # If we have no extended access token we won't bail out. There are situations where they might have a valid login but no permissions.
+                    if (defined $extended_access_token) {
+                        # Decode the token using our token library.
+                        my $decoded_extended_access_token =JSON::WebToken->decode ($extended_access_token, undef, 0, 'none');
+
+                        # Sanity check.
+                        $decoded_extended_access_token->{authorization}{permissions} || die ("RPT Token missing authorization permissions.");
+
+                        # Convert our permissions objects array to a list of associated permissions.
+                        my @permission_names = map { $_->{rsname} } @{$decoded_extended_access_token->{authorization}{permissions}};
+
+                        # Associate the list of permissions against our Jarvis session. Implementing applications can access this as required.
+                        $jconfig->{session}->param ("oauth_permissions", \@permission_names);
+                    }
+
+                    # Finally return our successful login indicator to our calling module providing the user name and groups we got back.
+                    return ("", $username, $user_groups);
 
                 } else {
-                    $user_groups = $decoded_id_token->{groups};
+                    die ("Failed to contact token endpoint: [" . ($token_response->code ? $token_response->code : 500) . "] " . ($token_response->message ? $token_response->message : "") . "\n");
                 }
             }
-
-            # Once we've done everything that we can with the tokens that we currently have
-            # we need to send a request to the token endpoint so we can request our extended permissions.
-            my $extended_token_request_data = {
-                grant_type    => 'urn:ietf:params:oauth:grant-type:uma-ticket'
-                , audience => $client_id
-            };
-
-            # This type of endpoint is special. We have to include our access token as authorization to query this information.
-            # The LWP user agent is a bit weird with how this works for setting headers. Anything after the first parameter can be a header definition.
-            # This continues until the 'Content' property is detected at which point it is encoded as the post data.
-            my $extended_token_response = $ua->post ($token_endpoint, 'Authorization' => "Bearer $access_token", Content => $extended_token_request_data);
-
-            my $extended_token_message      = $extended_token_response->decoded_content;
-            my $extended_token_message_json = JSON::XS::decode_json($extended_token_message);
-
-            # Check if the response contains the access token we expect.
-            my $extended_access_token = $extended_token_message_json->{access_token};
-
-            # If we have no extended access token we won't bail out. There are situations where they might have a valid login but no permissions.
-            if (defined $extended_access_token) {
-                  # Decode the token using our token library.
-                my $decoded_extended_access_token =JSON::WebToken->decode ($extended_access_token, undef, 0, 'none');
-
-                # Sanity check.
-                $decoded_extended_access_token->{authorization}{permissions} || die ("RPT Token missing authorization permissions.");
-
-                # Convert our permissions objects array to a list of associated permissions.
-                my @permission_names = map { $_->{rsname} } @{$decoded_extended_access_token->{authorization}{permissions}};
-
-                # Associate the list of permissions against our Jarvis session. Implementing applications can access this as required.
-                $jconfig->{session}->param ("oauth_permissions", \@permission_names);
-            }
-
-            # Finally return our successful login indicator to our calling module providing the user name and groups we got back.
-            return ("", $username, $user_groups);
-
         } else {
-            die ("Failed to contact token endpoint: [" . ($token_response->code ? $token_response->code : 500) . "] " . ($token_response->message ? $token_response->message : "") . "\n");
+            die ("OAuth2 Module Unsupported Access Type: '$access_type'");
         }
+    } else {
+        die ("OAuth2 Module Unsupported Grant Type: '$grant_type'");
     }
+
+    # No login actions. Return.
+    return ("", "", undef);
 }
 
 ################################################################################
@@ -277,67 +509,129 @@ sub Jarvis::Login::OAuth2::check {
 sub Jarvis::Login::OAuth2::refresh {
     my ($jconfig, %login_parameters) = @_;
 
-    # Sanity check that our login parameters specify all the configuration that we need.
-    my $token_path    = $login_parameters{token_path}                || die ("token_path must be defined.\n");
-    my $client_id     = $login_parameters{client_id}                 || die ("client_id must be defined.\n");
-    my $client_secret = $login_parameters{client_secret}             || die ("client_secret must be defined.\n");
-    my $site          = $login_parameters{site}                      || die ("site must be defined.\n");
-    my $refresh_token = $jconfig->{session}->param ('refresh_token');
+    # Load base parameters. Fall back to confidential auth code setups to support existing deployments.
+    my $grant_type  = $login_parameters{grant_type}  // 'auth_code';
+    my $access_type = $login_parameters{access_type} // 'confidential';
 
-    # No refresh token? This can happen, no point in trying.
-    if (! defined ($refresh_token)) {
-        return undef;
-    }
+    # Check for a supported grant type.
+    if ($grant_type eq 'auth_code') {
 
-    # Optional fields.
-    my $self_signed_cert = $login_parameters{self_signed_cert};
+        # Check for supported access types.
+        if ($access_type eq 'public') {
 
-    # Get our user agent.
-    my $ua = get_user_agent ($self_signed_cert);
+            # Check if we were provided an Authorization header.
+            my $authorization_header = $jconfig->{cgi}->http('Authorization');
 
-    # Construct the refresh endpoint.
-    my $token_endpoint = $site . $token_path;
+            # No auth header present anymore and we have a valid session? Terminate.
+            if ($authorization_header) {
 
-    # Create our outbound request and construct our data.
-    my $refresh_request_data = {
-        refresh_token   => $refresh_token
-        , client_id     => $client_id
-        , client_secret => $client_secret
-        , grant_type    => 'refresh_token'
-    };
+                # Get a hash of the provided header.
+                # If it matches the existing one and it hasn't expired we can just allow it through.
+                my $authorization_header_hash          = md5_hex ($authorization_header);
+                my $existing_authorization_header_hash = $jconfig->{session}->param ("current_auth_token_hash");
+                my $existing_token_expiry              = $jconfig->{session}->param ("token_expiry");
+                my @now                                = gettimeofday;
 
-    my $token_refresh_response = $ua->post ($token_endpoint, $refresh_request_data);
+                # Matches?
+                if (defined $existing_authorization_header_hash && $existing_authorization_header_hash eq $authorization_header_hash) {
+                    # Expired?
+                    if ($existing_token_expiry > $now[0]){
+                        # Header matches and is still valid. Nice and easy return undef.
+                        return undef;
+                    } else {
+                        # Token has since expired. Clear the session data and return an error.
+                        Jarvis::Login::logout ($jconfig);
+                        $jconfig->{status} = "401 Unauthorized";
+                        # Return an error.
+                        return "Session Expired";
+                    }
 
-    # Check for success, in failure cases we'll return a tailored error message.
-    if ($token_refresh_response->is_success) {
+                    # We have an existing session and the header hashes match. Nice and easy return undef nothing else to do here.
+                    return undef;
+                } else {
+                    # Got a new token? We need to perform the standard login validation logic for that new token.
+                    # Trigger a logout to remove all state associated with the previous token. We need to rebuild it.
+                    Jarvis::Login::logout ($jconfig);
+                    # Trigger a new login with the new token.
+                    Jarvis::Login::check ($jconfig);
+                }
+            } else {
+                # No auth header? No longer a valid session. Trigger a logout to remove all state associated with what may have been a previous token.
+                Jarvis::Login::logout ($jconfig);
+                # Return an error.
+                return "No Authroziation Header Provided";
+            }
 
-        # Decode the message so we can get our updated tokens.
-        my $token_refresh_message      = $token_refresh_response->decoded_content;
-        my $token_refresh_message_json = JSON::XS::decode_json($token_refresh_message);
+        } elsif ($access_type eq 'confidential') {
 
-        # Update each of the stored tokens as they now have a newer time stamp.
-        $jconfig->{session}->param ("access_token" , $token_refresh_message_json->{access_token});
-        $jconfig->{session}->param ("refresh_token", $token_refresh_message_json->{refresh_token});
-        $jconfig->{session}->param ("id_token"     , $token_refresh_message_json->{id_token});
+            # Sanity check that our login parameters specify all the configuration that we need.
+            my $token_path    = $login_parameters{token_path}                || die ("token_path must be defined.\n");
+            my $client_id     = $login_parameters{client_id}                 || die ("client_id must be defined.\n");
+            my $client_secret = $login_parameters{client_secret}             || die ("client_secret must be defined.\n");
+            my $site          = $login_parameters{site}                      || die ("site must be defined.\n");
+            my $refresh_token = $jconfig->{session}->param ('refresh_token');
 
-        # We do have to parse the refresh token as we do need to update the expire time on our CGI session.
-        my $decoded_refresh_token =JSON::WebToken->decode ($token_refresh_message_json->{refresh_token}, undef, 0, 'none');
-        $decoded_refresh_token->{'exp'} || die ("Refresh token does not contain an expiry time.\n");
+            # No refresh token? This can happen, no point in trying.
+            if (! defined ($refresh_token)) {
+                return undef;
+            }
 
-        # Update the expiry stored against our session.
-        $jconfig->{session}->expire ($decoded_refresh_token->{'exp'});
+            # Optional fields.
+            my $self_signed_cert = $login_parameters{self_signed_cert};
 
+            # Get our user agent.
+            my $ua = get_user_agent ($self_signed_cert);
+
+            # Construct the refresh endpoint.
+            my $token_endpoint = $site . $token_path;
+
+            # Create our outbound request and construct our data.
+            my $refresh_request_data = {
+                refresh_token   => $refresh_token
+                , client_id     => $client_id
+                , client_secret => $client_secret
+                , grant_type    => 'refresh_token'
+            };
+
+            my $token_refresh_response = $ua->post ($token_endpoint, $refresh_request_data);
+
+            # Check for success, in failure cases we'll return a tailored error message.
+            if ($token_refresh_response->is_success) {
+
+                # Decode the message so we can get our updated tokens.
+                my $token_refresh_message      = $token_refresh_response->decoded_content;
+                my $token_refresh_message_json = JSON::XS::decode_json($token_refresh_message);
+
+                # Update each of the stored tokens as they now have a newer time stamp.
+                $jconfig->{session}->param ("access_token" , $token_refresh_message_json->{access_token});
+                $jconfig->{session}->param ("refresh_token", $token_refresh_message_json->{refresh_token});
+                $jconfig->{session}->param ("id_token"     , $token_refresh_message_json->{id_token});
+
+                # We do have to parse the refresh token as we do need to update the expire time on our CGI session.
+                my $decoded_refresh_token =JSON::WebToken->decode ($token_refresh_message_json->{refresh_token}, undef, 0, 'none');
+                $decoded_refresh_token->{'exp'} || die ("Refresh token does not contain an expiry time.\n");
+
+                # Update the expiry stored against our session.
+                $jconfig->{session}->expire ($decoded_refresh_token->{'exp'});
+
+            } else {
+                # Some thing went wrong, try and extract and error.
+                my $error_message;
+                eval {
+                    my $refresh_request_failure      = $token_refresh_response->decoded_content;
+                    my $refresh_request_failure_json = JSON::XS::decode_json($refresh_request_failure);
+                    $error_message = $refresh_request_failure_json->{error};
+                };
+                return ($error_message ? 'Refresh Failed: ' . $error_message : 'Refresh Failed: Unknown Error Occurred');
+            }
+
+        } else {
+            die ("OAuth2 Module Unsupported Access Type: '$access_type'");
+        }
     } else {
-        # Some thing went wrong, try and extract and error.
-        my $error_message;
-        eval {
-            my $refresh_request_failure      = $token_refresh_response->decoded_content;
-            my $refresh_request_failure_json = JSON::XS::decode_json($refresh_request_failure);
-            $error_message = $refresh_request_failure_json->{error};
-        };
-        return ($error_message ? 'Refresh Failed: ' . $error_message : 'Refresh Failed: Unknown Error Occurred');
-
+        die ("OAuth2 Module Unsupported Grant Type: '$grant_type'");
     }
+
 
     return undef;
 }
@@ -366,51 +660,63 @@ sub Jarvis::Login::OAuth2::refresh {
 sub Jarvis::Login::OAuth2::logout {
     my ($jconfig, %login_parameters) = @_;
 
-    # Sanity check that our login parameters specify all the configuration that we need.
-    my $logout_path   = $login_parameters{logout_path}               || die ("logout_path must be defined.\n");
-    my $client_id     = $login_parameters{client_id}                 || die ("client_id must be defined.\n");
-    my $client_secret = $login_parameters{client_secret}             || die ("client_secret must be defined.\n");
-    my $site          = $login_parameters{site}                      || die ("site must be defined.\n");
-    my $refresh_token = $jconfig->{session}->param ('refresh_token');
-    my $access_token  = $jconfig->{session}->param ('access_token');
+    # Load base parameters. Fall back to confidential auth code setups to support existing deployments.
+    my $grant_type  = $login_parameters{grant_type}  // 'auth_code';
+    my $access_type = $login_parameters{access_type} // 'confidential';
 
-    # No tokens, lets skip as this can happen.
-    if (! defined ($refresh_token) || ! defined ($access_token)) {
-        return undef;
-    }
+    # Check for a supported grant type.
+    if ($grant_type eq 'auth_code') {
 
-    # Optional fields.
-    my $self_signed_cert = $login_parameters{self_signed_cert};
+        # Check for supported access types. We only have to perform specific logic for our confidential endpoint.
+        # For public flows we simply return and allow Jarvis to clear our session information.
+        if ($access_type eq 'confidential') {
+            # Sanity check that our login parameters specify all the configuration that we need.
+            my $logout_path   = $login_parameters{logout_path}               || die ("logout_path must be defined.\n");
+            my $client_id     = $login_parameters{client_id}                 || die ("client_id must be defined.\n");
+            my $client_secret = $login_parameters{client_secret}             || die ("client_secret must be defined.\n");
+            my $site          = $login_parameters{site}                      || die ("site must be defined.\n");
+            my $refresh_token = $jconfig->{session}->param ('refresh_token');
+            my $access_token  = $jconfig->{session}->param ('access_token');
 
-    # Get our user agent.
-    my $ua = get_user_agent ($self_signed_cert);
+            # No tokens, lets skip as this can happen.
+            if (! defined ($refresh_token) || ! defined ($access_token)) {
+                return undef;
+            }
 
-    # Construct the logout endpoint.
-    my $logout_endpoint = $site . $logout_path;
+            # Optional fields.
+            my $self_signed_cert = $login_parameters{self_signed_cert};
 
-    # Create our outbound request and construct our data.
-    my $logout_request_data = {
-        refresh_token   => $refresh_token
-        , client_id     => $client_id
-        , client_secret => $client_secret
-    };
+            # Get our user agent.
+            my $ua = get_user_agent ($self_signed_cert);
 
-    # This type of endpoint is special. We have to include our access token as authorization to query this information.
-    # The LWP user agent is a bit weird with how this works for setting headers. Anything after the first parameter can be a header definition.
-    # This continues until the 'Content' property is detected at which point it is encoded as the post data.
-    my $logout_response = $ua->post ($logout_endpoint, 'Authorization' => "Bearer $access_token", Content => $logout_request_data);
+            # Construct the logout endpoint.
+            my $logout_endpoint = $site . $logout_path;
 
-    # We're looking for any sort of success here. Some may implement a code 200, others might just acknowledge our success with a 204.
-    # We're only going to have an issue if we don't have a success otherwise we're done here.
-    if (! $logout_response->is_success) {
-        # Attempt to extract an error message.
-        my $error_message;
-        eval {
-            my $logout_failure      = $logout_response->decoded_content;
-            my $logout_failure_json = JSON::XS::decode_json($logout_failure);
-            $error_message = $logout_failure_json->{error};
-        };
-        return ($error_message ? 'Logout Failed: ' . $error_message : 'Logout Failed: Unknown Error Occurred');
+            # Create our outbound request and construct our data.
+            my $logout_request_data = {
+                refresh_token   => $refresh_token
+                , client_id     => $client_id
+                , client_secret => $client_secret
+            };
+
+            # This type of endpoint is special. We have to include our access token as authorization to query this information.
+            # The LWP user agent is a bit weird with how this works for setting headers. Anything after the first parameter can be a header definition.
+            # This continues until the 'Content' property is detected at which point it is encoded as the post data.
+            my $logout_response = $ua->post ($logout_endpoint, 'Authorization' => "Bearer $access_token", Content => $logout_request_data);
+
+            # We're looking for any sort of success here. Some may implement a code 200, others might just acknowledge our success with a 204.
+            # We're only going to have an issue if we don't have a success otherwise we're done here.
+            if (! $logout_response->is_success) {
+                # Attempt to extract an error message.
+                my $error_message;
+                eval {
+                    my $logout_failure      = $logout_response->decoded_content;
+                    my $logout_failure_json = JSON::XS::decode_json($logout_failure);
+                    $error_message = $logout_failure_json->{error};
+                };
+                return ($error_message ? 'Logout Failed: ' . $error_message : 'Logout Failed: Unknown Error Occurred');
+            }
+        }
     }
 
     return undef;

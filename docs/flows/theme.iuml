@@ -1,0 +1,17 @@
+skinparam {
+    backgroundColor white
+}
+
+skinparam sequence {
+    arrowColor #222222
+
+    participantBorderColor #444444
+    participantBackgroundColor LightSteelBlue
+
+    sequenceArrowThickness 2
+    ActorBorderThickness 3
+
+    LifeLineBorderColor #666666
+    LifeLineBorderThickness 2
+    LifeLineBackgroundColor #666666
+}

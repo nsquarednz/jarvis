@@ -1,0 +1,33 @@
+@startuml
+
+    !include ../theme.iuml
+
+    title Public OAuth Flow
+
+    participant "Client Application"
+    participant "OAuth Authorization Endpoint"
+    participant "OAuth Token Endpoint"
+    participant "Jarvis"
+
+    "Client Application" -> "OAuth Authorization Endpoint": Redirects to authorization endpoint. Requests authorization code.
+    "Client Application" -> "OAuth Authorization Endpoint": User enters details. Confirming requested access.
+    "Client Application" <- "OAuth Authorization Endpoint": Returns authorization code.
+    |||
+    |||
+    "Client Application" -> "OAuth Token Endpoint": Requests access token providing authorization code, client ID.
+    "Client Application" <- "OAuth Token Endpoint": Returns access token and refresh token.
+    "Client Application" -> "Client Application": Updates internal access token and refresh token state.
+    |||
+    |||
+    "Client Application" -> "Jarvis": Requests secure data endpoint. Access token provided in Authorization header.
+    "Jarvis" -> "Jarvis": Validate provided token using service provider public key.
+    "Client Application" <- "Jarvis": Returns secure data.
+    |||
+    |||
+    alt Authorization Token Expires
+        "Client Application" -> "OAuth Token Endpoint": Requests new access token providing refresh token, client ID.
+        "Client Application" <- "OAuth Token Endpoint": Returns new access token and new refresh token.
+        "Client Application" -> "Client Application": Updates internal access token and refresh token state.
+    end
+
+@enduml

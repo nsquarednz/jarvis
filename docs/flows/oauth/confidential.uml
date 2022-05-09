@@ -1,0 +1,28 @@
+@startuml
+
+    !include ../theme.iuml
+
+    title Confidential OAuth Flow
+
+    participant "Client Application"
+    participant "OAuth Authorization Endpoint"
+    participant "Jarvis"
+    participant "OAuth Token Endpoint"
+
+    "Client Application" -> "OAuth Authorization Endpoint": Redirects to auth endpoint. Requests authorization code.
+    "Client Application" -> "OAuth Authorization Endpoint": User enters details. Confirming requested access.
+    "Client Application" <- "OAuth Authorization Endpoint": Returns authorization code.
+    |||
+    |||
+    "Client Application" -> "Jarvis": Passes authorization code to login endpoint.
+    "Jarvis" -> "OAuth Token Endpoint": Requests access token providing authorization code, client ID, client secret.
+    "Jarvis" <- "OAuth Token Endpoint": Returns access token, refresh token and Id token.
+    "Jarvis" -> "Jarvis": Decode tokens.
+    "Jarvis" -> "OAuth Token Endpoint": Request extended access token information.
+    "Jarvis" <- "OAuth Token Endpoint": Returns extended access token.
+    "Jarvis" -> "Jarvis": Decode extended access token.
+    "Jarvis" -> "Jarvis": Parse groups and permissions.
+    "Jarvis" -> "Jarvis": Store session information.
+    "Client Application" <- "Jarvis": Returns session cookie.
+
+@enduml
