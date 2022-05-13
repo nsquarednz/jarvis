@@ -648,11 +648,10 @@ sub Jarvis::Login::OAuth2::refresh {
                     Jarvis::Login::check ($jconfig);
                 }
             } else {
-                # No auth header?
-                # Set a 401 state.
-                $jconfig->{status} = "401 Unauthorized";
+                # No auth header? No longer a valid session. Trigger a logout to remove all state associated with what may have been a previous token.
+                Jarvis::Login::logout ($jconfig);
                 # Return an error.
-                die ("No Authorization Header Provided\n");
+                return "No Authroziation Header Provided";
             }
 
         } elsif ($access_type eq 'confidential') {
