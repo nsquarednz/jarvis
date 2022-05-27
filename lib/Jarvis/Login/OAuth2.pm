@@ -617,7 +617,7 @@ sub Jarvis::Login::OAuth2::refresh {
         if ($access_type eq 'public') {
 
             # Check if we were provided an Authorization header.
-            my $authorization_header = ($jconfig->{cgi}->https () ? $jconfig->{cgi}->https ('Authorization') : $jconfig->{cgi}->http ('Authorization'));
+            my $authorization_header = $ENV{HTTP_AUTHORIZATION};
 
             # No auth header present anymore and we have a valid session? Terminate.
             if ($authorization_header) {
