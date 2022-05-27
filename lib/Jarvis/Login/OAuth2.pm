@@ -553,7 +553,8 @@ sub Jarvis::Login::OAuth2::check {
         # We expect the access token passed to us with every request via an authorization bearer header.
         #
         if ($access_type eq 'public') {
-            return performPublicAuth ($jconfig, %login_parameters);
+            my $auth_result = performPublicAuth ($jconfig, %login_parameters);
+	    return defined $auth_result ? $auth_result : ("", "", undef);
 
         #
         # The confidential OAuth flow is were we are passed an authorization code by the client and we handle the key exchange ourselves
@@ -561,7 +562,8 @@ sub Jarvis::Login::OAuth2::check {
         # to load our service. We update this only periodically and store all the information in our CGI session.
         #
         } elsif ($access_type eq 'confidential') {
-            return performConfidentialAuth ($jconfig, %login_parameters);
+            my $auth_result = performConfidentialAuth ($jconfig, %login_parameters);
+	    return defined $auth_result ? $auth_result : ("", "", undef);
 
         } else {
             die ("OAuth2 Module Unsupported Access Type: '$access_type'");
