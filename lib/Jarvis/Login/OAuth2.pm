@@ -237,9 +237,7 @@ sub performPublicAuth {
     my ($jconfig, %login_parameters) = @_;
 
     # Check if we were provided an Authorization header.
-    my $authorization_header = ($jconfig->{cgi}->https () ? $jconfig->{cgi}->https ('Authorization') : $jconfig->{cgi}->http ('Authorization'));
-
-    # No auth header. Then likely just a blank request to __status.
+    my $authorization_header = $ENV{HTTP_AUTHORIZATION};
     if ($authorization_header) {
 
         # Get required fields for pulling apart the JWT token.
@@ -256,7 +254,7 @@ sub performPublicAuth {
         # We need information from the header which is normally not parsed and returned so lets do it ourselves.
         my $header;
         eval {
-            $header = JSON::XS::decode_json (decode_base64 ($header_segment))
+            $header = JSON::XS::decode_json (decode_base64 ($header_segment));
         };
         if ($@) {
             die "Failed to decode Authorization Token Header: $@\n";
@@ -322,6 +320,9 @@ sub performPublicAuth {
 
         # Finally return our successful login indicator to our calling module providing the user name and groups we got back.
         return ("", $username, $user_groups);
+    } else {
+	# No idea if we're logged in or not. Return all blanks.
+        return ("", "", "");
     }
 }
 
@@ -457,6 +458,12 @@ sub performConfidentialAuth {
         } else {
             die ("Failed to contact token endpoint: [" . ($token_response->code ? $token_response->code : 500) . "] " . ($token_response->message ? $token_response->message : "") . "\n");
         }
+    } else {
+	# No idea if we're logged in or not. Return all blanks.
+	# Potentially this should error for the confidential flow?
+	# But I think this can be called on __status/__habitat which should
+	# not fail if not logged in
+        return ("", "", "");
     }
 }
 
@@ -553,8 +560,7 @@ sub Jarvis::Login::OAuth2::check {
         # We expect the access token passed to us with every request via an authorization bearer header.
         #
         if ($access_type eq 'public') {
-            my $auth_result = performPublicAuth ($jconfig, %login_parameters);
-	    return defined $auth_result ? $auth_result : ("", "", undef);
+            return performPublicAuth ($jconfig, %login_parameters);
 
         #
         # The confidential OAuth flow is were we are passed an authorization code by the client and we handle the key exchange ourselves
@@ -562,8 +568,7 @@ sub Jarvis::Login::OAuth2::check {
         # to load our service. We update this only periodically and store all the information in our CGI session.
         #
         } elsif ($access_type eq 'confidential') {
-            my $auth_result = performConfidentialAuth ($jconfig, %login_parameters);
-	    return defined $auth_result ? $auth_result : ("", "", undef);
+            return performConfidentialAuth ($jconfig, %login_parameters);
 
         } else {
             die ("OAuth2 Module Unsupported Access Type: '$access_type'");
