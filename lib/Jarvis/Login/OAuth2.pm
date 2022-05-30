@@ -317,6 +317,8 @@ sub performPublicAuth {
         $jconfig->{session}->param ("token_expiry", $token_expiry);
         $jconfig->{session}->param ("current_auth_token_hash", $authorization_header_hash);
         $jconfig->{session}->param ('external_user_id', $external_user_id);
+        # Store the item from our user name key on the session. This maps to what will be our user principle.
+        $jconfig->{session}->param ('external_user_principle', $username);
 
         # Finally return our successful login indicator to our calling module providing the user name and groups we got back.
         return ("", $username, $user_groups);
