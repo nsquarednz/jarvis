@@ -54,6 +54,8 @@ RUN \
             apache2 libapache2-mod-fcgid \
             # A sane text editor.
             nano \
+            # Another sane text editor.
+            vim \
             # Tools required for getting and installing GPG keys.
             gnupg wget \
     && \
