@@ -52,6 +52,18 @@ sub find {
 
     $jconfig || die;
 
+    # Check we have a base path part.
+    my $base_part = $$path_parts[0];
+    if (! defined ($base_part) || ! length ($base_part)) {
+        die "Missing base URI part.";
+    }
+
+    # Check for special "system" paths.  No rest args either.
+    if (substr ($base_part, 0, 2) eq '__') {
+        &Jarvis::Error::debug ($jconfig, "Special system dataset '%s'.", $base_part);
+        return ($base_part, {}, "array");
+    }
+
     # Copy numbered rest args into a hash.
     my %numbered_rest_args = ();
     foreach my $i (0 .. $#$path_parts) {
@@ -163,9 +175,8 @@ sub find {
         die "Request URI does not match any configured <route>.";
 
     } else {
-        my $dataset_name = $$path_parts[0];
-        &Jarvis::Error::debug ($jconfig, "No route match (of %d routes).  Try using arg0 as dataset_name '%s'.", $nroutes, $dataset_name);
-        return ($dataset_name, \%numbered_rest_args, "array");
+        &Jarvis::Error::debug ($jconfig, "No route match (of %d routes).  Try using arg0 as dataset_name '%s'.", $nroutes, $base_part);
+        return ($base_part, \%numbered_rest_args, "array");
     }
 }
 
