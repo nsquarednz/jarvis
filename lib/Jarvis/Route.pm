@@ -165,9 +165,8 @@ sub find {
     } else {
         my $dataset_name = $$path_parts[0];
         &Jarvis::Error::debug ($jconfig, "No route match (of %d routes).  Try using arg0 as dataset_name '%s'.", $nroutes, $dataset_name);
+        return ($dataset_name, \%numbered_rest_args, "array");
     }
-
-    return ($dataset_name, \%numbered_rest_args, "array");
 }
 
 1;

@@ -174,7 +174,7 @@ sub new {
     #
     # DEFAULT = When one or more <route> is defined, then the non-route /<dataset>/ interpretation does NOT get applied.
     #
-    $self->{dataset_route} = defined ($Jarvis::Config::yes_value {lc ($axml->{text_errors} // "no")});
+    $self->{dataset_route} = defined ($Jarvis::Config::yes_value {lc ($axml->{dataset_route} // "no")});
 
     # This is an optional METHOD overide parameter, similar to Ruby on Rails.
     # It bypasses a problem where non-proxied Flex can only send GET/POST requests.
