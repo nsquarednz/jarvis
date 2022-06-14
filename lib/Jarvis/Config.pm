@@ -166,9 +166,15 @@ sub new {
     # This is used for backwards compatibility with old Jarvis versions.
     $self->{return_json_as_text} = defined ($Jarvis::Config::yes_value {lc ($axml->{return_json_as_text} // "no")});
 
-    # This says to use text errors instead of numeric REST-style codes.
-    # For now, this is the default behavior.  In future we will change this.
-    $self->{text_errors} = defined ($Jarvis::Config::yes_value {lc ($axml->{text_errors} // "yes")});
+    # Dataset fallback.
+    #
+    # IF: One or more <route> element is defined in the Jarvis config (and/or the <include> files)
+    # AND: no <route> in that element matches the requested path    
+    # THEN: This flag determines if the URI should or should not be parsed as /<dataset>/... in the same way as when <routes> is not present.
+    #
+    # DEFAULT = When one or more <route> is defined, then the non-route /<dataset>/ interpretation does NOT get applied.
+    #
+    $self->{dataset_route} = defined ($Jarvis::Config::yes_value {lc ($axml->{text_errors} // "no")});
 
     # This is an optional METHOD overide parameter, similar to Ruby on Rails.
     # It bypasses a problem where non-proxied Flex can only send GET/POST requests.

@@ -64,6 +64,7 @@ sub find {
 
         # Process the 'route' entries across the main jarvis file AND THEN any <include> files.
         foreach my $axml ($jconfig->{xml}->findnodes ('./jarvis/app'), @{$jconfig->{iaxmls}}) {
+
             # Look for the first router element in each XML configuration, and check that it has at least one route defined.
             my $rxml = $axml->find ('./router')->pop ();
             if ($rxml && $rxml->exists ('./route')) {
@@ -92,6 +93,8 @@ sub find {
     }
 
     # Find the first matching route.
+    my $nroutes = scalar (@{ $jconfig->{routes} });
+
     foreach my $route (@{ $jconfig->{routes} }) {
         &Jarvis::Error::dump ($jconfig, "Try Match Route: '%s'.", $route->{path});
 
@@ -154,8 +157,15 @@ sub find {
     }
 
     # Default logic, use arg0 as the dataset name, and no named args.
-    my $dataset_name = $$path_parts[0];
-    &Jarvis::Error::debug ($jconfig, "No route match.  Using arg0 as dataset_name '%s'.", $dataset_name);
+    if ($nroutes && ! $jconfig->{dataset_route}) {
+        &Jarvis::Error::debug ($jconfig, "No route match (of %d routes).  Config 'dataset_route' is NO.  Do NOT try arg0 as dataset_name.", $nroutes);
+        $jconfig->{status} = '400 Bad Request';
+        die "Request URI does not match any configured <route>.";
+
+    } else {
+        my $dataset_name = $$path_parts[0];
+        &Jarvis::Error::debug ($jconfig, "No route match (of %d routes).  Try using arg0 as dataset_name '%s'.", $nroutes, $dataset_name);
+    }
 
     return ($dataset_name, \%numbered_rest_args, "array");
 }

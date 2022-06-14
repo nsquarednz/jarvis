@@ -212,7 +212,7 @@ sub load_dsxml {
 
     # Check it exists.
     if (! -f $dsxml_filename) {
-        $jconfig->{status} = '404 Not Found';
+        $jconfig->{status} = '400 Bad Request';
         die "No such DSXML file '$dataset_name.xml' for application '" . $jconfig->{app_name} . "'.\n";
     }
 
