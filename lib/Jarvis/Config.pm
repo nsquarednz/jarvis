@@ -55,8 +55,8 @@ $XML::LibXML::Error::WARNINGS = 1;
 # Params:
 #       $app_name   - MANDATORY arg
 #       %args       - Hash of optional args.
-#           $args{'cgi'}                CGI object.  We will use new CGI; by defaul.
-#           $args{'etc_dir'}            We will use "<cgi-bin>/../etc" by default.
+#           $args{cgi}                CGI object.  We will use new CGI; by defaul.
+#           $args{etc_dir}            We will use "<cgi-bin>/../etc" by default.
 #
 # Returns:
 #       Jarvis::Config object
@@ -82,28 +82,28 @@ sub new {
     # Check our parameters for correctness.  Note that jarvis.pl has already
     # validated this, but other callers might not have, so we re-validate.
     #
-    $self->{'app_name'} = $app_name || die "Missing parameter 'app_name'\n";
-    ($self->{'app_name'} =~ m/^[\w\-]+$/) || die "Invalid characters in parameter 'app_name'.\n";
+    $self->{app_name} = $app_name // die "Missing parameter 'app_name'\n";
+    ($self->{app_name} =~ m/^[\w\-]+$/) or die "Invalid characters in parameter 'app_name'.\n";
 
     # We'll need a CGI handle.
-    $self->{'cgi'} = $args{'cgi'} || new CGI;
+    $self->{cgi} = $args{cgi} // new CGI;
 
     # We also store the mod_perl IO object, if we get it
-    $self->{'mod_perl_io'} = $args{'mod_perl_io'} || undef;
+    $self->{mod_perl_io} = $args{mod_perl_io};
 
     # Directory for a bunch of later config.
-    $self->{'etc_dir'} = $args{'etc_dir'} || "../etc" || die "Missing parameter 'etc_dir'\n";
-    (-d $self->{'etc_dir'}) || die "Parameter 'etc_dir' does not specify a directory.\n";
+    $self->{etc_dir} = $args{etc_dir} // "../etc";
+    (-d $self->{etc_dir}) or die "Parameter 'etc_dir' does not specify a directory.\n";
 
     # Setup http headers
-    $self->{'http_headers'} = {};
+    $self->{http_headers} = {};
 
     ###############################################################################
     # Load our global configuration.
     ###############################################################################
     #
     # Process the global XML config file.
-    my $xml_filename = $self->{'etc_dir'} . "/" . $self->{'app_name'} . ".xml";
+    my $xml_filename = $self->{etc_dir} . "/" . $self->{app_name} . ".xml";
 
     # Attempt to read our XML configuration file.
     my $xml;
@@ -124,10 +124,10 @@ sub new {
     }
 
     # Sanity check the XML structure.
-    $xml->exists ('./jarvis') || die "Missing <jarvis> tag in '$xml_filename'!\n";
+    $xml->exists ('./jarvis') or die "Missing <jarvis> tag in '$xml_filename'!\n";
 
     # Store the XML refernce, most of our configuration reading happens in classes that call this module.
-    $self->{'xml'} = $xml;
+    $self->{xml} = $xml;
 
     ###############################################################################
     # Get the application config.
@@ -135,67 +135,77 @@ sub new {
     ###############################################################################
     #
     # We MUST have an entry for this application in our config.
-    $xml->exists ('./jarvis/app') || die "Cannot find <jarvis><app> in '" . $self->{'app_name'} . ".xml'!\n";
+    $xml->exists ('./jarvis/app') or die "Cannot find <jarvis><app> in '" . $self->{app_name} . ".xml'!\n";
     my $axml = $xml->findnodes ('./jarvis/app')->pop ();
 
     # Defines if we should produce debug and/or dump output.  Dump implies debug.
-    $self->{'dump'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'dump'} || "no")});
-    $self->{'debug'} = $self->{'dump'} || defined ($Jarvis::Config::yes_value {lc ($axml->{'debug'} || "no")});
+    $self->{dump} = defined ($Jarvis::Config::yes_value {lc ($axml->{dump} // "no")});
+    $self->{debug} = $self->{dump} // defined ($Jarvis::Config::yes_value {lc ($axml->{debug} // "no")});
 
     # Set binmode on STDERR because folks could want to send us UTF-8 content, and
     # debug (or even log) could raise "Wide character in print" errors.
     binmode STDERR, ":utf8";
 
     # This is used by both debug and log output.
-    $self->{'log_format'} = $axml->{'log_format'} || '[%P/%A/%U/%D][%R] %M';
+    $self->{log_format} = $axml->{log_format} // '[%P/%A/%U/%D][%R] %M';
 
     # This is what format we use when sending death messages back to the client
-    $self->{'error_response_format'} = $axml->{'error_response_format'} || '[%T][%R] %M';
+    $self->{error_response_format} = $axml->{error_response_format} // '[%T][%R] %M';
 
     # This is used by several things, so let's store it in our config.
-    $self->{'format'} = lc ($self->{'cgi'}->param ('format') || $axml->{'format'} || "json");
+    $self->{format} = lc ($self->{cgi}->param ('format') // $axml->{format} // "json");
 
     # This controls whether we discard null fields on return.
     #
     #   default is "on" for JSON.
     #   default is "off" for everything else.
     #
-    my $default_retain_null = ($self->{'format'} eq "json") ? "yes" : "no";
-    $self->{'retain_null'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'retain_null'} || $default_retain_null)});
+    my $default_retain_null = ($self->{format} eq "json") ? "yes" : "no";
+    $self->{retain_null} = defined ($Jarvis::Config::yes_value {lc ($axml->{retain_null} // $default_retain_null)});
 
     # This is used for backwards compatibility with old Jarvis versions.
-    $self->{'return_json_as_text'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'return_json_as_text'} || "no")});
+    $self->{return_json_as_text} = defined ($Jarvis::Config::yes_value {lc ($axml->{return_json_as_text} // "no")});
+
+    # Dataset fallback.
+    #
+    # IF: One or more <route> element is defined in the Jarvis config (and/or the <include> files)
+    # AND: no <route> in that element matches the requested path    
+    # THEN: This flag determines if the URI should or should not be parsed as /<dataset>/... in the same way as when <routes> is not present.
+    #
+    # DEFAULT = When one or more <route> is defined, then the non-route /<dataset>/ interpretation does NOT get applied.
+    #
+    $self->{dataset_route} = defined ($Jarvis::Config::yes_value {lc ($axml->{dataset_route} // "no")});
 
     # This is an optional METHOD overide parameter, similar to Ruby on Rails.
     # It bypasses a problem where non-proxied Flex can only send GET/POST requests.
-    $self->{'method_param'} = $self->{'cgi'}->param ('method_param') || "_method";
+    $self->{method_param} = $self->{cgi}->param ('method_param') // "_method";
 
     # Load settings for CSRF protection. Enabled flag, cookie name and header name.
-    $self->{'csrf_protection'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'csrf_protection'} || "no")});
-    $self->{'csrf_cookie'} = uc ($axml->{'csrf_cookie'} || "XSRF-TOKEN");
-    $self->{'csrf_header'} = uc ($axml->{'csrf_header'} || "X-XSRF-TOKEN");
+    $self->{csrf_protection} = defined ($Jarvis::Config::yes_value {lc ($axml->{csrf_protection} // "no")});
+    $self->{csrf_cookie} = uc ($axml->{csrf_cookie} // "XSRF-TOKEN");
+    $self->{csrf_header} = uc ($axml->{csrf_header} // "X-XSRF-TOKEN");
 
     # Check if cross origin protection is enabled. All incoming requests will have their referer or origin compared to the host configuration.
-    $self->{'cross_origin_protection'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'cross_origin_protection'} || "no")});
+    $self->{cross_origin_protection} = defined ($Jarvis::Config::yes_value {lc ($axml->{cross_origin_protection} // "no")});
 
     # Check if XSRF protection is enabled. All JSON requests will be prefixed with ")]}',\n"
-    $self->{'xsrf_protection'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'xsrf_protection'} || "no")});
+    $self->{xsrf_protection} = defined ($Jarvis::Config::yes_value {lc ($axml->{xsrf_protection} // "no")});
 
     # Pull out the list of default (Perl) library paths to use for perl plugins scripts
     # from the configuration, and store in an array in the config item.
-    $self->{'default_libs'} = [];
+    $self->{default_libs} = [];
     if ($axml->exists ('./default_libs/lib')) {
         foreach my $lib ($axml->findnodes ('./default_libs/lib')) {
-            &Jarvis::Error::debug ($self, "Default Lib Path: " . ($lib->{'path'} || 'UNDEFINED'));
-            if ($lib->{'path'}) {
-                push (@{ $self->{'default_libs'} }, $lib->{'path'});
+            &Jarvis::Error::debug ($self, "Default Lib Path: " . ($lib->{path} // 'UNDEFINED'));
+            if ($lib->{path}) {
+                push (@{ $self->{default_libs} }, $lib->{path});
             }
         }
     }
 
     # Basic security check here.
-    $self->{'require_https'} = defined ($Jarvis::Config::yes_value {lc ($axml->{'require_https'} || "no")});
-    if ($self->{'require_https'} && ! $self->{'cgi'}->https()) {
+    $self->{require_https} = defined ($Jarvis::Config::yes_value {lc ($axml->{require_https} // "no")});
+    if ($self->{require_https} && ! $self->{cgi}->https()) {
         die "Client must access over HTTPS for this application.\n";
     }
 
@@ -204,7 +214,7 @@ sub new {
     # intended for additional information, e.g. extended login returned results.
     ###############################################################################
     my %additional_safe = ();
-    $self->{'additional_safe'} = \%additional_safe;
+    $self->{additional_safe} = \%additional_safe;
 
     ###############################################################################
     # Get any included files that will contain extra config
@@ -368,14 +378,14 @@ sub xml_yes_no {
 sub default_parameters {
     my ($jconfig) = @_;
 
-    $jconfig || die;
+    $jconfig or die;
 
     my %default_parameters = ();
 
-    my $pxml = $jconfig->{'xml'}->find ('./jarvis/app/default_parameters')->pop ();
+    my $pxml = $jconfig->{xml}->find ('./jarvis/app/default_parameters')->pop ();
     if ($pxml && $pxml->exists ('./parameter')) {
         foreach my $parameter ($pxml->findnodes ('./parameter')) {
-            $default_parameters {$parameter->{'name'}} = $parameter->{'value'};
+            $default_parameters {$parameter->{name}} = $parameter->{value};
         }
     }
     return %default_parameters;
@@ -441,21 +451,21 @@ sub safe_variables {
     # Our secure variables.  Note that __username and __group_list are null if
     # the user hasn't logged in
     #
-    $safe_params{"__username"} = $jconfig->{'username'};
-    $safe_params{"__group_list"} = $jconfig->{'group_list'};
+    $safe_params{"__username"} = $jconfig->{username};
+    $safe_params{"__group_list"} = $jconfig->{group_list};
     &Jarvis::Error::debug ($jconfig, "Secure Arg: __username => " . $safe_params{"__username"});
     &Jarvis::Error::debug ($jconfig, "Secure Arg: __group_list => " . $safe_params{"__group_list"});
 
     # And our separate groups.
-    foreach my $group (split (',', $jconfig->{'group_list'})) {
+    foreach my $group (split (',', $jconfig->{group_list})) {
         $safe_params{"__group:$group"} = 1;
         &Jarvis::Error::debug ($jconfig, "Secure Arg: __group:$group => 1");
     }
 
     # Finally, any additional safe parameters that might have been added by
     # login modules or other site-specific hooks.
-    foreach my $name (keys %{ $jconfig->{'additional_safe'} }) {
-        my $value = $jconfig->{'additional_safe'}{$name};
+    foreach my $name (keys %{ $jconfig->{additional_safe} }) {
+        my $value = $jconfig->{additional_safe}{$name};
         $safe_params {$name} = $value;
         &Jarvis::Error::debug ($jconfig, "Secure Arg: $name => " . (defined $value ? "'$value'" : "NULL"));
     }
@@ -496,8 +506,8 @@ sub add_http_headers {
     my @keys = keys %{ $header };
 
     for my $key (@keys) {
-        $jconfig->{'http_headers'}->{$key} = $header->{$key};
-        &Jarvis::Error::debug ($jconfig,"Adding header $key = " . ($header->{$key} || '') );
+        $jconfig->{http_headers}->{$key} = $header->{$key};
+        &Jarvis::Error::debug ($jconfig,"Adding header $key = " . ($header->{$key} // '') );
     }
 }
 

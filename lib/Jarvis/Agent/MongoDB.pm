@@ -385,13 +385,13 @@ sub expand_vars {
         }
     }
 
-    &Jarvis::Error::debug ($jconfig, "Before copy/elide:");
-    &Jarvis::Error::debug_var ($jconfig, $object);
+    &Jarvis::Error::dump ($jconfig, "Before copy/elide:");
+    &Jarvis::Error::dump_var ($jconfig, $object);
 
     my $copy = &copy_and_elide ($jconfig, $object);
 
-    &Jarvis::Error::debug ($jconfig, "After copy/elide:");
-    &Jarvis::Error::debug_var ($jconfig, $copy);
+    &Jarvis::Error::dump ($jconfig, "After copy/elide:");
+    &Jarvis::Error::dump_var ($jconfig, $copy);
 
     # Never return \undef, that's not nice to do.
     if ((ref ($copy) eq 'SCALAR') && (! defined $$copy)) {

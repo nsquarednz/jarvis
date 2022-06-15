@@ -493,11 +493,15 @@ sub statement_execute {
                 # Handle JSON encoded values. We need to take the requested argument which is
                 # expected to be a HASH reference and encode it as JSON we can use.
                 if (defined $flags->{json}) {
-                    eval {
-                        $$args[$i] = JSON::encode_json ($$args[$i]);
-                    };
-                    if ($@) {
-                        die "Failed to encode JSON bind value: $@\n";
+                    my $json_str = $$args[$i];
+
+                    if (defined $json_str) {
+                        eval {
+                            $$args[$i] = JSON::encode_json ($json_str);
+                        };
+                        if ($@) {
+                            die "Failed to encode JSON bind value: $@\n";
+                        }
                     }
                 }
             }

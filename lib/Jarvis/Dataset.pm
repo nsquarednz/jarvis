@@ -212,7 +212,7 @@ sub load_dsxml {
 
     # Check it exists.
     if (! -f $dsxml_filename) {
-        $jconfig->{status} = '404 Not Found';
+        $jconfig->{status} = '400 Bad Request';
         die "No such DSXML file '$dataset_name.xml' for application '" . $jconfig->{app_name} . "'.\n";
     }
 
@@ -379,6 +379,7 @@ sub names_to_values {
 #           <select> ...
 #
 # Options are:
+#       word2html - Convert common MS Word special characters into HTML equivalent.
 #       trim - Leading and trailing whitespace is removed.
 #       null - All whitespace/empty strings are converted to NULL/absent.
 #       notnull - All NULL strings are converted to ''.
@@ -422,7 +423,7 @@ sub transform {
         }
     }
 
-    # Any undef values will be converted to whitespace.
+    # Any undef values will be converted to the empty string.
     if ($$transforms_href{notnull}) {
         foreach my $key (keys %$vals_href) {
             (defined $$vals_href{$key}) || ($$vals_href{$key} = '');
@@ -893,8 +894,9 @@ sub fetch_rows {
     my $num_fetched = scalar @$rows_aref;
     $extra_href->{fetched} = $num_fetched;
 
-    &Jarvis::Error::debug ($jconfig, "Fetch Result:");
-    &Jarvis::Error::debug_var ($jconfig, $rows_aref);
+    # These datasets can be large, and many Jarvis sites have debug enabled.  So use "dump".
+    &Jarvis::Error::dump ($jconfig, "Fetch Result:");
+    &Jarvis::Error::dump_var ($jconfig, $rows_aref);
     &Jarvis::Error::debug ($jconfig, "Number of rows fetched = $num_fetched.");
 
     # Do we want to do server side sorting?  This happens BEFORE paging.  Note that this
@@ -956,8 +958,9 @@ sub fetch_rows {
         }
     }
 
-    &Jarvis::Error::debug ($jconfig, "Fetch Result (after transformations):");
-    &Jarvis::Error::debug_var ($jconfig, $rows_aref);
+    # These datasets can be large, and many Jarvis sites have debug enabled.  So use "dump".
+    &Jarvis::Error::dump ($jconfig, "Fetch Result (after transformations):");
+    &Jarvis::Error::dump_var ($jconfig, $rows_aref);
 
     ###########################################################################
     # DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED
