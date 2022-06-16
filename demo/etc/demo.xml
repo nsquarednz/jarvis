@@ -3,7 +3,7 @@
     <include file="/usr/share/jarvis/demo/etc/include1.xml"/>
     <include file="/usr/share/jarvis/demo/etc/include2.xml"/>
 
-    <app format="json" debug="yes" dump="no" return_json_as_text="yes" dataset_route="yes">
+    <app format="json" debug="yes" dump="no" dataset_route="yes">
         <!-- This is where our <dataset>.xml are all stored -->
 	    <dataset_dir>/usr/share/jarvis/demo/dataset</dataset_dir>
 

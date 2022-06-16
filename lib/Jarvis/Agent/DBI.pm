@@ -34,6 +34,7 @@ use parent qw(Jarvis::Agent);
 
 use DBI qw(:sql_types);
 use JSON;
+use boolean;
 use Data::Dumper;
 
 use Jarvis::Text;
@@ -676,6 +677,119 @@ sub fetch_inner {
         $column_names_aref = \@column_names;
     }
 
+    # See if we can get type information?
+    if (($jconfig->{format} ne 'json') && ($jconfig->{format} ne 'json.array') && ($jconfig->{format} ne 'json.rest')) {
+        &Jarvis::Error::debug ($jconfig, 'Format is not "json".  Do not use extended JSON types.');
+
+    } elsif ($jconfig->{json_string_only}) {
+        &Jarvis::Error::debug ($jconfig, 'JSON proper types are disabled by explicit configuration.');
+
+    } elsif (! $column_names_aref) {
+        &Jarvis::Error::debug ($jconfig, 'Could not get column names.  Cannot apply JSON proper types.');
+
+    } else {
+        # Silly old SQLite returns types as names, not as proper type codes.
+        #
+        if ($dbh->{Driver}{Name} eq 'SQLite') {
+
+            # There is nothing we can really do for SQLite.
+            # 
+            # Yes, it does return column types via $stm->{sth}{TYPE}.  However there is no useful action.
+            # 
+            #   INTEGER - SQLite DBD already seems to return these as SV and hence they are integers in JSON.
+            #   BOOLEAN - SQLite does not support a proper boolean type.
+            #   JSON    - SQLite does not support any complex object storage.
+            #  
+            # Hence it's a waste of CPU trying to do anything more.
+            #
+            # If you DO decide to do something here, note that:
+            #  a) the SQLite types returned are STRING names, not the standard SQL_BOOLEAN constants.
+            #  b) the SQLite types returned seem to be mixed case (maybe they retain the case specified at creation time).
+            #
+            &Jarvis::Error::debug ($jconfig, 'Not performing type conversion for SQLite.  There is nothing we can usefully do.');
+
+        # All other DB types, do our best with the SQL constants.
+        } elsif ($dbh->{Driver}{Name} eq 'Pg') {
+
+            # Use the PostgreSQL type list.  It has extra fields like JSON in it.
+            my $column_types_aref = $stm->{sth}{pg_type};
+            if ($column_types_aref) {
+                &Jarvis::Error::debug ($jconfig, 'Checking for JSON proper type conversion (Other - %s).', $dbh->{Driver}{Name});
+
+                foreach my $i (0 .. $#$column_names_aref) {
+                    my $name = $$column_names_aref[$i];
+                    my $type = $$column_types_aref[$i];
+
+                    &Jarvis::Error::dump ($jconfig, 'Column name [%s] has type [%s].', $name, $type);
+
+                    next if (! defined ($name) || ! defined ($type));
+                    print STDERR "COLUMN: $name $type\n";
+
+                    # NOTE: We don't bother doing INTEGER.  
+                    # The DBD::Pg driver already return IV or NV scalars which JSON correctly detects as numbers not strings.
+                    #
+                    # But BOOLEAN.  Yes.  We can do something useful with booleans.
+                    if ($type eq 'bool') {
+                        &Jarvis::Error::debug ($jconfig, 'Converting column [%s] to BOOLEAN.');
+                        foreach my $row (@$rows_aref) {
+                            if (defined ($row->{$name})) {
+                                $row->{$name} = $row->{$name} ? JSON::true : JSON::false;
+                            }
+                        }
+
+                    # Oh yeah, Baby.  This is what we live for.
+                    } elsif ($type eq 'json') {
+                        &Jarvis::Error::debug ($jconfig, 'Converting column [%s] to JSON.');
+                        foreach my $row (@$rows_aref) {
+                            if (defined ($row->{$name})) {
+                                $row->{$name} = JSON::decode_json ($row->{$name});
+                            }
+                        }
+                    }
+                }
+            }
+
+        # All other DB types, do our best with the SQL constants.
+        } else {
+
+            # This is the only TYPE list we can trust.
+            my $column_types_aref = $stm->{sth}{TYPE};
+            if ($column_types_aref) {
+                &Jarvis::Error::debug ($jconfig, 'Checking for JSON proper type conversion (Other - %s).', $dbh->{Driver}{Name});
+
+                foreach my $i (0 .. $#$column_names_aref) {
+                    my $name = $$column_names_aref[$i];
+                    my $type = $$column_types_aref[$i];
+
+                    &Jarvis::Error::dump ($jconfig, 'Column name [%s] has type [%s].', $name, $type);
+
+                    next if (! defined ($name) || ! defined ($type));
+                    print STDERR "COLUMN: $name $type\n";
+
+                    # This might or might not be required.  Many drivers already return IV or NV scalars which JSON correctly detects as numbers not strings.
+                    if ($type eq SQL_NUMERIC) {
+                        &Jarvis::Error::debug ($jconfig, 'Converting column [%s] to NUMERIC.');
+                        foreach my $row (@$rows_aref) {
+                            if (defined ($row->{$name})) {
+                                $row->{$name} = $row->{$name} * 1;
+                            }
+                        }
+
+                    } elsif ($type eq SQL_BOOLEAN) {
+                        &Jarvis::Error::debug ($jconfig, 'Converting column [%s] to BOOLEAN.');
+                        foreach my $row (@$rows_aref) {
+                            if (defined ($row->{$name})) {
+                                $row->{$name} = $row->{$name} ? JSON::true : JSON::false;
+                            }
+                        }
+
+                    }
+                }
+            }
+        }
+
+    }
+
     # Finish the statement handle.
     $stm->{sth}->finish;
 
@@ -823,7 +937,7 @@ sub store_inner {
                     &Jarvis::Error::log ($jconfig, "Used SQLite last_insert_rowid but it returned no id.");
                 }
 
-            # Otherwise: See if the query had a built-in fetch.  Under PostGreSQL (and very
+            # Otherwise: See if the query had a built-in fetch.  Under PostgreSQL (and very
             # likely also under other drivers) this will fail if there is no current
             # query.  I.e. if you have no "RETURNING" clause on your insert.
             #

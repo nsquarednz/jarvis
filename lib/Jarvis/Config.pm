@@ -163,8 +163,12 @@ sub new {
     my $default_retain_null = ($self->{format} eq "json") ? "yes" : "no";
     $self->{retain_null} = defined ($Jarvis::Config::yes_value {lc ($axml->{retain_null} // $default_retain_null)});
 
-    # This is used for backwards compatibility with old Jarvis versions.
+    # TODO: Remove this entirely.
     $self->{return_json_as_text} = defined ($Jarvis::Config::yes_value {lc ($axml->{return_json_as_text} // "no")});
+    $self->{return_json_as_text} and die "Flag 'return_json_as_text' is no longer supported.";
+
+    # This disables the return of boolean/integer/JSON database typs as actual JSON boolean types (rather than string representations).
+    $self->{json_string_only} = defined ($Jarvis::Config::yes_value {lc ($axml->{json_string_only} // "no")});
 
     # Dataset fallback.
     #

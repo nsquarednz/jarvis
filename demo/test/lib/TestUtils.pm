@@ -22,8 +22,7 @@ my %passwords = ("admin" => "admin", "guest" => "guest");
 
 my $JSON_SENT_MIME_TYPE = "application/json";
 
-#my $JSON_RETURNED_MIME_TYPE = "application/json";
-my $JSON_RETURNED_MIME_TYPE = "text/plain";
+my $JSON_RETURNED_MIME_TYPE = "application/json";
 
 # This user agent will perform all our tests.
 my $ua = LWP::UserAgent->new;

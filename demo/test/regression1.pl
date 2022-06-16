@@ -7,6 +7,7 @@ use warnings;
 
 use lib "./lib";
 
+use B qw( svref_2object SVf_IOK );
 use Test::More;
 use Test::Differences;
 use Data::Dumper;
@@ -213,6 +214,13 @@ $expected = [ {
     'id' => $en_boat_id,
     'description' => ''
 } ];
+
+# Check the ID is actually an integer.
+my $sv = svref_2object (\$json->{data}[0]{id});
+if (! ok ($sv->FLAGS & SVf_IOK, "Fetched boat[0].id is IV.")) {
+    BAIL_OUT("Fetched boat[0].id is not IV: " . &Dumper ($json));
+}
+
 if (! eq_or_diff ($json->{data}, $expected, 'JSON Duplicated Fetch matches.')) {
     BAIL_OUT("Unexpected Duplicated Fetch result: " . &Dumper ($json));
 }
