@@ -24,10 +24,11 @@
 use strict;
 use warnings;
 
+package Jarvis::Status;
+
 use JSON;
 use XML::LibXML;
-
-package Jarvis::Status;
+use Data::Dumper;
 
 use Jarvis::Text;
 use Jarvis::Error;
@@ -85,6 +86,12 @@ sub report {
 
         # Set attributes on the root response object.
         foreach my $key (keys %fields) {
+
+            # We do not support setting of null fields (e.g. via xsi:nil), nor of non-SCALAR values.
+            next if ! defined ($fields{$key});
+            next if ref ($fields{$key});
+
+            # Only for simple SCALARs do we set the attribute here.
             $response_node->setAttribute ($key, $fields{$key});
         }
 

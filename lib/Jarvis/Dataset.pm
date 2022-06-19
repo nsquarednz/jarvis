@@ -56,6 +56,11 @@ my $AGENT_CLASSES = {
     'mongo' => 'Jarvis::Agent::MongoDB',
 };
 
+# Type hints which the caller may use to indicate the appropriate JSON encoding.
+our $TYPE_BOOLEAN = 'boolean';
+our $TYPE_JSON = 'json';
+our $TYPE_NUMERIC = 'numeric';
+
 ###############################################################################
 # Internal Functions
 ###############################################################################
@@ -372,63 +377,114 @@ sub names_to_values {
 }
 
 ################################################################################
-# Perform some optional server-side data transforms.  These are configured
-# by e.g.
-#       <dataset>
-#           <transform store="trim,null" fetch="notnull" />
-#           <select> ...
-#
-# Options are:
-#       word2html - Convert common MS Word special characters into HTML equivalent.
-#       trim - Leading and trailing whitespace is removed.
-#       null - All whitespace/empty strings are converted to NULL/absent.
-#       notnull - All NULL strings are converted to ''.
+# Convert Boolean and JSON into the real JSON types.
 #
 # Params:
-#       $transforms_href - Hash of 'enabled-option' -> 1
+#       $column_types_href - Map of TYPE_NUMERIC, etc.
 #       $vals_href - Hash of key -> value to transform
 #
 # Returns:
 #       1
 ################################################################################
-#
-sub transform {
-    my ($transforms_href, $vals_href) = @_;
+sub convert_types {
+    my ($column_types_href, $vals_href) = @_;
 
-    # Convert MS Word characters into their HTML equivalent.  This will stop
-    # Our XML from attempting to encode them in base64.
-    if ($$transforms_href{word2html}) {
-        foreach my $key (keys %$vals_href) {
-            next if ! defined $$vals_href{$key};
-            $$vals_href{$key} = &word2html ($$vals_href{$key});
-        }
-    }
+    foreach my $key (keys %$vals_href) {
+        if (defined ($vals_href->{$key})) {
+            if ($column_types_href && (my $type = $column_types_href->{$key})) {
+                if ($type eq $TYPE_BOOLEAN) {
+                    $vals_href->{$key} = $vals_href->{$key} ? JSON::true : JSON::false;
 
-    # Trim leading and trailing space off any defined value.
-    if ($$transforms_href{trim}) {
-        foreach my $key (keys %$vals_href) {
-            next if ! defined $$vals_href{$key};
-            $$vals_href{$key} = &trim ($$vals_href{$key});
-        }
-    }
+                } if ($type eq $TYPE_JSON) {
+                    $vals_href->{$key} = JSON::decode_json ($vals_href->{$key});
 
-    # Convert any whitespace values into undef.  Later, all undef values
-    # will be omitted from the final results in JSON and XML format.
-    if ($$transforms_href{null}) {
-        foreach my $key (keys %$vals_href) {
-            next if ! defined $$vals_href{$key};
-            if ($$vals_href{$key} =~ m/^\s*$/) {
-                $$vals_href{$key} = undef;
+                # Actually we're NOT going to do this, since all of the DBD drivers seem to do this for us automatically.
+                } if ($type eq $TYPE_NUMERIC) {
+                    #$vals_href->{$key} = $vals_href->{$key} * 1;
+                }
             }
         }
     }
 
-    # Any undef values will be converted to the empty string.
-    if ($$transforms_href{notnull}) {
-        foreach my $key (keys %$vals_href) {
-            (defined $$vals_href{$key}) || ($$vals_href{$key} = '');
+    return 1;
+}
+
+################################################################################
+# Perform some optional server-side data transforms for fetching/storing. 
+# These are configured by e.g.
+#       <dataset>
+#           <transform store="trim,null" fetch="notnull" />
+#           <select> ...
+#
+# Params:
+#       $transforms_href - Hash of 'enabled-option' -> 1
+#           word2html - Convert common MS Word special characters into HTML equivalent.
+#           trim - Leading and trailing whitespace is removed.
+#           null - All whitespace/empty strings are converted to NULL/absent.
+#           notnull - All NULL strings are converted to ''.
+#
+#       $vals_href - Hash of key -> value to transform
+#
+# Returns:
+#       1
+################################################################################
+sub transform {
+    my ($transforms_href, $vals_href) = @_;
+
+    foreach my $key (keys %$vals_href) {
+        if (defined ($vals_href->{$key})) {
+
+            # Any Boolean or JSON type, do NOT try and transform!
+            next if ref ($vals_href->{$key});
+
+            # Convert MS Word characters into their HTML equivalent.  This will stop
+            # Our XML from attempting to encode them in base64.
+            if ($transforms_href->{word2html}) {
+                $vals_href->{$key} = &word2html ($vals_href->{$key});
+            }
+
+            # Trim leading and trailing space off any defined value.
+            if ($transforms_href->{trim}) {
+                $vals_href->{$key} = &trim ($vals_href->{$key});
+            }
+
+            # Convert any whitespace values into undef.
+            if ($transforms_href->{null}) {
+                if (! length ($vals_href->{$key})) {
+                    $vals_href->{$key} = undef;
+                }
+            }
+
+        } else {
+
+            # Any undef values will be converted to the empty string.
+            if ($transforms_href->{notnull}) {
+                $vals_href->{$key} = '';
+            }
         }
     }
+
+    return 1;
+}
+
+################################################################################
+# Optionally remove nulls.
+#
+# Params:
+#       $vals_href - Hash of key -> value to remove nulls
+#
+# Returns:
+#       1
+################################################################################
+sub remove_nulls {
+    my ($vals_href) = @_;
+
+    foreach my $key (keys %$vals_href) {
+        if (! defined ($vals_href->{$key})) {
+            delete $vals_href->{$key};
+        }
+    }
+
     return 1;
 }
 
@@ -638,7 +694,7 @@ sub fetch {
 
         # Now print the data.
         foreach my $row (@$rows_aref) {
-            my @columns = map { $$row{$_} } @$column_names_aref;
+            my @columns = map { $row->{$_} } @$column_names_aref;
             $csv->print ($io, \@columns);
             print $io "\n";
         }
@@ -680,7 +736,7 @@ sub fetch {
         my $row_num = 1;
         foreach my $row (@$rows_aref) {
             $col = 0;
-            my @columns = map { $$row{$_} } @$column_names_aref;
+            my @columns = map { $row->{$_} } @$column_names_aref;
             foreach my $value (@columns) {
                 if (defined $value){
                     # When writing data to the Excel spreadsheet there are a number of limitations.
@@ -882,10 +938,10 @@ sub fetch_rows {
 
     # Now fetch the tuples.
     my $fetch_innert_start = [gettimeofday];
-    my ($rows_aref, $column_names_aref);
+    my ($rows_aref, $column_names_aref, $column_types_href);
     {
         no strict 'refs';
-        ($rows_aref, $column_names_aref) = $agent_class->fetch_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%safe_params);
+        ($rows_aref, $column_names_aref, $column_types_href) = $agent_class->fetch_inner ($jconfig, $dataset_name, $dsxml, $dbh, \%safe_params);
     }
 
     &Jarvis::Error::debug ($jconfig, '[Timing] Completed Fetch Inner in: %fs', tv_interval ($fetch_innert_start));
@@ -951,43 +1007,31 @@ sub fetch_rows {
     my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->findvalue ('./dataset/transform/@fetch'));
     &Jarvis::Error::debug ($jconfig, "Fetch transformations = " . join (', ', keys %transforms) . " (applied to returned results)");
 
+    # Add this globally-configured transform too.
+    $transforms{retain_null} = $jconfig->{retain_null};
+
     # Apply any output transformations to remaining hashes.
+    # We do this AFTER paging, because we don't want to waste CPU on rows that we are going to discard.
+    #
+    if ($column_types_href && ($jconfig->{format} =~ m/^json/) && ! $jconfig->{json_string_only}) {
+        foreach my $row (@$rows_aref) {
+            &Jarvis::Dataset::convert_types ($column_types_href, $row);
+        }
+    }
     if (scalar (keys %transforms)) {
         foreach my $row (@$rows_aref) {
             &Jarvis::Dataset::transform (\%transforms, $row);
         }
     }
+    if (! $jconfig->{retain_null}) {
+        foreach my $row (@$rows_aref) {
+            &Jarvis::Dataset::remove_nulls ($row);
+        }        
+    }
 
     # These datasets can be large, and many Jarvis sites have debug enabled.  So use "dump".
     &Jarvis::Error::dump ($jconfig, "Fetch Result (after transformations):");
     &Jarvis::Error::dump_var ($jconfig, $rows_aref);
-
-    ###########################################################################
-    # DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED DOCUMENTED
-    # -- These features are officially documented, remember to
-    # -- update the documentation if you change/extend then.
-    ###########################################################################
-    #
-    # If the retain null flag has been set then we do not want to remove undef values from the return array.
-    # This will allow us to have null values in our JSON object.
-    #
-    if (! $jconfig->{'retain_null'}) {
-        # Delete null (undef) values, otherwise JSON/XML will represent them as ''.
-        #
-        # Note that this must happen AFTER the transform step, for two reasons:
-        # (a) any preceding "notnull" transform (if specified for "fetch" on
-        #     this dataset) will have turned NULLs into "" by this stage, meaning that
-        #     we won't be deleting them here.
-        #
-        # (b) any preceding "null" transform will have set whitespace values to
-        #     undef, meaning that we will now delete them here.
-        #
-        foreach my $row (@$rows_aref) {
-            foreach my $key (keys %$row) {
-                (defined $$row{$key}) || delete $$row{$key};
-            }
-        }
-    }
 
     # Now do we have any child datasets?
     if ($dsxml->exists ('./dataset/child')) {
@@ -1440,7 +1484,7 @@ sub store_rows {
         # Re-do our parameter merge, this time including our per-row parameters.
         my %safe_params = &Jarvis::Config::safe_variables ($jconfig, \%safe_all_rows_params, $user_args, $fields_href);
 
-        # Any input transformations?
+        # Any input transformations?  This uses the "transform" which always retains NULL params.
         if (scalar (keys %transforms)) {
             &Jarvis::Dataset::transform (\%transforms, \%safe_params);
         }
@@ -1458,10 +1502,12 @@ sub store_rows {
         # Hand off to agent for the actual store (assuming it supports it).
         # This also perform our "returning" logic (if applicable).
         my $row_result = undef;
+        my $returning_types_href = undef;
+
         my $store_inner_start = [gettimeofday];
         {
             no strict 'refs';
-            $row_result = $agent_class->store_inner ($jconfig, $dataset_name, $dsxml, $dbh, $stms, $row_ttype, \%safe_params, $fields_href);
+            ($row_result, $returning_types_href) = $agent_class->store_inner ($jconfig, $dataset_name, $dsxml, $dbh, $stms, $row_ttype, \%safe_params, $fields_href);
         }
         &Jarvis::Error::debug ($jconfig, '[Timing] Completed Store Inner in: %fs', tv_interval ($store_inner_start));
 
@@ -1473,6 +1519,13 @@ sub store_rows {
 
             # This is DBD::Sybase string cleanup.
             $message =~ s/^Server message number=[0-9]+ severity=[0-9]+ state=[0-9]+ line=[0-9]+ server=[A-Z0-9\\]+text=//i;
+        }
+
+        # Convert returning types to Boolean or JSON.
+        if ($returning_types_href && ($jconfig->{format} =~ m/^json/) && ! $jconfig->{json_string_only} && $row_result->{returning}) {
+            foreach my $row (@{ $row_result->{returning} }) {
+                &Jarvis::Dataset::convert_types ($returning_types_href, $row);
+            }
         }
 
         # Store the results, even if they are not successful.

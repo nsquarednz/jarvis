@@ -32,17 +32,16 @@ package Jarvis::Agent::DBI;
 
 use parent qw(Jarvis::Agent);
 
+use sort 'stable';      # Don't mix up records when server-side sorting
+
 use DBI qw(:sql_types);
 use JSON;
-use boolean;
 use Data::Dumper;
 
 use Jarvis::Text;
 use Jarvis::Error;
 use Jarvis::DB;
 use Jarvis::Hook;
-
-use sort 'stable';      # Don't mix up records when server-side sorting
 
 ################################################################################
 # Get the SQL for the update, insert, and delete or whatever.
@@ -103,7 +102,6 @@ sub get_sql {
 ################################################################################
 #
 sub sql_with_substitutions {
-
     my ($jconfig, $dbh, $sql, $args_href) = @_;
 
     # Dump the available arguments at this stage.
@@ -289,7 +287,6 @@ sub parse_attr {
 #
 #       Or undef if no SQL.
 ################################################################################
-#
 sub parse_statement {
     my ($jconfig, $dataset_name, $dsxml, $dbh, $ttype, $args_href) = @_;
 
@@ -586,6 +583,118 @@ sub statement_execute {
 }
 
 ################################################################################
+# Loads the data for the current dataset(s), and puts it into our return data
+# array so that it can be presented to the client in JSON or XML or whatever.
+#
+# This function only processes a single dataset.  The parent method may invoke
+# us multiple times for a single request, and combine into a single return
+# object.
+#
+# Params:
+#       $jconfig - Jarvis::Config object
+#       $column_names_aref - Array of tuple column names, if available.
+#       $dbh - Database handle of the correct type to match the dataset.
+#       $sth - Statement handle which has just performed a "fetch" statement.
+#
+# Returns:
+#       $column_types_href - Hash mapping column name -> $TYPE_*. 
+################################################################################
+sub get_column_types {
+    my ($jconfig, $column_names_aref, $dbh, $sth) = @_;
+
+    # This may not necessaryily work.
+    if (! $column_names_aref) {
+        &Jarvis::Error::debug ($jconfig, 'No column names.  Cannot apply JSON proper types.');
+        return undef;
+    }
+
+    # We're going to try and determine useful types (for JSON conversion).
+    my $column_types_href = {};
+
+    # Silly old SQLite returns types as names, not as proper type codes.
+    #
+    if ($dbh->{Driver}{Name} eq 'SQLite') {
+
+        # Note that:
+        #
+        #  a) the SQLite types returned are STRING names, not the standard SQL_BOOLEAN constants.
+        #  b) the SQLite types returned seem to be mixed case (maybe they retain the case specified at creation time).
+        #
+        my $column_types_aref = $sth->{TYPE};
+        if ($column_types_aref) {
+            &Jarvis::Error::debug ($jconfig, 'Checking for returned type conversion (SQLite).');
+
+            foreach my $i (0 .. $#$column_names_aref) {
+                my $name = $$column_names_aref[$i];
+                my $type = $$column_types_aref[$i];
+
+                &Jarvis::Error::dump ($jconfig, 'Column name [%s] has type [%s].', $name, $type);
+                if (lc ($type) eq 'integer') {
+                    &Jarvis::Error::debug ($jconfig, 'Detecting column [%s] as NUMERIC.');
+                    $column_types_href->{$name} = $Jarvis::Dataset::TYPE_NUMERIC;
+                }
+            }
+        }
+
+    # All other DB types, do our best with the SQL constants.
+    } elsif ($dbh->{Driver}{Name} eq 'Pg') {
+
+        # Use the PostgreSQL type list.  It has extra fields like JSON in it.
+        my $column_types_aref = $sth->{pg_type};
+        if ($column_types_aref) {
+            &Jarvis::Error::debug ($jconfig, 'Checking for returned type conversion (Pg).');
+
+            foreach my $i (0 .. $#$column_names_aref) {
+                my $name = $$column_names_aref[$i];
+                my $type = $$column_types_aref[$i];
+
+                &Jarvis::Error::dump ($jconfig, 'Column name [%s] has type [%s].', $name, $type);
+
+                if ($type eq 'int4') {
+                    &Jarvis::Error::debug ($jconfig, 'Detecting column [%s] as NUMERIC.');
+                    $column_types_href->{$name} = $Jarvis::Dataset::TYPE_NUMERIC;
+
+                } elsif ($type eq 'bool') {
+                    &Jarvis::Error::debug ($jconfig, 'Detecting column [%s] as BOOLEAN.');
+                    $column_types_href->{$name} = $Jarvis::Dataset::TYPE_BOOLEAN;
+
+                # Oh yeah, Baby.  This is what we live for.
+                } elsif ($type eq 'json') {
+                    &Jarvis::Error::debug ($jconfig, 'Detecting column [%s] as JSON.');
+                    $column_types_href->{$name} = $Jarvis::Dataset::TYPE_JSON;
+                }
+            }
+        }
+
+    # All other DB types, do our best with the SQL constants.
+    } else {
+
+        # This is the only TYPE list we can trust.
+        my $column_types_aref = $sth->{TYPE};
+        if ($column_types_aref) {
+            &Jarvis::Error::debug ($jconfig, 'Checking for returned type conversion (Other - %s).', $dbh->{Driver}{Name});
+
+            foreach my $i (0 .. $#$column_names_aref) {
+                my $name = $$column_names_aref[$i];
+                my $type = $$column_types_aref[$i];
+
+                &Jarvis::Error::dump ($jconfig, 'Column name [%s] has type [%s].', $name, $type);
+                if ($type eq SQL_NUMERIC) {
+                    &Jarvis::Error::debug ($jconfig, 'Detecting column [%s] as NUMERIC.');
+                    $column_types_href->{$name} = $Jarvis::Dataset::TYPE_NUMERIC;
+
+                } elsif ($type eq SQL_BOOLEAN) {
+                    &Jarvis::Error::debug ($jconfig, 'Detecting column [%s] as BOOLEAN.');
+                    $column_types_href->{$name} = $Jarvis::Dataset::TYPE_BOOLEAN;
+                }
+            }
+        }
+    }
+
+    return $column_types_href;
+}
+
+################################################################################
 # AGENT METHOD OVERRIDE
 ################################################################################
 
@@ -648,8 +757,8 @@ sub transaction_commit {
 # Returns:
 #       $rows_aref - Array of tuple data returned.
 #       $column_names_aref - Array of tuple column names, if available.
+#       $column_types_href - Hash mapping column name -> $TYPE_*. 
 ################################################################################
-#
 sub fetch_inner {
     my ($class, $jconfig, $dataset_name, $dsxml, $dbh, $safe_params) = @_;
 
@@ -678,122 +787,12 @@ sub fetch_inner {
     }
 
     # See if we can get type information?
-    if (($jconfig->{format} ne 'json') && ($jconfig->{format} ne 'json.array') && ($jconfig->{format} ne 'json.rest')) {
-        &Jarvis::Error::debug ($jconfig, 'Format is not "json".  Do not use extended JSON types.');
-
-    } elsif ($jconfig->{json_string_only}) {
-        &Jarvis::Error::debug ($jconfig, 'JSON proper types are disabled by explicit configuration.');
-
-    } elsif (! $column_names_aref) {
-        &Jarvis::Error::debug ($jconfig, 'Could not get column names.  Cannot apply JSON proper types.');
-
-    } else {
-        # Silly old SQLite returns types as names, not as proper type codes.
-        #
-        if ($dbh->{Driver}{Name} eq 'SQLite') {
-
-            # There is nothing we can really do for SQLite.
-            # 
-            # Yes, it does return column types via $stm->{sth}{TYPE}.  However there is no useful action.
-            # 
-            #   INTEGER - SQLite DBD already seems to return these as SV and hence they are integers in JSON.
-            #   BOOLEAN - SQLite does not support a proper boolean type.
-            #   JSON    - SQLite does not support any complex object storage.
-            #  
-            # Hence it's a waste of CPU trying to do anything more.
-            #
-            # If you DO decide to do something here, note that:
-            #  a) the SQLite types returned are STRING names, not the standard SQL_BOOLEAN constants.
-            #  b) the SQLite types returned seem to be mixed case (maybe they retain the case specified at creation time).
-            #
-            &Jarvis::Error::debug ($jconfig, 'Not performing type conversion for SQLite.  There is nothing we can usefully do.');
-
-        # All other DB types, do our best with the SQL constants.
-        } elsif ($dbh->{Driver}{Name} eq 'Pg') {
-
-            # Use the PostgreSQL type list.  It has extra fields like JSON in it.
-            my $column_types_aref = $stm->{sth}{pg_type};
-            if ($column_types_aref) {
-                &Jarvis::Error::debug ($jconfig, 'Checking for JSON proper type conversion (Other - %s).', $dbh->{Driver}{Name});
-
-                foreach my $i (0 .. $#$column_names_aref) {
-                    my $name = $$column_names_aref[$i];
-                    my $type = $$column_types_aref[$i];
-
-                    &Jarvis::Error::dump ($jconfig, 'Column name [%s] has type [%s].', $name, $type);
-
-                    next if (! defined ($name) || ! defined ($type));
-                    print STDERR "COLUMN: $name $type\n";
-
-                    # NOTE: We don't bother doing INTEGER.  
-                    # The DBD::Pg driver already return IV or NV scalars which JSON correctly detects as numbers not strings.
-                    #
-                    # But BOOLEAN.  Yes.  We can do something useful with booleans.
-                    if ($type eq 'bool') {
-                        &Jarvis::Error::debug ($jconfig, 'Converting column [%s] to BOOLEAN.');
-                        foreach my $row (@$rows_aref) {
-                            if (defined ($row->{$name})) {
-                                $row->{$name} = $row->{$name} ? JSON::true : JSON::false;
-                            }
-                        }
-
-                    # Oh yeah, Baby.  This is what we live for.
-                    } elsif ($type eq 'json') {
-                        &Jarvis::Error::debug ($jconfig, 'Converting column [%s] to JSON.');
-                        foreach my $row (@$rows_aref) {
-                            if (defined ($row->{$name})) {
-                                $row->{$name} = JSON::decode_json ($row->{$name});
-                            }
-                        }
-                    }
-                }
-            }
-
-        # All other DB types, do our best with the SQL constants.
-        } else {
-
-            # This is the only TYPE list we can trust.
-            my $column_types_aref = $stm->{sth}{TYPE};
-            if ($column_types_aref) {
-                &Jarvis::Error::debug ($jconfig, 'Checking for JSON proper type conversion (Other - %s).', $dbh->{Driver}{Name});
-
-                foreach my $i (0 .. $#$column_names_aref) {
-                    my $name = $$column_names_aref[$i];
-                    my $type = $$column_types_aref[$i];
-
-                    &Jarvis::Error::dump ($jconfig, 'Column name [%s] has type [%s].', $name, $type);
-
-                    next if (! defined ($name) || ! defined ($type));
-                    print STDERR "COLUMN: $name $type\n";
-
-                    # This might or might not be required.  Many drivers already return IV or NV scalars which JSON correctly detects as numbers not strings.
-                    if ($type eq SQL_NUMERIC) {
-                        &Jarvis::Error::debug ($jconfig, 'Converting column [%s] to NUMERIC.');
-                        foreach my $row (@$rows_aref) {
-                            if (defined ($row->{$name})) {
-                                $row->{$name} = $row->{$name} * 1;
-                            }
-                        }
-
-                    } elsif ($type eq SQL_BOOLEAN) {
-                        &Jarvis::Error::debug ($jconfig, 'Converting column [%s] to BOOLEAN.');
-                        foreach my $row (@$rows_aref) {
-                            if (defined ($row->{$name})) {
-                                $row->{$name} = $row->{$name} ? JSON::true : JSON::false;
-                            }
-                        }
-
-                    }
-                }
-            }
-        }
-
-    }
+    my $column_types_href = &get_column_types ($jconfig, $column_names_aref, $dbh, $stm->{sth});
 
     # Finish the statement handle.
     $stm->{sth}->finish;
 
-    return ($rows_aref, $column_names_aref);
+    return ($rows_aref, $column_names_aref, $column_types_href);
 }
 
 ################################################################################
@@ -882,6 +881,7 @@ sub store_inner {
 
     # Execute
     my $row_result = {};
+    my $returning_types = undef;
 
     &statement_execute ($jconfig, $stm, \@arg_values);
     $row_result->{modified} = $stm->{retval} || 0;
@@ -962,10 +962,17 @@ sub store_inner {
                         $stm->{error} = $error_message;
                         $row_result->{success} = 0;
                         $row_result->{message} = $error_message;
+
+                    # Successful returning?  See if we can get type information?
+                    } else {
+                        my $column_names_aref = $stm->{sth}{NAME};
+                        $returning_types = &get_column_types ($jconfig, $column_names_aref, $dbh, $stm->{sth});
                     }
 
                     $row_result->{returning} = $returning_aref;
                     &Jarvis::Error::debug ($jconfig, "Fetched " . (scalar @$returning_aref) . " rows for returning.");
+
+                    # Now transform using the same behavior as for fetch.
                 }
 
                 # When using output parameters from a SQL Server stored procedure, there is a
@@ -998,6 +1005,7 @@ sub store_inner {
 
                         if (&nolog ($stm, $error_message)) {
                             &Jarvis::Error::debug ($jconfig, "Failure fetching additional result sets. Log disabled.");
+
                         } else {
                             &Jarvis::Error::log ($jconfig, "Failure fetching additional result sets for '" . $stm->{ttype} . "'.  Details follow.");
                             &Jarvis::Error::log ($jconfig, $stm->{sql_with_substitutions}) if $stm->{sql_with_substitutions};
@@ -1022,7 +1030,7 @@ sub store_inner {
 
     }
 
-    return $row_result;
+    return ($row_result, $returning_types);
 }
 
 ################################################################################
