@@ -33,6 +33,7 @@ use parent qw(Jarvis::Agent);
 use boolean;
 use Data::Dumper;
 use BSON::Types ':all';
+use MongoDB::OID;
 
 use Jarvis::Text;
 use Jarvis::Error;
@@ -44,6 +45,13 @@ use sort 'stable';      # Don't mix up records when server-side sorting
 use DateTime;
 
 use Jarvis::JSON::Utils;
+
+################################################################################
+# GLOBAL VARIABLES
+################################################################################
+
+my $MONGODB_OID = undef;
+my $BSON_OID = undef;
 
 ################################################################################
 # Reads a JSON object and finds/checks the ~varname!flag~ variable components.
@@ -209,9 +217,12 @@ sub mongo_to_perl {
     } elsif (ref ($var) eq 'boolean') {
         return $var ? \1 : \0;
 
-    } elsif (ref ($var) eq 'MongoDB::OID') {
-
+    } elsif (ref ($var) eq 'BSON::OID') {
         return $var->value;
+        
+    } elsif (ref ($var) eq 'MongoDB::OID') {
+        return $var->value;
+
     } elsif (ref ($var) eq 'BSON::Decimal128') {
         return $var->value;
 
@@ -285,6 +296,24 @@ sub expand_vars {
     # Merge the resulting hash with the original hash to maintain the object structure for variables that require it.
     $values = { %$values, %$compacted_values };
 
+    # Determine if we use BSON::OID (new class name) or MongoDB::OID (old class name).
+    if (! defined ($BSON_OID)) {
+        $BSON_OID = 0;
+        eval {
+            BSON::OID->new (value => 0);
+            $BSON_OID = 1;
+        };
+
+        if (! $BSON_OID) {
+            $MONGODB_OID = 0;
+            eval {
+                MongoDB::OID->new (value => 0);
+                $MONGODB_OID = 1;
+            };
+            $MONGODB_OID or die "Cannot find BSON::OID nor MongoDB::OID.";
+        }
+    }
+
     foreach my $var (@$vars) {
         &Jarvis::Error::debug ($jconfig, "Variable: %s [%s].", join ('|', @{ $var->{names} }), join (",", sort (keys (%{ $var->{flags} }))));
         &Jarvis::Error::debug_var ($jconfig, $values);
@@ -300,6 +329,7 @@ sub expand_vars {
                 $$vref = $value;
                 $matched = 1;
                 last;
+
             } else {
                 &Jarvis::Error::debug ($jconfig, "No Value for '%s'.", $name);
             }
@@ -343,7 +373,10 @@ sub expand_vars {
         # MongoDB::OID is used to replace string GUIID Object IDs. An "undef" is not translated.
         if ($flags->{oid} && $matched && defined ($$vref)) {
             &Jarvis::Error::debug ($jconfig, "Applying OID replacement.");
-            $$vref = MongoDB::OID->new (value => $$vref);
+            {
+                no warnings 'deprecated';
+                $$vref = $BSON_OID ? BSON::OID->new (oid => pack ('H*', $$vref)) : MongoDB::OID->new (value => $$vref);
+            }
         }
 
         # MongoDB::OID is used to replace string GUIID Object IDs. An "undef" is not translated.
@@ -352,7 +385,10 @@ sub expand_vars {
 
             # Iterate over each provided ID and convert it into a MongoDB::OID object.
             for (my $i = 0; $i < scalar @$$vref; $i++) {
-                @{$$vref}[$i] = MongoDB::OID->new (value => @{$$vref}[$i]);
+                {
+                    no warnings 'deprecated';
+                    @{$$vref}[$i] = $BSON_OID ? BSON::OID->new (oid => pack ('H*', @{$$vref}[$i])) : MongoDB::OID->new (value => @{$$vref}[$i]);
+                }
             }
         }
 

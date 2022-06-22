@@ -139,8 +139,8 @@ sub new {
     my $axml = $xml->findnodes ('./jarvis/app')->pop ();
 
     # Defines if we should produce debug and/or dump output.  Dump implies debug.
-    $self->{dump} = defined ($Jarvis::Config::yes_value {lc ($axml->{dump} // "no")});
-    $self->{debug} = $self->{dump} // defined ($Jarvis::Config::yes_value {lc ($axml->{debug} // "no")});
+    $self->{dump} = $Jarvis::Config::yes_value {lc ($axml->{dump} // "no")};
+    $self->{debug} = $self->{dump} || $Jarvis::Config::yes_value {lc ($axml->{debug} // "no")};
 
     # Set binmode on STDERR because folks could want to send us UTF-8 content, and
     # debug (or even log) could raise "Wide character in print" errors.
@@ -161,14 +161,14 @@ sub new {
     #   default is "off" for everything else.
     #
     my $default_retain_null = ($self->{format} eq "json") ? "yes" : "no";
-    $self->{retain_null} = defined ($Jarvis::Config::yes_value {lc ($axml->{retain_null} // $default_retain_null)});
+    $self->{retain_null} = $Jarvis::Config::yes_value {lc ($axml->{retain_null} // $default_retain_null)};
 
     # TODO: Remove this entirely.
-    $self->{return_json_as_text} = defined ($Jarvis::Config::yes_value {lc ($axml->{return_json_as_text} // "no")});
+    $self->{return_json_as_text} = $Jarvis::Config::yes_value {lc ($axml->{return_json_as_text} // "no")};
     $self->{return_json_as_text} and die "Flag 'return_json_as_text' is no longer supported.";
 
     # This disables the return of boolean/integer/JSON database typs as actual JSON boolean types (rather than string representations).
-    $self->{json_string_only} = defined ($Jarvis::Config::yes_value {lc ($axml->{json_string_only} // "no")});
+    $self->{json_string_only} = $Jarvis::Config::yes_value {lc ($axml->{json_string_only} // "no")};
 
     # Dataset fallback.
     #
@@ -178,22 +178,22 @@ sub new {
     #
     # DEFAULT = When one or more <route> is defined, then the non-route /<dataset>/ interpretation does NOT get applied.
     #
-    $self->{dataset_route} = defined ($Jarvis::Config::yes_value {lc ($axml->{dataset_route} // "no")});
+    $self->{dataset_route} = $Jarvis::Config::yes_value {lc ($axml->{dataset_route} // "no")};
 
     # This is an optional METHOD overide parameter, similar to Ruby on Rails.
     # It bypasses a problem where non-proxied Flex can only send GET/POST requests.
     $self->{method_param} = $self->{cgi}->param ('method_param') // "_method";
 
     # Load settings for CSRF protection. Enabled flag, cookie name and header name.
-    $self->{csrf_protection} = defined ($Jarvis::Config::yes_value {lc ($axml->{csrf_protection} // "no")});
+    $self->{csrf_protection} = $Jarvis::Config::yes_value {lc ($axml->{csrf_protection} // "no")};
     $self->{csrf_cookie} = uc ($axml->{csrf_cookie} // "XSRF-TOKEN");
     $self->{csrf_header} = uc ($axml->{csrf_header} // "X-XSRF-TOKEN");
 
     # Check if cross origin protection is enabled. All incoming requests will have their referer or origin compared to the host configuration.
-    $self->{cross_origin_protection} = defined ($Jarvis::Config::yes_value {lc ($axml->{cross_origin_protection} // "no")});
+    $self->{cross_origin_protection} = $Jarvis::Config::yes_value {lc ($axml->{cross_origin_protection} // "no")};
 
     # Check if XSRF protection is enabled. All JSON requests will be prefixed with ")]}',\n"
-    $self->{xsrf_protection} = defined ($Jarvis::Config::yes_value {lc ($axml->{xsrf_protection} // "no")});
+    $self->{xsrf_protection} = $Jarvis::Config::yes_value {lc ($axml->{xsrf_protection} // "no")};
 
     # Pull out the list of default (Perl) library paths to use for perl plugins scripts
     # from the configuration, and store in an array in the config item.
@@ -208,7 +208,7 @@ sub new {
     }
 
     # Basic security check here.
-    $self->{require_https} = defined ($Jarvis::Config::yes_value {lc ($axml->{require_https} // "no")});
+    $self->{require_https} = $Jarvis::Config::yes_value {lc ($axml->{require_https} // "no")};
     if ($self->{require_https} && ! $self->{cgi}->https()) {
         die "Client must access over HTTPS for this application.\n";
     }
@@ -362,7 +362,7 @@ sub xml_yes_no {
     my ($jconfig, $fxml, $default) = @_;
 
     if ($fxml) {
-        return (defined $Jarvis::Config::yes_value{ lc ($fxml) }) ? 1 : 0;
+        return $Jarvis::Config::yes_value{ lc ($fxml) } ? 1 : 0;
 
     } else {
         return $default ? 1 : 0;

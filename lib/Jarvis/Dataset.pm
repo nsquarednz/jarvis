@@ -1007,26 +1007,36 @@ sub fetch_rows {
     my %transforms = map { lc (&trim($_)) => 1 } split (',', $dsxml->findvalue ('./dataset/transform/@fetch'));
     &Jarvis::Error::debug ($jconfig, "Fetch transformations = " . join (', ', keys %transforms) . " (applied to returned results)");
 
-    # Add this globally-configured transform too.
-    $transforms{retain_null} = $jconfig->{retain_null};
-
     # Apply any output transformations to remaining hashes.
     # We do this AFTER paging, because we don't want to waste CPU on rows that we are going to discard.
     #
-    if ($column_types_href && ($jconfig->{format} =~ m/^json/) && ! $jconfig->{json_string_only}) {
-        foreach my $row (@$rows_aref) {
-            &Jarvis::Dataset::convert_types ($column_types_href, $row);
+    # NOTE: The $rows_aref is an ARRAY of HASH elements in EVERY case, EXCEPT for one!
+    #
+    # That exception is the "distinct" for MongoDB in which case the returned rows array is
+    # an ARRAY of simple scalars without the fieldname key.  
+    #
+    # Hence we need to do this ugly sniff-ahead to make sure that we're doing something sensible.
+    #
+    if (scalar (@$rows_aref) && ref ($$rows_aref[0])) {
+
+        # Add this globally-configured transform too.
+        $transforms{retain_null} = $jconfig->{retain_null};
+
+        if ($column_types_href && ($jconfig->{format} =~ m/^json/) && ! $jconfig->{json_string_only}) {
+            foreach my $row (@$rows_aref) {
+                &Jarvis::Dataset::convert_types ($column_types_href, $row);
+            }
         }
-    }
-    if (scalar (keys %transforms)) {
-        foreach my $row (@$rows_aref) {
-            &Jarvis::Dataset::transform (\%transforms, $row);
+        if (scalar (keys %transforms)) {
+            foreach my $row (@$rows_aref) {
+                &Jarvis::Dataset::transform (\%transforms, $row);
+            }
         }
-    }
-    if (! $jconfig->{retain_null}) {
-        foreach my $row (@$rows_aref) {
-            &Jarvis::Dataset::remove_nulls ($row);
-        }        
+        if (! $jconfig->{retain_null}) {
+            foreach my $row (@$rows_aref) {
+                &Jarvis::Dataset::remove_nulls ($row);
+            }        
+        }
     }
 
     # These datasets can be large, and many Jarvis sites have debug enabled.  So use "dump".

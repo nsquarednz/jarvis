@@ -78,7 +78,7 @@ sub find {
         foreach my $axml ($jconfig->{xml}->findnodes ('./jarvis/app'), @{$jconfig->{iaxmls}}) {
 
             # Look for the first router element in each XML configuration, and check that it has at least one route defined.
-            my $rxml = $axml->find ('./router')->pop ();
+            my $rxml = $axml->find ('./routes')->pop () // $axml->find ('./router')->pop ();
             if ($rxml && $rxml->exists ('./route')) {
                 foreach my $route ($rxml->findnodes ("./route")) {
                     # Sanity checks.

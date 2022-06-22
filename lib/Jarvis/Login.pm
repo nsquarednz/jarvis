@@ -201,8 +201,8 @@ sub check {
         eval {
             my $parsed_cgi_postdata = decode_json ($cgi_postdata);
             # If we have any of our expected login fields apply them against our existing parameters so we can continue our login.
-            $cgi_username = ($parsed_cgi_postdata->{username} ? $parsed_cgi_postdata->{username} : $cgi_username);
-            $cgi_password = ($parsed_cgi_postdata->{password} ? $parsed_cgi_postdata->{password} : $cgi_password);
+            $cgi_username = $parsed_cgi_postdata->{username} // $cgi_username;
+            $cgi_password = $parsed_cgi_postdata->{password} // $cgi_password;
         }
     }
 

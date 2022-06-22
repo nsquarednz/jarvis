@@ -186,7 +186,7 @@ if (! ok (defined $json->{returned} && defined $json->{fetched} && defined $json
     BAIL_OUT("Failed to fetch: " . &Dumper ($json));    
 }
 
-if (! eq_or_diff ($json->{data}, $expected, 'Updated Rows after Update Queen Mary matches.')) {
+if (! eq_or_diff ($json->{data}, $expected, 'Updated Rows after Deactivate Queen Mary matches.')) {
     BAIL_OUT("Unexpected Duplicated Fetch result: " . &Dumper ($json));    
 }
 
