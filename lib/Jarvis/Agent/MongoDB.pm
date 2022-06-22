@@ -314,7 +314,7 @@ sub expand_vars {
             $BSON_OID = 1;
         };
     }
-    if (! $BSON_OID) {
+    if (! defined $MONGODB_OID) {
         $MONGODB_OID = 0;
         eval {
             MongoDB::OID->new (value => 0);
