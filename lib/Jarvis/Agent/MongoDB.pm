@@ -50,18 +50,8 @@ use Jarvis::JSON::Utils;
 # GLOBAL VARIABLES
 ################################################################################
 
-# What do we support?
+# Do we support MongoDB::OID using the old "value" format?
 my $MONGODB_OID = undef;
-my $BSON_OID = undef;
-
-# Which do we prefer in the case where both are detected?  
-# 
-# Annoyingly, we cannot prefer BSON::OID, because 4.0.19 seems to have the BSON::OID class present, but fails on DB access with: 
-#   "type (BSON::OID) unhandled at /usr/lib/x86_64-linux-gnu/perl5/5.26/MongoDB/BSON.pm line 218.""
-#
-# So for now we have to prefer MongoDB.  Which means we need no warning 'deprecated' since it's deprecated on 4.4.15.
-#
-my $PREFER_MONGODB = 1;
 
 ################################################################################
 # Reads a JSON object and finds/checks the ~varname!flag~ variable components.
@@ -307,21 +297,15 @@ sub expand_vars {
     $values = { %$values, %$compacted_values };
 
     # Determine if we use BSON::OID (new class name) or MongoDB::OID (old class name).
-    if (! defined ($BSON_OID)) {
-        $BSON_OID = 0;
-        eval {
-            BSON::OID->new (value => 0);
-            $BSON_OID = 1;
-        };
-    }
     if (! defined $MONGODB_OID) {
         $MONGODB_OID = 0;
+
+        # This will fail with deprecation on a recent version of the MongoDB Perl module.
         eval {
             MongoDB::OID->new (value => 0);
             $MONGODB_OID = 1;
         };
     }
-    ($BSON_OID || $MONGODB_OID) or die "Cannot find BSON::OID nor MongoDB::OID.";
 
     foreach my $var (@$vars) {
         &Jarvis::Error::debug ($jconfig, "Variable: %s [%s].", join ('|', @{ $var->{names} }), join (",", sort (keys (%{ $var->{flags} }))));
@@ -382,15 +366,7 @@ sub expand_vars {
         # MongoDB::OID is used to replace string GUIID Object IDs. An "undef" is not translated.
         if ($flags->{oid} && $matched && defined ($$vref)) {
             &Jarvis::Error::debug ($jconfig, "Applying OID replacement.");
-            {
-                if ($PREFER_MONGODB) {
-                    no warnings 'deprecated';
-                    $$vref = $MONGODB_OID ? MongoDB::OID->new (value => $$vref) : BSON::OID->new (oid => pack ('H*', $$vref));
-
-                } else {
-                    $$vref = $BSON_OID ? BSON::OID->new (oid => pack ('H*', $$vref)) : MongoDB::OID->new (value => $$vref);
-                }
-            }
+            $$vref = $MONGODB_OID ? MongoDB::OID->new (value => $$vref) : BSON::OID->new (oid => pack ('H*', $$vref));
         }
 
         # MongoDB::OID is used to replace string GUIID Object IDs. An "undef" is not translated.
@@ -399,13 +375,7 @@ sub expand_vars {
 
             # Iterate over each provided ID and convert it into a MongoDB::OID object.
             for (my $i = 0; $i < scalar @$$vref; $i++) {
-                if ($PREFER_MONGODB) {
-                    no warnings 'deprecated';
-                    @{$$vref}[$i] = $MONGODB_OID ? MongoDB::OID->new (value => @{$$vref}[$i]) : BSON::OID->new (oid => pack ('H*', @{$$vref}[$i]));
-
-                } else {
-                    @{$$vref}[$i] = $BSON_OID ? BSON::OID->new (oid => pack ('H*', @{$$vref}[$i])) : MongoDB::OID->new (value => @{$$vref}[$i]);
-                }
+                @{$$vref}[$i] = $MONGODB_OID ? MongoDB::OID->new (value => @{$$vref}[$i]) : BSON::OID->new (oid => pack ('H*', @{$$vref}[$i]));
             }
         }
 
