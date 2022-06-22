@@ -301,10 +301,13 @@ sub expand_vars {
         $MONGODB_OID = 0;
 
         # This will fail with deprecation on a recent version of the MongoDB Perl module.
-        # eval {
+        eval {
             MongoDB::OID->new (value => 0);
             $MONGODB_OID = 1;
-        # };
+        };
+        if (defined ($@)) {
+            die "Failed testing MongoDB: $@";
+        }
     }
 
     foreach my $var (@$vars) {
