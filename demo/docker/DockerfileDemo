@@ -25,9 +25,12 @@ RUN \
 
 # Define the tasks that will be run when our container starts up.
 ENTRYPOINT \
+    # Sleep for a moment to allow everything to spin up.
+    echo "**** Waiting to allow for headless startup ****" \
+        && sleep 5 \
+    && \
     # Start our test scripts.
     echo "*** Executing Regression Tests ***" \
         && cd /jarvis/demo/test \
         && perl regression1.pl --base_url_override "http://jarvis:80/jarvis-agent/demo" \
         && perl regression2.pl --base_url_override "http://jarvis:80/jarvis-agent/demo"
-
