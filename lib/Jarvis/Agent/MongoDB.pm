@@ -300,14 +300,14 @@ sub expand_vars {
     if (! defined $MONGODB_OID) {
         $MONGODB_OID = 0;
 
-        # This will fail with deprecation on a recent version of the MongoDB Perl module.
+        # This will fail with deprecation on recent versions of the MongoDB Perl module.
         eval {
             # OID must be /\A[0-9a-f]{24}\z/;
             MongoDB::OID->new (value => '000000000000000000000000');
             $MONGODB_OID = 1;
         };
-        if (defined ($@)) {
-            die "Failed testing MongoDB: $@";
+        if ($@) {
+            &Jarvis::Error::debug ($jconfig, "Not happy with MongoDB::OID.  We will use BSON::OID (more modern) instead.");
         }
     }
 
