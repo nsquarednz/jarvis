@@ -241,9 +241,20 @@ sub performPublicAuth {
     if ($authorization_header) {
 
         # Get required fields for pulling apart the JWT token.
-        my $groups_key          = $login_parameters{groups_key}          || die ("OAuth2 module 'groups_key' must be defined for public access type.\n");
         my $username_key        = $login_parameters{username_key}        || die ("OAuth2 module 'username_key' must be defined for public access type.\n");
         my $user_identifier_key = $login_parameters{user_identifier_key} || die ("OAuth2 module 'user_identifier_key' must be defined for public access type.\n");
+
+        # Different auth mechanisms diverge from the standard groups mechanism defined by OAuth; we'll detect these here and handle them appropriatly.
+        my $groups_key;
+        my $groups_mode;
+        if ($login_parameters{groups_mode} && $login_parameters{groups_mode} eq 'salesforce') {
+            $groups_mode = 'salesforce';
+
+        } else {
+            # Otherwise fall back to the standard approach.
+            $groups_key  = $login_parameters{groups_key} || die ("OAuth2 module 'groups_key' must be defined for public access type.\n");
+            $groups_mode = 'standard';
+        }
 
         # Clear bearer information. We only want the key.
         $authorization_header =~ s/Bearer\s?//;
@@ -291,15 +302,44 @@ sub performPublicAuth {
         # First lets hash the auth token and store that. This will let us skip all the parsing steps if the token is still valid and hasn't changed.
         my $username = $decoded_authorization_token->{$username_key} || die ("Authroziation Token does not contain '$username_key' information.\n");
 
-        # Grab our user groups. This might be a string or an array or even undefined so lets be careful.
+        # Handle groups. This depends entirely on the groups mode.
         my $user_groups = '';
-        if (defined $groups_key && defined $decoded_authorization_token->{$groups_key}) {
-            if (ref $decoded_authorization_token->{$groups_key} eq 'ARRAY') {
-                $user_groups = join (',', @{$decoded_authorization_token->{$groups_key}});
+        if ($groups_mode eq 'standard') {
+            # Grab our user groups. This might be a string or an array or even undefined so lets be careful.
+            if (defined $groups_key && defined $decoded_authorization_token->{$groups_key}) {
+                if (ref $decoded_authorization_token->{$groups_key} eq 'ARRAY') {
+                    $user_groups = join (',', @{$decoded_authorization_token->{$groups_key}});
+
+                } else {
+                    $user_groups = $decoded_authorization_token->{$groups_key};
+                }
+            }
+
+        } elsif ($groups_mode eq 'salesforce') {
+            # Sales force has an interesting structure.
+            #
+            # "custom_attributes": {
+            #     "groups": "[\"auth_group\"]"
+            # },
+            #
+            # The groups are stored in nested objects and then serialised as a JSON string.
+            #
+            if (defined $decoded_authorization_token->{custom_attributes} && defined $decoded_authorization_token->{custom_attributes}{groups}) {
+                my $groups_json_string = $decoded_authorization_token->{custom_attributes}{groups};
+                eval {
+                    my $groups_json = decode_json ($groups_json_string);
+                    $user_groups = join (',', @{$groups_json});
+                };
+                if ($@) {
+                    die "Failed to parse non application/json Salesforce groups data: $@\n";
+                }
 
             } else {
-                $user_groups = $decoded_authorization_token->{$groups_key};
+                die ("OAuth2 module 'groups_mode' 'salesforce' token missing custom_attributes->groups key.\n");
             }
+
+        } else {
+            die ("OAuth2 module unknown 'groups_mode' '$groups_mode' defined for public access type.\n");
         }
 
         # Grab the expiry time of the token.
