@@ -680,26 +680,17 @@ sub Jarvis::Login::OAuth2::refresh {
                     } else {
                         # Lets be nice and dump some debug.
                         &Jarvis::Error::debug ($jconfig, "Refresh triggered for expired token for user: '$jconfig->{username}'");
-                        # Token has since expired. Clear the session data and return an error.
-                        Jarvis::Login::logout ($jconfig);
-                        $jconfig->{status} = "401 Unauthorized";
-                        # Return an error.
-                        die ("Session Expired");
+                        return "Session Expired";
                     }
 
                     # We have an existing session and the header hashes match. Nice and easy return undef nothing else to do here.
                     return undef;
                 } else {
                     # Got a new token? We need to perform the standard login validation logic for that new token.
-                    # Trigger a logout to remove all state associated with the previous token. We need to rebuild it.
-                    Jarvis::Login::logout ($jconfig);
-                    # Trigger a new login with the new token.
-                    Jarvis::Login::check ($jconfig);
+                    return Jarvis::Login::OAuth2::check ($jconfig);
                 }
             } else {
-                # No auth header? No longer a valid session. Trigger a logout to remove all state associated with what may have been a previous token.
-                Jarvis::Login::logout ($jconfig);
-                # Return an error.
+                # No auth header? Return an error code to the calling parent. Not a valid session.
                 return "No Authroziation Header Provided";
             }
 
