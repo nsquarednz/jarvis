@@ -687,7 +687,7 @@ sub Jarvis::Login::OAuth2::refresh {
                     return undef;
                 } else {
                     # Got a new token? We need to perform the standard login validation logic for that new token.
-                    return Jarvis::Login::OAuth2::check ($jconfig);
+                    return Jarvis::Login::OAuth2::check ($jconfig, %login_parameters);
                 }
             } else {
                 # No auth header? Return an error code to the calling parent. Not a valid session.
