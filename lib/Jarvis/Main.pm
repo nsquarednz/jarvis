@@ -414,8 +414,7 @@ sub do {
 
         if ($name =~ /\[\]$/) {
             my $user_arg  = substr($name, 0, -2);
-            $user_args->{$user_arg} = $user_args->{$user_arg} // [];
-            push @{$user_args->{$user_arg}}, $cgi_params->{$name};
+            $user_args->{$user_arg} = [ split(m{\0}, $cgi_params->{$name}) ];
         } else {
             $user_args->{$name} = $cgi_params->{$name};
         }
