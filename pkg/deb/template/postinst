@@ -49,6 +49,17 @@ case "$1" in
             a2enmod cgi
         fi
 
+        # Install clean sessions systemd script.
+        if [ -d /usr/lib/systemd/system/ ]; then
+            echo "Installing Clean Sessions as a service"
+            cp /usr/share/jarvis/etc/systemd/clean_sessions.service /usr/lib/systemd/system/
+            cp /usr/share/jarvis/etc/systemd/clean_sessions.timer   /usr/lib/systemd/system/
+            echo "Update service configuration as required and start via: systemctl start clean_sessions.timer"
+            echo "Can be permanently enabled with: systemctl enable clean_sessions.timer"
+        else
+            echo "No systemd. NOT installing Clean Sessions as a service."
+        fi
+
 	# Don't restart apache.  It's not nice.
         # [ -x `which apache2ctl` ] && apache2ctl restart
 	echo "Apache requires a restart for changes to take effect."

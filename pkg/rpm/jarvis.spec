@@ -17,7 +17,7 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 %global __requires_exclude perl\\(
 
 #BuildRequires:
-Requires: httpd perl(CGI) perl(CGI::Session) perl(CGI::Cookie) perl(HTTP::Cookies) perl(MIME::Types) perl(DBI) perl(JSON) perl(XML::LibXML) perl(Digest::MD5) perl(Time::HiRes) perl(Module::Load)
+Requires: httpd perl(CGI) perl(CGI::Session) perl(CGI::Cookie) perl(HTTP::Cookies) perl(MIME::Types) perl(DBI) perl(JSON) perl(XML::LibXML) perl(Digest::MD5) perl(Time::HiRes) perl(Module::Load) perl(File::Find::Rule)
 
 %description
 Jarvis is "helper glue". It is designed to bridge the gap between your
@@ -76,6 +76,18 @@ fi
 if [ ! -d /etc/%{name} ]; then
     cp -r /usr/share/%{name}/etc/jarvis /etc/%{name}
     echo "Created /etc/%{name}"
+fi
+
+# Install clean sessions systemd script.
+if [ -d /usr/lib/systemd/system/ ]; then
+    echo "Installing Clean Sessions as a service"
+    cp /usr/share/jarvis/etc/systemd/clean_sessions.service /usr/lib/systemd/system/
+    cp /usr/share/jarvis/etc/systemd/clean_sessions.timer   /usr/lib/systemd/system/
+    echo "Update service configuration as required and start via: systemctl start clean_sessions.timer"
+    echo "Can be permanently enabled with: systemctl enable clean_sessions.timer"
+
+else
+    echo "No systemd. NOT installing Clean Sessions as a service."
 fi
 
 echo "Jarvis installed and configuration created in /etc/httpd/conf.d"

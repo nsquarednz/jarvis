@@ -20,7 +20,7 @@ AutoReqProv : no
 Provides: perl(Jarvis::Config) perl(Jarvis::DB) perl(Jarvis::Error) perl(Jarvis::Main) perl(Jarvis::Dataset) perl(Jarvis::Exec) perl(Jarvis::Habitat) perl(Jarvis::Hook) perl(Jarvis::JSON::Utils) perl(Jarvis::Login) perl(Jarvis::Login::Adempiere) perl(Jarvis::Plugin) perl(Jarvis::Route) perl(Jarvis::Status) perl(Jarvis::Text)
 
 #BuildRequires:
-Requires: httpd perl(CGI) perl(CGI::Session) perl(CGI::Cookie) perl(HTTP::Cookies) perl(MIME::Types) perl(DBI) perl(JSON) perl(XML::LibXML) perl(Digest::MD5) perl(Time::HiRes)
+Requires: httpd perl(CGI) perl(CGI::Session) perl(CGI::Cookie) perl(HTTP::Cookies) perl(MIME::Types) perl(DBI) perl(JSON) perl(XML::LibXML) perl(Digest::MD5) perl(Time::HiRes) perl(File::Find::Rule)
 
 %description
 Jarvis is "helper glue". It is designed to bridge the gap between your
@@ -79,6 +79,17 @@ fi
 if [ ! -d /etc/%{name} ]; then
     cp -r /usr/share/%{name}/etc/jarvis /etc/%{name}
     echo "Created /etc/%{name}"
+fi
+
+# Install clean sessions systemd script.
+if [ -d /usr/lib/systemd/system/ ]; then
+    echo "Installing Clean Sessions as a service"
+    cp /usr/share/jarvis/etc/systemd/clean_sessions.service /usr/lib/systemd/system/
+    cp /usr/share/jarvis/etc/systemd/clean_sessions.timer   /usr/lib/systemd/system/
+    echo "Update service configuration as required and start via: systemctl start clean_sessions.timer"
+    echo "Can be permanently enabled with: systemctl enable clean_sessions.timer"
+else
+    echo "No systemd. NOT installing Clean Sessions as a service."
 fi
 
 echo "Jarvis installed and configuration created in /etc/httpd/conf.d"
