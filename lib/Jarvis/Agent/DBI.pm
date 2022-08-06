@@ -819,11 +819,11 @@ sub fetch_inner {
 sub execute_before {
     my ($class, $jconfig, $dataset_name, $dsxml, $dbh, $before_params_href) = @_;
 
-    my $bstm = &Jarvis::Dataset::DBI::parse_statement ($jconfig, $dataset_name, $dsxml, $dbh, 'before', $before_params_href);
+    my $bstm = &parse_statement ($jconfig, $dataset_name, $dsxml, $dbh, 'before', $before_params_href);
     if ($bstm) {
         my @barg_values = &Jarvis::Dataset::names_to_values ($jconfig, $bstm->{vnames_aref}, $before_params_href);
 
-        &Jarvis::Dataset::DBI::statement_execute($jconfig, $bstm, \@barg_values);
+        &statement_execute($jconfig, $bstm, \@barg_values);
         if ($bstm->{error}) {
             my $message = $bstm->{error};
             $message =~ s/^Server message number=[0-9]+ severity=[0-9]+ state=[0-9]+ line=[0-9]+ server=[A-Z0-9\\]+text=//i;
@@ -1080,11 +1080,11 @@ sub free_statements {
 sub execute_after {
     my ($class, $jconfig, $dataset_name, $dsxml, $dbh, $after_params_href) = @_;
 
-    my $astm = &Jarvis::Dataset::DBI::parse_statement ($jconfig, $dataset_name, $dsxml, $dbh, 'after', $after_params_href);
+    my $astm = &parse_statement ($jconfig, $dataset_name, $dsxml, $dbh, 'after', $after_params_href);
     if ($astm) {
         my @aarg_values = &Jarvis::Dataset::names_to_values ($jconfig, $astm->{vnames_aref}, $after_params_href);
 
-        &Jarvis::Dataset::DBI::statement_execute($jconfig, $astm, \@aarg_values);
+        &statement_execute($jconfig, $astm, \@aarg_values);
         if ($astm->{error}) {
             my $message = $astm->{error};
             $message =~ s/^Server message number=[0-9]+ severity=[0-9]+ state=[0-9]+ line=[0-9]+ server=[A-Z0-9\\]+text=//i;
