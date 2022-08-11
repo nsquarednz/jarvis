@@ -401,7 +401,7 @@ sub do {
     # Merge in the CGI vars.  Do NOT override REST args.
     my $cgi_params = $jconfig->{cgi}->Vars;
     foreach my $name (keys %$cgi_params) {
-        next if ($name !~ m/^_?[a-z][a-z0-9_\-]*$/i);
+        next if ($name !~ m/^_?[a-z][a-z0-9_\-]*(\[\])?$/i);
         next if ($name eq 'POSTDATA');
         next if (defined $user_args->{$name});
 
@@ -411,7 +411,13 @@ sub do {
         } else {
             &Jarvis::Error::debug ($jconfig, "CGI Param: '$name' => '%s'.", $cgi_params->{$name});
         }
-        $user_args->{$name} = $cgi_params->{$name};
+
+        if ($name =~ /\[\]$/) {
+            my $user_arg  = substr($name, 0, -2);
+            $user_args->{$user_arg} = [ split(m{\0}, $cgi_params->{$name}) ];
+        } else {
+            $user_args->{$name} = $cgi_params->{$name};
+        }
     }
 
     # Dataset name can't be empty.  Also, it can only be normal characters
