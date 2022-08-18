@@ -312,7 +312,7 @@ sub return_fetch {
     return 1;
 }
 sub return_store {
-    my ($jconfig, $dsxml, $user_args_aref, $results_aref, $extra_href, $return_text_ref) = @_;
+    my ($jconfig, $user_args_aref, $results_aref, $extra_href, $return_text_ref) = @_;
 
     foreach my $hook (@{ $jconfig->{hooks} }) {
         last if ($hook->{level} > 0);
