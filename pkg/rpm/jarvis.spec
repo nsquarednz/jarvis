@@ -81,10 +81,10 @@ fi
 # Install clean sessions systemd script.
 if [ -d /usr/lib/systemd/system/ ]; then
     echo "Installing Clean Sessions as a service"
-    cp /usr/share/jarvis/etc/systemd/clean-sessions.service /usr/lib/systemd/system/
-    cp /usr/share/jarvis/etc/systemd/clean-sessions.timer   /usr/lib/systemd/system/
-    echo "Update service configuration as required and start via: systemctl start clean-sessions.timer"
-    echo "Can be permanently enabled with: systemctl enable clean-sessions.timer"
+    cp /usr/share/jarvis/etc/systemd/jarvis-session-cleanup.service /usr/lib/systemd/system/
+    cp /usr/share/jarvis/etc/systemd/jarvis-session-cleanup.timer   /usr/lib/systemd/system/
+    echo "Update service configuration as required and start via: systemctl start jarvis-session-cleanup.timer"
+    echo "Can be permanently enabled with: systemctl enable jarvis-session-cleanup.timer"
 
 else
     echo "No systemd. NOT installing Clean Sessions as a service."
