@@ -307,9 +307,12 @@ sub check {
                 ($error_string) = &$refresh_method ($jconfig, %login_parameters);
             }
 
-            # If our refresh method generated any sort of error message we should alert.
+            # If our refresh method generated any sort of error message we will stop the session in its tracks.
             if ($error_string) {
+                $jconfig->{'logged_in'}    = 0;
+                $jconfig->{'username'}     = "";
                 $jconfig->{'error_string'} = $error_string;
+                $jconfig->{'group_list'}   = "";
                 return 0;
             }
         }

@@ -81,6 +81,17 @@ if [ ! -d /etc/%{name} ]; then
     echo "Created /etc/%{name}"
 fi
 
+# Install clean sessions systemd script.
+if [ -d /usr/lib/systemd/system/ ]; then
+    echo "Installing Clean Sessions as a service"
+    cp /usr/share/jarvis/etc/systemd/jarvis-session-cleanup.service /usr/lib/systemd/system/
+    cp /usr/share/jarvis/etc/systemd/jarvis-session-cleanup.timer   /usr/lib/systemd/system/
+    echo "Update service configuration as required and start via: systemctl start jarvis-session-cleanup.timer"
+    echo "Can be permanently enabled with: systemctl enable jarvis-session-cleanup.timer"
+else
+    echo "No systemd. NOT installing Clean Sessions as a service."
+fi
+
 echo "Jarvis installed and configuration created in /etc/httpd/conf.d"
 echo "Reload the Apache configuration now."
 echo "   systemctl restart httpd"

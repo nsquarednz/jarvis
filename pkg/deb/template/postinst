@@ -49,6 +49,22 @@ case "$1" in
             a2enmod cgi
         fi
 
+        # Install clean sessions systemd script.
+        if [ -d /usr/lib/systemd/system/ ]; then
+            echo "Installing Jarvis Session Cleanup as a service"
+            cp /usr/share/jarvis/etc/systemd/jarvis-session-cleanup.service /usr/lib/systemd/system/
+            cp /usr/share/jarvis/etc/systemd/jarvis-session-cleanup.timer   /usr/lib/systemd/system/
+
+            # Replace Apache groups for deb.
+            sed -i 's/User=apache/User=www-data/g' /usr/lib/systemd/system/jarvis-session-cleanup.service
+            sed -i 's/Group=apache/Group=www-data/g' /usr/lib/systemd/system/jarvis-session-cleanup.service
+
+            echo "Update service configuration as required and start via: systemctl start jarvis-session-cleanup.timer"
+            echo "Can be permanently enabled with: systemctl enable jarvis-session-cleanup.timer"
+        else
+            echo "No systemd. NOT installing Clean Sessions as a service."
+        fi
+
 	# Don't restart apache.  It's not nice.
         # [ -x `which apache2ctl` ] && apache2ctl restart
 	echo "Apache requires a restart for changes to take effect."
