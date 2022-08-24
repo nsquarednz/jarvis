@@ -391,11 +391,28 @@ sub performConfidentialAuth {
     if (defined $auth_code) {
 
         # At this stage lets sanity check that all the required items we need are defined.
-        my $client_secret= $login_parameters{client_secret} || die ("client_secret must be defined.\n");
-        my $client_id    = $login_parameters{client_id}     || die ("client_id must be defined.\n");
-        my $site         = $login_parameters{site}          || die ("site must be defined.\n");
-        my $token_path   = $login_parameters{token_path}    || die ("token_path must be defined.\n");
-        my $redirect_uri = $login_parameters{redirect_uri}  || die ("redirect_uri must be defined.\n");
+        my $client_secret         = $login_parameters{client_secret}         || die ("client_secret must be defined.\n");
+        my $client_id             = $login_parameters{client_id}             || die ("client_id must be defined.\n");
+        my $site                  = $login_parameters{site}                  || die ("site must be defined.\n");
+        my $token_path            = $login_parameters{token_path}            || die ("token_path must be defined.\n");
+        my $redirect_uri          = $login_parameters{redirect_uri}          || die ("redirect_uri must be defined.\n");
+        my $scope                 = $login_parameters{scope}                 // 'openid';
+        my $grant_type            = $login_parameters{grant_type}            // 'authorization_code';
+        my $groups_key            = $login_parameters{groups_key}            // 'groups';
+        my $id_token_contains_exp = $login_parameters{id_token_contains_exp} // 0;
+        my $decode_refresh_token  = $login_parameters{decode_refresh_token}  // 1;
+        my $perform_introspection = $login_parameters{perform_introspection} // 1;
+        my $user_identifier_key   = $login_parameters{user_identifier_key}   // 'sub';
+
+        # Different auth mechanisms diverge from the standard groups mechanism defined by OAuth; we'll detect these here and handle them appropriatly.
+        my $groups_mode;
+        if ($login_parameters{groups_mode} && $login_parameters{groups_mode} eq 'salesforce') {
+            $groups_mode = 'salesforce';
+
+        } else {
+            # Otherwise fall back to the standard approach.
+            $groups_mode = 'standard';
+        }
 
         # Optional fields.
         my $self_signed_cert = $login_parameters{self_signed_cert};
@@ -412,8 +429,8 @@ sub performConfidentialAuth {
             , client_secret => $client_secret
             , code          => $auth_code
             , redirect_uri  => $redirect_uri
-            , grant_type    => 'authorization_code'
-            , scope         => 'openid'
+            , grant_type    => $grant_type
+            , scope         => $scope
         };
 
         # Trigger our token request.
@@ -439,60 +456,112 @@ sub performConfidentialAuth {
 
             # Decode the ID token using our token library. This contains user identifying information that we can access and use.
             my $decoded_id_token = JSON::WebToken->decode ($id_token, undef, 0, 'none');
-
-            # Also decode the refresh token, it will hold our session expiry time.
-            my $decoded_refresh_token =JSON::WebToken->decode ($refresh_token, undef, 0, 'none');
-
             # Extract values as needed.
             my $username = $decoded_id_token->{preferred_username};
 
-            # Update the expiry stored against our session.
-            $decoded_refresh_token->{'exp'} || die ("Refresh token does not contain an expiry time.\n");
-            $jconfig->{session}->expire ($decoded_refresh_token->{'exp'});
+            # Determine if we need to pull apart the refresh token. This could just be a single use token.
+            if ($decode_refresh_token) {
+                # Also decode the refresh token, it will hold our session expiry time.
+                my $decoded_refresh_token =JSON::WebToken->decode ($refresh_token, undef, 0, 'none');
 
-            # Grab our user groups. This might be a string or an array or even undefined so lets be careful.
-            my $user_groups = '';
-            if (defined $decoded_id_token->{groups}) {
-                if (ref $decoded_id_token->{groups} eq 'ARRAY') {
-                    $user_groups = join (',', @{$decoded_id_token->{groups}});
-
-                } else {
-                    $user_groups = $decoded_id_token->{groups};
+                # Update the expiry stored against our session if we are getting it from our refresh token.
+                if (! $id_token_contains_exp) {
+                    $decoded_refresh_token->{'exp'} || die ("Refresh token does not contain an expiry time.\n");
+                    $jconfig->{session}->expire ($decoded_refresh_token->{'exp'});
                 }
             }
 
-            # Once we've done everything that we can with the tokens that we currently have
-            # we need to send a request to the token endpoint so we can request our extended permissions.
-            my $extended_token_request_data = {
-                grant_type    => 'urn:ietf:params:oauth:grant-type:uma-ticket'
-                , audience => $client_id
-            };
-
-            # This type of endpoint is special. We have to include our access token as authorization to query this information.
-            # The LWP user agent is a bit weird with how this works for setting headers. Anything after the first parameter can be a header definition.
-            # This continues until the 'Content' property is detected at which point it is encoded as the post data.
-            my $extended_token_response = $ua->post ($token_endpoint, 'Authorization' => "Bearer $access_token", Content => $extended_token_request_data);
-
-            my $extended_token_message      = $extended_token_response->decoded_content;
-            my $extended_token_message_json = JSON::XS::decode_json($extended_token_message);
-
-            # Check if the response contains the access token we expect.
-            my $extended_access_token = $extended_token_message_json->{access_token};
-
-            # If we have no extended access token we won't bail out. There are situations where they might have a valid login but no permissions.
-            if (defined $extended_access_token) {
-                # Decode the token using our token library.
-                my $decoded_extended_access_token =JSON::WebToken->decode ($extended_access_token, undef, 0, 'none');
-
-                # Sanity check.
-                $decoded_extended_access_token->{authorization}{permissions} || die ("RPT Token missing authorization permissions.");
-
-                # Convert our permissions objects array to a list of associated permissions.
-                my @permission_names = map { $_->{rsname} } @{$decoded_extended_access_token->{authorization}{permissions}};
-
-                # Associate the list of permissions against our Jarvis session. Implementing applications can access this as required.
-                $jconfig->{session}->param ("oauth_permissions", \@permission_names);
+            # ID token contains the expiry?
+            if ($id_token_contains_exp) {
+                $decoded_id_token->{'exp'} || die ("ID token does not contain an expiry time.\n");
+                $jconfig->{session}->expire ($decoded_id_token->{'exp'});
             }
+
+            # Handle groups. This depends entirely on the groups mode.
+            my $user_groups = '';
+            if ($groups_mode eq 'standard') {
+                # Grab our user groups. This might be a string or an array or even undefined so lets be careful.
+                if (defined $groups_key && defined $decoded_id_token->{$groups_key}) {
+                    if (ref $decoded_id_token->{$groups_key} eq 'ARRAY') {
+                        $user_groups = join (',', @{$decoded_id_token->{$groups_key}});
+
+                    } else {
+                        $user_groups = $decoded_id_token->{$groups_key};
+                    }
+                }
+
+            } elsif ($groups_mode eq 'salesforce') {
+                # Sales force has an interesting structure.
+                #
+                # "custom_attributes": {
+                #     "groups": "[\"auth_group\"]"
+                # },
+                #
+                # The groups are stored in nested objects and then serialised as a JSON string.
+                #
+                if (defined $decoded_id_token->{custom_attributes} && defined $decoded_id_token->{custom_attributes}{groups}) {
+                    my $groups_json_string = $decoded_id_token->{custom_attributes}{groups};
+                    eval {
+                        my $groups_json = decode_json ($groups_json_string);
+                        $user_groups = join (',', @{$groups_json});
+                    };
+                    if ($@) {
+                        die "Failed to parse non application/json Salesforce groups data: $@\n";
+                    }
+
+                } else {
+                    die ("OAuth2 module 'groups_mode' 'salesforce' token missing custom_attributes->groups key.\n");
+                }
+
+            } else {
+                die ("OAuth2 module unknown 'groups_mode' '$groups_mode' defined for confidential access type.\n");
+            }
+
+            # Check if we need to do additional introspection. This is for more complex providers that let us define complex inherited permissions.
+            if ($perform_introspection) {
+                # Once we've done everything that we can with the tokens that we currently have
+                # we need to send a request to the token endpoint so we can request our extended permissions.
+                my $extended_token_request_data = {
+                    grant_type    => 'urn:ietf:params:oauth:grant-type:uma-ticket'
+                    , audience => $client_id
+                };
+
+                # This type of endpoint is special. We have to include our access token as authorization to query this information.
+                # The LWP user agent is a bit weird with how this works for setting headers. Anything after the first parameter can be a header definition.
+                # This continues until the 'Content' property is detected at which point it is encoded as the post data.
+                my $extended_token_response = $ua->post ($token_endpoint, 'Authorization' => "Bearer $access_token", Content => $extended_token_request_data);
+
+                my $extended_token_message      = $extended_token_response->decoded_content;
+                my $extended_token_message_json = JSON::XS::decode_json($extended_token_message);
+
+                # Check if the response contains the access token we expect.
+                my $extended_access_token = $extended_token_message_json->{access_token};
+
+                # If we have no extended access token we won't bail out. There are situations where they might have a valid login but no permissions.
+                if (defined $extended_access_token) {
+                    # Decode the token using our token library.
+                    my $decoded_extended_access_token =JSON::WebToken->decode ($extended_access_token, undef, 0, 'none');
+
+                    # Sanity check.
+                    $decoded_extended_access_token->{authorization}{permissions} || die ("RPT Token missing authorization permissions.");
+
+                    # Convert our permissions objects array to a list of associated permissions.
+                    my @permission_names = map { $_->{rsname} } @{$decoded_extended_access_token->{authorization}{permissions}};
+
+                    # Associate the list of permissions against our Jarvis session. Implementing applications can access this as required.
+                    $jconfig->{session}->param ("oauth_permissions", \@permission_names);
+                }
+            }
+
+            # Grab the external ID of the user that we performed auth for.
+            my $external_user_id = $decoded_id_token->{$user_identifier_key} || die ("Authorization Token does not contain '$user_identifier_key' information.\n");
+
+            # Store session properties.
+            # $jconfig->{session}->param ("token_expiry", $token_expiry);
+            # $jconfig->{session}->param ("current_auth_token_hash", $authorization_header_hash);
+            $jconfig->{session}->param ('external_user_id', $external_user_id);
+            # Store the item from our user name key on the session. This maps to what will be our user principle.
+            $jconfig->{session}->param ('external_user_principle', $username);
 
             # Finally return our successful login indicator to our calling module providing the user name and groups we got back.
             return ("", $username, $user_groups);
@@ -697,11 +766,13 @@ sub Jarvis::Login::OAuth2::refresh {
         } elsif ($access_type eq 'confidential') {
 
             # Sanity check that our login parameters specify all the configuration that we need.
-            my $token_path    = $login_parameters{token_path}                || die ("token_path must be defined.\n");
-            my $client_id     = $login_parameters{client_id}                 || die ("client_id must be defined.\n");
-            my $client_secret = $login_parameters{client_secret}             || die ("client_secret must be defined.\n");
-            my $site          = $login_parameters{site}                      || die ("site must be defined.\n");
-            my $refresh_token = $jconfig->{session}->param ('refresh_token');
+            my $token_path            = $login_parameters{token_path}                || die ("token_path must be defined.\n");
+            my $client_id             = $login_parameters{client_id}                 || die ("client_id must be defined.\n");
+            my $client_secret         = $login_parameters{client_secret}             || die ("client_secret must be defined.\n");
+            my $site                  = $login_parameters{site}                      || die ("site must be defined.\n");
+            my $decode_refresh_token  = $login_parameters{decode_refresh_token}      // 1;
+            my $id_token_contains_exp = $login_parameters{id_token_contains_exp}     // 0;
+            my $refresh_token         = $jconfig->{session}->param ('refresh_token');
 
             # No refresh token? This can happen, no point in trying.
             if (! defined ($refresh_token)) {
@@ -740,11 +811,26 @@ sub Jarvis::Login::OAuth2::refresh {
                 $jconfig->{session}->param ("id_token"     , $token_refresh_message_json->{id_token});
 
                 # We do have to parse the refresh token as we do need to update the expire time on our CGI session.
-                my $decoded_refresh_token =JSON::WebToken->decode ($token_refresh_message_json->{refresh_token}, undef, 0, 'none');
-                $decoded_refresh_token->{'exp'} || die ("Refresh token does not contain an expiry time.\n");
+                # Determine if we need to pull apart the refresh token. This could just be a single use token.
+                if ($decode_refresh_token) {
+                    # Also decode the refresh token, it will hold our session expiry time.
+                    my $decoded_refresh_token =JSON::WebToken->decode ($refresh_token, undef, 0, 'none');
 
-                # Update the expiry stored against our session.
-                $jconfig->{session}->expire ($decoded_refresh_token->{'exp'});
+                    # Update the expiry stored against our session if we are getting it from our refresh token.
+                    if (! $id_token_contains_exp) {
+                        $decoded_refresh_token->{'exp'} || die ("Refresh token does not contain an expiry time.\n");
+                        $jconfig->{session}->expire ($decoded_refresh_token->{'exp'});
+                    }
+                }
+
+                # ID token contains the expiry?
+                if ($id_token_contains_exp) {
+                    # Decode the ID token using our token library. This contains user identifying information that we can access and use.
+                    my $decoded_id_token = JSON::WebToken->decode ($token_refresh_message_json->{id_token}, undef, 0, 'none');
+
+                    $decoded_id_token->{'exp'} || die ("ID token does not contain an expiry time.\n");
+                    $jconfig->{session}->expire ($decoded_id_token->{'exp'});
+                }
 
             } else {
                 # Some thing went wrong, try and extract and error.
@@ -763,7 +849,6 @@ sub Jarvis::Login::OAuth2::refresh {
     } else {
         die ("OAuth2 Module Unsupported Grant Type: '$grant_type'");
     }
-
 
     return undef;
 }
