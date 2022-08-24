@@ -90,7 +90,7 @@ mv $DEPLOY_DIR/$JARVIS_PACKAGE/etc/apache $DEPLOY_DIR/$JARVIS_PACKAGE/etc/httpd/
 
 # Move bundled binary scripts.
 mkdir $DEPLOY_DIR/$JARVIS_PACKAGE/bin
-cp $SRC_DIR/bin/clean_sessions.pl $DEPLOY_DIR/$JARVIS_PACKAGE/bin
+cp $SRC_DIR/bin/clean-sessions.pl $DEPLOY_DIR/$JARVIS_PACKAGE/bin
 
 # Check for RHEL 8 specific build tasks.
 if [[ $RHELVERSION == '8' ]]; then

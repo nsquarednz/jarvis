@@ -1,0 +1,13 @@
+#
+# Periodic system execution of clean-sessions perl script.
+#
+# Distributed by N-Squared Software.
+#
+[Unit]
+Description=Jarvis Perl CGI Session cleanup script.
+
+[Service]
+Type=oneshot
+User=apache
+Group=apache
+ExecStart=/usr/bin/perl /usr/share/jarvis/bin/clean-sessions.pl

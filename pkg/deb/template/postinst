@@ -52,10 +52,15 @@ case "$1" in
         # Install clean sessions systemd script.
         if [ -d /usr/lib/systemd/system/ ]; then
             echo "Installing Clean Sessions as a service"
-            cp /usr/share/jarvis/etc/systemd/clean_sessions.service /usr/lib/systemd/system/
-            cp /usr/share/jarvis/etc/systemd/clean_sessions.timer   /usr/lib/systemd/system/
-            echo "Update service configuration as required and start via: systemctl start clean_sessions.timer"
-            echo "Can be permanently enabled with: systemctl enable clean_sessions.timer"
+            cp /usr/share/jarvis/etc/systemd/clean-sessions.service /usr/lib/systemd/system/
+            cp /usr/share/jarvis/etc/systemd/clean-sessions.timer   /usr/lib/systemd/system/
+
+            # Replace Apache groups for deb.
+            sed -i 's/User=apache/User=www-data/g' /usr/lib/systemd/system/clean-sessions.service
+            sed -i 's/Group=apache/Group=www-data/g' /usr/lib/systemd/system/clean-sessions.service
+
+            echo "Update service configuration as required and start via: systemctl start clean-sessions.timer"
+            echo "Can be permanently enabled with: systemctl enable clean-sessions.timer"
         else
             echo "No systemd. NOT installing Clean Sessions as a service."
         fi
