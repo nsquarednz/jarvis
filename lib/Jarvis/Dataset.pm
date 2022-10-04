@@ -194,8 +194,8 @@ sub load_dsxml {
         $prefix_seen{$prefix}++ && die "Duplicate dataset_dir entries for prefix '$prefix' are defined.\n";
 
         &Jarvis::Error::debug ($jconfig, "Dataset Directory: '$dir', type '$type', prefix '$prefix', dbname '$dbname'.");
-        if ($dataset_name =~ m/^$prefix(.*)$/) {
-            my $remainder = $1;
+        if (rindex ($dataset_name, $prefix, 0) == 0) {
+            my $remainder = substr ($dataset_name, length($prefix));
 
             &Jarvis::Error::dump ($jconfig, "Prefix '$prefix' matched, length = " . $prefix_len);
             if ($prefix_len > $best_prefix_len) {

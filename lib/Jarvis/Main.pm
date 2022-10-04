@@ -511,11 +511,11 @@ sub do {
     my $object_content_type = "text/plain; charset=UTF-8";
     if ($jconfig->{format} =~ /json/i ) {
         if (! $jconfig->{return_json_as_text}) {
-            $object_content_type = 'application/json; charset=UTF-8"';
+            $object_content_type = 'application/json; charset=UTF-8';
         }
 
     } elsif ($jconfig->{format} =~ /XML/i ) {
-        $object_content_type =  'application/xml; charset=UTF-8"';
+        $object_content_type =  'application/xml; charset=UTF-8';
     }
 
     # All special datasets start with "__".
