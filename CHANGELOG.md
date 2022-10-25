@@ -4,14 +4,16 @@
 
 The Jarvis Web Framework. More information can be found at https://www.nsquared.co.nz/tech/jarvis.html
 
-## [7.3.0] - 2022-04-27
-### Added
-
-### Changed
-- 14574: Rework the "varname?" modifier.
+## [7.4.0] - 2022-10-26
 
 ### Fixed
 
+- JVS-14631: Use a substring match, not a regex match for dataset dir prefix check.
+
+## [7.3.0] - 2022-04-27
+
+### Changed
+- 14574: Rework the "varname?" modifier.
 
 ## [7.2.1] - 2022-03-31
 ### Added
