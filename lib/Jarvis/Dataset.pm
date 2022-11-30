@@ -1263,6 +1263,11 @@ sub store {
     if ($return_text) {
         &Jarvis::Error::debug ($jconfig, "Return content determined by hook ::return_store");
 
+    # We if requested by the app, we die on a store error which allows our die handler to return 
+    # an error in the format requested by the user configuring jarvis (in <app ... error_response_format>)
+    } elsif ($jconfig->{http_code_on_store_error} && !$success) {
+        die &trim($message);
+
     # Otherwise we encode to a supported format.  Note that the hook may have modified
     # the data prior to this encoding.
     #
@@ -1273,6 +1278,7 @@ sub store {
     } elsif ($jconfig->{format} =~ m/^json/) {
         &Jarvis::Error::debug ($jconfig, "Returning JSON.  Return Array = $return_array.");
 
+        # Normal response for formatted errors for JSON
         my $return_object = {};
         $return_object->{success} = $success;
         $return_object->{logged_in} = $jconfig->{logged_in};

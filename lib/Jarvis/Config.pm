@@ -71,6 +71,9 @@ $XML::LibXML::Error::WARNINGS = 1;
 #               log_format         Format for log and debug output.
 #               error_response_format
 #                                  The format of error messages sent to the client
+#               http_code_on_store_error
+#                                  A truthy/falsy value to use HTTP codes not JSON
+#                                  on store errors.
 ################################################################################
 #
 sub new {
@@ -149,8 +152,17 @@ sub new {
     # This is used by both debug and log output.
     $self->{log_format} = $axml->{log_format} // '[%P/%A/%U/%D][%R] %M';
 
-    # This is what format we use when sending death messages back to the client
+    # This is what the format of the string is when we send HTTP 500 messages back to the client
     $self->{error_response_format} = $axml->{error_response_format} // '[%T][%R] %M';
+
+    # This is what syntax we use when respond to the client with an error due to
+    # an error during a Dataset store request. If true, we use HTTP 500. If false,
+    # the traditional Jarvis JSON structure is returned (with the "message" field
+    # holding the error).
+    #
+    # Note that on response using a HTTP code, the error_response_format will be 
+    # honored.
+    $self->{http_code_on_store_error} = $Jarvis::Config::yes_value {lc ($axml->{http_code_on_store_error} // "no")};
 
     # This is used by several things, so let's store it in our config.
     $self->{format} = lc ($self->{cgi}->param ('format') // $axml->{format} // "json");
