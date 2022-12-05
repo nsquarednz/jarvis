@@ -68,7 +68,7 @@ tar zcf $TAR_ORIG \
 #
 # Template was originally created with:
 #   cd jarvis-$VERSION
-#   dh_make -e jarvis@nsquaredsoftware.com
+#   dh_make -e jarvis@nsquared.nz
 #
 # (But has been customized since then)
 #

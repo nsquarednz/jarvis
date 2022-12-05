@@ -1,8 +1,8 @@
 # Jarvis Changelog
 
-![logo](https://www.nsquared.co.nz/assets/images/nsquared-logo-big.png) 
+![logo](https://www.nsquared.nz/img/nsquared-logo-big.png)
 
-The Jarvis Web Framework. More information can be found at https://www.nsquared.co.nz/tech/jarvis.html
+The Jarvis Web Framework. More information can be found at https://www.nsquared.nz/tech/jarvis.html
 
 ## [7.4.0] - 2022-10-26
 

@@ -1,6 +1,6 @@
 This work was packaged for Debian by:
 
-    N-Squared Software <jarvis@nsquaredsoftware.com> on DATE
+    N-Squared Software <jarvis@nsquared.nz> on DATE
 
 Copyright:
 
@@ -14,5 +14,5 @@ License:
 
 The Debian packaging is:
 
-    Copyright (C) 2010 Jonathan Couper-Smartt <jarvis@nsquaredsoftware.com>
+    Copyright (C) 2010 Jonathan Couper-Smartt <jarvis@nsquared.nz>
     The packaging is included under the same license as the software itself.

@@ -1,12 +1,12 @@
 # Jarvis Web Gateway
 
-![logo](https://www.nsquared.co.nz/assets/images/nsquared-logo-big.png) 
+![logo](https://www.nsquared.nz/img/nsquared-logo-big.png)
 
 <p align="center">
   <strong>
-    <a href="https://www.nsquared.co.nz/">website</a>
+    <a href="https://www.nsquared.nz/">website</a>
     •
-    <a href="https://www.nsquared.co.nz/tech/jarvis.html">docs</a>
+    <a href="https://www.nsquared.nz/tech/jarvis.html">docs</a>
   </strong>
 </p>
 

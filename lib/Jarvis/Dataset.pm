@@ -1098,7 +1098,7 @@ sub fetch_rows {
     # What filename would this dataset use?  This is an ugly side-effect.
     #
     # TODO: Get rid of this parameter from the dataset/exec/plugin level.
-    #       See http://support.nsquaredsoftware.com/tickets/view.php?id=6777
+    #       See JVS-14448
     #
     if ($dataset->{level} == 0) {
         my $filename_parameter = $dsxml->findvalue ('./dataset/@filename_parameter') || 'filename';

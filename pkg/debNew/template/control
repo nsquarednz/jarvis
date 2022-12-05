@@ -1,10 +1,10 @@
 Source: jarvisnew
 Section: web
 Priority: extra
-Maintainer: N-Squared Software <jarvis@nsquaredsoftware.com>
+Maintainer: N-Squared Software <jarvis@nsquared.nz>
 Build-Depends: debhelper (>= 7)
 Standards-Version: 3.8.4
-Homepage: http://www.nsquaredsoftware.com/
+Homepage: http://www.nsquared.nz/
 
 Package: jarvisnew
 Architecture: all
