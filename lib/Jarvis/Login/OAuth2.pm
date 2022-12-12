@@ -285,8 +285,8 @@ sub performPublicAuth {
         my $public_key_data = $public_keys->{$header_kid} // die "Authorization Token Header with KID '$header_kid' not found in public keys.\n";
 
         # Grab the key information itself.
-        my $public_key           = $public_key_data->{public_key}           // die "Authroziation Token Header with KID '$header_kid' references public key without public key information.\n" ;
-        my $supported_algorithms = $public_key_data->{supported_algorithms} // die "Authroziation Token Header with KID '$header_kid' references public key without supported algorithm information.\n" ;
+        my $public_key           = $public_key_data->{public_key}           // die "Authorisation Token Header with KID '$header_kid' references public key without public key information.\n" ;
+        my $supported_algorithms = $public_key_data->{supported_algorithms} // die "Authorisation Token Header with KID '$header_kid' references public key without supported algorithm information.\n" ;
 
         # Attempt to decode the auth header. This is were we validate it against the public key. If this step fails for any reason
         # we will not continue the authorization and fail hard.
@@ -300,7 +300,7 @@ sub performPublicAuth {
 
         # Start fetching information that we will store in our session. We will parse various parts and store it.
         # First lets hash the auth token and store that. This will let us skip all the parsing steps if the token is still valid and hasn't changed.
-        my $username = $decoded_authorization_token->{$username_key} || die ("Authroziation Token does not contain '$username_key' information.\n");
+        my $username = $decoded_authorization_token->{$username_key} || die ("Authorisation Token does not contain '$username_key' information.\n");
 
         # Handle groups. This depends entirely on the groups mode.
         my $user_groups = '';
@@ -760,7 +760,7 @@ sub Jarvis::Login::OAuth2::refresh {
                 }
             } else {
                 # No auth header? Return an error code to the calling parent. Not a valid session.
-                return "No Authroziation Header Provided";
+                return "No Authorisation Header Provided";
             }
 
         } elsif ($access_type eq 'confidential') {
