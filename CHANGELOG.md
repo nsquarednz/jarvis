@@ -4,6 +4,13 @@
 
 The Jarvis Web Framework. More information can be found at https://www.nsquared.nz/tech/jarvis.html
 
+## [7.5.0] - 2022-12-16
+
+### Changed
+
+* JVS-14604: Respond with a HTTP code on database failure.
+* N2-10430: Update documentation to use nsquared.nz domain.
+
 ## [7.4.0] - 2022-10-26
 
 ### Fixed
