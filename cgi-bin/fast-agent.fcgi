@@ -26,6 +26,7 @@ use strict;
 use warnings;
 
 use CGI::Fast;
+use CGI::Carp qw(set_die_handler);
 
 use Carp;
 $Carp::CarpLevel = 1;
@@ -38,7 +39,23 @@ $Carp::CarpLevel = 1;
 # SetEnv JARVIS_ROOT "/path/to/jarvis"
 #
 my $jarvis_root;
-BEGIN { $jarvis_root = $ENV{'JARVIS_ROOT'} || "/usr/share/jarvis" }
+BEGIN { 
+    $jarvis_root = $ENV{'JARVIS_ROOT'} || "/usr/share/jarvis";
+
+    #
+    # A strange feature of CGI::Fast seems to be to silently incorporate
+    # CGI::Carp in the deployment. CGI::Carp adds the date and script name
+    # to all dies, and it does this before calling our Main.pm die handler
+    #
+    # To avoid this happening, we overwrite the CGI::Carp die handler and
+    # so that instead of doing all the logic it thinks we want, it simply
+    # and immediately passes handling up to our Main.pm die handler.
+    #
+    sub cgi_carp_die_override {
+        CORE::die(@_);
+    }
+    set_die_handler(\&cgi_carp_die_override);
+}
 
 use lib "$jarvis_root/lib";
 
