@@ -4,12 +4,17 @@
 
 The Jarvis Web Framework. More information can be found at https://www.nsquared.nz/tech/jarvis.html
 
+## [7.5.1] - 2022-12-29
+### Fixed
+
+- JVS-14633: When using fastcgi, do not include the date & script name in errors. Jarvis does it's own error string generation.
+
 ## [7.5.0] - 2022-12-16
 
 ### Changed
 
-* JVS-14604: Respond with a HTTP code on database failure.
-* N2-10430: Update documentation to use nsquared.nz domain.
+- JVS-14604: Respond with a HTTP code on database failure.
+- N2-10430: Update documentation to use nsquared.nz domain.
 
 ## [7.4.0] - 2022-10-26
 
@@ -29,7 +34,6 @@ The Jarvis Web Framework. More information can be found at https://www.nsquared.
 - 14606: Extend the Single login module with the ability to set oauth_permissions.
 
 ### Fixed
-
 
 ## [7.1.0] - 2021-09-11
 ### Added
