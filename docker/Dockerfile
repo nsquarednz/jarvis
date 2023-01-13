@@ -22,6 +22,9 @@ ARG SERVICES="apache2 openssl"
 
 ### Install
 RUN \
+    echo "**** fix up sources list to use local servers ****" \
+        && sed -i -e 's/archive.ubuntu.com/nz.archive.ubuntu.com/' /etc/apt/sources.list\
+    && \
     echo "**** Update sources ****" \
        && apt-get update \
     && \
