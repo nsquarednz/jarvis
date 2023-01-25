@@ -226,7 +226,7 @@ sub get_auth_public_key {
         return $public_keys;
 
     } else {
-        die ("Failed to contact public key endpoint: [" . ($public_key_response->code ? $public_key_response->code : 500) . "] " . ($public_key_response->message ? $public_key_response->message : "") . "\n");
+        die ("Failed to contact public key endpoint: [" . ($public_key_response->code ? $public_key_response->code : 500) . "] " . ($public_key_response->content ? $public_key_response->content : "") . "\n");
     }
 }
 
@@ -567,7 +567,7 @@ sub performConfidentialAuth {
             return ("", $username, $user_groups);
 
         } else {
-            die ("Failed to contact token endpoint: [" . ($token_response->code ? $token_response->code : 500) . "] " . ($token_response->message ? $token_response->message : "") . "\n");
+            die ("Failed to contact token endpoint: [" . ($token_response->code ? $token_response->code : 500) . "] " . ($token_response->content ? $token_response->content : "") . "\n");
         }
     } else {
 	# No idea if we're logged in or not. Return all blanks.
