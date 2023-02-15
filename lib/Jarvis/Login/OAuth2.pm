@@ -64,12 +64,15 @@ use MIME::Base64 qw (decode_base64url decode_base64);
 # Params:
 #       $self_signed_cert - Optional self signed certificate path
 #                           to use when constructing an SSL based user agent.
+#       $ssl_opts -         Additional options to set in the SSL request as a
+#                           string. Separate keys from values with "=" and
+#                           separate key/value pairs with "|", e.g. "a=1|b=2".
 #
 # Returns:
 #       LWP::UserAgent
 ###############################################################################
 sub get_user_agent {
-    my ($self_signed_cert) = @_;
+    my ($self_signed_cert, $ssl_opts) = @_;
 
     # Define our UserAgent.
     my $ua = LWP::UserAgent->new;
@@ -87,8 +90,15 @@ sub get_user_agent {
         );
     }
 
+    $ssl_opts = [ split /[|]/, $ssl_opts // "" ];
+    foreach my $ssl_opt (@$ssl_opts) {
+        my ($key, $value) = split /[=]/, $ssl_opt;
+        $ua->ssl_opts ($key => $value);
+    }
+
     return $ua;
 }
+
 
 ###############################################################################
 # Helper function that will handle getting our auth public key.
@@ -114,6 +124,7 @@ sub get_auth_public_key {
     my $public_key_path             = $login_parameters{public_key_path}             || die ("OAuth2 module 'public_key_path' must be defined.\n");
     my $public_key_store            = $login_parameters{public_key_store}            // '/tmp/auth_public_key';
     my $public_key_lifetime_seconds = $login_parameters{public_key_lifetime_seconds} // 600;
+    my $ssl_opts                    = $login_parameters{ssl_opts};
 
     # Optional fields.
     my $self_signed_cert = $login_parameters{self_signed_cert};
@@ -159,7 +170,7 @@ sub get_auth_public_key {
     # If we make it here then either we had no key store, the key store was out of date, or the key we loaded was not valid.
     # Go ahead and fetch a new one.
     # Fetch a user agent.
-    my $ua = get_user_agent ($self_signed_cert);
+    my $ua = get_user_agent ($self_signed_cert, $ssl_opts);
 
     # Construct the public key endpoint.
     my $public_key_endpoint = $site . $public_key_path;
@@ -403,6 +414,7 @@ sub performConfidentialAuth {
         my $decode_refresh_token  = $login_parameters{decode_refresh_token}  // 1;
         my $perform_introspection = $login_parameters{perform_introspection} // 1;
         my $user_identifier_key   = $login_parameters{user_identifier_key}   // 'sub';
+        my $ssl_opts              = $login_parameters{ssl_opts};
 
         # Different auth mechanisms diverge from the standard groups mechanism defined by OAuth; we'll detect these here and handle them appropriatly.
         my $groups_mode;
@@ -418,7 +430,7 @@ sub performConfidentialAuth {
         my $self_signed_cert = $login_parameters{self_signed_cert};
 
         # At this stage we have everything we need to send a request on to our token request endpoint. Lets construct this now.
-        my $ua = get_user_agent ($self_signed_cert);
+        my $ua = get_user_agent ($self_signed_cert, $ssl_opts);
 
         # Construct the token endpoint.
         my $token_endpoint = $site . $token_path;
@@ -720,6 +732,7 @@ sub Jarvis::Login::OAuth2::refresh {
     # Load base parameters. Fall back to confidential auth code setups to support existing deployments.
     my $grant_type  = $login_parameters{grant_type}  // 'auth_code';
     my $access_type = $login_parameters{access_type} // 'confidential';
+    my $ssl_opts    = $login_parameters{ssl_opts};
 
     # Check for a supported grant type.
     if ($grant_type eq 'auth_code') {
@@ -783,7 +796,7 @@ sub Jarvis::Login::OAuth2::refresh {
             my $self_signed_cert = $login_parameters{self_signed_cert};
 
             # Get our user agent.
-            my $ua = get_user_agent ($self_signed_cert);
+            my $ua = get_user_agent ($self_signed_cert, $ssl_opts);
 
             # Construct the refresh endpoint.
             my $token_endpoint = $site . $token_path;
@@ -880,6 +893,7 @@ sub Jarvis::Login::OAuth2::logout {
     # Load base parameters. Fall back to confidential auth code setups to support existing deployments.
     my $grant_type  = $login_parameters{grant_type}  // 'auth_code';
     my $access_type = $login_parameters{access_type} // 'confidential';
+    my $ssl_opts    = $login_parameters{ssl_opts};
 
     # Check for a supported grant type.
     if ($grant_type eq 'auth_code') {
@@ -904,7 +918,7 @@ sub Jarvis::Login::OAuth2::logout {
             my $self_signed_cert = $login_parameters{self_signed_cert};
 
             # Get our user agent.
-            my $ua = get_user_agent ($self_signed_cert);
+            my $ua = get_user_agent ($self_signed_cert, $ssl_opts);
 
             # Construct the logout endpoint.
             my $logout_endpoint = $site . $logout_path;
