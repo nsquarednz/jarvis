@@ -149,6 +149,10 @@ sub new {
     # debug (or even log) could raise "Wide character in print" errors.
     binmode STDERR, ":utf8";
 
+    # Ditto for STDOUT and the content that we send to the browser. Note that we
+    # always indicate that we send UTF-8 in our content-type header (see Main.pm).
+    binmode STDOUT, ":utf8";
+
     # This is used by both debug and log output.
     $self->{log_format} = $axml->{log_format} // '[%P/%A/%U/%D][%R] %M';
 
