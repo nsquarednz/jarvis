@@ -63,7 +63,20 @@ sub printable {
     # If it contains any 'odd' characters, print as HEX.  Maybe truncated.    
     if ($value =~ m/[^\n\r\t\x20-\x7e]/s) {       
         my $hex = $value;
-        utf8::downgrade ($hex);
+
+        # This downgrade can fail. One example I've seen is when the value is a
+        # string that contains UTF-8 characters that - presumably - can't be
+        # represented in the native encoding. Frankly if we could be sure that
+        # the value contained a UTF-8 string then I think we should be able to
+        # return it as-is. The hex output of the ord() values isn't very
+        # comprehensible!
+        eval {
+            utf8::downgrade ($hex);
+        };
+        if ($@) {
+            print STDERR "UTF-8 downgrade failed. Value is '$hex'.\n";
+        }
+
         $hex =~ s/(.)/'\x'.sprintf("%02x", ord ($1))/egs;
         return $hex;
         
