@@ -553,6 +553,10 @@ sub do {
         } else {
             die "Unknown special dataset '$dataset_name'!\n";
         }
+
+        # Content type charset is guaranteed to be UTF-8.
+        binmode STDOUT, ':utf8';
+
         &Jarvis::Config::add_http_headers ($jconfig, {
             -type => $object_content_type,
             -cookie => $jconfig->{cookie},
@@ -611,6 +615,9 @@ sub do {
             });
 
         } else {
+            # Content type charset is guaranteed to be UTF-8.
+            binmode STDOUT, ':utf8';
+
             &Jarvis::Config::add_http_headers($jconfig,  {
                 -type => $object_content_type,
                 -cookie => $jconfig->{cookie},
@@ -630,6 +637,8 @@ sub do {
 
     # Modify a regular dataset.
     } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete") || ($action eq "mixed") || ($action eq "merge")) {
+        # Content type charset is guaranteed to be UTF-8.
+        binmode STDOUT, ':utf8';
 
         $jconfig->{dataset_type} = 's';
         my $return_text = &Jarvis::Dataset::store ($jconfig, $dataset_name, $user_args);
