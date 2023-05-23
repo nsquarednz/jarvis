@@ -406,8 +406,7 @@ sub do {
         next if ($name eq 'POSTDATA');
         next if (defined $user_args->{$name});
 
-        #my $value = decode_utf8 ($cgi_params->{$name});
-        my $value = $cgi_params->{$name};
+        my $value = decode_utf8 ($cgi_params->{$name});
         if (length ($value) > 256) {
             &Jarvis::Error::debug ($jconfig, "CGI Param: '$name' => (%d bytes).", length ($value));
 
