@@ -52,23 +52,27 @@ use Jarvis::Login::Adempiere;
 #    <app format="json" debug="no">
 #        ...
 #        <login module="Jarvis::Login::ActiveDirectory">
-#  	     <parameter name="server" value="<server-address>"/>
-#  	     <parameter name="port" value="389"/>
-#  	     <parameter name="bind_username" value="<bind-username>"/>
-#  	     <parameter name="bind_password" value="<bind-password>"/>
-#            <parameter name="base_object" value="OU=PORSENZ,DC=PORSENZ,DC=LOCAL"/>
-#            <parameter name="allowed_groups" value="SuperUser,Admin"/>
+#           <parameter name="server"         value="<server-address>"/>
+#           <parameter name="port"           value="389"/>
+#           <parameter name="bind_username"  value="<bind-username>"/>
+#           <parameter name="bind_password"  value="<bind-password>"/>
+#           <parameter name="base_object"    value="dc=nsquared,dc=nz"/>
+#           <parameter name="allowed_groups" value="SuperUser,Admin"/>
+#           <parameter name="search_filter"  value="samaccountname"/>
+#           <parameter name="use_tls"        value="1"/>
 #        </login>
 #        ...
 #    </app>
 #
-#       server:         Address of server.  Required.
-#       port:           Port for server.  Default 389.
-#       bind_username:  Username to bind to server for search.
-#       bind_password:  Password to bind to server for search.
-#       base_object:    Root of the search tree for user lookup.
-#       no_password:    Don't validate the password.  Only check user details.
-#       allowed_groups: Only allow login for users belonging to one of these groups. Optional.
+#       server         : Address of server.  Required.
+#       port           : Port for server.  Default 389.
+#       bind_username  : Username to bind to server for search.
+#       bind_password  : Password to bind to server for search.
+#       base_object    : Root of the search tree for user lookup.
+#       no_password    : Don't validate the password.  Only check user details.
+#       allowed_groups : Only allow login for users belonging to one of these groups. Optional.
+#       search_filter  : Override the search filter name to use for user lookup. Optional. Default samaccountname.
+#       use_tls        : Whether to utilize LDAP TLS connectivity. Optional. Default 0.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -88,13 +92,15 @@ sub Jarvis::Login::ActiveDirectory::check {
     my ($jconfig, $username, $password, %login_parameters) = @_;
 
     # Our user name login parameters are here...
-    my $server = $login_parameters{'server'};
-    my $port = $login_parameters{'port'} || 389;
-    my $bind_username = $login_parameters{'bind_username'} || '';
-    my $bind_password = $login_parameters{'bind_password'} || '';
-    my $base_object = $login_parameters{'base_object'} || '';
-    my $no_password = $login_parameters{'no_password'} || 0;
-    my $allowed_groups = $login_parameters{'allowed_groups'} || '';
+    my $server         = $login_parameters{server};
+    my $port           = $login_parameters{port}           || 389;
+    my $bind_username  = $login_parameters{bind_username}  || '';
+    my $bind_password  = $login_parameters{bind_password}  || '';
+    my $base_object    = $login_parameters{base_object}    || '';
+    my $no_password    = $login_parameters{no_password}    || 0;
+    my $allowed_groups = $login_parameters{allowed_groups} || '';
+    my $search_filter  = $login_parameters{search_filter}  || 'samaccountname';
+    my $use_tls        = $login_parameters{use_tls}        || 0;
 
     # No info?
     $username || return ("No username supplied.");
@@ -107,6 +113,12 @@ sub Jarvis::Login::ActiveDirectory::check {
     # Do that ActiveDirectory thing.  Connect first.  AD uses default LDAP port 389.
     &Jarvis::Error::debug ($jconfig, "Connecting to ActiveDirectory Server: '$server:$port'.");
     my $ldap = Net::LDAP->new ($server, port => $port) || die "Cannot connect to '$server' on port $port\n";
+
+    # Configuration requires us to use TLS.
+    if ($use_tls) {
+        # Start a TLS session on the LDAP object.
+        $ldap->start_tls ();
+    }
 
     # Bind with a password.
     #   Protocol = 3 (Default)
@@ -122,12 +134,12 @@ sub Jarvis::Login::ActiveDirectory::check {
     #   Deref = Always
     #   Types Only = False (default)
     #
-    &Jarvis::Error::debug ($jconfig, "Searching for samaccountname = '$username'.");
+    &Jarvis::Error::debug ($jconfig, "Searching for $search_filter = '$username'.");
     $mesg = $ldap->search (
-        base => $base_object,
-        deref => 'always',
-        attrs => ['memberOf', 'mail'],
-        filter => "(samaccountname=$username)"
+        base   => $base_object,
+        deref  => 'always',
+        attrs  => ['memberOf', 'mail'],
+        filter => "($search_filter=$username)"
     );
 
     # Check that we got success, and exactly one entry.  We can't handle more than
@@ -147,7 +159,7 @@ sub Jarvis::Login::ActiveDirectory::check {
     # any groups, that's strange, but probably not impossible.  We let the application
     # sort that out.
     #
-    # Build up our group_list, which consists only of the "CN" part of the groups.  Actually,
+    # Build up our group_list, which consists only of the "CN" or "cn" part of the groups.  Actually,
     # a comma separator was probably a poor choice of separator in our group_list, since
     # full LDAP group specifications use commas for the CN, OU, DC components.  Oh well.
     #
@@ -155,14 +167,13 @@ sub Jarvis::Login::ActiveDirectory::check {
     my $group_list = '';
     foreach my $group (@groups) {
         &Jarvis::Error::debug ($jconfig, "Checking group '$group'.");
-        if ($group =~ m/^CN=([^,]+),/) {
+        if ($group =~ m/^CN=([^,]+),/i) {
             my $cn_group = $1;
             &Jarvis::Error::debug ($jconfig, "Identified as member of '$cn_group'.");
             $group_list .= ($group_list ? "," : "") . $cn_group;
         } else {
             &Jarvis::Error::log ($jconfig, "User '$username' is memberOf group with unsupported name syntax." );
         }
-
     }
     $ldap->unbind ();
 
@@ -188,6 +199,12 @@ sub Jarvis::Login::ActiveDirectory::check {
     # Reconnect and check the password.
     &Jarvis::Error::debug ($jconfig, "Connecting to ActiveDirectory Server: '$server:$port'.");
     $ldap = Net::LDAP->new ($server, port => $port) || die "Cannot connect to '$server' on port $port\n";
+
+    # Configuration requires us to use TLS.
+    if ($use_tls) {
+        # Start a TLS session on the LDAP object.
+        $ldap->start_tls ();
+    }
 
     $mesg = $ldap->bind ($dn, password => $password);
     if ($mesg->code == 49) {
