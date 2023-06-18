@@ -4,6 +4,17 @@
 
 The Jarvis Web Framework. More information can be found at https://www.nsquared.nz/tech/jarvis.html
 
+## [7.5.2] - 2023-06-07
+
+### Changed
+
+- JVS-14635: Allow OAuth configuration to specify arbitrary SSL options.
+
+### Added
+
+- JVS-14634: Add missing SystemD path definitions to build file.
+- JVS-14637: Add support for TLS and OpenLDAP implementations.
+
 ## [7.5.1] - 2022-12-29
 ### Fixed
 
