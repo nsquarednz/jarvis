@@ -37,8 +37,9 @@ use warnings;
 package Jarvis::Main;
 
 use CGI;
-use File::Basename;
 use Data::Dumper;
+use Encode 'decode_utf8';
+use File::Basename;
 
 use Jarvis::Error;
 use Jarvis::Config;
@@ -405,18 +406,19 @@ sub do {
         next if ($name eq 'POSTDATA');
         next if (defined $user_args->{$name});
 
-        if (length ($cgi_params->{$name}) > 256) {
-            &Jarvis::Error::debug ($jconfig, "CGI Param: '$name' => (%d bytes).", length ($cgi_params->{$name}));
+        my $value = decode_utf8 ($cgi_params->{$name});
+        if (length ($value) > 256) {
+            &Jarvis::Error::debug ($jconfig, "CGI Param: '$name' => (%d bytes).", length ($value));
 
         } else {
-            &Jarvis::Error::debug ($jconfig, "CGI Param: '$name' => '%s'.", $cgi_params->{$name});
+            &Jarvis::Error::debug ($jconfig, "CGI Param: '$name' => '%s'.", $value);
         }
 
         if ($name =~ /\[\]$/) {
             my $user_arg  = substr($name, 0, -2);
-            $user_args->{$user_arg} = [ split(m{\0}, $cgi_params->{$name}) ];
+            $user_args->{$user_arg} = [ split(m{\0}, $value) ];
         } else {
-            $user_args->{$name} = $cgi_params->{$name};
+            $user_args->{$name} = $value;
         }
     }
 
@@ -551,6 +553,10 @@ sub do {
         } else {
             die "Unknown special dataset '$dataset_name'!\n";
         }
+
+        # Content type charset is guaranteed to be UTF-8.
+        binmode STDOUT, ':utf8';
+
         &Jarvis::Config::add_http_headers ($jconfig, {
             -type => $object_content_type,
             -cookie => $jconfig->{cookie},
@@ -609,6 +615,9 @@ sub do {
             });
 
         } else {
+            # Content type charset is guaranteed to be UTF-8.
+            binmode STDOUT, ':utf8';
+
             &Jarvis::Config::add_http_headers($jconfig,  {
                 -type => $object_content_type,
                 -cookie => $jconfig->{cookie},
@@ -628,6 +637,8 @@ sub do {
 
     # Modify a regular dataset.
     } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete") || ($action eq "mixed") || ($action eq "merge")) {
+        # Content type charset is guaranteed to be UTF-8.
+        binmode STDOUT, ':utf8';
 
         $jconfig->{dataset_type} = 's';
         my $return_text = &Jarvis::Dataset::store ($jconfig, $dataset_name, $user_args);

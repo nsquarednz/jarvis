@@ -173,7 +173,7 @@ sub handle {
 
         # These are always added for DBI if not already specified.
         $dbh_attributes->{RaiseError} //= 1;
-        $dbh_attributes->{PrintError} //= 1,;
+        $dbh_attributes->{PrintError} //= 1;
         $dbh_attributes->{AutoCommit} //= 1;
 
         &Jarvis::Error::debug ($jconfig, "DBI Attributes");
