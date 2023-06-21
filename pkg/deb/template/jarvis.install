@@ -3,7 +3,7 @@ demo usr/share/jarvis
 docs/jarvis_guide.pdf usr/share/doc/jarvis
 etc/apache etc/jarvis
 etc/jarvis/cgi_params.pm etc/jarvis
-etc/systemd usr/share/jarvis/etc/systemd
+etc/systemd usr/share/jarvis/etc
 htdocs usr/share/jarvis
 lib usr/share/jarvis
 usr /
