@@ -4,6 +4,16 @@
 
 The Jarvis Web Framework. More information can be found at https://www.nsquared.nz/tech/jarvis.html
 
+## [7.6.0] - 2023-06-26
+
+### Changed
+
+* JVS-14637: Expand configuration of OpenLDAP implementations to support group searching via DN.
+
+### Fixed
+
+* ACD-12585: Fixed querying of database elements that contain wide characters.
+
 ## [7.5.2] - 2023-06-07
 
 ### Changed
