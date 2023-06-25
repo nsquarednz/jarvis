@@ -1,3 +1,4 @@
+
 ###############################################################################
 # Description:
 #       Jarvis supports pluggable Login modules.  This module checks usernames
@@ -60,19 +61,24 @@ use Jarvis::Login::Adempiere;
 #           <parameter name="allowed_groups" value="SuperUser,Admin"/>
 #           <parameter name="search_filter"  value="samaccountname"/>
 #           <parameter name="use_tls"        value="1"/>
+#           <parameter name="group_lookup"   value="memberOf"/>
 #        </login>
 #        ...
 #    </app>
 #
-#       server         : Address of server.  Required.
-#       port           : Port for server.  Default 389.
-#       bind_username  : Username to bind to server for search.
-#       bind_password  : Password to bind to server for search.
-#       base_object    : Root of the search tree for user lookup.
-#       no_password    : Don't validate the password.  Only check user details.
-#       allowed_groups : Only allow login for users belonging to one of these groups. Optional.
-#       search_filter  : Override the search filter name to use for user lookup. Optional. Default samaccountname.
-#       use_tls        : Whether to utilize LDAP TLS connectivity. Optional. Default 0.
+#       server            : Address of server.  Required.
+#       port              : Port for server.  Default 389.
+#       bind_username     : Username to bind to server for search.
+#       bind_password     : Password to bind to server for search.
+#       base_object       : Root of the search tree for user lookup.
+#       no_password       : Don't validate the password.  Only check user details.
+#       allowed_groups    : Only allow login for users belonging to one of these groups. Optional.
+#       search_filter     : Override the search filter name to use for user lookup. Optional. Default samaccountname.
+#       use_tls           : Whether to utilize LDAP TLS connectivity. Optional. Default 0.
+#       group_lookup      : The mechanism to determine group membership. Supports "memberOf" or "query". Optional. Default "memberOf".
+#       group_base        : Root of the search tree for group lookup.
+#       group_object_class: The object class to search for when determining group membership. Optional. Default "groupOfNames".
+#       group_member_class: The member class to lookup when attempting to determien group membership. Optional. Default "member".
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -92,23 +98,28 @@ sub Jarvis::Login::ActiveDirectory::check {
     my ($jconfig, $username, $password, %login_parameters) = @_;
 
     # Our user name login parameters are here...
-    my $server         = $login_parameters{server};
-    my $port           = $login_parameters{port}           || 389;
-    my $bind_username  = $login_parameters{bind_username}  || '';
-    my $bind_password  = $login_parameters{bind_password}  || '';
-    my $base_object    = $login_parameters{base_object}    || '';
-    my $no_password    = $login_parameters{no_password}    || 0;
-    my $allowed_groups = $login_parameters{allowed_groups} || '';
-    my $search_filter  = $login_parameters{search_filter}  || 'samaccountname';
-    my $use_tls        = $login_parameters{use_tls}        || 0;
+    my $server             = $login_parameters{server};
+    my $port               = $login_parameters{port}               || 389;
+    my $bind_username      = $login_parameters{bind_username}      || '';
+    my $bind_password      = $login_parameters{bind_password}      || '';
+    my $base_object        = $login_parameters{base_object}        || '';
+    my $no_password        = $login_parameters{no_password}        || 0;
+    my $allowed_groups     = $login_parameters{allowed_groups}     || '';
+    my $search_filter      = $login_parameters{search_filter}      || 'samaccountname';
+    my $use_tls            = $login_parameters{use_tls}            || 0;
+    my $group_lookup       = $login_parameters{group_lookup}       || 'memberOf';
+    my $group_object_class = $login_parameters{group_object_class} || 'groupOfNames';
+    my $group_member_class = $login_parameters{group_member_class} || 'member';
+    my $group_base         = $login_parameters{group_base};
 
     # No info?
     $username || return ("No username supplied.");
     $password || $no_password || return ("No password supplied.");
 
     # Sanity check on config.
-    $server || return ("Missing 'server' configuration for Login module ActiveDirectory.");
+    $server      || return ("Missing 'server' configuration for Login module ActiveDirectory.");
     $base_object || return ("Missing 'base_object' configuration for Login module ActiveDirectory.");
+    ($group_lookup eq 'query' && ! defined ($group_base)) &&  return ("Missing 'group_base' configuration for 'query' groups mode for Login module ActiveDirectory");
 
     # Do that ActiveDirectory thing.  Connect first.  AD uses default LDAP port 389.
     &Jarvis::Error::debug ($jconfig, "Connecting to ActiveDirectory Server: '$server:$port'.");
@@ -135,10 +146,21 @@ sub Jarvis::Login::ActiveDirectory::check {
     #   Types Only = False (default)
     #
     &Jarvis::Error::debug ($jconfig, "Searching for $search_filter = '$username'.");
+
+    # Determine attributes to query for. We have some base values.
+    my $query_attributes = [
+        'mail'
+    ];
+
+    # If we are using memberOf group looksup lets ensure we request it.
+    if ($group_lookup eq 'memberOf') {
+        push @{$query_attributes}, 'memberOf';
+    }
+
     $mesg = $ldap->search (
         base   => $base_object,
         deref  => 'always',
-        attrs  => ['memberOf', 'mail'],
+        attrs  => $query_attributes,
         filter => "($search_filter=$username)"
     );
 
@@ -152,29 +174,64 @@ sub Jarvis::Login::ActiveDirectory::check {
     # Get the entry and see who it's for.
     #
     my $entry = $mesg->entry (0);
-    my $dn = $entry->dn ();
+    my $dn    = $entry->dn ();
     &Jarvis::Error::debug ($jconfig, "User DN '$dn'");
 
-    # Now look at the memberOf attribute of this account.  If they don't belong to
-    # any groups, that's strange, but probably not impossible.  We let the application
-    # sort that out.
-    #
-    # Build up our group_list, which consists only of the "CN" or "cn" part of the groups.  Actually,
-    # a comma separator was probably a poor choice of separator in our group_list, since
-    # full LDAP group specifications use commas for the CN, OU, DC components.  Oh well.
-    #
-    my @groups = $entry->get_value ('memberOf');
+
+    # The way we fetch groups depends on how we are configured.
     my $group_list = '';
-    foreach my $group (@groups) {
-        &Jarvis::Error::debug ($jconfig, "Checking group '$group'.");
-        if ($group =~ m/^CN=([^,]+),/i) {
-            my $cn_group = $1;
-            &Jarvis::Error::debug ($jconfig, "Identified as member of '$cn_group'.");
-            $group_list .= ($group_list ? "," : "") . $cn_group;
-        } else {
-            &Jarvis::Error::log ($jconfig, "User '$username' is memberOf group with unsupported name syntax." );
+
+    # If the lookup model is 'memberOf' we check the previous request and look for a 'memberOf' entry.
+    if ($group_lookup eq 'memberOf') {
+
+        # Now look at the memberOf attribute of this account.  If they don't belong to
+        # any groups, that's strange, but probably not impossible.  We let the application
+        # sort that out.
+        #
+        # Build up our group_list, which consists only of the "CN" or "cn" part of the groups.  Actually,
+        # a comma separator was probably a poor choice of separator in our group_list, since
+        # full LDAP group specifications use commas for the CN, OU, DC components.  Oh well.
+        #
+        my @groups = $entry->get_value ('memberOf');
+
+        foreach my $group (@groups) {
+            &Jarvis::Error::debug ($jconfig, "Checking group '$group'.");
+            if ($group =~ m/^CN=([^,]+),/i) {
+                my $cn_group = $1;
+                &Jarvis::Error::debug ($jconfig, "Identified as member of '$cn_group'.");
+                $group_list .= ($group_list ? "," : "") . $cn_group;
+            } else {
+                &Jarvis::Error::log ($jconfig, "User '$username' is memberOf group with unsupported name syntax." );
+            }
+        }
+
+    # If we are using a 'query' lookup then we need to perform an additional search against
+    # the users search filtered username and look for group membership.
+    } elsif ($group_lookup eq 'query') {
+
+        # Search the configured group base object looking for mapped group objects for our username.
+        &Jarvis::Error::debug ($jconfig, "Searching for groups belonging to $search_filter = '$username'.");
+        $mesg = $ldap->search (
+            base   => $group_base,
+            deref  => 'always',
+            # Request the CN for our group so we don't have to parse it out.
+            attrs  => [
+                'cn'
+            ],
+            # Check for the requested group object class matching the DN against the object class member property.
+            filter => "(&(objectClass=$group_object_class)($group_member_class=$dn))"
+        );
+
+        # Check for failure.
+        $mesg->code && die "Search for '$username' failed with " . $mesg->code . " '" . $mesg->error . "'\n";
+
+        # We might have no group or multiple. Each group will be in its own response object. Parse each entry.
+        foreach $entry ($mesg->entries) {
+            my $group_cn = $entry->get_value ('cn') || die "Receieved group mapping that did not contain a 'CN'.\n";
+            $group_list .= ($group_list ? "," : "") . $group_cn;
         }
     }
+
     $ldap->unbind ();
 
     # we got the group list, check if user is allowed
