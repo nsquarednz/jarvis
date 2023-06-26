@@ -4,6 +4,12 @@
 
 The Jarvis Web Framework. More information can be found at https://www.nsquared.nz/tech/jarvis.html
 
+## [7.6.1] - 2023-06-26
+
+### Added
+
+* JVS-14637: Add support for PosixGroup UID binds on member lookups.
+
 ## [7.6.0] - 2023-06-26
 
 ### Changed
