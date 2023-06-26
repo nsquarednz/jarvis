@@ -79,6 +79,7 @@ use Jarvis::Login::Adempiere;
 #       group_base        : Root of the search tree for group lookup.
 #       group_object_class: The object class to search for when determining group membership. Optional. Default "groupOfNames".
 #       group_member_class: The member class to lookup when attempting to determien group membership. Optional. Default "member".
+#       group_member_bind : The type of lookup object to use to bind when querying groups. Optional. Default "dn".
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -110,6 +111,7 @@ sub Jarvis::Login::ActiveDirectory::check {
     my $group_lookup       = $login_parameters{group_lookup}       || 'memberOf';
     my $group_object_class = $login_parameters{group_object_class} || 'groupOfNames';
     my $group_member_class = $login_parameters{group_member_class} || 'member';
+    my $group_member_bind  = $login_parameters{group_member_bind}  || 'dn';
     my $group_base         = $login_parameters{group_base};
 
     # No info?
@@ -150,6 +152,7 @@ sub Jarvis::Login::ActiveDirectory::check {
     # Determine attributes to query for. We have some base values.
     my $query_attributes = [
         'mail'
+        , 'uid'
     ];
 
     # If we are using memberOf group looksup lets ensure we request it.
@@ -175,6 +178,8 @@ sub Jarvis::Login::ActiveDirectory::check {
     #
     my $entry = $mesg->entry (0);
     my $dn    = $entry->dn ();
+    my $uid   = $entry->get_value ('uid');
+
     &Jarvis::Error::debug ($jconfig, "User DN '$dn'");
 
 
@@ -209,6 +214,19 @@ sub Jarvis::Login::ActiveDirectory::check {
     # the users search filtered username and look for group membership.
     } elsif ($group_lookup eq 'query') {
 
+        # Determien the search term. This depends on what we're binding to.
+        my $group_search_user_filter;
+        if ($group_member_bind eq 'dn') {
+            $group_search_user_filter = $dn;
+
+        } elsif ($group_member_bind eq 'uid') {
+            $uid || return "User '$username' does not have an associated UID.";
+            $group_search_user_filter = $uid;
+
+        } else {
+            die "Unsupported Group Member Bind: '$group_member_bind'\n";
+        }
+
         # Search the configured group base object looking for mapped group objects for our username.
         &Jarvis::Error::debug ($jconfig, "Searching for groups belonging to $search_filter = '$username'.");
         $mesg = $ldap->search (
@@ -219,7 +237,7 @@ sub Jarvis::Login::ActiveDirectory::check {
                 'cn'
             ],
             # Check for the requested group object class matching the DN against the object class member property.
-            filter => "(&(objectClass=$group_object_class)($group_member_class=$dn))"
+            filter => "(&(objectClass=$group_object_class)($group_member_class=$group_search_user_filter))"
         );
 
         # Check for failure.
@@ -230,6 +248,9 @@ sub Jarvis::Login::ActiveDirectory::check {
             my $group_cn = $entry->get_value ('cn') || die "Receieved group mapping that did not contain a 'CN'.\n";
             $group_list .= ($group_list ? "," : "") . $group_cn;
         }
+
+    } else {
+        die "Unsupported 'group_lookup' '$group_lookup'\n";
     }
 
     $ldap->unbind ();
