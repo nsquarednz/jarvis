@@ -49,12 +49,19 @@ sub report {
     my ($jconfig) = @_;
 
     my %fields = ();
-    $fields{"logged_in"} = $jconfig->{'logged_in'} ? 1 : 0;
-    $fields{"username"} = $jconfig->{'username'};
+    $fields{"logged_in"}    = $jconfig->{'logged_in'} ? 1 : 0;
+    $fields{"username"}     = $jconfig->{'username'};
     $fields{"error_string"} = $jconfig->{'error_string'};
-    $fields{"group_list"} = $jconfig->{'group_list'};
-    $fields{"sid"} = $jconfig->{'sid'};
-    $fields{"sid_param"} = $jconfig->{'sid_param'};
+    $fields{"group_list"}   = $jconfig->{'group_list'};
+    $fields{"sid"}          = $jconfig->{'sid'};
+    $fields{"sid_param"}    = $jconfig->{'sid_param'};
+
+    # Has anything set a special status required flag that we should serialize?
+    if (defined ($jconfig->{additional_status})) {
+        foreach my $key (keys %{$jconfig->{additional_status}}) {
+            $fields{$key} = $jconfig->{additional_status}{$key};
+        }
+    }
 
     my $extra_href = {};
     my $return_text = undef;

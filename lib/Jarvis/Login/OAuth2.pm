@@ -472,21 +472,22 @@ sub performConfidentialAuth {
             my $username = $decoded_id_token->{preferred_username};
 
             # Determine if we need to pull apart the refresh token. This could just be a single use token.
+            my $token_expiry;
             if ($decode_refresh_token) {
                 # Also decode the refresh token, it will hold our session expiry time.
                 my $decoded_refresh_token =JSON::WebToken->decode ($refresh_token, undef, 0, 'none');
 
                 # Update the expiry stored against our session if we are getting it from our refresh token.
                 if (! $id_token_contains_exp) {
-                    $decoded_refresh_token->{'exp'} || die ("Refresh token does not contain an expiry time.\n");
-                    $jconfig->{session}->expire ($decoded_refresh_token->{'exp'});
+                    $token_expiry = $decoded_refresh_token->{'exp'} || die ("Refresh token does not contain an expiry time.\n");
+                    $jconfig->{session}->expire ($token_expiry);
                 }
             }
 
             # ID token contains the expiry?
             if ($id_token_contains_exp) {
-                $decoded_id_token->{'exp'} || die ("ID token does not contain an expiry time.\n");
-                $jconfig->{session}->expire ($decoded_id_token->{'exp'});
+                $token_expiry = $decoded_id_token->{'exp'} || die ("ID token does not contain an expiry time.\n");
+                $jconfig->{session}->expire ($token_expiry);
             }
 
             # Handle groups. This depends entirely on the groups mode.
@@ -568,9 +569,11 @@ sub performConfidentialAuth {
             # Grab the external ID of the user that we performed auth for.
             my $external_user_id = $decoded_id_token->{$user_identifier_key} || die ("Authorization Token does not contain '$user_identifier_key' information.\n");
 
-            # Store session properties.
-            # $jconfig->{session}->param ("token_expiry", $token_expiry);
-            # $jconfig->{session}->param ("current_auth_token_hash", $authorization_header_hash);
+            # If we have an expiry time ensure our GUI is aware of it so it can send updates to us to ensure the token is kept alive.
+            if ($token_expiry) {
+                $jconfig->{additional_status}{token_expiry} = $token_expiry;
+            }
+
             $jconfig->{session}->param ('external_user_id', $external_user_id);
             # Store the item from our user name key on the session. This maps to what will be our user principle.
             $jconfig->{session}->param ('external_user_principle', $username);
@@ -825,14 +828,15 @@ sub Jarvis::Login::OAuth2::refresh {
 
                 # We do have to parse the refresh token as we do need to update the expire time on our CGI session.
                 # Determine if we need to pull apart the refresh token. This could just be a single use token.
+                my $token_expiry;
                 if ($decode_refresh_token) {
                     # Also decode the refresh token, it will hold our session expiry time.
-                    my $decoded_refresh_token =JSON::WebToken->decode ($refresh_token, undef, 0, 'none');
+                    my $decoded_refresh_token = JSON::WebToken->decode ($refresh_token, undef, 0, 'none');
 
                     # Update the expiry stored against our session if we are getting it from our refresh token.
                     if (! $id_token_contains_exp) {
-                        $decoded_refresh_token->{'exp'} || die ("Refresh token does not contain an expiry time.\n");
-                        $jconfig->{session}->expire ($decoded_refresh_token->{'exp'});
+                        $token_expiry = $decoded_refresh_token->{'exp'} || die ("Refresh token does not contain an expiry time.\n");
+                        $jconfig->{session}->expire ($token_expiry);
                     }
                 }
 
@@ -841,8 +845,13 @@ sub Jarvis::Login::OAuth2::refresh {
                     # Decode the ID token using our token library. This contains user identifying information that we can access and use.
                     my $decoded_id_token = JSON::WebToken->decode ($token_refresh_message_json->{id_token}, undef, 0, 'none');
 
-                    $decoded_id_token->{'exp'} || die ("ID token does not contain an expiry time.\n");
-                    $jconfig->{session}->expire ($decoded_id_token->{'exp'});
+                    $token_expiry = $decoded_id_token->{'exp'} || die ("ID token does not contain an expiry time.\n");
+                    $jconfig->{session}->expire ($token_expiry);
+                }
+
+                # Store the token expiry if we have one.
+                if ($token_expiry) {
+                    $jconfig->{additional_status}{token_expiry} = $token_expiry;
                 }
 
             } else {
