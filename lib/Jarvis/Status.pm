@@ -1,3 +1,4 @@
+
 ###############################################################################
 # Description:  Reports the status of the current session.  Are we logged-in,
 #               what groups do we belong to, etc...
@@ -49,12 +50,18 @@ sub report {
     my ($jconfig) = @_;
 
     my %fields = ();
-    $fields{"logged_in"} = $jconfig->{'logged_in'} ? 1 : 0;
-    $fields{"username"} = $jconfig->{'username'};
+    $fields{"logged_in"}    = $jconfig->{'logged_in'} ? 1 : 0;
+    $fields{"username"}     = $jconfig->{'username'};
     $fields{"error_string"} = $jconfig->{'error_string'};
-    $fields{"group_list"} = $jconfig->{'group_list'};
-    $fields{"sid"} = $jconfig->{'sid'};
-    $fields{"sid_param"} = $jconfig->{'sid_param'};
+    $fields{"group_list"}   = $jconfig->{'group_list'};
+    $fields{"sid"}          = $jconfig->{'sid'};
+    $fields{"sid_param"}    = $jconfig->{'sid_param'};
+
+    # If we have a session associated with our request.
+    # Determine when that session will expire. We use the expiry time (seconds) and offset that with the access time of the token.
+    if ($jconfig->{'session'}) {
+        $fields{"login_expiry"} = ($jconfig->{'session'}->atime () + $jconfig->{'session'}->expire ());
+    }
 
     my $extra_href = {};
     my $return_text = undef;
