@@ -1,3 +1,4 @@
+
 ###############################################################################
 # Description:  Reports the status of the current session.  Are we logged-in,
 #               what groups do we belong to, etc...
@@ -56,11 +57,10 @@ sub report {
     $fields{"sid"}          = $jconfig->{'sid'};
     $fields{"sid_param"}    = $jconfig->{'sid_param'};
 
-    # Has anything set a special status required flag that we should serialize?
-    if (defined ($jconfig->{additional_status})) {
-        foreach my $key (keys %{$jconfig->{additional_status}}) {
-            $fields{$key} = $jconfig->{additional_status}{$key};
-        }
+    # If we have a session associated with our request.
+    # Determine when that session will expire. We use the expiry time (seconds) and offset that with the access time of the token.
+    if ($jconfig->{'session'}) {
+        $fields{"login_expiry"} = ($jconfig->{'session'}->atime () + $jconfig->{'session'}->expire ());
     }
 
     my $extra_href = {};
