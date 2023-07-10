@@ -4,6 +4,12 @@
 
 The Jarvis Web Framework. More information can be found at https://www.nsquared.nz/tech/jarvis.html
 
+## [7.6.2] - 2023-07-10
+
+### Added
+
+* JVS-14638: Return login expiration time information in status requests.
+
 ## [7.6.1] - 2023-06-26
 
 ### Added
