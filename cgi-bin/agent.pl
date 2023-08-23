@@ -36,7 +36,16 @@ $Carp::CarpLevel = 1;
 # SetEnv JARVIS_ROOT "/path/to/jarvis"
 #
 my $jarvis_root;
-BEGIN { $jarvis_root = $ENV{'JARVIS_ROOT'} || "/usr/share/jarvis" }
+BEGIN {
+    $jarvis_root = $ENV{'JARVIS_ROOT'} || "/usr/share/jarvis";
+
+    # Folks might want to send us UTF-8 content. Set binmode on STDERR to avoid
+    # "Wide character in print..." errors when debugging that content.
+    #
+    # Note we don't do the same for STDIN or STDOUT because that content may be
+    # binary (files), and applying binmode would corrupt it.
+    binmode STDERR, ":utf8";
+}
 
 use lib "$jarvis_root/lib";
 

@@ -145,10 +145,6 @@ sub new {
     $self->{dump} = $Jarvis::Config::yes_value {lc ($axml->{dump} // "no")};
     $self->{debug} = $self->{dump} || $Jarvis::Config::yes_value {lc ($axml->{debug} // "no")};
 
-    # Set binmode on STDERR because folks could want to send us UTF-8 content, and
-    # debug (or even log) could raise "Wide character in print" errors.
-    binmode STDERR, ":utf8";
-
     # This is used by both debug and log output.
     $self->{log_format} = $axml->{log_format} // '[%P/%A/%U/%D][%R] %M';
 

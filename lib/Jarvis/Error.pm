@@ -27,12 +27,13 @@ use warnings;
 package Jarvis::Error;
 
 use Data::Dumper;
+use Encode qw (_utf8_off _utf8_on);
 use Time::HiRes;
 
 use Jarvis::Text;
 
 # I don't like the way that Data::Dumper decides to print its non-printable
-# strings.  It uses octet for bytes that it doesn't like.  But in telephony
+# strings.  It uses octal for bytes that it doesn't like.  But in telephony
 # we prefer hex.  Also if one byte in a string is hex, it's a pretty good 
 # indicator that all the other bytes are probably hex as well, and should
 # be reported as such.
@@ -40,6 +41,55 @@ use Jarvis::Text;
     no warnings 'redefine';
     sub Data::Dumper::qquote {
         return "'" . &Jarvis::Error::printable (shift) . "'";
+    }
+}
+
+###############################################################################
+# Perform environment-specific UTF-8 printing.
+#
+# Both standard and fast CGI will warn if we attempt to print content
+# containing UTF-8.
+#
+#   standard: "Wide character in print..."
+#   fast: "Use of wide characters in FCGI::Stream::PRINT..."
+#
+# The warnings break output, so we can't just ignore them!
+#
+# With standard CGI we can use binmode to solve the problem.
+#
+# Unfortunately fast CGI uses tied handles which don't honour binmode:
+#   https://www.apachelounge.com/viewtopic.php?p=37483
+#
+# So for fast CGI we assume the content of $string_ref is [already] UTF-8
+# encoded. Therefore we do not have to encode again. We can simply clear the
+# internal UTF-8 flag that Fast CGI trips over.
+#
+# Parameters:
+#       $string_ref - A reference to the string to print.
+#       $stream - The stream to print to. Defaults to STDOUT.
+#
+# Returns:
+#       <nothing>
+###############################################################################
+#
+my $is_fast_cgi = undef;
+sub print_utf8 {
+    my ($string_ref, $stream) = @_;
+    $stream //= *STDOUT;
+    if (!defined $is_fast_cgi) {
+        my $h = $CGI::Fast::Ext_Request;
+        $is_fast_cgi = (defined $h && ref($h) && $h->IsFastCGI()) ? 1 : 0;
+    }
+    if ($is_fast_cgi) {
+        my $was_utf8 = _utf8_off($$string_ref);
+        print $stream $$string_ref;
+        _utf8_on(${$string_ref}) if ($was_utf8); 
+    } else {
+        # We enable binmode for STDERR globally in agent.pl.
+        if ($stream eq *STDOUT) {
+            binmode $stream, ':utf8';
+        }
+        print $stream $$string_ref;
     }
 }
 
@@ -164,8 +214,8 @@ sub print_message {
 }
 
 ################################################################################
-# Makes a standard message to print out. Uses the log_format from the Jarvis
-# config. Uses print_message 
+# Prints a standard-format message to STDERR. Uses the log_format from the
+# Jarvis config. Uses print_message and print_utf8.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -180,12 +230,13 @@ sub print_message {
 #       Default dbmask is in Config.pm.
 #
 # Returns:
-#       The error string to present to the client.
+#       <nothing>
 ################################################################################
 #
 sub print_log_message {
     my ($jconfig, $level, $msg, @params) = @_;
-    return &print_message ($jconfig, $jconfig->{log_format}, $level, $msg, @params);
+    my $string = &print_message ($jconfig, $jconfig->{log_format}, $level, $msg, @params);
+    print_utf8 (\$string, *STDERR);
 }
 
 ###############################################################################
@@ -193,7 +244,7 @@ sub print_log_message {
 ###############################################################################
 
 ################################################################################
-# Generate debug/dump/log output.  Uses print_log_message.
+# Print debug/dump/log output to STDERR.  Uses print_log_message.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -201,25 +252,25 @@ sub print_log_message {
 #       @params - Optional params to be "sprintf" written into $msg.
 #
 # Returns:
-#       Prints to STDERR and returns 1.
+#       <nothing>
 ################################################################################
 #
 sub debug {
     my ($jconfig, $msg, @params) = @_;
 
     $jconfig->{'debug'} || return;
-    print STDERR &print_log_message ($jconfig, 'debug', $msg, @params);
+    &print_log_message ($jconfig, 'debug', $msg, @params);
 }
 sub dump {
     my ($jconfig, $msg, @params) = @_;
 
     $jconfig->{'dump'} || return;
-    print STDERR &print_log_message ($jconfig, 'dump', $msg, @params);
+    &print_log_message ($jconfig, 'dump', $msg, @params);
 }
 sub log {
     my ($jconfig, $msg, @params) = @_;
 
-    print STDERR &print_log_message ($jconfig, 'log', $msg, @params);
+    &print_log_message ($jconfig, 'log', $msg, @params);
 }
 
 ################################################################################
@@ -256,7 +307,7 @@ sub print_var {
     my $dumper = Data::Dumper->new([$var]);
     my $var_dump = $dumper->Useqq(1)->Terse(1)->Indent(1)->Sortkeys(1)->Dump ();
     foreach my $msg (split ("\n", $var_dump)) {
-        print STDERR &print_log_message ($jconfig, $level, $msg);
+        &print_log_message ($jconfig, $level, $msg);
     }
 }
 
@@ -292,13 +343,13 @@ sub print_hex {
     my ($jconfig, $level, $msg) = @_;
     
     if (! defined $msg) {
-        print STDERR &print_log_message ($jconfig, $level, "  <undef>");
+        &print_log_message ($jconfig, $level, "  <undef>");
         
     } else {
         my $msglen = length ($msg);
         for (my $pos = 0; $pos < $msglen; $pos = $pos + 16) {
             my $hex = join (" ", unpack ("(H2)*", substr ($msg, $pos, 16)));
-            print STDERR &print_log_message ($jconfig, $level, "  " . $hex);
+            &print_log_message ($jconfig, $level, "  " . $hex);
         }
     }
 }
