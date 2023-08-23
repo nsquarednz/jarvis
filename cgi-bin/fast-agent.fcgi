@@ -36,7 +36,7 @@ $Carp::CarpLevel = 1;
 # webserver config.  E.g. in apache, add the following line (without the
 # leading hash).
 #
-# SetEnv JARVIS_ROOT "/path/to/jarvis"
+# FcgidInitialEnv JARVIS_ROOT "/path/to/jarvis"
 #
 my $jarvis_root;
 BEGIN { 
