@@ -598,7 +598,7 @@ sub do {
         #
         my $is_utf8_content = 0;
         if ($jconfig->{format} eq "csv" || $jconfig->{format} eq "xlsx") {
-            my $filename = $jconfig->{return_filename} || $dataset_name . ".csv";
+            my $filename = $jconfig->{return_filename} || $dataset_name . ".$jconfig->{format}";
             $filename =~ s/"/\\"/g;
 
             if ($jconfig->{format} eq "csv") {
