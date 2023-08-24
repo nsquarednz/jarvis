@@ -180,7 +180,7 @@ sub error_handler {
 
         # The message may contain UTF-8 content, not sure.  Better to be safe.
         $long_msg = $jconfig->{debug} ? Carp::longmess $long_msg : Carp::shortmess $long_msg;
-        &Jarvis::Error::print_utf8 (\$long_msg, *STDERR);
+        &Jarvis::Error::print_utf8 (\*STDERR, \$long_msg);
     }
 
     # We MUST ensure that ALL the cached database handles are removed.

@@ -65,8 +65,9 @@ use Jarvis::Text;
 # internal UTF-8 flag that Fast CGI trips over.
 #
 # Parameters:
+#       $stream - An optional reference to the stream to print to. Defaults to
+#                   STDOUT.
 #       $string_ref - A reference to the string to print.
-#       $stream - The stream to print to. Defaults to STDOUT.
 #
 # Returns:
 #       <nothing>
@@ -74,8 +75,11 @@ use Jarvis::Text;
 #
 my $is_fast_cgi = undef;
 sub print_utf8 {
-    my ($string_ref, $stream) = @_;
-    $stream //= *STDOUT;
+    my ($stream, $string_ref) = @_;
+    if (ref($stream) ne 'GLOB') {
+        $string_ref = $stream;
+        $stream = \*STDOUT;
+    }
     if (!defined $is_fast_cgi) {
         my $h = $CGI::Fast::Ext_Request;
         $is_fast_cgi = (defined $h && ref($h) && $h->IsFastCGI()) ? 1 : 0;
@@ -86,7 +90,7 @@ sub print_utf8 {
         _utf8_on(${$string_ref}) if ($was_utf8); 
     } else {
         # We enable binmode for STDERR globally in agent.pl.
-        if ($stream eq *STDOUT) {
+        if ($stream eq \*STDOUT) {
             binmode $stream, ':utf8';
         }
         print $stream $$string_ref;
@@ -236,7 +240,7 @@ sub print_message {
 sub print_log_message {
     my ($jconfig, $level, $msg, @params) = @_;
     my $string = &print_message ($jconfig, $jconfig->{log_format}, $level, $msg, @params);
-    print_utf8 (\$string, *STDERR);
+    print_utf8 (\*STDERR, \$string);
 }
 
 ###############################################################################
