@@ -130,12 +130,12 @@ sub printable {
 }
 
 ################################################################################
-# Generates an error message to send to the client over HTTP.
+# Formats a message according to a supplied format string.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
 #           READ: username, app_name, dataset_name
-#       $format - The format to use when formatting our response message
+#       $format - The format to use.
 #       $msg - User message string. We will extend with extra info from $jconfig.
 #       $level - "log", "error", etc.
 #       @params - Optional params to be "sprintf" written into $msg.
@@ -154,10 +154,10 @@ sub printable {
 #       Default dbmask is in Config.pm.
 #
 # Returns:
-#       The error string to present to the client.
+#       The formatted message.
 ################################################################################
 #
-sub print_message {
+sub format_message {
     my ($jconfig, $format, $level, $msg, @params) = @_;
 
     use integer;
@@ -219,7 +219,7 @@ sub print_message {
 
 ################################################################################
 # Prints a standard-format message to STDERR. Uses the log_format from the
-# Jarvis config. Uses print_message and print_utf8.
+# Jarvis config. Uses format_message and print_utf8.
 #
 # Params:
 #       $jconfig - Jarvis::Config object
@@ -228,7 +228,7 @@ sub print_message {
 #       $level - "log", "error", etc.
 #       @params - Optional params to be "sprintf" written into $msg.
 #
-#       log_format contains specifies the headers to include. See print_message
+#       log_format contains specifies the headers to include. See format_message
 #       for more information
 #
 #       Default dbmask is in Config.pm.
@@ -239,7 +239,7 @@ sub print_message {
 #
 sub print_log_message {
     my ($jconfig, $level, $msg, @params) = @_;
-    my $string = &print_message ($jconfig, $jconfig->{log_format}, $level, $msg, @params);
+    my $string = &format_message ($jconfig, $jconfig->{log_format}, $level, $msg, @params);
     print_utf8 (\*STDERR, \$string);
 }
 

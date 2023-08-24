@@ -164,14 +164,14 @@ sub error_handler {
     &Jarvis::Config::add_http_headers($jconfig,{ -status => $status, -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt" });
     print $cgi->header($jconfig->{http_headers});
     if ($status =~ /^500/) {
-        print &Jarvis::Error::print_message ($jconfig, $jconfig->{error_response_format} || "[%T][%R] %M", 'fatal', $msg);
+        print &Jarvis::Error::format_message ($jconfig, $jconfig->{error_response_format} || "[%T][%R] %M", 'fatal', $msg);
     } else {
         print $msg;
     }
 
     # Print to error log.  Include stack trace if debug is enabled.
     if ($status =~ /^500/) {
-        my $long_msg = &Jarvis::Error::print_message ($jconfig, $jconfig->{log_format}, 'fatal', $msg);
+        my $long_msg = &Jarvis::Error::format_message ($jconfig, $jconfig->{log_format}, 'fatal', $msg);
 
         # Include the URI.
         if (! $jconfig->{debug}) {
