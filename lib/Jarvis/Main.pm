@@ -161,24 +161,26 @@ sub error_handler {
     # since that is a potential security weakness.
     $jconfig->{status} = $jconfig->{status} || "500 Internal Server Error";
     my $status = $jconfig->{status};
-    &Jarvis::Config::add_http_headers($jconfig,{ -status => $status, -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt" });
-    print $cgi->header($jconfig->{http_headers});
+    &Jarvis::Config::add_http_headers ($jconfig,{ -status => $status, -type => "text/plain; charset=UTF-8", 'Content-Disposition' => "inline; filename=error.txt" });
+    &Jarvis::Error::print_utf8 (\$cgi->header ($jconfig->{http_headers}));
+    my $output = $msg;
     if ($status =~ /^500/) {
-        print &Jarvis::Error::print_message ($jconfig, $jconfig->{error_response_format} || "[%T][%R] %M", 'fatal', $msg);
-    } else {
-        print $msg;
+        $output = &Jarvis::Error::format_message ($jconfig, $jconfig->{error_response_format} || "[%T][%R] %M", 'fatal', $msg);
     }
+    &Jarvis::Error::print_utf8 (\$output);
 
     # Print to error log.  Include stack trace if debug is enabled.
-    my $long_msg = &Jarvis::Error::print_log_message ($jconfig, 'fatal', $msg);
-
-    # Print URI to log if not done already.
-    if (! $jconfig->{debug}) {
-        $long_msg = $long_msg . "        URI = $ENV{REQUEST_URI}";
-    }
-
     if ($status =~ /^500/) {
-        print STDERR ($jconfig->{debug} ? Carp::longmess $long_msg : Carp::shortmess $long_msg);
+        my $long_msg = &Jarvis::Error::format_message ($jconfig, $jconfig->{log_format}, 'fatal', $msg);
+
+        # Include the URI.
+        if (! $jconfig->{debug}) {
+            $long_msg = $long_msg . "        URI = $ENV{REQUEST_URI}";
+        }
+
+        # The message may contain UTF-8 content, not sure.  Better to be safe.
+        $long_msg = $jconfig->{debug} ? Carp::longmess $long_msg : Carp::shortmess $long_msg;
+        &Jarvis::Error::print_utf8 (\*STDERR, \$long_msg);
     }
 
     # We MUST ensure that ALL the cached database handles are removed.
@@ -554,16 +556,16 @@ sub do {
             die "Unknown special dataset '$dataset_name'!\n";
         }
 
-        # Content type charset is guaranteed to be UTF-8.
-        binmode STDOUT, ':utf8';
-
         &Jarvis::Config::add_http_headers ($jconfig, {
             -type => $object_content_type,
             -cookie => $jconfig->{cookie},
             'Cache-Control' => 'no-store, no-cache, must-revalidate'
         });
-        print $cgi->header ($jconfig->{http_headers});
-        print $return_text;
+
+        # As per the logic for $object_content_type, content type charset is
+        # guaranteed to be UTF-8.
+        &Jarvis::Error::print_utf8 (\$cgi->header ($jconfig->{http_headers}));
+        &Jarvis::Error::print_utf8 (\$return_text);
 
     # A custom exec for this application?  We hand off entirely for this case,
     # since the MIME type may be special.  Exec::Do will add the cookie in the
@@ -589,62 +591,64 @@ sub do {
         my $return_text = &Jarvis::Dataset::fetch ($jconfig, $dataset_name, $user_args);
 
         #
-        # When providing CSV output, it is most likely going to be downloaded and
-        # stored by users, or downloaded and loaded into a spreadsheet application.
+        # When providing CSV and XLSX output, it is most likely going to be
+        # downloaded and stored by users, or downloaded and loaded into a
+        # spreadsheet application. So, we suggest it as an attachment, with the
+        # filename of the dataset.
         #
-        # So, for CSV we suggest it as an attachment, with the filename of the dataset.
-        #
-        if ($jconfig->{format} eq "csv") {
-            my $filename = $jconfig->{return_filename} || $dataset_name . ".csv";
+        my $is_utf8_content = 0;
+        if ($jconfig->{format} eq "csv" || $jconfig->{format} eq "xlsx") {
+            my $filename = $jconfig->{return_filename} || $dataset_name . ".$jconfig->{format}";
             $filename =~ s/"/\\"/g;
-            &Jarvis::Config::add_http_headers($jconfig, {
-                -type => 'text/csv; charset=UTF-8; name="' . $filename . '"',
-                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-                -cookie => $jconfig->{cookie},
-                'Cache-Control' => 'no-store, no-cache, must-revalidate'
-            });
 
-        } elsif ($jconfig->{format} eq "xlsx") {
-            my $filename = $jconfig->{return_filename} || $dataset_name . ".xlsx";
-            $filename =~ s/"/\\"/g;
+            if ($jconfig->{format} eq "csv") {
+                $is_utf8_content = 1;
+                $object_content_type = 'text/csv; charset=UTF-8; name="' . $filename . '"';
+            } else {
+                $object_content_type = 'application/vnd.ms-excel; name="' . $filename . '"';
+            }
             &Jarvis::Config::add_http_headers($jconfig, {
-                -type => 'application/vnd.ms-excel; name="' . $filename . '"',
+                -type => $object_content_type,
                 'Content-Disposition' => 'attachment; filename="' . $filename . '"',
                 -cookie => $jconfig->{cookie},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             });
 
         } else {
-            # Content type charset is guaranteed to be UTF-8.
-            binmode STDOUT, ':utf8';
-
             &Jarvis::Config::add_http_headers($jconfig,  {
                 -type => $object_content_type,
                 -cookie => $jconfig->{cookie},
                 'Cache-Control' => 'no-store, no-cache, must-revalidate'
             });
+
+            # If we have XSRF Protection enabled then we prefix all JSON responses with ")]}',\n" This prevents executable JSON being
+            # being passed to JSON clients.
+            if ($jconfig->{xsrf_protection} && $jconfig->{format} =~ /^json/) {
+                $return_text = ")]}',\n" . $return_text;
+            }
+
+            # As per the logic for $object_content_type, content type charset
+            # is guaranteed to be UTF-8.
+            $is_utf8_content = 1;
         }
 
-        print $cgi->header($jconfig->{http_headers});
-
-        # If we have XSRF Protection enabled then we prefix all JSON responses with ")]}',\n" This prevents executable JSON being
-        # being passed to JSON clients.
-        if ($jconfig->{xsrf_protection} && $jconfig->{format} =~ /^json/) {
-            print ")]}',\n" . $return_text;
+        if ($is_utf8_content) {
+            &Jarvis::Error::print_utf8(\$cgi->header($jconfig->{http_headers}));
+            &Jarvis::Error::print_utf8(\$return_text);
         } else {
+            print $cgi->header($jconfig->{http_headers});
             print $return_text;
         }
 
     # Modify a regular dataset.
     } elsif (($action eq "insert") || ($action eq "update") || ($action eq "delete") || ($action eq "mixed") || ($action eq "merge")) {
-        # Content type charset is guaranteed to be UTF-8.
-        binmode STDOUT, ':utf8';
-
         $jconfig->{dataset_type} = 's';
         my $return_text = &Jarvis::Dataset::store ($jconfig, $dataset_name, $user_args);
         &Jarvis::Config::add_http_headers($jconfig, {-type => "text/plain; charset=UTF-8", -cookie => $jconfig->{cookie}});
-        print $cgi->header($jconfig->{http_headers});
-        print $return_text;
+
+        # Content type charset is guaranteed to be UTF-8.
+        &Jarvis::Error::print_utf8(\$cgi->header($jconfig->{http_headers}));
+        &Jarvis::Error::print_utf8(\$return_text);
 
     # It's the end of the world as we know it.
     } else {
