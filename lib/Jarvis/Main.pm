@@ -161,13 +161,13 @@ sub error_handler {
     # since that is a potential security weakness.
     $jconfig->{status} = $jconfig->{status} || "500 Internal Server Error";
     my $status = $jconfig->{status};
-    &Jarvis::Config::add_http_headers($jconfig,{ -status => $status, -type => "text/plain", 'Content-Disposition' => "inline; filename=error.txt" });
-    print $cgi->header($jconfig->{http_headers});
+    &Jarvis::Config::add_http_headers ($jconfig,{ -status => $status, -type => "text/plain; charset=UTF-8", 'Content-Disposition' => "inline; filename=error.txt" });
+    &Jarvis::Error::print_utf8 (\$cgi->header ($jconfig->{http_headers}));
+    my $output = $msg;
     if ($status =~ /^500/) {
-        print &Jarvis::Error::format_message ($jconfig, $jconfig->{error_response_format} || "[%T][%R] %M", 'fatal', $msg);
-    } else {
-        print $msg;
+        $output = &Jarvis::Error::format_message ($jconfig, $jconfig->{error_response_format} || "[%T][%R] %M", 'fatal', $msg);
     }
+    &Jarvis::Error::print_utf8 (\$output);
 
     # Print to error log.  Include stack trace if debug is enabled.
     if ($status =~ /^500/) {
