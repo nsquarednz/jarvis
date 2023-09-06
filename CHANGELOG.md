@@ -4,6 +4,12 @@
 
 The Jarvis Web Framework. More information can be found at https://www.nsquared.nz/tech/jarvis.html
 
+## [7.6.3] - 2023-09-06
+
+### Added
+
+* ACD-12767: Add improved handling for UTF-8 wide characters.
+
 ## [7.6.2] - 2023-07-10
 
 ### Added
