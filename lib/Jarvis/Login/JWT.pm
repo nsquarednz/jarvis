@@ -81,99 +81,107 @@ sub processRfc7519Token {
     my $groups_key            = $login_parameters{groups_key}           || 'groups';
     my $expiry_key            = $login_parameters{expiry_key}           || 'expiry';
     my $token_path            = $login_parameters{token_path}           || 'token';
+    my $token_source          = $login_parameters{token_source}         || 'uri';
 
     # If validating the token ensure key path is specified.
     if ($validate_token) {
         (defined ($validation_key) and defined ($validation_algorithms)) or die ("validation_key and validation_algorithms must be defined if validate_token is set.\n");
     }
 
-    # Attempt to locate the token.
-    my $token = $jconfig->{'cgi'}->param($token_path);
+    # Valid token source location. This could either be the URI or the POST body content.
+    if ($token_source ne 'uri' && $token_source ne 'body') {
+        die ("token_source must be either 'uri' or 'body'.\n");
+    }
 
-    # We might have also been given an encoded POSTDATA object.
-    if (my $post_data = $jconfig->{'cgi'}->param('POSTDATA')) {
-        # If we have POSTDATA lets try and decode it as JSON.
-        eval {
-            my $post_json = decode_json ($post_data);
-            $token = $post_json->{$token_path};
-        };
-        if ($@) {
-            die "Failed to parse non application/json POSTDATA";
+    # Attempt to locate the token. The location is strictly defined by configuration.
+    my $token;
+    if ($token_source eq 'uri') {
+        $token = $jconfig->{'cgi'}->param($token_path);
+
+    } elsif ($token_source eq 'body') {
+        if (my $post_data = $jconfig->{'cgi'}->param('POSTDATA')) {
+            # If we have POSTDATA lets try and decode it as JSON.
+            eval {
+                my $post_json = decode_json ($post_data);
+                $token = $post_json->{$token_path};
+            };
+            if ($@) {
+                die "Failed to parse non application/json POSTDATA";
+            }
         }
     }
 
-    # Provided a token via either GET or POST? Attempt to parse and handle it.
-    if (defined $token) {
-
-        # Since we already have the contained JWT we need to parse it. We either:
-        #   Parse it using the provided public key information to validate that we have a valid key from who says signed it.
-        #   Parse it as is without additional validation.
-        my $decoded_token;
-
-        if ($validate_token) {
-            # Load the configured public key.
-            my $key = get_validation_key ($jconfig, $validation_key);
-
-            # Standard parsing with validation requirements.
-            eval {
-                $decoded_token = JSON::WebToken->decode ($token, $key, 1, $validation_algorithms);
-            };
-            if ($@) {
-                die "Failed to decode Token: $@\n";
-            }
-
-        } else {
-            # Standard parsing.
-            eval {
-                $decoded_token = JSON::WebToken->decode ($token, undef, 0, 'none');
-            };
-            if ($@) {
-                die "Failed to decode Token: $@\n";
-            }
-        }
-
-        # At this stage we should have a decoded JWT token, either validated or invalidated but we should have something we can use.
-        # Does the token have a valid expiry?
-        my $expiry_timestamp = $decoded_token->{$expiry_key} or die ("JWT Token does not contain expiry timestamp key '$expiry_key'.\n");
-
-        # Token expired? Reject.
-        if ($expiry_timestamp < time ()) {
-            die ("Provided JWT Token has expired.\n");
-        }
-
-        # Attempt to pull bits out of the token that we need.
-        # Username is required.
-        my $username = $decoded_token->{$username_key} or die ("JWT Token does not contain username key '$username_key'.\n");
-
-        # External ID is required.
-        my $external_user_id = $decoded_token->{$external_user_id_key} or die ("JWT Token does not contain external user ID key '$external_user_id_key'.\n");
-
-        # Grab our user groups. This might be a string or an array or even undefined so lets be careful.
-        # Don't die on this being missing as they could have no groups and that is valid although not useful.
-        my $user_groups;
-        if (defined ($groups_key) && defined ($decoded_token->{$groups_key})) {
-            if (ref ($decoded_token->{$groups_key}) eq 'ARRAY') {
-                $user_groups = join (',', @{$decoded_token->{$groups_key}});
-
-            } else {
-                $user_groups = $decoded_token->{$groups_key};
-            }
-        }
-
-        # Store the username information against the session this will let us configure permissions as required.
-        # This authentication type only supports internal authentication and for now exports both as the username.
-        #
-        # UPN maps to a known username, whereas the user ID is usually some external identifier.
-        $jconfig->{session}->param ('external_user_id'       , $external_user_id);
-        $jconfig->{session}->param ('external_user_principle', $username);
-
-        # Finally return our successful login indicator to our calling module providing the user name and groups we got back.
-        return ("", $username, $user_groups);
-
-    } else {
+    # Check if we have a token at this stage. We could have failed to parse one.
+    if (! defined ($token)) {
         # Nothing to check return all empty elements. This is often the case for calls to things like our __status endpoint to query session information.
         return ("", "", "");
     }
+
+    # Provided a token via either GET or POST? Attempt to parse and handle it.
+    # Since we already have the contained JWT we need to parse it. We either:
+    #   Parse it using the provided public key information to validate that we have a valid key from who says signed it.
+    #   Parse it as is without additional validation.
+    my $decoded_token;
+
+    if ($validate_token) {
+        # Load the configured public key.
+        my $key = get_validation_key ($jconfig, $validation_key);
+
+        # Standard parsing with validation requirements.
+        eval {
+            $decoded_token = JSON::WebToken->decode ($token, $key, 1, $validation_algorithms);
+        };
+        if ($@) {
+            die "Failed to decode Token: $@\n";
+        }
+
+    } else {
+        # Standard parsing.
+        eval {
+            $decoded_token = JSON::WebToken->decode ($token, undef, 0, 'none');
+        };
+        if ($@) {
+            die "Failed to decode Token: $@\n";
+        }
+    }
+
+    # At this stage we should have a decoded JWT token, either validated or invalidated but we should have something we can use.
+    # Does the token have a valid expiry?
+    my $expiry_timestamp = $decoded_token->{$expiry_key} or die ("JWT Token does not contain expiry timestamp key '$expiry_key'.\n");
+
+    # Token expired? Reject.
+    if ($expiry_timestamp < time ()) {
+        die ("Provided JWT Token has expired.\n");
+    }
+
+    # Attempt to pull bits out of the token that we need.
+    # Username is required.
+    my $username = $decoded_token->{$username_key} or die ("JWT Token does not contain username key '$username_key'.\n");
+
+    # External ID is required.
+    my $external_user_id = $decoded_token->{$external_user_id_key} or die ("JWT Token does not contain external user ID key '$external_user_id_key'.\n");
+
+    # Grab our user groups. This might be a string or an array or even undefined so lets be careful.
+    # Don't die on this being missing as they could have no groups and that is valid although not useful.
+    my $user_groups;
+    if (defined ($groups_key) && defined ($decoded_token->{$groups_key})) {
+        if (ref ($decoded_token->{$groups_key}) eq 'ARRAY') {
+            $user_groups = join (',', @{$decoded_token->{$groups_key}});
+
+        } else {
+            $user_groups = $decoded_token->{$groups_key};
+        }
+    }
+
+    # Store the username information against the session this will let us configure permissions as required.
+    # This authentication type only supports internal authentication and for now exports both as the username.
+    #
+    # UPN maps to a known username, whereas the user ID is usually some external identifier.
+    $jconfig->{session}->param ('external_user_id'       , $external_user_id);
+    $jconfig->{session}->param ('external_user_principle', $username);
+
+    # Finally return our successful login indicator to our calling module providing the user name and groups we got back.
+    return ("", $username, $user_groups);
 }
 
 ###############################################################################
