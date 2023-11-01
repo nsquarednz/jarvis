@@ -4,6 +4,12 @@
 
 The Jarvis Web Framework. More information can be found at https://www.nsquared.nz/tech/jarvis.html
 
+## [7.6.4] - 2023-11-01
+
+### Added
+
+* JVS-14642: Add support for JWT pass-through authentication.
+
 ## [7.6.3] - 2023-09-06
 
 ### Added
