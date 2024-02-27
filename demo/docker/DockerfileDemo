@@ -10,7 +10,7 @@
 #
 
 # Use our test runner environment to build and subsequently use this image.
-FROM collector.nsquared.nz/test-environment-jarvis-deb-1804:latest
+FROM collector.nsquared.nz/test-environment-jarvis-deb-2204:latest
 LABEL maintainer="N-Squared Software <support@nsquared.nz>"
 
 # Setup the base home working directory that N2ACD will live in.

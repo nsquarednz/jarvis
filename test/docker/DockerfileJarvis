@@ -15,7 +15,7 @@
 
 # Currently using 18.04, there are issues with libmongodb-perl on 20.04 as it deprecated a number of items.
 # If we have to handle Mongo in the future we'll have to rethink this.
-FROM collector.nsquared.nz/core-environment-jarvis-deb-1804
+FROM collector.nsquared.nz/core-environment-jarvis-deb-2204
 LABEL maintainer="N-Squared Software <support@nsquared.nz>"
 
 # Copy configuration files into the root directory to setup things like Apache and Jarvis.
@@ -40,9 +40,9 @@ ENTRYPOINT \
         && make install \
         && ln -sf /jarvis /usr/share/jarvis \
     && \
-    # Startup Mongo DB.
+    # Start Mongod process. We don't have service process we can start in this container.
     echo "**** Setting up MongoDB ****" \
-        && service mongod start \
+        && bash -c "nohup mongod > /tmp/mongod.log 2>&1 &" \
         # Wait a second for Mongo to completly startup before we connect to the instance.
         && sleep 2 \
     && \
@@ -55,7 +55,7 @@ ENTRYPOINT \
         && cp /jarvis/demo/db/demo-empty.db /var/lib/jarvis/demo/demo.db \
         && chown www-data:www-data /var/lib/jarvis/demo/demo.db \
         # And the Mongo DB.
-        && mongo < /jarvis/demo/db/demo-mongo.js \
+        && mongosh < /jarvis/demo/db/demo-mongo.js \
     && \
     # Start Apache.
     echo "**** Starting up Apache ****" \
