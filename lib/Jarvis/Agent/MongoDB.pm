@@ -34,6 +34,7 @@ use boolean;
 use Data::Dumper;
 use BSON::Types ':all';
 use BSON::OID;
+use BSON::ObjectId;
 
 use Jarvis::Text;
 use Jarvis::Error;
@@ -352,7 +353,7 @@ sub expand_vars {
         # BSON::OID is used to replace string GUIID Object IDs. An "undef" is not translated.
         if ($flags->{oid} && $matched && defined ($$vref)) {
             &Jarvis::Error::debug ($jconfig, "Applying OID replacement.");
-            $$vref = BSON::OID->new (oid => pack ('H*', $$vref));
+            $$vref = BSON::ObjectId->new ($$vref);
         }
 
         # BSON::OID is used to replace string GUIID Object IDs. An "undef" is not translated.
@@ -361,7 +362,7 @@ sub expand_vars {
 
             # Iterate over each provided ID and convert it into a BSON::OID object.
             for (my $i = 0; $i < scalar @$$vref; $i++) {
-                @{$$vref}[$i] = BSON::OID->new (oid => pack ('H*', @{$$vref}[$i]));
+                @{$$vref}[$i] = BSON::ObjectId->new (@{$$vref}[$i]);
             }
         }
 
