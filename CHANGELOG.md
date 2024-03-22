@@ -4,6 +4,12 @@
 
 The Jarvis Web Framework. More information can be found at https://www.nsquared.nz/tech/jarvis.html
 
+## [7.7.0] - 2024-03-22
+
+### Added
+
+* JVS-14645: Migrate DB support MongoDB 7, deprecating MongoDB 4.
+
 ## [7.6.4] - 2023-11-01
 
 ### Added
