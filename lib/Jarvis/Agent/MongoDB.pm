@@ -33,7 +33,7 @@ use parent qw(Jarvis::Agent);
 use boolean;
 use Data::Dumper;
 use BSON::Types ':all';
-use MongoDB::OID;
+use BSON::OID;
 
 use Jarvis::Text;
 use Jarvis::Error;
@@ -49,9 +49,6 @@ use Jarvis::JSON::Utils;
 ################################################################################
 # GLOBAL VARIABLES
 ################################################################################
-
-# Do we support MongoDB::OID using the old "value" format?
-my $MONGODB_OID = undef;
 
 ################################################################################
 # Reads a JSON object and finds/checks the ~varname!flag~ variable components.
@@ -219,14 +216,14 @@ sub mongo_to_perl {
 
     } elsif (ref ($var) eq 'BSON::OID') {
         return $var->value;
-        
-    } elsif (ref ($var) eq 'MongoDB::OID') {
-        return $var->value;
 
     } elsif (ref ($var) eq 'BSON::Decimal128') {
         return $var->value;
 
     } elsif (ref ($var) eq 'DateTime' ) {
+        return $var->epoch ();
+
+    } elsif (ref ($var) eq 'BSON::Time') {
         return $var->epoch ();
 
     } else {
@@ -296,21 +293,6 @@ sub expand_vars {
     # Merge the resulting hash with the original hash to maintain the object structure for variables that require it.
     $values = { %$values, %$compacted_values };
 
-    # Determine if we use BSON::OID (new class name) or MongoDB::OID (old class name).
-    if (! defined $MONGODB_OID) {
-        $MONGODB_OID = 0;
-
-        # This will fail with deprecation on recent versions of the MongoDB Perl module.
-        eval {
-            # OID must be /\A[0-9a-f]{24}\z/;
-            MongoDB::OID->new (value => '000000000000000000000000');
-            $MONGODB_OID = 1;
-        };
-        if ($@) {
-            &Jarvis::Error::debug ($jconfig, "Not happy with MongoDB::OID.  We will use BSON::OID (more modern) instead.");
-        }
-    }
-
     foreach my $var (@$vars) {
         &Jarvis::Error::debug ($jconfig, "Variable: %s [%s].", join ('|', @{ $var->{names} }), join (",", sort (keys (%{ $var->{flags} }))));
         &Jarvis::Error::debug_var ($jconfig, $values);
@@ -367,19 +349,19 @@ sub expand_vars {
             $$vref = $$vref ? boolean::true : boolean::false;
         }
 
-        # MongoDB::OID is used to replace string GUIID Object IDs. An "undef" is not translated.
+        # BSON::OID is used to replace string GUIID Object IDs. An "undef" is not translated.
         if ($flags->{oid} && $matched && defined ($$vref)) {
             &Jarvis::Error::debug ($jconfig, "Applying OID replacement.");
-            $$vref = $MONGODB_OID ? MongoDB::OID->new (value => $$vref) : BSON::OID->new (oid => pack ('H*', $$vref));
+            $$vref = BSON::OID->new (oid => pack ('H*', $$vref));
         }
 
-        # MongoDB::OID is used to replace string GUIID Object IDs. An "undef" is not translated.
+        # BSON::OID is used to replace string GUIID Object IDs. An "undef" is not translated.
         if ($flags->{oidarray} && $matched && defined ($$vref)) {
             &Jarvis::Error::debug ($jconfig, "Applying OID Array replacement.");
 
-            # Iterate over each provided ID and convert it into a MongoDB::OID object.
+            # Iterate over each provided ID and convert it into a BSON::OID object.
             for (my $i = 0; $i < scalar @$$vref; $i++) {
-                @{$$vref}[$i] = $MONGODB_OID ? MongoDB::OID->new (value => @{$$vref}[$i]) : BSON::OID->new (oid => pack ('H*', @{$$vref}[$i]));
+                @{$$vref}[$i] = BSON::OID->new (oid => pack ('H*', @{$$vref}[$i]));
             }
         }
 
@@ -584,7 +566,7 @@ sub fetch_inner {
 
     } elsif ($dsxml->exists ('./dataset/count')) {
 
-        my $filter    = undef;
+        my $filter    = {};
         my $options   = undef;
 
         # Parse the filter from JSON and perform variable substitution.
@@ -611,7 +593,7 @@ sub fetch_inner {
 
         # Execute our Mongo document count.
         # Since we don't return a cursor and just a result of our count echo it back here.
-        my $count = $collection->count ($filter, $options);
+        my $count = $collection->count_documents ($filter, $options);
 
         return [{
             count => $count
