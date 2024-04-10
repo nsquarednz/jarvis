@@ -49,6 +49,26 @@ $XML::LibXML::Error::WARNINGS = 1;
 %Jarvis::Config::yes_value = ('yes' => 1, 'true' => 1, 'on' => 1, '1' => 1);
 
 ################################################################################
+# For errors that occur before we have a jconfig, we need to print a formatted
+# version out to STDERR, and die safely
+################################################################################
+sub pre_config_safe_die {
+    my ($app_name, $msg) = @_;
+    # the message format here is based on our standard format we use.
+    chomp $msg;
+    $msg = $msg . "\n";
+
+    # provide some information to our formatter for useful output.
+    my %jconfig;
+    $jconfig{request_id} = Jarvis::Main::generate_uuid();
+    $jconfig{app_name} = $app_name;
+
+    print STDERR Jarvis::Error::format_message(\%jconfig, "[%H][%P/%A//%D][%R] %M", "error", $msg);
+    die "Configuration Error. Reference for technical support is: $jconfig{request_id}.\n";
+}
+
+
+################################################################################
 # Setup our entire jarvis config, based on the application name provided, which
 # directs us to our application xml file.
 #
@@ -85,8 +105,8 @@ sub new {
     # Check our parameters for correctness.  Note that jarvis.pl has already
     # validated this, but other callers might not have, so we re-validate.
     #
-    $self->{app_name} = $app_name // die "Missing parameter 'app_name'\n";
-    ($self->{app_name} =~ m/^[\w\-]+$/) or die "Invalid characters in parameter 'app_name'.\n";
+    $self->{app_name} = $app_name // &pre_config_safe_die($app_name, "Missing parameter 'app_name'");
+    ($self->{app_name} =~ m/^[\w\-]+$/) or &pre_config_safe_die($app_name, "Invalid characters in parameter 'app_name'.");
 
     # We'll need a CGI handle.
     $self->{cgi} = $args{cgi} // new CGI;
@@ -96,7 +116,7 @@ sub new {
 
     # Directory for a bunch of later config.
     $self->{etc_dir} = $args{etc_dir} // "../etc";
-    (-d $self->{etc_dir}) or die "Parameter 'etc_dir' does not specify a directory.\n";
+    (-d $self->{etc_dir}) or &pre_config_safe_die ($app_name, "Cannot load application configuration for '$self->{app_name}'");
 
     # Setup http headers
     $self->{http_headers} = {};
@@ -119,15 +139,15 @@ sub new {
         # If we have a specific XML::LibXML::Error object then we can pretty print the error.
         my $error_domain  = $@->domain ();
         my $error_message = $@->message ();
-        die "Cannot read '$xml_filename': [$error_domain] $error_message\n";
+        &pre_config_safe_die ($app_name, "Cannot read '$xml_filename': [$error_domain] $error_message");
 
     # Fall back to default error handling.
     } elsif ($@) {
-        die "Cannot read '$xml_filename': $@.\n";
+        &pre_config_safe_die ($app_name, "Cannot read '$xml_filename': $@.");
     }
 
     # Sanity check the XML structure.
-    $xml->exists ('./jarvis') or die "Missing <jarvis> tag in '$xml_filename'!\n";
+    $xml->exists ('./jarvis') or &pre_config_safe_die ($app_name, "Missing <jarvis> tag in '$xml_filename'!");
 
     # Store the XML refernce, most of our configuration reading happens in classes that call this module.
     $self->{xml} = $xml;
@@ -138,7 +158,7 @@ sub new {
     ###############################################################################
     #
     # We MUST have an entry for this application in our config.
-    $xml->exists ('./jarvis/app') or die "Cannot find <jarvis><app> in '" . $self->{app_name} . ".xml'!\n";
+    $xml->exists ('./jarvis/app') or &pre_config_safe_die($app_name, "Cannot find <jarvis><app> in '" . $self->{app_name} . ".xml'!");
     my $axml = $xml->findnodes ('./jarvis/app')->pop ();
 
     # Defines if we should produce debug and/or dump output.  Dump implies debug.
@@ -173,7 +193,7 @@ sub new {
 
     # TODO: Remove this entirely.
     $self->{return_json_as_text} = $Jarvis::Config::yes_value {lc ($axml->{return_json_as_text} // "no")};
-    $self->{return_json_as_text} and die "Flag 'return_json_as_text' is no longer supported.";
+    $self->{return_json_as_text} and &pre_config_safe_die ($app_name, "Flag 'return_json_as_text' is no longer supported.");
 
     # This disables the return of boolean/integer/JSON database typs as actual JSON boolean types (rather than string representations).
     $self->{json_string_only} = $Jarvis::Config::yes_value {lc ($axml->{json_string_only} // "no")};
@@ -218,7 +238,7 @@ sub new {
     # Basic security check here.
     $self->{require_https} = $Jarvis::Config::yes_value {lc ($axml->{require_https} // "no")};
     if ($self->{require_https} && ! $self->{cgi}->https()) {
-        die "Client must access over HTTPS for this application.\n";
+        &pre_config_safe_die ($app_name, "Client must access over HTTPS for this application.");
     }
 
     ###############################################################################
@@ -258,13 +278,13 @@ sub new {
     my @iaxmls = ();
     foreach my $include ($xml->findnodes ('./jarvis/include')) {
 
-        (defined $include->{file}) or die "Missing attribute 'file' on <include> within '$app_name'.";
+        (defined $include->{file}) or &pre_config_safe_die ($app_name, "Missing attribute 'file' on <include> within '$app_name'.");
         my $filename = $include->{file};
-        (length ($filename) > 0) or die "Filename for <include> '$app_name' is empty.";
+        (length ($filename) > 0) or &pre_config_safe_die ($app_name, "Filename for <include> '$app_name' is empty.");
 
         &Jarvis::Error::debug ($self, "Include File: '%s'.", $filename);
-        (-e $filename) or die "Application '$app_name' include file '$filename' does not exist.";
-        (-r $filename) or die "Application '$app_name' include file '$filename' is not readable.";
+        (-e $filename) or &pre_config_safe_die ($app_name, "Application '$app_name' include file '$filename' does not exist.");
+        (-r $filename) or &pre_config_safe_die ($app_name, "Application '$app_name' include file '$filename' is not readable.");
 
         # Attempt to the included configuration files.
         my $ixml;
@@ -277,11 +297,11 @@ sub new {
             # If we have a specific XML::LibXML::Error object then we can pretty print the error.
             my $error_domain  = $@->domain ();
             my $error_message = $@->message ();
-            die "Cannot read '$xml_filename': [$error_domain] $error_message\n";
+            &pre_config_safe_die ($app_name, "Cannot read '$xml_filename': [$error_domain] $error_message");
 
         # Fall back to default error handling.
         } elsif ($@) {
-            die "Cannot read '$xml_filename': $@.\n";
+            &pre_config_safe_die ($app_name, "Cannot read '$xml_filename': $@.");
         }
 
         # This is a sanity check for any stray content which the user might have
