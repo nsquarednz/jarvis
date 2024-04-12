@@ -566,7 +566,7 @@ sub fetch_inner {
 
     } elsif ($dsxml->exists ('./dataset/count')) {
 
-        my $filter    = {};
+        my $filter    = undef;
         my $options   = undef;
 
         # Parse the filter from JSON and perform variable substitution.
@@ -592,8 +592,15 @@ sub fetch_inner {
         }
 
         # Execute our Mongo document count.
-        # Since we don't return a cursor and just a result of our count echo it back here.
-        my $count = $collection->count_documents ($filter, $options);
+        # Counting in MongoDB 7 has replaced "count" with two functions.
+        # count_documents is the equivalent of count with a filter.
+        # estimated_document_count is the equivalent of count with no filter.
+        my $count = undef;
+        if (defined ($filter)) {
+            $count = $collection->count_documents ($filter, $options);
+        } else {
+            $count = $collection->estimated_document_count ($options);
+        }
 
         return [{
             count => $count
