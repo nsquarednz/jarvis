@@ -4,6 +4,13 @@
 
 The Jarvis Web Framework. More information can be found at https://www.nsquared.nz/tech/jarvis.html
 
+## [7.7.1] - 2024-04-18
+
+### Changed
+
+* JVS-14644: Prevent leaking path details to the browser on failed configuration load.
+* JVS-14648: Use count_documents or estimated_document_count conditionally based on whether there is a filter defined.
+
 ## [7.7.0] - 2024-03-22
 
 ### Added
