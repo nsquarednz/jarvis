@@ -35,7 +35,8 @@ CGI_SESSION_DIR=../../cgi-session
 
 # Determine the version of the source system the output packages where compiled on.
 # This is used in our output filename as well as determining which spec file to use.
-RHELVERSION=`rpm -E %{rhel}`
+#RHELVERSION=`rpm -E %{rhel}`
+RHELVERSION=9
 
 # We implement a specific version for RHEL6 everything else just uses the default spec file.
 SPECFILE=""
