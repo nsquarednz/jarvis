@@ -65,7 +65,7 @@ rm -rf %{buildroot}
 %docdir /usr/share/jarvis/docs/
 
 # From RHEL 9 onwards the perl path includes version information. We need to factor this in.
-/usr/local/lib/x86_64-linux-gnu/perl/*/auto/Jarvis/
+/usr/local/lib64/perl5/*/auto/Jarvis/
 
 %changelog
 
