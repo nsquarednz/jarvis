@@ -140,7 +140,7 @@ sub check {
         }
         $SIG{__DIE__} = $err_handler;
         if (! $session) {
-            die "Error in creating CGI::Session: " . ($! || "Unknown Reason");
+            die "Error in creating CGI::Session: " . (CGI::Session->errstr || "Unknown Reason");
         }
 
         $jconfig->{'session'} = $session;

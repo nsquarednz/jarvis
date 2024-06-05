@@ -16,8 +16,13 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 # Lets do our own perl requires, because 50% of the packages we want are not available via yum.
 %global __requires_exclude perl\\(
 
-#BuildProvides:
-Provides: perl(Jarvis::Config) perl(Jarvis::DB) perl(Jarvis::Error) perl(Jarvis::Main) perl(Jarvis::Dataset) perl(Jarvis::Exec) perl(Jarvis::Habitat) perl(Jarvis::Hook) perl(Jarvis::JSON::Utils) perl(Jarvis::Login) perl(Jarvis::Login::Adempiere) perl(Jarvis::Plugin) perl(Jarvis::Route) perl(Jarvis::Status) perl(Jarvis::Text) perl(Jarvis::Agent::DBI)
+# Note that RHEL9 seems to require Text::Abbrev explicitly
+# For RHEL9 perl(Safe) is required for CGI:Session to work,
+# however it is not easy to find!
+#
+# perl(sort) is required for database usage (but not basic
+# connectivity!)
+Provides: perl(Jarvis::Config) perl(Jarvis::DB) perl(Jarvis::Error) perl(Jarvis::Main) perl(Jarvis::Dataset) perl(Jarvis::Exec) perl(Jarvis::Habitat) perl(Jarvis::Hook) perl(Jarvis::JSON::Utils) perl(Jarvis::Login) perl(Jarvis::Login::Adempiere) perl(Jarvis::Plugin) perl(Jarvis::Route) perl(Jarvis::Status) perl(Jarvis::Text) perl(Jarvis::Agent::DBI) perl(Text::Abbrev) perl(Safe) perl(sort)
 
 #BuildRequires:
 Requires: httpd perl(CGI) perl(CGI::Cookie) perl(HTTP::Cookies) perl(MIME::Types) perl(DBI) perl(JSON) perl(XML::LibXML) perl(Digest::MD5) perl(Time::HiRes) perl(Module::Load)
