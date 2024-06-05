@@ -45,6 +45,9 @@ if [[ $RHELVERSION == '6' ]]; then
 elif [[ $RHELVERSION == '8' ]]; then
     SPECFILE="jarvis_rhel_8.spec"
 
+elif [[ $RHELVERSION == '9' ]]; then
+    SPECFILE="jarvis_rhel_9.spec"
+
 else
     SPECFILE="jarvis.spec"
 fi
@@ -92,10 +95,10 @@ mv $DEPLOY_DIR/$JARVIS_PACKAGE/etc/apache $DEPLOY_DIR/$JARVIS_PACKAGE/etc/httpd/
 mkdir $DEPLOY_DIR/$JARVIS_PACKAGE/bin
 cp $SRC_DIR/bin/clean-sessions.pl $DEPLOY_DIR/$JARVIS_PACKAGE/bin
 
-# Check for RHEL 8 specific build tasks.
-if [[ $RHELVERSION == '8' ]]; then
+# Check for RHEL 8 / 9 specific build tasks.
+if [[ $RHELVERSION == '8' ]] || [[ $RHELVERSION == '9' ]]; then
     # Fetch, build and inline the CGI Session Library.
-    echo "# RHEL 8 Detected. Fetching and building perl-CGI-Session"
+    echo "# RHEL 8 / 9 Detected. Fetching and building perl-CGI-Session"
 
     # Cleanup.
     rm -rf $CGI_SESSION_DIR
