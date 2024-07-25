@@ -1,0 +1,57 @@
+########################################################################################################################
+# WARNING:
+# This dockerfile is INSUFFICIENT as a running Jarvis environment, as no app is deployed into it. You must derive
+# your own Dockerfile from this, or docker-compose it with sufficient volumes (/etc/jarvis, and your own /app for example
+# to get any functionality)
+# 
+# To Build it, execute:
+#       "docker build -f ./docker/DockerfileJARVIS ."
+########################################################################################################################
+FROM httpd:2.4-bookworm
+
+LABEL maintainer="N-Squared Software <support@nsquared.nz>"
+
+# Implement our environment.
+RUN apt-get -y update && apt-get install -y \
+    libcgi-session-perl \
+    libmime-types-perl \
+    libxml-smart-perl \
+    libdbi-perl \
+    libapache-dbi-perl \
+    libxml-libxml-perl \
+    libcrypt-eksblowfish-perl \
+    libjson-webtoken-perl \
+    libio-socket-ssl-perl \
+    libdbd-pg-perl \
+    libcrypt-ssleay-perl \
+    libapache2-mod-fcgid \
+    libjson-perl \
+    && rm -rf /var/lib/apt/lists/* \
+    && echo "LoadModule cgi_module /usr/lib/apache2/modules/mod_cgi.so" >> /usr/local/apache2/conf/httpd.conf \
+    && echo "LoadModule fcgid_module /usr/lib/apache2/modules/mod_fcgid.so" >> /usr/local/apache2/conf/httpd.conf
+
+# Nicities - see http://label-schema.org/rc1/ Done after the RUN above, since these change but the above doesn't often
+ARG BUILD_DATE
+ARG VCS_REF
+ARG BUILD_VERSION
+LABEL org.label-schema.schema-version="1.0"
+LABEL org.label-schema.name="jarvis"
+LABEL org.label-schema.vendor="N-Squared Software (NZ) Limited"
+LABEL org.label-schema.url="https://nsquared.nz/tech/jarvis.html"
+LABEL org.label-schema.description="The N-Squared Jarvis web framework, on Rocky Linux 9"
+LABEL org.label-schema.build-date=$BUILD_DATE
+LABEL org.label-schema.version=$BUILD_VERSION
+LABEL org.label-schema.vcs-ref=$VCS_REF
+#LABEL k8s.deployment= "Base64 YAML for Kubernetes deployment using this image"
+#LABEL docker.cmd=
+
+### Install Jarvis
+RUN mkdir -p /usr/share/jarvis/lib && mkdir -p /etc/jarvis/apache
+COPY etc      /usr/share/jarvis/etc
+COPY cgi-bin  /usr/share/jarvis/cgi-bin
+COPY lib      /usr/share/jarvis/lib
+
+# This sets up the mod-perl configuration to run Jarvis
+RUN cat /usr/share/jarvis/etc/apache/jarvis-fast-cgi.conf >> /usr/local/apache2/conf/httpd.conf
+
+# ENTRYPOINT is derived from our source container

@@ -25,3 +25,5 @@ syntax: glob
 deploy/
 usr/
 cgi-session/
+# Default ignored files
+.idea/workspace.xml
