@@ -292,6 +292,10 @@ sub Jarvis::Login::ActiveDirectory::check {
     $mesg->code && die "Bind to server '$server:$port' failed with " . $mesg->code . " '" . $mesg->error . "'\n";
     $ldap->unbind ();
 
+    # Store the username information against the session
+    $jconfig->{session}->param ('external_user_id'       , $username);
+    $jconfig->{session}->param ('external_user_principle', $username);
+
     &Jarvis::Error::debug ($jconfig, "Password check succeeded for user '$username'.");
     return ("", $username, $group_list);
 }

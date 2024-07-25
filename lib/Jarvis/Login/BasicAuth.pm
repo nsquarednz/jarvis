@@ -165,7 +165,7 @@ sub Jarvis::Login::BasicAuth::check {
 
     # Now determine which username to use.
     if (! $username) {
-	$username = $remote_user;
+	   $username = $remote_user;
     }
     if (! $username) {
         return ("No remote user and no configured default username.");
@@ -173,8 +173,12 @@ sub Jarvis::Login::BasicAuth::check {
 
     # And determine the group list.
     if (! $group_list) {
-   	$group_list = $username;
+   	    $group_list = $username;
     }
+
+    # Store the username information against the session
+    $jconfig->{session}->param ('external_user_id'       , $username);
+    $jconfig->{session}->param ('external_user_principle', $username);
 
     return ("", $username, $group_list);
 }
