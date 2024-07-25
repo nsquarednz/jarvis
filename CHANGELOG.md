@@ -4,6 +4,17 @@
 
 The Jarvis Web Framework. More information can be found at https://www.nsquared.nz/tech/jarvis.html
 
+## [7.7.2] - 2024-07-25
+
+### Changed
+
+* JVS-14647: Replace custom !NOW placeholder for Mongo with official $$NOW.
+
+### Added
+
+* JVS-14652: Support exporting user ID and principle for AD and basic auth modules.
+* JVS-14651: Support RHEL9 as a build target for Jarvis.
+
 ## [7.7.1] - 2024-04-18
 
 ### Changed
