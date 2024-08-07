@@ -57,6 +57,7 @@ my @tests = (
     { name => 'empty', json => '""', expected => '' },
     { name => 'unterminated', json => ' "Unterminated\n String', error => "Unterminated string beginning at byte offset 1." },
     { name => 'simple', json => '" A simple String "', expected => ' A simple String ' },
+    { name => 'big', json => '"\\u0001' . ("ABCD" x 2000) . '\\n"', expected => "\x01" . ("ABCD" x 2000) . "\n" },
     { name => 'utf8', json => '" UTF sö € string𝄞"', expected => ' UTF sö € string𝄞' },
     { name => 'multi-line', json => '" UTF sö € 
 multi-line string

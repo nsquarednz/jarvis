@@ -440,14 +440,18 @@ SV * json_to_perl_inner (int level, char *json, STRLEN nbytes, STRLEN *offset, A
 
             // Do we need to re-alloc our string buffer?
             if ((str_len + len) > max_len) {
-                DEBUG ("Growing string buffer up to %d bytes.\n", DEFAULT_STRING_LEN * 4)
-                char *str2 = (char *) malloc (DEFAULT_STRING_LEN * 4);
+                STRLEN new_len = max_len;
+                while ((str_len + len) > new_len) {
+                    new_len = new_len * 2;
+                }
+                DEBUG ("Growing string buffer %lu bytes -> %lu bytes.\n", max_len, new_len)
+                char *str2 = (char *) malloc (new_len);
                 memcpy (str2, str, str_len);
-                max_len = DEFAULT_STRING_LEN * 4;
+                max_len = new_len;
                 free (str);
                 str = str2;
             }
-
+            
             // Copy the byte(s) for this character.
             // Assume this is faster than memcpy for 1-2 byte strings.
             STRLEN i;
