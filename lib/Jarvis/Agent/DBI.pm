@@ -651,16 +651,16 @@ sub get_column_types {
                 &Jarvis::Error::dump ($jconfig, 'Column name [%s] has type [%s].', $name, $type);
 
                 if ($type eq 'int4') {
-                    &Jarvis::Error::debug ($jconfig, 'Detecting column [%s] as NUMERIC.');
+                    &Jarvis::Error::debug ($jconfig, 'Detecting column [%s] as NUMERIC.', $name);
                     $column_types_href->{$name} = $Jarvis::Dataset::TYPE_NUMERIC;
 
                 } elsif ($type eq 'bool') {
-                    &Jarvis::Error::debug ($jconfig, 'Detecting column [%s] as BOOLEAN.');
+                    &Jarvis::Error::debug ($jconfig, 'Detecting column [%s] as BOOLEAN.', $name);
                     $column_types_href->{$name} = $Jarvis::Dataset::TYPE_BOOLEAN;
 
                 # Oh yeah, Baby.  This is what we live for.
-                } elsif ($type eq 'json') {
-                    &Jarvis::Error::debug ($jconfig, 'Detecting column [%s] as JSON.');
+                } elsif ($type eq 'json' || $type eq 'jsonb') {
+                    &Jarvis::Error::debug ($jconfig, 'Detecting column [%s] as JSON(B).', $name);
                     $column_types_href->{$name} = $Jarvis::Dataset::TYPE_JSON;
                 }
             }
