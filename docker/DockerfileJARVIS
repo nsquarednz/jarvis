@@ -26,7 +26,7 @@ RUN apt-get -y update && apt-get install -y \
     libcrypt-ssleay-perl \
     libapache2-mod-fcgid \
     libjson-perl \
-    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean \
     && echo "LoadModule cgi_module /usr/lib/apache2/modules/mod_cgi.so" >> /usr/local/apache2/conf/httpd.conf \
     && echo "LoadModule fcgid_module /usr/lib/apache2/modules/mod_fcgid.so" >> /usr/local/apache2/conf/httpd.conf
 
