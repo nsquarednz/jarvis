@@ -3,9 +3,36 @@
 # This dockerfile is INSUFFICIENT as a running Jarvis environment, as no app is deployed into it. You must derive
 # your own Dockerfile from this, or docker-compose it with sufficient volumes (/etc/jarvis, and your own /app for example
 # to get any functionality)
-# 
+#
 # To Build it, execute:
 #       "docker build -f ./docker/DockerfileJARVIS ."
+
+# We build the XS we have first.
+########################################################################################################################
+
+# This is the build step. The build step builds the Debian package, then drops all the build artefacts, leaving us
+# with the built package to be installed locally. Why do this? because then the docker builds from the source,
+# and doesn't require the jarvis debian in our repo.
+# latest is always the latest LTS release according to the docker page https://hub.docker.com/_/ubuntu
+FROM ubuntu:latest
+
+RUN export DEBIAN_FRONTEND=noninteractive && \
+    sed -i -e 's/archive.ubuntu.com/nz.archive.ubuntu.com/' /etc/apt/sources.list && \
+    apt-get update && \
+    apt-get install -y make gcc perl-doc
+
+# Do the build and "install"
+WORKDIR /jarvis
+COPY xs xs/
+RUN mkdir /jarvisxs && cd /jarvis/xs/ && for d in `find . -maxdepth 1 -mindepth 1 -type d`; do \
+                                             cd "/jarvis/xs/$d" && \
+                                             perl Makefile.PL  && \
+                                             make DESTDIR=/jarvisxs install; \
+                                         done && \
+    cd /jarvisxs && find . -name perllocal.pod -type f -delete
+
+########################################################################################################################
+# This next is the minimal Jarvis environment, .. well minimal enough without being a Pain to work with.
 ########################################################################################################################
 FROM httpd:2.4-bookworm
 
@@ -29,6 +56,9 @@ RUN apt-get -y update && apt-get install -y \
     && apt-get clean \
     && echo "LoadModule cgi_module /usr/lib/apache2/modules/mod_cgi.so" >> /usr/local/apache2/conf/httpd.conf \
     && echo "LoadModule fcgid_module /usr/lib/apache2/modules/mod_fcgid.so" >> /usr/local/apache2/conf/httpd.conf
+
+# Get our built files
+COPY --from=0 jarvisxs .
 
 # Nicities - see http://label-schema.org/rc1/ Done after the RUN above, since these change but the above doesn't often
 ARG BUILD_DATE
