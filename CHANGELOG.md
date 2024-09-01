@@ -4,6 +4,20 @@
 
 The Jarvis Web Framework. More information can be found at https://www.nsquared.nz/tech/jarvis.html
 
+## [7.7.3] - 2024-09-02
+
+### Changed
+
+* JVS-14653: Update Jarvis Dockerfile with new Docker paradigms.
+
+### Added
+
+* JVS-14627: Treat PostgreSQL JSONB like JSON.
+
+### Fixed
+
+* SVCD-15515: Fix overflow bug with large JSON string parsing.
+
 ## [7.7.2] - 2024-07-25
 
 ### Changed
