@@ -35,8 +35,6 @@ use warnings;
 package Jarvis::Config;
 
 use CGI;
-use CGI::Session;
-use DBI;
 use XML::LibXML;
 
 use Jarvis::Error;
