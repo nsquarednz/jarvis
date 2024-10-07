@@ -76,8 +76,8 @@ sub db_config {
     # Find the specific database config we need.
     my @dbs = grep { (($_->findvalue ('./@name') || 'default') eq $dbname) && (($_->findvalue ('./@type') || 'dbi') eq $dbtype) } $axml->findnodes ('./database');
 
-    (scalar @dbs) || die "No database with name '$dbname', type '$dbtype' is currently configured in Jarvis.\n";
-    ((scalar @dbs) == 1) || die "Multiple databases with name '$dbname', type '$dbtype' are currently configured in Jarvis.\n";
+    (scalar @dbs) or die "No database with name '$dbname', type '$dbtype' is currently configured in Jarvis.\n";
+    ((scalar @dbs) == 1) or die "Multiple databases with name '$dbname', type '$dbtype' are currently configured in Jarvis.\n";
 
     return $dbs[0];
 }
@@ -118,12 +118,12 @@ sub handle {
     my $dbusername = $dbxml->{username} || '';
     my $dbpassword = $dbxml->{password} || '';
 
-    # Optional parameters, handled per-database type.
+    # Optional attributes, handled per-database type.
     my $dbh_attributes = {};
     if ($dbxml->exists ('./dbh_attributes') && $dbxml->exists ('./dbh_attributes/attribute')) {
         foreach my $attr ($dbxml->findnodes ('./dbh_attributes/attribute')) {
-            $attr->{name} or die "DB Parameter entry is missing 'name'.";
-            $attr->{value} or die "DB Parameter entry is missing 'value'.";
+            $attr->{name} or die "DBH Attribute entry is missing 'name'.";
+            $attr->{value} or die "DBH Attribute entry is missing 'value'.";
 
             my $name = $attr->{name};
             my $value = $attr->{value};
@@ -146,11 +146,18 @@ sub handle {
         }
     }
 
-    # Optional post-connection command string.
-    my $post_connect = $dbxml->{post_connect};
-    if ($post_connect) {
-        $post_connect =~ s/^\s*//;
-        $post_connect =~ s/\s*$//;
+    # Optional post-connection commands.
+    my @post_connect_commands = ();
+    if ($dbxml->exists ('./post_connect_commands') && $dbxml->exists ('./post_connect_commands/command')) {
+        # This is the recommended approach if you have more than one
+        # post-connect command to execute.  (Success of multiple commands using
+        # the other approach may be driver dependent.)
+        foreach my $command ($dbxml->findnodes ('./post_connect_commands/command')) {
+            push (@post_connect_commands, $command->textContent);
+        }
+
+    } elsif ($dbxml->{post_connect}) {
+        push (@post_connect_commands, $dbxml->{post_connect});
     }
 
     # Allow the hook to potentially modify some of these attributes.
@@ -181,9 +188,17 @@ sub handle {
         my $dbh = $dbhs{$dbtype}{$dbname} = DBI->connect ($dbconnect, $dbusername, $dbpassword, $dbh_attributes) ||
             die "Cannot connect to DBI database '$dbname': " . DBI::errstr . "\n";
 
-        if ($post_connect) {
-            &Jarvis::Error::debug ($jconfig, "DB PostConnect = '$post_connect'");
-            $dbh->do($post_connect) or die "Error Executing PostConnect: " . DBI::errstr . "\n";
+        if (scalar (@post_connect_commands)) {
+            foreach my $command (@post_connect_commands) {
+                $command =~ s/^\s*//;
+                $command =~ s/\s*$//;
+
+                &Jarvis::Error::debug ($jconfig, "DB Post-Connect Command = '%s'", $command);
+                my $post_connect_result = $dbh->do ($command);
+                if (! defined $post_connect_result) {
+                    die "Error executing Post-Connect Command: " . DBI::errstr . "\n";
+                }
+            }
         }
 
     # SDP is a SSAS DataPump pseudo-database.
@@ -195,7 +210,7 @@ sub handle {
     } elsif ($dbtype eq "sdp") {
         require Jarvis::DB::SDP;
 
-        $dbconnect || die "Missing 'connect' parameter on SSAS DataPump database '$dbname'.\n";
+        $dbconnect or die "Missing 'connect' parameter on SSAS DataPump database '$dbname'.\n";
         &Jarvis::Error::debug ($jconfig, "SDP Attributes");
         &Jarvis::Error::debug_var ($jconfig, $dbh_attributes);
         $dbhs{$dbtype}{$dbname} = Jarvis::DB::SDP->new ($jconfig, $dbconnect, $dbusername, $dbpassword, $dbh_attributes);
@@ -209,7 +224,7 @@ sub handle {
     } elsif ($dbtype eq "mongo") {
         require MongoDB;
 
-        $dbconnect || die "Missing 'connect' parameter on MongoDB DataPump database '$dbname'.\n";
+        $dbconnect or die "Missing 'connect' parameter on MongoDB DataPump database '$dbname'.\n";
         &Jarvis::Error::debug ($jconfig, "MongoDB Options");
         &Jarvis::Error::debug_var ($jconfig, $dbh_attributes);
         $dbhs{$dbtype}{$dbname} = MongoDB->connect ($dbconnect, $dbh_attributes);
