@@ -922,20 +922,26 @@ sub store_inner {
                 &Jarvis::Error::debug ($jconfig, "Copied single row from bind_param_inout results.");
                 $use_generic_approach = 0;
 
-            # Older versions of SQLite don't support RETURNING.  For them we
+            # Old versions of SQLite (< 3.35.x) don't support RETURNING (see
+            # https://www.sqlite.org/changes.html#version_3_35_0).  For them we
             # use the last_insert_rowid() function to return the record ID.
             # This is very special case handling.  We echo the input fields
             # too!
             #
-            # See https://www.sqlite.org/versionnumbers.html and
-            # https://www.sqlite.org/changes.html
-            #
             } elsif ($dbh->{Driver}{Name} eq 'SQLite') {
+                # Safety: assume an older version in the case that we fail to
+                # parse the version number.
                 $use_generic_approach = 0;
-                my $driver_version = $dbh->get_info (18);   # e.g. 3.35.0
-                if ($driver_version =~ m/^3\.(\d+)\.(\d+)$/) {
-                    my ($minor, $release) = ($1 * 1, $2 * 1);
-                    if ($minor >= 35) {
+
+                # SQLite version number formats have varied over the years.
+                # The docs (https://www.sqlite.org/versionnumbers.html) say
+                # they can have 2, 3, or 4 parts. Furthermore, version 3.4.0
+                # precedes 3.35.0 chronologically, but numerically 3.4 > 3.35.
+                # So, take care here!
+                my $driver_version = $dbh->get_info (18);   # e.g. 3.35.0, or 3.9.0
+                if ($driver_version =~ m/^(\d+)\.(\d+)\.(\d+)$/) {
+                    my ($major, $minor, $release) = ($1 * 1, $2 * 1, $3 * 1);
+                    if ($major > 3 || ($major == 3 && $minor >= 35)) {
                         $use_generic_approach = 1;
                     }
                 }
