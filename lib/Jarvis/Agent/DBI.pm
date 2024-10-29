@@ -902,6 +902,9 @@ sub store_inner {
 
         # Try and determine the returned values (normally the auto-increment ID)
         if ($stm->{returning}) {
+            # We have a preferred generic approach, but we might have to use a
+            # DB or driver-specific approach in certain cases.
+            my $use_generic_approach = 1;
 
             # If you flagged any variables as "!out" then we will have used
             # bind_param_inout () and copied the output vars into $stm->{returned}.
@@ -917,31 +920,54 @@ sub store_inner {
 
                 $row_result->{returning} = [ $row ];
                 &Jarvis::Error::debug ($jconfig, "Copied single row from bind_param_inout results.");
+                $use_generic_approach = 0;
 
-            # SQLite uses the last_insert_rowid() function for returning IDs.
-            # This is very special case handling.  We echo the input fields too!
+            # Old versions of SQLite (< 3.35.x) don't support RETURNING (see
+            # https://www.sqlite.org/changes.html#version_3_35_0).  For them we
+            # use the last_insert_rowid() function to return the record ID.
+            # This is very special case handling.  We echo the input fields
+            # too!
             #
             } elsif ($dbh->{Driver}{Name} eq 'SQLite') {
+                # Safety: assume an older version in the case that we fail to
+                # parse the version number.
+                $use_generic_approach = 0;
 
-                my $rowid = $dbh->func('last_insert_rowid');
-                if ($rowid) {
-                    my $returning_row = {};
-                    foreach my $field (keys %$fields_href) {
-                        (ref $fields_href->{$field} eq '') && ($returning_row->{$field} = $fields_href->{$field});
+                # SQLite version number formats have varied over the years.
+                # The docs (https://www.sqlite.org/versionnumbers.html) say
+                # they can have 2, 3, or 4 parts. Furthermore, version 3.4.0
+                # precedes 3.35.0 chronologically, but numerically 3.4 > 3.35.
+                # So, take care here!
+                my $driver_version = $dbh->get_info (18);   # e.g. 3.35.0, or 3.9.0
+                if ($driver_version =~ m/^(\d+)\.(\d+)\.(\d+)$/) {
+                    my ($major, $minor, $release) = ($1 * 1, $2 * 1, $3 * 1);
+                    if ($major > 3 || ($major == 3 && $minor >= 35)) {
+                        $use_generic_approach = 1;
                     }
-                    $returning_row->{id} = $rowid;
-                    $row_result->{returning} = [ $returning_row ];
-                    &Jarvis::Error::debug ($jconfig, "Used SQLite last_insert_rowid to get returned 'id' => '$rowid'.");
-
-                } else {
-                    &Jarvis::Error::log ($jconfig, "Used SQLite last_insert_rowid but it returned no id.");
                 }
+
+                if (! $use_generic_approach) {
+                    my $rowid = $dbh->func('last_insert_rowid');
+                    if ($rowid) {
+                        my $returning_row = {};
+                        foreach my $field (keys %$fields_href) {
+                            (ref $fields_href->{$field} eq '') && ($returning_row->{$field} = $fields_href->{$field});
+                        }
+                        $returning_row->{id} = $rowid;
+                        $row_result->{returning} = [ $returning_row ];
+                        &Jarvis::Error::debug ($jconfig, "Used SQLite last_insert_rowid to get returned 'id' => '$rowid'.");
+
+                    } else {
+                        &Jarvis::Error::log ($jconfig, "Used SQLite last_insert_rowid but it returned no id.");
+                    }
+                }
+            }
 
             # Otherwise: See if the query had a built-in fetch.  Under PostgreSQL (and very
             # likely also under other drivers) this will fail if there is no current
             # query.  I.e. if you have no "RETURNING" clause on your insert.
             #
-            } else {
+            if ($use_generic_approach) {
                 my $returning_aref = $stm->{sth}->fetchall_arrayref({}) || undef;
 
                 if ($returning_aref && (scalar @$returning_aref)) {
