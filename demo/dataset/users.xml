@@ -17,7 +17,8 @@ WHERE id = {{id}};
     </update>
     <insert returning="yes">
 INSERT INTO users (name, is_admin, change_user, change_date)
-VALUES ({{name}}, COALESCE ({{is_admin}}, 0), {{__username}}, datetime ('now'));
+VALUES ({{name}}, COALESCE ({{is_admin}}, 0), {{__username}}, datetime ('now'))
+RETURNING id;
     </insert>
     <delete>
 DELETE FROM users

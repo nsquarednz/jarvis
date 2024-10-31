@@ -16,7 +16,8 @@ WHERE id = {{id}};
     </update>
     <insert returning="yes">
 INSERT INTO boat_class (class, active, description, change_user, change_date)
-VALUES ({{class}}, {{active}}, {{description}}, {{__username}}, datetime ('now'));
+VALUES ({{class}}, {{active}}, {{description}}, {{__username}}, datetime ('now'))
+RETURNING id;
     </insert>
     <delete>
 DELETE FROM boat_class

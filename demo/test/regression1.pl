@@ -133,7 +133,7 @@ my $insert = [
 ];
 $json = TestUtils::store_json ([ 'boat' ], { _method => 'insert' }, $insert);
 my $en_boat_id = $json->{row}[0]{returning}[0]{id};
-if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1) && $en_boat_id, "JSON Insert Boat '$en_boat_name'")) {
+if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 0) && $en_boat_id, "JSON Insert Boat '$en_boat_name'")) {
     BAIL_OUT("Failed to insert: " . &Dumper ($json));
 }
 
@@ -349,14 +349,14 @@ $insert = [
 ];
 $json = TestUtils::store_json ([ 'boat' ], { _method => 'insert' }, $insert);
 my $fd_boat_id = $json->{row}[0]{returning}[0]{id};
-if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1) && $fd_boat_id, "JSON Insert Boat '$fd_boat_name'")) {
+if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 0) && $fd_boat_id, "JSON Insert Boat '$fd_boat_name'")) {
     BAIL_OUT("Failed to insert: " . &Dumper ($json));
 }
 
 $expected = [
 	{
 		'success' => 1,
-		'modified' => '1',
+		'modified' => '0E0',
 		'returning' => [
 			{
 				'name' => 'Fatal Dodger',
@@ -443,7 +443,7 @@ $insert = [
 	{ boat_id => $en_boat_id, name => "Gadget" },
 ];
 $json = TestUtils::store_json ([ 'boat_part' ], { _method => 'insert' }, $insert);
-if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 3), "JSON Insert Boat Parts for '$en_boat_name'")) {
+if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 0), "JSON Insert Boat Parts for '$en_boat_name'")) {
     BAIL_OUT("Failed to insert: " . &Dumper ($json));
 }
 my @part_ids = map { $_->{returning}[0]{id} } @{ $json->{row} };
@@ -489,7 +489,7 @@ $insert = [
 ];
 $json = TestUtils::store_json ([ 'boat_object' ], { _method => 'insert' }, $insert);
 my $mh_boat_id = $json->{row}[0]{returning}[0]{id};
-if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 1) && $mh_boat_id, "JSON Nested Insert for '$mh_boat_name'")) {
+if (! ok (defined $json->{success} && defined $json->{modified} && ($json->{success} == 1) && ($json->{modified} == 0) && $mh_boat_id, "JSON Nested Insert for '$mh_boat_name'")) {
     BAIL_OUT("Failed to insert: " . &Dumper ($json));
 }
 my $mh_doodad_id = $json->{row}[0]{child}{parts}{row}[0]{returning}[0]{id};

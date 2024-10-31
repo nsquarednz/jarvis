@@ -19,7 +19,8 @@ WHERE id = {{id}};
     <insert returning="yes">
 INSERT INTO boat_part (boat_id, name, change_user, change_date)
 VALUES ({{boat_id}}, {{name}},
-        {{__username}}, datetime ('now'));
+        {{__username}}, datetime ('now'))
+RETURNING id;
     </insert>
     <delete>
 DELETE FROM boat_part
