@@ -266,11 +266,14 @@ sub disconnect {
                 my $handler = $SIG{ __DIE__ };
                 $SIG{ __DIE__ } = 'IGNORE';
 
-                if ($dbhs{$dbt}{$dbn}) {
+                my $dbh = $dbhs{$dbt}{$dbn};
+                if ($dbh) {
                     if ($rollback) {
-                        $dbhs{$dbt}{$dbn}->rollback();
+                        $dbh->rollback();
                     }
-                    $dbhs{$dbt}{$dbn}->disconnect();
+                    if (! $dbh->{InactiveDestroy}) {
+                        $dbh->disconnect();
+                    }
 
                 } else {
                     &Jarvis::Error::debug ($jconfig, "No Disconnect Required (handle undefined).");
