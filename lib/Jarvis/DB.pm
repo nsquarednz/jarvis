@@ -123,7 +123,7 @@ sub handle {
     if ($dbxml->exists ('./dbh_attributes') && $dbxml->exists ('./dbh_attributes/attribute')) {
         foreach my $attr ($dbxml->findnodes ('./dbh_attributes/attribute')) {
             $attr->{name} or die "DBH Attribute entry is missing 'name'.";
-            $attr->{value} or die "DBH Attribute entry is missing 'value'.";
+            defined $attr->{value} or die "DBH Attribute entry is missing 'value'.";
 
             my $name = $attr->{name};
             my $value = $attr->{value};
