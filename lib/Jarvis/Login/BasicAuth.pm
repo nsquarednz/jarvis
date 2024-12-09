@@ -176,9 +176,12 @@ sub Jarvis::Login::BasicAuth::check {
    	    $group_list = $username;
     }
 
-    # Store the username information against the session
-    $jconfig->{session}->param ('external_user_id'       , $username);
-    $jconfig->{session}->param ('external_user_principle', $username);
+    # Store the username information against the session if we have one.
+    # Technically the session is optional.
+    if (defined $jconfig->{session}) {
+        $jconfig->{session}->param ('external_user_id'       , $username);
+        $jconfig->{session}->param ('external_user_principle', $username);
+    }
 
     return ("", $username, $group_list);
 }
