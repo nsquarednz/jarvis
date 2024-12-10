@@ -4,6 +4,23 @@
 
 The Jarvis Web Framework. More information can be found at https://www.nsquared.nz/tech/jarvis.html
 
+## [7.7.4] - 2024-12-12
+
+### Changed
+
+* JVS-14659: Change the BasicAuth login method to not require a sessiondb.
+* JVS-14656: SQLite DB integration now prefers standard RETURNING path where supported.
+* JVS-14654: Removed unused modules from Jarvis::Config.
+
+### Added
+
+* JVS-14655: Added a feature to allow multiple post-connect commands/statements.
+
+### Fixed
+
+* JVS-14658: Jarvis no longer disconnects DB handles when InactiveDestroy is set.
+* JVS-14657: Allow DB attribute values to be 0.
+
 ## [7.7.3] - 2024-09-02
 
 ### Changed
