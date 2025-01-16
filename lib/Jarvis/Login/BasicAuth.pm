@@ -123,6 +123,7 @@ sub Jarvis::Login::BasicAuth::check {
     my $remote_user = $login_parameters{'remote_user'} || '';
     $username = $login_parameters{'username'};
     my $group_list = $login_parameters{'group_list'} || $username;
+    my $oauth_permissions = $login_parameters{'oauth_permissions'} || '';
 
     # No check on username/password.  We don't require or expect them.  WE will
     # determine the username.
@@ -181,6 +182,14 @@ sub Jarvis::Login::BasicAuth::check {
     if (defined $jconfig->{session}) {
         $jconfig->{session}->param ('external_user_id'       , $username);
         $jconfig->{session}->param ('external_user_principle', $username);
+
+        # Do we have an override of OAuth permissions to set.
+        if ($oauth_permissions) {
+            # Split by ',' we expect an array of strings downstream.
+            my @oauth_permission_list = split (',', $oauth_permissions);
+            # OAuth permissions are stored on the session.
+            $jconfig->{session}->param ("oauth_permissions", \@oauth_permission_list);
+        }
     }
 
     return ("", $username, $group_list);
