@@ -11,6 +11,9 @@ The Jarvis Web Framework. More information can be found at https://www.nsquared.
 * JVS-14662: Set oauth_permissions in BasicAuth from configuration. 
   * Add inmemory CGI session driver to allow basic authentication with no session cookie.
 
+### Fixed
+* JVS-14663: Deliver the session cleanup script on Debian based OS releases.
+
 ## [7.7.4] - 2024-12-12
 
 ### Changed
