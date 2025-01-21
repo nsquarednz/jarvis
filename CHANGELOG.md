@@ -4,6 +4,13 @@
 
 The Jarvis Web Framework. More information can be found at https://www.nsquared.nz/tech/jarvis.html
 
+## [7.7.5] - 2025-01-21
+
+### Added
+
+* JVS-14662: Set oauth_permissions in BasicAuth from configuration. 
+  * Add inmemory CGI session driver to allow basic authentication with no session cookie.
+
 ## [7.7.4] - 2024-12-12
 
 ### Changed
