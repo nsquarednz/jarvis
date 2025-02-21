@@ -314,6 +314,14 @@ sub expand_vars {
             }
         }
 
+        # Now is a special variable less type that will insert the current system time into the query.
+        # Much like how NOW () exists within SQL.
+        if ($var->{flags}{now}) {
+            &Jarvis::Error::debug ($jconfig, "Applying Now Date Replacement.");
+            $$vref = DateTime->now ();
+            $matched = 1;
+        }
+
         # Mark it with a "REMOVE ME" flag.
         # This will force a COPY even if not required.
         if (! $matched) {
