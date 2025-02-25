@@ -4,6 +4,11 @@
 
 The Jarvis Web Framework. More information can be found at https://www.nsquared.nz/tech/jarvis.html
 
+## [7.7.6] - 2025-02-25
+
+### Changed
+* N2QD-122: Reinstated MongoDB "now" replacement.
+
 ## [7.7.5] - 2025-01-21
 
 ### Added
