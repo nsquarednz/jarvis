@@ -389,7 +389,7 @@ sub names_to_values {
 sub convert_types {
     my ($column_types_href, $vals_href) = @_;
 
-    # Define a singluar JSON handler that will process any JSON returned rows.
+    # Define a singular JSON handler that will process any JSON returned rows.
     # Note: We use this instead of JSON::decode_json as that does not support wide characters within the JSON.
     my $json = JSON->new ();
 
