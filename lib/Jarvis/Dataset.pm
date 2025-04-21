@@ -389,6 +389,10 @@ sub names_to_values {
 sub convert_types {
     my ($column_types_href, $vals_href) = @_;
 
+    # Define a singular JSON handler that will process any JSON returned rows.
+    # Note: We use this instead of JSON::decode_json as that does not support wide characters within the JSON.
+    my $json = JSON->new ();
+
     foreach my $key (keys %$vals_href) {
         if (defined ($vals_href->{$key})) {
             if ($column_types_href && (my $type = $column_types_href->{$key})) {
@@ -396,7 +400,7 @@ sub convert_types {
                     $vals_href->{$key} = $vals_href->{$key} ? JSON::true : JSON::false;
 
                 } if ($type eq $TYPE_JSON) {
-                    $vals_href->{$key} = JSON::decode_json ($vals_href->{$key});
+                    $vals_href->{$key} = $json->decode ($vals_href->{$key});
 
                 # Actually we're NOT going to do this, since all of the DBD drivers seem to do this for us automatically.
                 } if ($type eq $TYPE_NUMERIC) {
