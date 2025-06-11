@@ -52,6 +52,7 @@ use Jarvis::Plugin;
 use Jarvis::Hook;
 use Jarvis::DB;
 use Jarvis::Route;
+use Jarvis::Utils qw(generate_uuid);
 
 ###############################################################################
 # Global variables.
@@ -83,29 +84,8 @@ my $jconfig = undef;
 #
 my @etc = ('/etc/jarvis', '/opt/jarvis/etc');
 
-# Version 6.0.0.
+# Version 7.0.0.
 $Jarvis::Main::JARVIS_VERSION = 700;
-
-###############################################################################
-# Generate a random UUID. Avoid any reliance on 3rd party UUID generator
-# perl modules due to the difficulty in yum/apt installation procedures on
-# most target systems.
-#
-# This approach here is a UUID generated based on random numbers - and is based
-# off of Perl's UUID::Tiny module.
-###############################################################################
-#
-sub generate_uuid {
-    my $uuid = '';
-    for (1 .. 4) {
-        my $top = int(rand(65536)) % 65536;
-        my $bottom = int(rand(65536)) % 65536;
-        $uuid .= pack 'I', (($top << 16) | $bottom);
-    }
-    substr $uuid, 6, 1, chr(ord(substr($uuid, 6, 1)) & 0x0f);
-    substr $uuid, 8, 1, chr(ord(substr $uuid, 8, 1) & 0x3f | 0x80);
-    return join '-', map { unpack 'H*', $_ } map { substr $uuid, 0, $_, '' } ( 4, 2, 2, 2, 6 );
-}
 
 ###############################################################################
 # Setup error handler.
@@ -371,7 +351,7 @@ sub do {
 
     # Determine a unique request ID for this request. Useful for tracing and auditing.
     # This will later get expanded to incorporate the session ID, if we have one.
-    $jconfig->{request_id} = generate_uuid();
+    $jconfig->{request_id} = &Jarvis::Utils::generate_uuid ();
 
     # Debug can now occur, since we have called Config!
     &Jarvis::Error::debug ($jconfig, "URI = $ENV{REQUEST_URI}");
