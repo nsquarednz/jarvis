@@ -37,7 +37,7 @@ package Jarvis::Login;
 use JSON qw(decode_json);
 use Jarvis::Error;
 use Jarvis::Text;
-use Jarvis::Main qw(generate_uuid);
+use Jarvis::Utils qw(generate_uuid);
 
 ################################################################################
 # Checks to see if we are logged in.  If permitted, we will create a new
@@ -135,7 +135,7 @@ sub check {
         my $session = new CGI::Session ($sid_store, $sid, \%sid_params);
         # If we have CSRF Protection enabled and we are not logged in update the CSRF Token.
         if ($jconfig->{csrf_protection} && !$session->param ('logged_in')) {
-            my $unique_token = Jarvis::Main::generate_uuid ();
+            my $unique_token = generate_uuid ();
             $session->param ('csrf_token', $unique_token);
         }
         $SIG{__DIE__} = $err_handler;
