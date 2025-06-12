@@ -351,7 +351,7 @@ sub do {
 
     # Determine a unique request ID for this request. Useful for tracing and auditing.
     # This will later get expanded to incorporate the session ID, if we have one.
-    $jconfig->{request_id} = &Jarvis::Utils::generate_uuid ();
+    $jconfig->{request_id} = &generate_uuid ();
 
     # Debug can now occur, since we have called Config!
     &Jarvis::Error::debug ($jconfig, "URI = $ENV{REQUEST_URI}");

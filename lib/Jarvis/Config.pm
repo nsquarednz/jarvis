@@ -59,7 +59,7 @@ sub pre_config_safe_die {
 
     # provide some information to our formatter for useful output.
     my %jconfig;
-    $jconfig{request_id} = Jarvis::Utils::generate_uuid();
+    $jconfig{request_id} = generate_uuid();
     $jconfig{app_name} = $app_name;
 
     print STDERR Jarvis::Error::format_message(\%jconfig, "[%H][%P/%A//%D][%R] %M", "error", $msg);

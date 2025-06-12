@@ -17,7 +17,7 @@
 #       You should have received a copy of the GNU General Public License
 #       along with Jarvis.  If not, see <http://www.gnu.org/licenses/>.
 #
-#       This software is Copyright 2008 by Jonathan Couper-Smartt.
+#       This software is Copyright 2025 by Jonathan Couper-Smartt.
 ###############################################################################
 #
 use strict;
