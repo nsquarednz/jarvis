@@ -50,13 +50,14 @@ RUN apt-get -y update && apt-get install -y \
     libcrypt-ssleay-perl \
     libapache2-mod-fcgid \
     libjson-perl \
-    && apt-get clean \
-    && echo "LoadModule cgi_module /usr/lib/apache2/modules/mod_cgi.so" >> /usr/local/apache2/conf/httpd.conf \
-    && echo "LoadModule fcgid_module /usr/lib/apache2/modules/mod_fcgid.so" >> /usr/local/apache2/conf/httpd.conf
+    && apt-get clean
 
 # Fetch the built files from our builder. We take those files and place them at the root
 # directory. This is because within that folder the path is output from root.
 COPY --from=builder jarvisxs/. /
+
+# Copy the configuration we need to apply to enable FCGI.
+COPY docker/etc/jarvis-fcgi.conf /usr/share/jarvis/etc/docker/jarvis-fcgi.conf
 
 # Nicities - see http://label-schema.org/rc1/ Done after the RUN above, since these change but the above doesn't often
 ARG BUILD_DATE
@@ -79,7 +80,7 @@ COPY etc      /usr/share/jarvis/etc
 COPY cgi-bin  /usr/share/jarvis/cgi-bin
 COPY lib      /usr/share/jarvis/lib
 
-# This sets up the mod-perl configuration to run Jarvis
-RUN cat /usr/share/jarvis/etc/apache/jarvis-fast-cgi.conf >> /usr/local/apache2/conf/httpd.conf
+# This sets up the mod-perl configuration to run Jarvis.
+RUN cat /usr/share/jarvis/etc/docker/jarvis-fcgi.conf >> /usr/local/apache2/conf/httpd.conf
 
 # ENTRYPOINT is derived from our source container
