@@ -4,6 +4,12 @@
 
 The Jarvis Web Framework. More information can be found at https://www.nsquared.nz/tech/jarvis.html
 
+## [7.7.7] - 2025-08-05
+
+### Changed
+JVS-14665: Switch automatic JSON decoder approach to support wide characters.
+JVS-14666: Move generate_uuid() from Jarvis::Main to Jarvis::Utils.
+
 ## [7.7.6] - 2025-02-25
 
 ### Changed
